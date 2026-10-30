@@ -3,25 +3,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { en } from '../src/client/locales.ts'
-import { MissionPipeline, MissionTemplates } from '../src/client/skeleton/MissionHome.tsx'
+import { MissionTemplates } from '../src/client/skeleton/MissionHome.tsx'
 
 afterEach(cleanup)
 
 const t = ((key: keyof typeof en) => en[key]) as never
-
-describe('MissionPipeline', () => {
-  it('lists the five stages of a mission in order', () => {
-    render(<MissionPipeline t={t} />)
-    const stages = within(screen.getByTestId('mission-pipeline')).getAllByRole('listitem')
-    expect(stages.map(stage => stage.textContent)).toEqual([
-      '1CouncilMap, plan, size the team',
-      '2ForgeSpecialists build in parallel',
-      '3Fact-checkRe-run every claim',
-      '4GatesVerify, review, secure',
-      '5ChronicleReport and memory',
-    ])
-  })
-})
 
 describe('MissionTemplates', () => {
   it('offers the four starter missions as buttons', () => {

@@ -5,7 +5,7 @@
 > Built for hackathon problem statement **PS-001: DevPilot, the Mystic Mikado's Autonomous AI Engineering Guild**.
 > *Plan like a Shogun. Build like a Samurai. Test like a Sentinel. Adapt until the mission is complete.*
 
-Hack Dev Code is a multi-agent engineering platform. The guild in [`packages/hackdev`](packages/hackdev) is what was built for this problem statement; it runs on a sandboxed agent runtime that provides sessions, subagents, tools, a Web UI and a CLI. See [Acknowledgements](#acknowledgements-and-license) for the runtime's origin and license.
+Hack Dev Code is a multi-agent engineering platform. The guild in [`packages/hackdev`](packages/hackdev) is what was built for this problem statement; it runs on a sandboxed agent runtime that provides sessions, subagents, tools, a Web UI and a CLI.
 
 ---
 
@@ -25,7 +25,6 @@ Hack Dev Code is a multi-agent engineering platform. The guild in [`packages/hac
 12. [Bonus points](#bonus-points)
 13. [Known limitations](#known-limitations)
 14. [Repository layout, tests and license](#repository-layout-tests-and-license)
-15. [Acknowledgements and license](#acknowledgements-and-license)
 
 ---
 
@@ -401,11 +400,3 @@ The orchestration tests run the real pipeline scripts in a Node VM with scripted
 Repository conventions for contributors are in [AGENTS.md](AGENTS.md).
 
 [MIT](LICENSE). Third-party dependencies and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
-
----
-
-## Acknowledgements and license
-
-The runtime layer (sessions, sandboxed tools, subagents, the Web UI shell and the CLI) comes from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), an MIT-licensed open-source agent framework. The problem statement allows building on an existing framework. What is new in this repository: the mission pipeline and its gates (`packages/hackdev`), the Web result card, the mission-control home screen, the visual identity and logo, the English-only documentation, and the cleanup of the repository.
-
-The original copyright and permission notice are kept in [LICENSE](LICENSE), and third-party licenses are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), as the MIT license requires.

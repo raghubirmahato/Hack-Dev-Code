@@ -7,29 +7,7 @@ import css from './MissionHome.module.css'
 /** The owner's locale seat type, passed as a plain prop. */
 type MissionTranslate = ConversationContentProps['t']
 
-const PIPELINE = ['council', 'forge', 'factcheck', 'gates', 'chronicle'] as const
 const TEMPLATES = ['build', 'fix', 'review', 'resume'] as const
-
-/**
- * The five stages every mission passes through, shown as an ordered strip.
- * @param props.t - locale seat.
- * @returns the pipeline list.
- */
-export function MissionPipeline({ t }: { t: MissionTranslate }) {
-  return (
-    <ol className={css.pipeline} aria-label={t('mission.pipeline.label')} data-testid="mission-pipeline">
-      {PIPELINE.map((stage, index) => (
-        <li key={stage} className={css.stage}>
-          <span className={css.stageIndex} aria-hidden="true">{index + 1}</span>
-          <span className={css.stageText}>
-            <span className={css.stageTitle}>{t(`mission.pipeline.${stage}.title`)}</span>
-            <span className={css.stageCaption}>{t(`mission.pipeline.${stage}.caption`)}</span>
-          </span>
-        </li>
-      ))}
-    </ol>
-  )
-}
 
 /**
  * Starter missions; choosing one writes its prompt into the composer draft.
