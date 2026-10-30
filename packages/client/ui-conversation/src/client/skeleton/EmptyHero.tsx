@@ -8,6 +8,7 @@ import {
 import { workspaceTitleOf } from '@hackdevcode/dsh-util-workspace-path'
 import type { ConversationContentProps } from '../contract/slots.ts'
 import css from './HeroShell.module.css'
+import { MissionPipeline } from './MissionHome.tsx'
 
 /** The owner's locale seat type, passed to hero chrome as a plain prop. */
 type HeroTranslate = ConversationContentProps['t']
@@ -112,6 +113,8 @@ export function HeroShell({ t, renderSlot, children }: HeroShellProps) {
             <span className={css.previewBadge}>{t('hero.preview')}</span>
           </span>
         </div>
+        <p className={css.subtitle}>{t('hero.subtitle')}</p>
+        <MissionPipeline t={t} />
         <div className={css.body}>
           {/* The composer remains mounted outside this component. */}
         </div>

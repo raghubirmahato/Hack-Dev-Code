@@ -46,6 +46,16 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* One-sentence promise under the headline. */
+.subtitle {
+  margin: 14px auto 0;
+  max-width: 56ch;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 14.5px;
+  line-height: 22px;
+  text-align: center;
+}
+
 /* Title text + badge as one wrap unit so the title never breaks mid-text with
    the badge stranded beside a fragment. When the badge no longer fits beside
    the title it wraps to its own centered line below; while both fit, the group
