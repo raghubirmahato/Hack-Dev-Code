@@ -51,9 +51,9 @@ describe('parseAnsiLines: basic colors mapped onto theme tokens', () => {
     ['33', 'yellow', 'var(--dsw-alias-state-warn-primary)'],
     ['93', 'bright yellow', 'var(--dsw-alias-state-warn-secondary)'],
     ['34', 'blue', 'var(--dsw-alias-state-business-primary)'],
-    ['94', 'bright blue', 'var(--dsw-static-blue-400)'],
-    ['36', 'cyan', 'var(--dsw-static-blue-600)'],
-    ['96', 'bright cyan', 'var(--dsw-static-blue-500)'],
+    ['94', 'bright blue', 'var(--dsw-static-jade-400)'],
+    ['36', 'cyan', 'var(--dsw-static-jade-600)'],
+    ['96', 'bright cyan', 'var(--dsw-static-jade-500)'],
   ])('SGR %s (%s) resolves to %s', (code, _name, token) => {
     expect(onlySpan(sgr(code, 'x'))).toEqual({ text: 'x', style: { color: token } })
   })

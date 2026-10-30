@@ -1,15 +1,13 @@
-/* Base variables referenced by the token sheets and component CSS but defined
- * upstream (deepsuite theme/global.css) — supplied here so the composite
- * --dsw-font-* variables resolve and motion rides the upstream curve. Code
- * font stack deliberately omits a bare `monospace` tail (Windows CJK falls
- * back to SimSun otherwise). */
+/* Base variables referenced by the token sheets and component CSS. They supply
+ * the composite --dsw-font-* variables and the motion curve. The code font
+ * stack deliberately omits a bare `monospace` tail. */
 :root {
-  --dsh-font-family-text-default: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --dsh-font-family-text-default: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system,
+    BlinkMacSystemFont, 'Helvetica Neue', Helvetica, Arial, sans-serif;
   --dsw-font-family: var(--dsh-font-family-text-default);
   --dsw-font-family-brand: 'Montserrat', var(--dsh-font-family-text-default);
-  --dsh-font-family-code-default: 'SF Mono', 'JetBrains Mono', 'Fira Code', Consolas,
-    'Liberation Mono', Menlo, Courier, 'PingFang SC', 'Microsoft YaHei';
+  --dsh-font-family-code-default: 'Cascadia Code', 'JetBrains Mono', 'SF Mono', 'Fira Code', Consolas,
+    'Liberation Mono', Menlo, Courier;
   --ds-font-family-code: var(--dsh-font-family-code-default);
   --ds-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ds-transition-duration: 0.2s;

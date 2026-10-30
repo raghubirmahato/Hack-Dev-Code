@@ -55,7 +55,7 @@
  * step has no alias-layer name). */
 .selected {
   background: var(--dsw-alias-bg-module-platform);
-  border-color: var(--dsw-static-neutral-bluish-400);
+  border-color: var(--dsw-static-neutral-warm-400);
 }
 
 /* Narrow settings panel: all three cubes share one row instead of wrapping to

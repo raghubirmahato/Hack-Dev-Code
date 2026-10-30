@@ -78,7 +78,7 @@ export const en = {
   'settings.enter.description': 'What Enter and the Send button do while the agent is running; Cmd/Ctrl+Enter uses the other behavior',
   'settings.enter.queue': 'Queue',
   'settings.enter.steer': 'Steer',
-  'hero.headline': 'Into the Unknown',
+  'hero.headline': 'Plan. Build. Verify.',
   'hero.preview': 'Preview',
   'hero.chooseWorkspace': 'Choose workspace',
   'session.hierarchy': 'Session hierarchy',

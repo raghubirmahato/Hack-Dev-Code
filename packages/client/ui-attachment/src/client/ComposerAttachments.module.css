@@ -68,7 +68,7 @@
   width: 35%;
   height: 100%;
   border-radius: inherit;
-  background: var(--dsw-alias-brand-primary, #4d6bfe);
+  background: var(--dsw-alias-brand-primary, #fe5f4d);
   animation: image-upload-progress 1.2s ease-in-out infinite alternate;
 }
 
