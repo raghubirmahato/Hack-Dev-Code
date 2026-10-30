@@ -1,0 +1,47 @@
+- dialog "Settings":
+  - text: Settings
+  - navigation:
+    - button "General"
+    - button "Model"
+    - button "Built-in plugins"
+    - button "Agent presets"
+  - button "Open configuration file"
+  - button "Close"
+  - heading "Agent presets" [level=2]
+  - paragraph: Choose the agent’s tools and how it works. Use Standard mode for everyday tasks, or Creator mode to add capabilities to DSH.
+  - heading "Built-in" [level=3]
+  - list:
+    - listitem:
+      - 'button "New task default: Standard mode" [disabled] [pressed]':
+        - text: Standard mode New task default
+        - code: standard
+        - text: Work with code, files, and information. Suitable for most tasks, with search, editing, terminal commands, and other tools available as needed.
+      - 'button "Mode details: Standard mode"': Mode details
+      - 'button "How to use: Standard mode"': How to use
+      - 'button "View configuration: Standard mode"': View configuration
+    - listitem:
+      - 'button "Set as new task default: PTC mode"':
+        - text: PTC mode Built-in
+        - code: ptc
+        - text: Includes all Standard mode capabilities. Better suited to tasks that call tools in batches and then filter, organize, deduplicate, count, or summarize the results.
+      - 'button "Mode details: PTC mode"': Mode details
+      - 'button "How to use: PTC mode"': How to use
+      - 'button "View configuration: PTC mode"': View configuration
+    - listitem:
+      - 'button "Set as new task default: Minimal mode"':
+        - text: Minimal mode Built-in
+        - code: minimal
+        - text: The agent uses a terminal and image reading, with context compaction. Useful for testing and comparing its basic performance.
+      - 'button "Mode details: Minimal mode"': Mode details
+      - 'button "How to use: Minimal mode"': How to use
+      - 'button "View configuration: Minimal mode"': View configuration
+    - listitem:
+      - 'button "Set as new task default: Creator mode"':
+        - text: Creator mode Built-in
+        - code: cordis
+        - text: Customize DSH through conversation. Let the agent write plugins that add features or UI, or combine tools and prompts to create your own mode.
+      - 'button "Mode details: Creator mode"': Mode details
+      - 'button "How to use: Creator mode"': How to use
+      - 'button "View configuration: Creator mode"': View configuration
+  - heading "Custom" [level=3]
+  - button "Let the agent help me create a preset"

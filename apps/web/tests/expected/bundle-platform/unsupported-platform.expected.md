@@ -1,0 +1,1 @@
+- status: This plugin does not support the operating system running DSH.

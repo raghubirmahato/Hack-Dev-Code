@@ -1,0 +1,7 @@
+- menu:
+  - text: "Merge #9 into main"
+  - menuitem "Squash and merge Combine every commit into one"
+  - menuitem "Create a merge commit Keep every commit and add a merge commit"
+  - menuitem "Rebase and merge Replay each commit onto main"
+  - separator
+  - menuitem "New commits arrived. Review them before reopening the merge menu." [disabled]

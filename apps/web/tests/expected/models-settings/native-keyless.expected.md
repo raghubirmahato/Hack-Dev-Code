@@ -1,0 +1,63 @@
+- dialog "Settings":
+  - text: Settings
+  - navigation:
+    - button "General"
+    - button "Model"
+    - button "Built-in plugins"
+    - button "Agent presets"
+  - button "Open configuration file"
+  - button "Close"
+  - heading "Model" [level=2]
+  - paragraph: Enter your API keys to use models from the following providers.
+  - list
+  - tablist "How to add":
+    - tab "Third-party model provider" [selected]
+    - tab "Custom model API"
+  - paragraph: Pick OpenAI, Anthropic, Kimi, or another provider from the built-in catalog and enter its API key.
+  - tabpanel "Third-party model provider":
+    - text: Provider
+    - combobox "Provider":
+      - option "amazon-bedrock"
+      - option "ant-ling"
+      - option "anthropic"
+      - option "azure"
+      - option "baseten"
+      - option "cerebras"
+      - option "cloudflare-ai-gateway"
+      - option "cloudflare-workers-ai"
+      - option "deepseek"
+      - option "fireworks"
+      - option "github-copilot"
+      - option "google"
+      - option "google-vertex"
+      - option "groq"
+      - option "huggingface"
+      - option "kimi-coding"
+      - option "meta"
+      - option "minimax"
+      - option "minimax-cn"
+      - option "mistral"
+      - option "moonshotai"
+      - option "moonshotai-cn"
+      - option "nvidia"
+      - option "openai"
+      - option "openai-codex" [selected]
+      - option "opencode"
+      - option "opencode-go"
+      - option "openrouter"
+      - option "qwen-token-plan"
+      - option "qwen-token-plan-cn"
+      - option "qwen-token-plan-individual"
+      - option "radius"
+      - option "together"
+      - option "vercel-ai-gateway"
+      - option "xai"
+      - option "xiaomi"
+      - option "xiaomi-token-plan-ams"
+      - option "xiaomi-token-plan-cn"
+      - option "xiaomi-token-plan-sgp"
+      - option "zai"
+      - option "zai-coding-cn"
+    - group: Customized settings
+    - button "Cancel"
+    - button "Apply"

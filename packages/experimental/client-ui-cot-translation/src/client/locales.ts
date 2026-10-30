@@ -1,0 +1,35 @@
+/** Locale-owned copy for reasoning translation and its preferences. */
+import type { SettingsFormLabels } from '@hackdevcode/dsh-client-ui-primitives'
+
+/** Dictionary namespace for this plugin. */
+export const NS = 'cotTranslation'
+
+/** English copy and key source. */
+export const en = {
+  provider: 'Translation service', google: 'Google', bing: 'Bing',
+  deepseekAccount: 'DeepSeek Flash — account (paid)', deepseekOfficial: 'DeepSeek Flash — official API (paid)',
+  providerUnavailableOption: '{provider} — unavailable',
+  providerUnavailable: 'This provider is unavailable. Configure your DeepSeek account or official API provider, or choose an available service.',
+  paidNotice: 'Each uncached fragment sends a separate paid DeepSeek Flash request through the selected account or official API credentials. Reopening reasoning reuses saved results; changing the provider, language, source text, or request settings may send a new paid request.',
+  anonymousNotice: 'Bing and Google need no translation login or API key. Their anonymous endpoints may reject or limit requests.', targetLanguage: 'Target language',
+  targetLanguageHint: 'auto follows the UI language; language codes such as en, ja, and fr also work.',
+  privacy: 'Expanded reasoning is sent to the selected service. It may contain private code or conversation details.',
+  translation: 'View translation', original: 'View original', retry: 'Retry', failed: 'Translation failed. Showing the original.',
+  translating: 'Translating reasoning', invalidProvider: 'Choose a translation service.', invalidLanguage: 'Enter auto or a language code, such as en, ja, or fr.',
+  overridden: 'Overridden', reset: 'Reset to default',
+  unavailable: 'Translation preferences are unavailable.', readOnly: 'This deployment stores settings read-only.',
+  saveFailed: 'The deployment did not accept these values; they were left for you to correct.', save: 'Save', saving: 'Saving…',
+  copy: 'Copy', copied: 'Copied', codeTitle: 'Code block', wrap: 'Wrap lines', unwrap: 'Unwrap lines', footnotes: 'Footnotes',
+}
+
+/** Locale dictionary key union. */
+export type CotTranslationKey = keyof typeof en
+
+/**
+ * Read shared form chrome from the plugin dictionary.
+ * @param t - current locale reader.
+ * @returns localized form labels.
+ */
+export function formLabels(t: (key: CotTranslationKey) => string): SettingsFormLabels {
+  return { unavailable: t('unavailable'), readOnly: t('readOnly'), saveFailed: t('saveFailed'), save: t('save'), saving: t('saving') }
+}

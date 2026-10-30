@@ -1,0 +1,56 @@
+{
+  "name": "@hackdevcode/dsh-workspace",
+  "description": "Workspace entity registry (ctx.workspaceRegistry): durable workspace records with validated session attachment over the domain data form for the Hack Dev Code",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/workspace/workspace"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/dsh-storage": "workspace:*",
+    "@hackdevcode/dsh-storage-domain": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*"
+  },
+  "dependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/dsh-storage": "workspace:*",
+    "@hackdevcode/dsh-storage-domain": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*"
+  }
+}

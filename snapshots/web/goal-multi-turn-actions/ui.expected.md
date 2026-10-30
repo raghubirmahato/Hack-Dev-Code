@@ -1,0 +1,126 @@
+- banner:
+  - navigation "Session hierarchy": workspace
+  - text: Standard mode
+  - button "More actions"
+  - button "Open right sidebar"
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "More conversation views"
+- navigation "Turn navigation":
+  - button "Jump to turn 1"
+  - button "Jump to turn 2"
+- group "Command input": /goal Do two turns; each turn outputs the file structure of a random package. After finishing a turn, output the content directly and stop; our system opens another turn, and you do something similar.
+- 'button "goal Goal created Status: active Objective: Do two turns; each turn outputs the file structure of a random package. After finishing a turn, output the content directly and stop; our system opens another turn, and you do something similar. Rounds: 0/256 Activation: armed Commands: /goal edit <objective>, /goal pause, /goal clear"'
+- button "Continuing goal {{clock}}":
+  - text: Continuing goal
+  - time: {{clock}}
+- status: Completed
+- button "Completed in {{duration}}"
+- paragraph:
+  - strong: Turn 1 / 2
+  - text: — Randomly selected package:
+  - code: packages/context/session-reference
+  - text: 📦
+- text: Code block
+- button "Wrap lines" [pressed]
+- button "Copy"
+- code: session-reference ├── README.md ├── package.json ├── src │ ├── index.ts │ └── uri.ts └── tests └── session-reference.spec.ts
+- text: Code block
+- button "Wrap lines" [pressed]
+- button "Copy"
+- code: "session-reference/ ├── README.md # Package README ├── package.json # Package metadata and dependency declarations ├── src/ │ ├── index.ts # Entry point, exports the public API │ └── uri.ts # Session-reference URI implementation └── tests/ └── session-reference.spec.ts # Unit tests"
+- paragraph: This is a typical lightweight TypeScript package layout: entry point, implementation, and tests. This turn ends here; waiting for the system to open the next turn.
+- button "Copy"
+- button "Good response"
+- button "Bad response"
+- button "Branch into a new conversation"
+- text: {{clock}}
+- button "Continuing goal {{clock}}":
+  - text: Continuing goal
+  - time: {{clock}}
+- status: Completed
+- button "Completed in {{duration}}"
+- paragraph:
+  - strong: Turn 2 / 2
+  - text: — Randomly selected package:
+  - code: packages/llm/token-meter
+  - text: 📦
+- text: Code block
+- button "Wrap lines" [pressed]
+- button "Copy"
+- code: token-meter ├── README.md ├── package.json ├── src │ └── index.ts └── tests └── token-meter.spec.ts
+- text: Code block
+- button "Wrap lines" [pressed]
+- button "Copy"
+- code: "token-meter/ ├── README.md # Package README ├── package.json # Package metadata and dependency declarations ├── src/ │ └── index.ts # Entry point, exports the public API (token metering logic) └── tests/ └── token-meter.spec.ts # Unit tests"
+- paragraph:
+  - text: Both turns are complete (turn 1:
+  - code: session-reference
+  - text: , turn 2: 
+  - code: token-meter
+  - text: ). This turn ends here.
+- paragraph: Both turns are complete, the goal is met, and the goal is marked complete.
+- paragraph: Both turns are complete ✅
+- paragraph:
+  - strong: Summary:
+- list:
+  - listitem:
+    - strong: Turn 1
+    - text: — randomly selected
+    - code: packages/context/session-reference
+    - text: , and output the file structure: Code block
+    - button "Wrap lines" [pressed]
+    - button "Copy"
+    - code: session-reference/ ├── README.md ├── package.json ├── src/ │ ├── index.ts │ └── uri.ts └── tests/ └── session-reference.spec.ts
+  - listitem:
+    - strong: Turn 2
+    - text: — randomly selected
+    - code: packages/llm/token-meter
+    - text: , and output the file structure: Code block
+    - button "Wrap lines" [pressed]
+    - button "Copy"
+    - code: token-meter/ ├── README.md ├── package.json ├── src/ │ └── index.ts └── tests/ └── token-meter.spec.ts
+- paragraph:
+  - strong: Verification:
+  - text: Both random package selections passed
+  - code: python3 random.choice
+  - text: Drawn from the
+  - code: packages/
+  - text: directory's actual enumeration of 4 candidate packages (
+  - code: ui-conversation
+  - text: , 
+  - code: session-reference
+  - text: , 
+  - code: token-meter
+  - text: , 
+  - code: skill-filesystem
+  - text:); file structures were assembled with
+  - code: find
+  - text: after actually listing files, excluding
+  - code: node_modules
+  - text: and
+  - code: .git
+  - text: . The second random draw picked the same package as turn 1, so another one was drawn instead.
+- paragraph:
+  - strong: Note:
+  - text: This turn produced no file changes or commits — the task itself is to “output the file structure”, and every artifact is in the message text above.
+- paragraph:
+  - text: If you want to see the structure of the remaining two packages (
+  - code: ui-conversation
+  - text: , 
+  - code: skill-filesystem
+  - text: ), or output in another format such as a tree with file sizes, just tell me.
+- button "Copy"
+- button "Good response"
+- button "Bad response"
+- button "Branch into a new conversation"
+- text: {{clock}}
+- textbox "Message or run a task, / commands, @ files or sessions"
+- button "Add files or run commands"
+- 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Select model, current DeepSeek-V4-Flash": DeepSeek-V4-Flash
+- button "Send message" [disabled]
+- button "2 turns 12 steps · {{throughput}} tok/s": 2 turns 12 steps{{throughput}} tok/s
+- button "115K tok · Cache hit 91%": 115K tokCache hit 91%
+- button "9% of context used": 9%

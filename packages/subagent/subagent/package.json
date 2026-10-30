@@ -1,0 +1,137 @@
+{
+  "name": "@hackdevcode/dsh-subagent",
+  "description": "Abstract subagent seam (ctx.subagents): named-provider registry for delegating to child agents",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/subagent/subagent"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./internal": {
+      "types": "./lib/types/internal.d.ts",
+      "default": "./lib/types/internal.js"
+    },
+    "./client": {
+      "types": "./lib/types/client.d.ts",
+      "default": "./lib/types/client.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-chunked-list": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "zod": "4.4.3"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-agent-preset-registry": "workspace:*",
+    "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*",
+    "@hackdevcode/dsh-scope": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-session-query": "workspace:*",
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/dsh-user-approval": "workspace:*",
+    "@hackdevcode/dsh-util-time": "workspace:*",
+    "@hackdevcode/dsh-permission-presets": "workspace:*",
+    "@hackdevcode/dsh-workspace": "workspace:*",
+    "@hackdevcode/dsh-working-directory": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@hackdevcode/dsh-agent-preset-registry": {
+      "optional": true
+    },
+    "@hackdevcode/dsh-permission-presets": {
+      "optional": true
+    },
+    "@hackdevcode/dsh-sandbox": {
+      "optional": true
+    },
+    "@hackdevcode/dsh-sandbox-policy": {
+      "optional": true
+    },
+    "@hackdevcode/dsh-session-persistence": {
+      "optional": true
+    },
+    "@hackdevcode/dsh-session-query": {
+      "optional": true
+    },
+    "@hackdevcode/dsh-workspace": {
+      "optional": true
+    },
+    "@hackdevcode/dsh-user-approval": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-agent-preset-registry": "workspace:*",
+    "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*",
+    "@hackdevcode/dsh-scope": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-session-query": "workspace:*",
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-tool-testkit": "workspace:*",
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/dsh-user-approval": "workspace:*",
+    "@hackdevcode/dsh-util-time": "workspace:*",
+    "@hackdevcode/dsh-permission-presets": "workspace:*",
+    "@hackdevcode/dsh-workspace": "workspace:*",
+    "@hackdevcode/cordis-plugin-include": "workspace:~",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-agent-loop": "workspace:*",
+    "@hackdevcode/dsh-agent-loop-testkit": "workspace:*",
+    "@hackdevcode/dsh-fs-sandbox": "workspace:*",
+    "@hackdevcode/dsh-tool-fs": "workspace:*",
+    "@hackdevcode/dsh-session-persistence-jsonl": "workspace:*",
+    "@hackdevcode/dsh-working-directory": "workspace:*"
+  }
+}

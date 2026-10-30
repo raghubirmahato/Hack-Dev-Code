@@ -1,0 +1,22 @@
+- dialog "Settings":
+  - text: Settings
+  - navigation:
+    - button "General"
+    - button "Model"
+    - button "Built-in plugins"
+    - button "Agent presets"
+  - button "Open configuration file"
+  - button "Close"
+  - heading "Model" [level=2]
+  - paragraph: Enter your API keys to use models from the following providers.
+  - list:
+    - listitem:
+      - text: minimax-cn
+      - img "API key configured"
+      - button "Edit minimax-cn": Edit
+      - button "Delete minimax-cn": Delete
+    - listitem:
+      - text: Acme Gateway Custom
+      - button "Edit Acme Gateway (acme-gateway)": Edit
+      - button "Delete Acme Gateway (acme-gateway)": Delete
+  - button "Add model provider"

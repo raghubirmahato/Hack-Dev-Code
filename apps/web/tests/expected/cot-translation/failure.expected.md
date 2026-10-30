@@ -1,0 +1,5 @@
+- button "Think" [expanded]
+- button "View translation" [disabled]
+- status: Translation failed. Showing the original.
+- button "Retry"
+- paragraph: The user wants me to reply with a single word. Let me comply.

@@ -1,0 +1,26 @@
+- button "Back to plugins": Plugins
+- button "Fixture action"
+- button "Uninstall @fixture/live-client": Uninstall
+- status
+- switch "Enable @fixture/live-client" [checked]
+- heading "@fixture/live-client" [level=3]
+- text: v0.0.1 Fixture badge
+- paragraph:
+  - code: "@fixture/live-client"
+- heading "Components" [level=4]
+- text: 1 total · 1 running
+- list:
+  - listitem:
+    - button "Configure @fixture/live-client": "@fixture/live-client"
+    - code: fixture-live-client
+    - text: Running
+    - switch "Enable component @fixture/live-client" [checked]
+- heading "Source" [level=4]
+- term: Code source
+- definition:
+  - code: file:{{fixtures}}/fixture-live-client
+- term: Current version
+- definition: 0.0.1
+- region "Fixture section":
+  - heading "Fixture section" [level=4]
+  - paragraph: Section content from the fixture

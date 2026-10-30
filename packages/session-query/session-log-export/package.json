@@ -1,0 +1,87 @@
+{
+  "name": "@hackdevcode/dsh-session-log-export",
+  "description": "Web Session-log ZIP export and Session Markdown copy",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/session-query/session-log-export"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@hackdevcode/dsh-session-format": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "fflate": "^0.8.2",
+    "@hackdevcode/dsh-brand": "workspace:*"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-locale": "workspace:*",
+    "@hackdevcode/dsh-client-store": "workspace:*",
+    "@hackdevcode/dsh-client-ui-commands": "workspace:*",
+    "@hackdevcode/dsh-client-ui-conversation": "workspace:*",
+    "@hackdevcode/dsh-client-ui-layout": "workspace:*",
+    "@hackdevcode/dsh-client-ui-message-feedback": "workspace:*",
+    "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
+    "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
+    "@hackdevcode/dsh-client-ui-session": "workspace:*",
+    "@hackdevcode/dsh-client-ui-slots": "workspace:*",
+    "@hackdevcode/dsh-commands": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/dsh-session-query": "workspace:*",
+    "@hackdevcode/dsh-session-title": "workspace:*",
+    "react": "^18.2.0"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@hackdevcode/dsh-client-locale",
+        "@hackdevcode/dsh-client-ui-commands",
+        "@hackdevcode/dsh-client-ui-conversation",
+        "@hackdevcode/dsh-client-ui-layout",
+        "@hackdevcode/dsh-client-ui-renderer",
+        "@hackdevcode/dsh-client-ui-session"
+      ],
+      "platform": "web"
+    }
+  }
+}

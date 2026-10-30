@@ -1,0 +1,19 @@
+- dialog "Settings":
+  - text: Settings
+  - navigation:
+    - button "General"
+    - button "Model"
+    - button "Built-in plugins"
+    - button "Agent presets"
+  - button "Open configuration file"
+  - button "Close"
+  - heading "Model" [level=2]
+  - paragraph: Enter your API keys to use models from the following providers.
+  - status: Saved minimax-cn.
+  - list:
+    - listitem:
+      - text: minimax-cn
+      - img "API key configured"
+      - button "Edit minimax-cn": Edit
+      - button "Delete minimax-cn": Delete
+  - button "Add model provider"

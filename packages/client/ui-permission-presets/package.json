@@ -1,0 +1,78 @@
+{
+  "name": "@hackdevcode/dsh-client-ui-permission-presets",
+  "description": "Permission surfaces: a new-session default in General settings and a current-session /permission popup over the permissions projection",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/client/ui-permission-presets"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@hackdevcode/dsh-api-session-controller",
+        "@hackdevcode/dsh-client-connection",
+        "@hackdevcode/dsh-client-locale",
+        "@hackdevcode/dsh-client-ui-commands",
+        "@hackdevcode/dsh-client-ui-conversation",
+        "@hackdevcode/dsh-api-remotes",
+        "@hackdevcode/dsh-client-ui-settings"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-remote-mock": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-api-remotes": "workspace:*",
+    "@hackdevcode/dsh-api-session-controller": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-locale": "workspace:*",
+    "@hackdevcode/dsh-client-store": "workspace:*",
+    "@hackdevcode/dsh-client-test-runtime": "workspace:*",
+    "@hackdevcode/dsh-client-ui-commands": "workspace:*",
+    "@hackdevcode/dsh-client-ui-conversation": "workspace:*",
+    "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
+    "@hackdevcode/dsh-client-ui-settings": "workspace:*",
+    "@hackdevcode/dsh-client-ui-input-trigger": "workspace:*",
+    "@hackdevcode/dsh-client-ui-slots": "workspace:*",
+    "@hackdevcode/dsh-permission-presets": "workspace:*",
+    "clsx": "^2.0.0",
+    "react": "^18.2.0",
+    "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
+    "@hackdevcode/dsh-client-ui-session": "workspace:*"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "lib/types/**/*.d.ts"
+  ]
+}

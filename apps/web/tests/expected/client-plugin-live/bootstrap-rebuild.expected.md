@@ -1,0 +1,4 @@
+- alert: Some plugins could not sync on this page. Host enablement is unchanged.
+- list:
+  - listitem: "@hackdevcode/dsh-client-modules: Error: client-modules: replacing bootstrap module @hackdevcode/dsh-client-modules requires a page reload"
+- button "Retry this page"

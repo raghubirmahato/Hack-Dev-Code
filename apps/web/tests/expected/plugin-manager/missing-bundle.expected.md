@@ -1,0 +1,12 @@
+- button "Back to plugins": Plugins
+- button "Uninstall @fixture/missing-bundle": Uninstall
+- status
+- switch "Enable @fixture/missing-bundle" [checked]
+- heading "@fixture/missing-bundle" [level=3]
+- text: Problem Not installed
+- paragraph:
+  - code: "@fixture/missing-bundle"
+- status: "Reason: dsh: cannot resolve profile bundle \"@fixture/missing-bundle\" from the dsh installation or {{home}}/profiles/scaffold; run 'dsh plugin --profile scaffold install' if its dependency is not installed"
+- heading "Source" [level=4]
+- term: Code source
+- definition: Not installed

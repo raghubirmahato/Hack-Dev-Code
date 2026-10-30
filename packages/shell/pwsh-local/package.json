@@ -1,0 +1,47 @@
+{
+  "name": "@hackdevcode/dsh-pwsh-local",
+  "description": "Local PowerShell implementation of the Hack Dev Code bash executor seam",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/shell/pwsh-local"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/dsh-shell": "workspace:*",
+    "@hackdevcode/dsh-subprocess": "workspace:*",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "dependencies": {
+    "@hackdevcode/schemastery": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-shell": "workspace:*",
+    "@hackdevcode/dsh-subprocess": "workspace:*",
+    "@hackdevcode/dsh-subprocess-local": "workspace:*",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~"
+  }
+}

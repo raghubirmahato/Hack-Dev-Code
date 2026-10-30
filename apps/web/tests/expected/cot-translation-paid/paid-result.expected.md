@@ -1,0 +1,3 @@
+- button "Think" [expanded]
+- button "View original"
+- paragraph: The user asked me to reply with one word. I will comply.

@@ -1,0 +1,53 @@
+{
+  "name": "@hackdevcode/dsh-experimental-ptc-runtime-python",
+  "description": "CPython subprocess implementation of the Hack Dev Code PTC execution seam",
+  "version": "0.2.2-alpha.2",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/experimental/ptc-runtime-python"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "py/**/*.py",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/dsh-ptc-runtime": "workspace:*",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-ptc-runtime": "workspace:*",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*",
+    "@hackdevcode/dsh-sandbox-local": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*"
+  },
+  "dependencies": {
+    "@hackdevcode/schemastery": "workspace:~"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,103 @@
+{
+  "name": "@hackdevcode/dsh-api-workspace-controller",
+  "description": "Workspace Remote commands and reconnect-safe state transport",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/api/workspace-controller"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./default-workspace": {
+      "types": "./lib/types/default-workspace.d.ts",
+      "default": "./lib/types/default-workspace.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "client": {
+      "external": [
+        "@hackdevcode/dsh-api-gateway/client"
+      ],
+      "inject": [
+        "@hackdevcode/dsh-api-gateway",
+        "@hackdevcode/dsh-client-connection"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@hackdevcode/dsh-deque": "workspace:*",
+    "@hackdevcode/dsh-native-command": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "zod": "4.4.3"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-api-gateway": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-host-directory-picker": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-storage-domain": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/dsh-workspace": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-api-gateway": "workspace:*",
+    "@hackdevcode/dsh-api-remote-access": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-store": "workspace:*",
+    "@hackdevcode/dsh-client-test-runtime": "workspace:*",
+    "@hackdevcode/dsh-host-directory-picker": "workspace:*",
+    "@hackdevcode/dsh-remote-mock": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-storage-domain": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/dsh-workspace": "workspace:*"
+  }
+}

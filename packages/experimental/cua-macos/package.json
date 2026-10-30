@@ -1,0 +1,98 @@
+{
+  "name": "@hackdevcode/dsh-experimental-cua-macos",
+  "description": "macOS native provider for shared Computer Use application and window objects",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/experimental/cua-macos"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "native/bin",
+    "native/Package.swift",
+    "native/Sources",
+    "native/tests/swift",
+    "native/tests/test_swift.py",
+    "native/LICENSE.cua-driver",
+    "native/upstream.json",
+    "native/README.md",
+    "native/protocol.schema.json",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-computer-use": "workspace:*",
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-subprocess": "workspace:*",
+    "@hackdevcode/dsh-user-questions": "workspace:*"
+  },
+  "dependencies": {
+    "zod": "^4.4.3",
+    "@hackdevcode/dsh-atomic-write": "workspace:*",
+    "@hackdevcode/dsh-cua": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-working-directory": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cordis-plugin-include": "workspace:~",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-agent-loop": "workspace:*",
+    "@hackdevcode/dsh-agent-loop-testkit": "workspace:*",
+    "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-attachment-local": "workspace:*",
+    "@hackdevcode/dsh-computer-use": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-tool-executor-native": "workspace:*",
+    "@hackdevcode/dsh-tool-executor-ptc": "workspace:*",
+    "@hackdevcode/dsh-tool-testkit": "workspace:*",
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@hackdevcode/dsh-subprocess": "workspace:*",
+    "@hackdevcode/dsh-subprocess-local": "workspace:*",
+    "@hackdevcode/dsh-fs-local": "workspace:*",
+    "@hackdevcode/dsh-llm-deepseek": "workspace:*",
+    "@hackdevcode/dsh-ptc-runtime-node": "workspace:*",
+    "@hackdevcode/dsh-sandbox-local": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*",
+    "sharp": "^0.35.3",
+    "@hackdevcode/dsh-ptc-runtime": "workspace:*",
+    "@hackdevcode/dsh-user-questions": "workspace:*",
+    "@hackdevcode/dsh-settings": "workspace:*",
+    "@hackdevcode/dsh-app-boot": "workspace:*",
+    "@hackdevcode/dsh-config-editor": "workspace:*",
+    "@hackdevcode/dsh-hmr": "workspace:*",
+    "@hackdevcode/cordis-plugin-timer": "workspace:~",
+    "@hackdevcode/dsh-storage": "workspace:*",
+    "@hackdevcode/dsh-storage-json": "workspace:*",
+    "@hackdevcode/dsh-storage-domain": "workspace:*"
+  },
+  "scripts": {
+    "build:native": "swift build --package-path native --configuration release"
+  },
+  "os": [
+    "darwin"
+  ]
+}

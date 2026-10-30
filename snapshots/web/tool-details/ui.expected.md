@@ -1,0 +1,729 @@
+- button "Create goal Ship compact tool cards" [expanded]
+- list:
+  - listitem:
+    - text: Ship compact tool cards
+    - term: Status
+    - definition: Awaiting continuation
+    - term: Rounds
+    - definition: 0 / 8
+- button "Inspect"
+- button "Update to-do list 1/3 completed · Render compact fields and lists 3 added" [expanded]
+- text: Initial list
+- list:
+  - listitem:
+    - img "Added": +
+    - text: Keep the existing row and expansion controls Completed
+  - listitem:
+    - img "Added": +
+    - text: Render compact fields and lists In progress
+  - listitem:
+    - img "Added": +
+    - text: Review the narrow layout Pending
+- button "Inspect"
+- button "Create reminder Review the build and open the demo" [expanded]
+- list:
+  - listitem:
+    - text: Review the build and open the demo
+    - term: Scheduled for
+    - definition: Sep 10, 2099, {{clock}} GMT+8
+    - term: Repeat
+    - definition: Every 1 h
+    - term: Status
+    - definition: Scheduled
+- button "Inspect"
+- button "Update reminder Review the build and open the demo" [expanded]
+- list:
+  - listitem:
+    - text: Review the build and open the demo
+    - term: Scheduled for
+    - definition: Sep 11, 2099, {{clock}} GMT+8
+    - term: Repeat
+    - definition: Every day at {{clock}} (Asia/Shanghai)
+    - term: Status
+    - definition: Scheduled
+- button "Inspect"
+- button "View goal Ship compact tool cards" [expanded]
+- list:
+  - listitem:
+    - text: Ship compact tool cards
+    - term: Status
+    - definition: Awaiting continuation
+    - term: Rounds
+    - definition: 0 / 8
+- button "Inspect"
+- button "Update goal Ship compact tool cards" [expanded]
+- list:
+  - listitem:
+    - text: Ship compact tool cards
+    - term: Status
+    - definition: Completed
+    - term: Rounds
+    - definition: 0 / 8
+- button "Inspect"
+- button "List reminders 4 reminders" [expanded]
+- list:
+  - listitem:
+    - text: Review the build and open the demo
+    - term: Scheduled for
+    - definition: Sep 10, 2099, {{clock}} GMT+8
+    - term: Repeat
+    - definition: Every 1 h
+    - term: Status
+    - definition: Scheduled
+  - listitem:
+    - text: Review the narrow reminder layout before sharing the updated demo with the team
+    - term: Scheduled for
+    - definition: Sep 10, 2099, {{clock}} GMT+8
+    - term: Repeat
+    - definition: Every 1 h
+    - term: Status
+    - definition: Scheduled
+  - listitem:
+    - text: Check the recorded tool results and finish the remaining review comments
+    - term: Scheduled for
+    - definition: Sep 10, 2099, {{clock}} GMT+8
+    - term: Repeat
+    - definition: Every 1 h
+    - term: Status
+    - definition: Scheduled
+  - listitem:
+    - text: Publish the reviewed demo and verify the deployment status
+    - term: Scheduled for
+    - definition: Sep 10, 2099, {{clock}} GMT+8
+    - term: Repeat
+    - definition: Every 1 h
+    - term: Status
+    - definition: Scheduled
+- button "Inspect"
+- button "Delete reminder details-reminder" [expanded]
+- list:
+  - listitem:
+    - text: details-reminder
+    - term: Status
+    - definition: Deleted
+- button "Inspect"
+- button "Update to-do list 2/3 completed 1 added · 1 updated · 1 removed" [expanded]
+- text: Changes since the previous list
+- list:
+  - listitem:
+    - img "Status changed"
+    - text: Render compact fields and lists In progress → Completed
+  - listitem:
+    - img "Added": +
+    - text: Publish the reviewed cards Pending
+  - listitem:
+    - img "Removed": −
+    - text: Review the narrow layout Pending
+- group:
+  - text: 1 unchanged
+  - list:
+    - listitem:
+      - img "Completed"
+      - text: Keep the existing row and expansion controls Completed
+- button "Inspect"
+- button "Inspect providers 2 inspect providers" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Service
+    - paragraph: Inspect available Cordis Services and their methods.
+    - term: Platform
+    - definition: host
+    - group:
+      - text: Methods
+      - list:
+        - listitem:
+          - text: listService
+          - paragraph: List Service signatures or inspect one exact Service.
+          - group:
+            - text: Input schema
+            - list:
+              - listitem:
+                - text: json
+                - button "Wrap lines" [pressed]
+                - button "Copy"
+                - code: "{ \"type\": \"object\", \"properties\": { \"service\": { \"type\": \"string\" } } }"
+          - group:
+            - text: Output schema
+            - list:
+              - listitem:
+                - text: json
+                - button "Wrap lines" [pressed]
+                - button "Copy"
+                - code: "{ \"type\": \"object\" }"
+  - listitem:
+    - text: Slots
+    - paragraph: Inspect the live Client Slot tree.
+    - term: Platform
+    - definition: client
+    - group:
+      - text: Methods
+      - list:
+        - listitem:
+          - text: listSubTree
+          - paragraph: Read registrations and props under a Slot.
+          - group:
+            - text: Input schema
+            - list:
+              - listitem:
+                - text: json
+                - button "Wrap lines" [pressed]
+                - button "Copy"
+                - code: "{ \"type\": \"object\", \"properties\": { \"root\": { \"type\": \"string\" } } }"
+          - group:
+            - text: Output schema
+            - list:
+              - listitem:
+                - text: json
+                - button "Wrap lines" [pressed]
+                - button "Copy"
+                - code: "{ \"type\": \"object\" }"
+- button "Inspect"
+- button "Query runtime Slots.listSubTree" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - term: Root
+    - definition: tool.call.toolview
+    - group:
+      - text: Registrations
+      - list:
+        - listitem:
+          - term: key
+          - definition: todo_write
+          - term: owner
+          - definition: client-ui-tool
+          - term: component
+          - definition: TodoRow
+        - listitem:
+          - term: key
+          - definition: create_goal
+          - term: owner
+          - definition: client-ui-tool
+          - term: component
+          - definition: DetailsRow
+    - group:
+      - text: Props
+      - list:
+        - listitem:
+          - term: toolName
+          - definition: string
+          - term: block
+          - definition: ToolCallBlock
+- button "Inspect"
+- button "Inspect plugins 1 dynamic plugins" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Tool card example
+    - term: pluginId
+    - definition: demo-tool-card
+    - term: Current package
+    - definition: package-demo-1
+    - term: Next package
+    - definition: package-demo-2
+    - group:
+      - text: Latest run
+      - list:
+        - listitem: run-demo-1 Completed
+- button "Inspect"
+- button "Run workflow tool-card-audit" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: tool-card-audit Completed
+    - term: Agents started
+    - definition: "0"
+    - group:
+      - text: Workflow script
+      - list:
+        - listitem:
+          - text: javascript
+          - button "Wrap lines" [pressed]
+          - button "Copy"
+          - code: "return { reviewed: 12, needsDetails: [\"list_agents\", \"job_list\", \"terminal_list\"] };"
+  - listitem:
+    - term: reviewed
+    - definition: "12"
+    - group:
+      - text: needsDetails
+      - list:
+        - listitem:
+          - paragraph: list_agents
+        - listitem:
+          - paragraph: job_list
+        - listitem:
+          - paragraph: terminal_list
+- button "Inspect"
+- button "Run ralph loop Checked line wrapping and tool-name display in the detail area." [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Checked line wrapping and tool-name display in the detail area. Worker reported completion
+    - term: Rounds
+    - definition: "2"
+    - list:
+      - listitem: Goals, task lists, and scheduled tasks were each checked.
+      - listitem: List-style tools still show raw output.
+    - group:
+      - text: Task
+      - list:
+        - listitem:
+          - paragraph: Review and fix the tool card layout issues
+- button "Inspect"
+- 'button "Read event tool/call · #5" [expanded]'
+- text: Recorded result
+- list:
+  - listitem:
+    - text: tool/call Todo list change example · todo-diff-demo
+    - term: Event sequence
+    - definition: "5"
+    - term: Time
+    - definition: Sep 10, 2026, 4:00 PM
+  - listitem:
+    - text: todo_write
+    - term: Turn
+    - definition: "1"
+    - term: Step
+    - definition: "1"
+    - term: Call ID
+    - definition: demo-todo-1
+    - group:
+      - text: IN
+      - list:
+        - listitem:
+          - group:
+            - text: todos
+            - list:
+              - listitem:
+                - text: Result In progress
+                - term: Content
+                - definition: Implement compact details
+  - listitem:
+    - group:
+      - text: Surrounding events
+      - list:
+        - listitem:
+          - paragraph: "Before: - seq 4 | assistant/message | {{timestamp}} Updated the todo list. After: - seq 6 | tool/result | {{timestamp}} Updated todo list: 0 completed, 1 in progress, 0 pending."
+- button "Inspect"
+- button "Search events 2 matches" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: "Redesigned the todo list tool card. user/message · #1"
+    - term: Time
+    - definition: Sep 10, 2026, 4:00 PM
+    - term: Record status
+    - definition: current
+  - listitem:
+    - text: "Tool cards now show additions, updates, and deletions. assistant/message · #12"
+    - term: Time
+    - definition: Sep 10, 2026, 4:01 PM
+    - term: Record status
+    - definition: current
+- button "Inspect"
+- button "Trace event Todo list change example" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Todo list change example todo-diff-demo
+    - term: Target event
+    - definition: seq 12 | assistant/message | current | {{timestamp}}
+    - term: Replaced by
+    - definition: None
+    - term: Replacement chain
+    - definition: None
+    - term: Replaced events
+    - definition: None
+    - term: Source events
+    - definition: None
+    - term: Derived events
+    - definition: None
+- button "Inspect"
+- button "Search sessions 2 matches" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Todo list change example todo-diff-demo
+    - paragraph: Redesign the todo list tool card.
+    - term: Time
+    - definition: Sep 10, 2026, 4:00 PM
+    - term: Parent
+    - definition: root
+    - term: Availability
+    - definition: persisted
+    - term: Best match
+    - definition: seq 1 | user/message | current | {{timestamp}}
+  - listitem:
+    - text: Tool card details demo tool-details-demo
+    - paragraph: Show a goal, a to-do list, and reminders.
+    - term: Time
+    - definition: Sep 10, 2026, 3:00 PM
+    - term: Parent
+    - definition: root
+    - term: Availability
+    - definition: persisted
+    - term: Best match
+    - definition: seq 1 | user/message | current | {{timestamp}}
+- button "Inspect"
+- button "Trace session Todo list change example" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Todo list change example todo-diff-demo
+    - term: Time
+    - definition: Sep 10, 2026, 4:00 PM
+    - term: Availability
+    - definition: persisted
+  - listitem:
+    - text: Ancestor sessions
+    - paragraph: None
+  - listitem:
+    - text: Descendant sessions
+    - list:
+      - listitem: review-child — Layout review | {{timestamp}} | persisted
+      - listitem: review-grandchild — Narrow layout | {{timestamp}} | persisted
+- button "Inspect"
+- button "List models deepseek" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: deepseek/deepseek-chat
+    - paragraph: DeepSeek Chat
+  - listitem:
+    - text: deepseek/deepseek-reasoner
+    - paragraph: DeepSeek Reasoner
+- button "Inspect"
+- button "Create subagent Review the tool card layout and list the three most valuable improvements." [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Review the tool card layout and list the three most valuable improvements. Started
+    - term: Agent ID
+    - definition: agent-demo-review
+- button "Inspect"
+- button "List subagents 3 agents" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Review the tool card layout Running agent-demo-review
+    - term: Parent
+    - definition: todo-diff-demo
+    - term: Depth
+    - definition: "1"
+  - listitem:
+    - text: Organize the tool presentation list Idle agent-demo-docs
+    - term: Parent
+    - definition: todo-diff-demo
+    - term: Depth
+    - definition: "1"
+  - listitem:
+    - text: Check status icons Ready agent-demo-icons
+    - term: Parent
+    - definition: agent-demo-review
+    - term: Depth
+    - definition: "2"
+- button "Inspect"
+- button "Send message agent-demo-review" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: agent-demo-review Message delivered
+    - paragraph: Prioritize the task diff list at narrow widths.
+- button "Inspect"
+- button "Interrupt agent agent-demo-review" [expanded]
+- text: Recorded result
+- list:
+  - listitem: agent-demo-review Interrupt requested
+- button "Inspect"
+- button "List background jobs 3 background jobs" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Build client assets Running job-demo-build
+    - term: Type
+    - definition: bash
+  - listitem:
+    - text: Review tool cards Completed job-demo-audit
+    - term: Type
+    - definition: subagent
+  - listitem:
+    - text: Watch preview server Running job-demo-preview
+    - term: Type
+    - definition: terminal
+- button "Inspect"
+- button "Read job output job-demo-build" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: job-demo-build Running Code block
+    - button "Wrap lines" [pressed]
+    - button "Copy"
+    - code: Building client assets… ✓ 184 modules transformed. dist/index.js 92.4 kB
+- button "Inspect"
+- button "Cancel background job job-demo-preview" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: job-demo-preview Cancellation requested
+    - paragraph: The demo review has ended
+- button "Inspect"
+- button "Open terminal preview" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: preview Started terminal-demo-1
+    - term: Type
+    - definition: shell
+    - text: Code block
+    - button "Wrap lines" [pressed]
+    - button "Copy"
+    - code: /workspace/demo %
+- button "Inspect"
+- button "Read terminal terminal-demo-1" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: terminal-demo-1 Lines 16–18 of 18 Code block
+    - button "Wrap lines" [pressed]
+    - button "Copy"
+    - code: "VITE v7.0.0 ready in {{duration}} Local: http://localhost:5173/ Watching for file changes…"
+- button "Inspect"
+- button "List terminals 3 terminals" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: preview Running terminal-demo-1
+    - term: Type
+    - definition: shell
+    - term: Process ID
+    - definition: "43120"
+  - listitem:
+    - text: repl Running terminal-demo-2
+    - term: Type
+    - definition: shell
+    - term: Process ID
+    - definition: "43158"
+  - listitem:
+    - text: build Exited terminal-demo-3
+    - term: Type
+    - definition: shell
+    - term: Process ID
+    - definition: "43210"
+    - term: Exit code
+    - definition: "0"
+- button "Inspect"
+- button "Signal terminal terminal-demo-1" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: terminal-demo-1 Signal delivered
+    - term: Signal
+    - definition: SIGINT
+    - term: Process group
+    - definition: "43120"
+- button "Inspect"
+- button "Close terminal terminal-demo-1" [expanded]
+- text: Recorded result
+- list:
+  - listitem: terminal-demo-1 Closed
+- button "Inspect"
+- button "Find definition src/app.ts · 1 locations" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - button "src/tool-details.ts"
+    - text: Line 24, column 1
+- button "Inspect"
+- button "Find references src/tool-details.ts · 4 locations" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - button "src/app.ts"
+    - text: Line 18, column 5
+  - listitem:
+    - button "src/tool-row.tsx"
+    - text: Line 42, column 9
+  - listitem:
+    - button "src/todo-row.tsx"
+    - text: Line 67, column 12
+  - listitem: untitled:Untitled-1 Line 6, column 7
+- button "Inspect"
+- button "Find implementation src/types.ts · 2 locations" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - button "src/tool-details.ts"
+    - text: Line 24, column 1
+  - listitem:
+    - button "src/fallback-details.ts"
+    - text: Line 8, column 1
+- button "Inspect"
+- button "Inspect symbol src/tool-details.ts:24:1" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - button "src/tool-details.ts:24:1"
+    - text: typescript
+    - button "Wrap lines" [pressed]
+    - button "Copy"
+    - code: "function renderToolDetails(model: ToolDetailsModel): ReactNode"
+    - paragraph: Render compact fields and list rows from a recorded tool result.
+- button "Inspect"
+- button "Create teammate ui-review" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: ui-review Running
+    - paragraph: Check the tool card readability
+    - term: ID
+    - definition: agent-demo-review
+    - term: Role
+    - definition: teammate
+    - term: Provider
+    - definition: spawn
+    - term: Context
+    - definition: fresh
+- button "Inspect"
+- button "List subagents 3 agents" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: lead Running
+    - term: ID
+    - definition: todo-diff-demo
+    - term: Role
+    - definition: lead
+  - listitem:
+    - text: ui-review Running
+    - paragraph: Check the tool card readability
+    - term: ID
+    - definition: agent-demo-review
+    - term: Role
+    - definition: teammate
+    - term: Provider
+    - definition: spawn
+    - term: Context
+    - definition: fresh
+  - listitem:
+    - text: docs Inactive
+    - paragraph: Organize the tool list
+    - term: ID
+    - definition: agent-demo-docs
+    - term: Role
+    - definition: teammate
+    - term: Provider
+    - definition: spawn
+    - term: Context
+    - definition: fresh
+- button "Inspect"
+- button "Send message ui-review" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: ui-review Message delivered
+    - paragraph: First check whether additions, deletions, and status changes are distinguishable.
+- button "Inspect"
+- button "Create team task Check the tool card layout at narrow widths" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Check the tool card layout at narrow widths Pending
+    - paragraph: Check wrapping, detail buttons, and status icons at 360px width.
+    - term: ID
+    - definition: task-demo-1
+    - term: Revision
+    - definition: "1"
+    - term: Ready
+    - definition: "Yes"
+    - group:
+      - text: Write scopes
+      - list:
+        - listitem:
+          - paragraph: packages/client/ui-tool/src/client/tool/
+- button "Inspect"
+- button "Read team task Check the tool card layout at narrow widths" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Check the tool card layout at narrow widths Pending
+    - paragraph: Check wrapping, detail buttons, and status icons at 360px width.
+    - term: ID
+    - definition: task-demo-1
+    - term: Revision
+    - definition: "1"
+    - term: Ready
+    - definition: "Yes"
+    - group:
+      - text: Write scopes
+      - list:
+        - listitem:
+          - paragraph: packages/client/ui-tool/src/client/tool/
+- button "Inspect"
+- button "Update team task Check the tool card layout at narrow widths" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Check the tool card layout at narrow widths In progress
+    - paragraph: Check wrapping, detail buttons, and status icons at 360px width.
+    - term: ID
+    - definition: task-demo-1
+    - term: Revision
+    - definition: "2"
+    - term: Ready
+    - definition: "Yes"
+    - term: Owner
+    - definition: ui-review
+    - group:
+      - text: Write scopes
+      - list:
+        - listitem:
+          - paragraph: packages/client/ui-tool/src/client/tool/
+- button "Inspect"
+- button "List team tasks 2 team tasks" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: Check the tool card layout at narrow widths In progress
+    - paragraph: Check wrapping, detail buttons, and status icons at 360px width.
+    - term: ID
+    - definition: task-demo-1
+    - term: Revision
+    - definition: "2"
+    - term: Ready
+    - definition: "Yes"
+    - term: Owner
+    - definition: ui-review
+    - group:
+      - text: Write scopes
+      - list:
+        - listitem:
+          - paragraph: packages/client/ui-tool/src/client/tool/
+  - listitem:
+    - text: Organize the review findings Pending
+    - paragraph: Check wrapping, detail buttons, and status icons at 360px width.
+    - term: ID
+    - definition: task-demo-2
+    - term: Revision
+    - definition: "1"
+    - term: Ready
+    - definition: "No"
+    - group:
+      - text: Dependencies
+      - list:
+        - listitem:
+          - paragraph: task-demo-1
+- button "Inspect"
+- button "Wait for subagent Subagent activity" [expanded]
+- text: Recorded result
+- list:
+  - listitem: Subagent activity Change detected
+- button "Inspect"
+- button "Interrupt agent ui-review" [expanded]
+- text: Recorded result
+- list:
+  - listitem:
+    - text: ui-review Interrupt requested
+    - term: Previous status
+    - definition: Running
+- button "Inspect"

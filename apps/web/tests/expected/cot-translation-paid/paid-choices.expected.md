@@ -1,0 +1,47 @@
+- button "Back to Experimental plugins": Experimental plugins
+- button "Uninstall Machine translation of reasoning" [disabled]: Uninstall
+- status
+- switch "Enable Machine translation of reasoning" [checked]
+- heading "Machine translation of reasoning" [level=3]
+- text: v{{version}} Experimental
+- paragraph:
+  - code: "@hackdevcode/dsh-experimental-cot-translation-bundle"
+- paragraph: Translates expanded Think rows into your chosen language as the agent writes them, and View original switches back.
+- region "Details":
+  - paragraph:
+    - img "An expanded Think row translated into English, with a View original button"
+- paragraph: Expanded reasoning is sent to the selected service. It may contain private code or conversation details.
+- paragraph: Each uncached fragment sends a separate paid DeepSeek Flash request through the selected account or official API credentials. Reopening reasoning reuses saved results; changing the provider, language, source text, or request settings may send a new paid request.
+- text: Translation service Overridden
+- button "Reset to default"
+- combobox "Translation service":
+  - option "Bing"
+  - option "Google"
+  - option "DeepSeek Flash — account (paid)" [selected]
+- text: Target language Overridden
+- button "Reset to default"
+- textbox "Target language":
+  - /placeholder: ""
+  - text: auto
+- paragraph: auto follows the UI language; language codes such as zh, en, and ja also work.
+- button "Save" [disabled]
+- heading "Components" [level=4]
+- text: 2 total · 2 running
+- list:
+  - listitem:
+    - text: Translation service Translate text and reuse translations saved in the session.
+    - code: translator
+    - code: "@hackdevcode/dsh-experimental-translator"
+    - text: Running
+    - switch "Enable component Translation service" [checked]
+  - listitem:
+    - text: Machine translation of reasoning Display expanded reasoning in another language using machine translation.
+    - code: cot-translation
+    - code: "@hackdevcode/dsh-experimental-client-ui-cot-translation"
+    - text: Running
+    - switch "Enable component Machine translation of reasoning" [checked]
+- heading "Source" [level=4]
+- term: Code source
+- definition: Built in
+- term: Current version
+- definition: {{version}}

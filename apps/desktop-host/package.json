@@ -1,0 +1,44 @@
+{
+  "name": "@hackdevcode/dsh-desktop-host",
+  "description": "Private Node-mode host process for the Electron desktop application",
+  "version": "0.2.2-alpha.2",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "main": "lib/index.js",
+  "files": [
+    "lib/index.js",
+    "lib/cli.js"
+  ],
+  "dependencies": {
+    "koffi": "3.1.1",
+    "@deepseek-ai/libreoffice-kit": "^0.1.5",
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh": "workspace:*",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-app-boot": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-host-webserver": "workspace:*",
+    "@hackdevcode/dsh-home-paths": "workspace:*",
+    "@hackdevcode/dsh-jobs": "workspace:*",
+    "@hackdevcode/dsh-schedule": "workspace:*",
+    "@hackdevcode/dsh-tool-workspace-dependencies": "workspace:*",
+    "@hackdevcode/dsh-skill-office": "workspace:*",
+    "@hackdevcode/dsh-deepseek-account": "workspace:*",
+    "@hackdevcode/dsh-workspace": "workspace:*",
+    "@hackdevcode/dsh-plugin-manager": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/cordis-plugin-include": "workspace:~",
+    "@hackdevcode/dsh-skill": "workspace:*",
+    "@hackdevcode/dsh-fs": "workspace:*",
+    "@hackdevcode/dsh-fs-local": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*",
+    "@hackdevcode/dsh-util-workspace-path": "workspace:*",
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-tool-executor-native": "workspace:*"
+  }
+}

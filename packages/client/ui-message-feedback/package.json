@@ -1,0 +1,78 @@
+{
+  "name": "@hackdevcode/dsh-client-ui-message-feedback",
+  "description": "The Web feedback surface: per-message Like/Dislike in the assistant-message action strip and the feedback dialog behind both ratings and /feedback, backed by the messageFeedback and sessionFeedback Host Remotes",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/client/ui-message-feedback"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@hackdevcode/dsh-api-remotes",
+        "@hackdevcode/dsh-client-locale",
+        "@hackdevcode/dsh-client-ui-conversation",
+        "@hackdevcode/dsh-client-ui-renderer",
+        "@hackdevcode/dsh-client-ui-commands"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-api-remotes": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-locale": "workspace:*",
+    "@hackdevcode/dsh-client-test-runtime": "workspace:*",
+    "@hackdevcode/dsh-client-ui-conversation": "workspace:*",
+    "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
+    "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
+    "@hackdevcode/dsh-client-ui-slots": "workspace:*",
+    "@hackdevcode/dsh-message-feedback": "workspace:*",
+    "@hackdevcode/dsh-remote-mock": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~",
+    "@testing-library/react": "^16.3.3",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@hackdevcode/dsh-client-ui-chat": "workspace:*",
+    "@hackdevcode/dsh-client-ui-session": "workspace:*",
+    "@hackdevcode/dsh-client-ui-commands": "workspace:*",
+    "@hackdevcode/dsh-command-feedback": "workspace:*",
+    "@hackdevcode/dsh-client-store": "workspace:*"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "lib/types/**/*.d.ts"
+  ]
+}

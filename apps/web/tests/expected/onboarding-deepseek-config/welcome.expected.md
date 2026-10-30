@@ -1,0 +1,5 @@
+- dialog "Preview Notice":
+  - heading "Preview Notice" [level=2]
+  - paragraph: Hack Dev Code 0.2 is still in preview, and many areas need continued improvement and refinement. We welcome feedback and suggestions from all developers and users. The new desktop app now targets a broad range of users, while developer-related advanced features can be enabled in the settings. Hack Dev Code’s product features and plugin APIs are expected to continue rapid iteration and evolution, and will gradually stabilize over time.
+  - paragraph: We look forward to exploring the limits of intelligence together with users and developers around the world, building on open-source, reusable, and composable infrastructure. We welcome everyone to bring their ideas to life with Hack Dev Code and participate in the community to enrich the plugin ecosystem.
+  - button "Continue"

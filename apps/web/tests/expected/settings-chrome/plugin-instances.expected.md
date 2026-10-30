@@ -1,0 +1,16 @@
+- list:
+  - listitem:
+    - button "tool-subagent-control, tool-subagent-control, Enabled":
+      - strong: tool-subagent-control
+      - text: Let the AI send messages to or interrupt subagents.
+      - code: tool-subagent-control
+  - listitem:
+    - button "tool-subagent, tool-subagent, Enabled":
+      - strong: tool-subagent
+      - text: Let the AI hand tasks to subagents and get their results.
+      - code: tool-subagent
+  - listitem:
+    - button "tool-subagent, tool-subagent-fork, Enabled":
+      - strong: tool-subagent
+      - text: Let the AI hand tasks to subagents and get their results.
+      - code: tool-subagent-fork

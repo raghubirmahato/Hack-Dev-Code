@@ -1,0 +1,171 @@
+{
+  "name": "@hackdevcode/dsh-experimental-liveshare",
+  "description": "Opt-in LiveShare host bundle: share a Session through a separate Relay at the view or bounded-write tier, with forking and attachment uploads as independent switches",
+  "version": "0.2.2-alpha.2",
+  "icon": "./icon.svg",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/experimental/liveshare"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./viewer-declarations": {
+      "types": "./lib/types/viewer-declarations.d.ts",
+      "default": "./lib/viewer-declarations.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
+    "./types": {
+      "types": "./lib/types/share-api-types.d.ts"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "icon.svg",
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "lib/owner-gateway/cli.js",
+    "lib/retry-backoff-*.js",
+    "lib/viewer-declarations.js",
+    "lib/viewer-declarations-*.js",
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
+  ],
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@hackdevcode/dsh-atomic-write": "workspace:*",
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-experimental-liveshare-protocol": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "ws": "^8.18.3",
+    "zod": "4.4.3"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-scope": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-agent-loop-testkit": "workspace:*",
+    "@hackdevcode/dsh-api-gateway": "workspace:*",
+    "@hackdevcode/dsh-api-remote-access": "workspace:*",
+    "@hackdevcode/dsh-api-remotes": "workspace:*",
+    "@hackdevcode/dsh-api-session-controller": "workspace:*",
+    "@hackdevcode/dsh-api-settings-controller": "workspace:*",
+    "@hackdevcode/dsh-api-workspace-controller": "workspace:*",
+    "@hackdevcode/dsh-api-workspace-files": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-file-upload": "workspace:*",
+    "@hackdevcode/dsh-client-locale": "workspace:*",
+    "@hackdevcode/dsh-client-modules": "workspace:*",
+    "@hackdevcode/dsh-client-resources": "workspace:*",
+    "@hackdevcode/dsh-client-shortcuts": "workspace:*",
+    "@hackdevcode/dsh-client-store": "workspace:*",
+    "@hackdevcode/dsh-client-test-runtime": "workspace:*",
+    "@hackdevcode/dsh-client-ui-agent-preset": "workspace:*",
+    "@hackdevcode/dsh-client-ui-approval": "workspace:*",
+    "@hackdevcode/dsh-client-ui-attachment": "workspace:*",
+    "@hackdevcode/dsh-client-ui-brand-official": "workspace:*",
+    "@hackdevcode/dsh-client-ui-chat": "workspace:*",
+    "@hackdevcode/dsh-client-ui-commands": "workspace:*",
+    "@hackdevcode/dsh-client-ui-conversation": "workspace:*",
+    "@hackdevcode/dsh-client-ui-deliverables": "workspace:*",
+    "@hackdevcode/dsh-client-ui-input-trigger": "workspace:*",
+    "@hackdevcode/dsh-client-ui-jobs": "workspace:*",
+    "@hackdevcode/dsh-client-ui-layout": "workspace:*",
+    "@hackdevcode/dsh-client-ui-plan": "workspace:*",
+    "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
+    "@hackdevcode/dsh-client-ui-reference": "workspace:*",
+    "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
+    "@hackdevcode/dsh-client-ui-session": "workspace:*",
+    "@hackdevcode/dsh-client-ui-settings": "workspace:*",
+    "@hackdevcode/dsh-client-ui-sidebar": "workspace:*",
+    "@hackdevcode/dsh-client-ui-sidebar-right": "workspace:*",
+    "@hackdevcode/dsh-client-ui-slots": "workspace:*",
+    "@hackdevcode/dsh-client-ui-subagent": "workspace:*",
+    "@hackdevcode/dsh-client-ui-theme": "workspace:*",
+    "@hackdevcode/dsh-client-ui-tool": "workspace:*",
+    "@hackdevcode/dsh-client-ui-trajectory": "workspace:*",
+    "@hackdevcode/dsh-client-ui-user-questions": "workspace:*",
+    "@hackdevcode/dsh-client-ui-workflow-run": "workspace:*",
+    "@hackdevcode/dsh-client-ui-workspace": "workspace:*",
+    "@hackdevcode/dsh-client-web": "workspace:*",
+    "@hackdevcode/dsh-cua": "workspace:*",
+    "@hackdevcode/dsh-experimental-api-speech-to-text": "workspace:*",
+    "@hackdevcode/dsh-experimental-claude-code-mods": "workspace:*",
+    "@hackdevcode/dsh-experimental-client-ui-cot-translation": "workspace:*",
+    "@hackdevcode/dsh-fs": "workspace:*",
+    "@hackdevcode/dsh-fs-local": "workspace:*",
+    "@hackdevcode/dsh-fs-observation-policy": "workspace:*",
+    "@hackdevcode/dsh-fs-sandbox": "workspace:*",
+    "@hackdevcode/dsh-host-webserver": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*",
+    "@hackdevcode/dsh-scope": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-settings": "workspace:*",
+    "@hackdevcode/dsh-tool-executor-native": "workspace:*",
+    "@hackdevcode/dsh-tool-fs": "workspace:*",
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@hackdevcode/dsh-typert-registry": "workspace:*",
+    "@hackdevcode/dsh-workspace": "workspace:*",
+    "@types/ws": "^8.18.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml",
+      "listedByDefault": false
+    },
+    "client": {
+      "inject": [
+        "@hackdevcode/dsh-api-remote-access",
+        "@hackdevcode/dsh-api-remotes",
+        "@hackdevcode/dsh-client-locale",
+        "@hackdevcode/dsh-client-ui-conversation",
+        "@hackdevcode/dsh-client-ui-primitives",
+        "@hackdevcode/dsh-client-ui-renderer",
+        "@hackdevcode/dsh-client-ui-session"
+      ],
+      "platform": "web"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

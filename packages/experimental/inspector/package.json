@@ -1,0 +1,84 @@
+{
+  "name": "@hackdevcode/dsh-experimental-inspector",
+  "description": "Experimental cross-realm CDP hub for Host debugging and Client Runtime inspection",
+  "version": "0.2.2-alpha.2",
+  "icon": "./icon.svg",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/experimental/inspector"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./locale/*.json": "./locale/*.json",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "files": [
+    "icon.svg",
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "lib/client.*.js",
+    "lib/worker.js",
+    "lib/devtools/**",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@hackdevcode/dsh-app-boot": "workspace:*",
+    "@hackdevcode/dsh-util-crypto": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "open": "^11.0.2",
+    "serve-static": "^2.2.1",
+    "ws": "^8.21.3"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "chrome-devtools-frontend": "1.0.1638082",
+    "@types/serve-static": "^2.2.0",
+    "@hackdevcode/dsh-client-test-runtime": "workspace:*",
+    "@testing-library/react": "^16.3.3",
+    "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
+    "@hackdevcode/dsh-client-ui-layout": "workspace:*",
+    "@hackdevcode/dsh-client-shortcuts": "workspace:*",
+    "@hackdevcode/dsh-client-store": "workspace:*",
+    "@hackdevcode/dsh-client-ui-slots": "workspace:*",
+    "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
+    "@hackdevcode/dsh-client-locale": "workspace:*",
+    "react": "^18.2.0",
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cordis-plugin-include": "workspace:~",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-host-webserver": "workspace:*",
+    "@hackdevcode/dsh-cmdline": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@types/ws": "^8.18.1",
+    "playwright": "^1.49.0",
+    "tsx": "^4.23.13",
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-client-modules": "workspace:*"
+  }
+}

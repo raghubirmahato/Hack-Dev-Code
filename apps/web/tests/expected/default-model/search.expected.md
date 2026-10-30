@@ -1,0 +1,7 @@
+- group "Model and reasoning effort":
+  - searchbox "Search models…": ACMLG
+  - button "Clear search"
+  - menu "Model":
+    - group "Acme Gateway":
+      - text: Acme Gateway
+      - menuitemradio "Acme Large"

@@ -1,0 +1,14 @@
+- dialog "Add plugin":
+  - heading "Add plugin" [level=2]
+  - button "Close"
+  - textbox "Plugin package name":
+    - /placeholder: for example dsh-plugin-example-pet
+  - button "Hide the guide" [expanded]
+  - button "Registry Mainland China mirror"
+  - list:
+    - listitem:
+      - text: Enter the plugin's npm package name The plugin package name is the npm package name (like dsh-xxx or @author/plugin): the part after dsh plugin add or pnpm add in a community plugin's README install command. Example: 
+      - code: dsh-plugin-example-pet
+      - button "Use the example dsh-plugin-example-pet": Use example
+  - note: Install only plugins you trust: they run with your permissions and can damage Hack Dev Code or leak your data. On-demand official plugins offer Update when their version differs from DSH. To update other plugins, uninstall and reinstall them.
+  - button "Install" [disabled]

@@ -1,0 +1,24 @@
+- button "Back to plugins": Plugins
+- heading "Web search" [level=3]
+- paragraph: Set up the DeepSeek search provider.
+- text: Use the new Web Search API
+- switch "Use the new Web Search API" [checked]
+- paragraph:
+  - text: Off by default: search runs through DeepSeek Messages. For the new Web Search API's features and pricing, see the 
+  - link "Search & Fetch guide":
+    - /url: https://api-docs.deepseek.com/guides/search
+- text: API Key No key is configured; only conversations using a DeepSeek Account model can search, through the default endpoint.
+- textbox "API Key"
+- paragraph: Stored outside the settings file. Leave blank to keep the current key.
+- text: Search / Fetch API base URL Overridden
+- button "Reset to default"
+- textbox "Search / Fetch API base URL":
+  - /placeholder: ""
+  - text: https://search-api.test/api/v1/tools
+- paragraph: Include the API prefix, such as https://api.deepseek.com/v1/tools. The provider appends /search or /fetch. Leave blank to restore the default.
+- text: Results per search
+- textbox "Results per search":
+  - /placeholder: ""
+  - text: "10"
+- paragraph: Results returned per query: an integer from 1 to 50, default 10. This controls result count, not search calls. web_search keeps no more sources than its own result limit.
+- button "Save" [disabled]

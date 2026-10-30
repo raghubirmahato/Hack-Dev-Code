@@ -1,0 +1,63 @@
+{
+  "name": "@hackdevcode/dsh-sdk-app",
+  "description": "The dsh SDK profile bundle: stdio JSON-RPC serving and process lifecycle over dsh-base",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/bundle/sdk-app"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./src/*": "./src/*",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "cordis.patch.yml",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@hackdevcode/dsh-cmdline": "workspace:*",
+    "@hackdevcode/dsh-sdk-jsonrpc-server": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "commander": "^15.0.0",
+    "@hackdevcode/dsh-skill-office": "workspace:*",
+    "@hackdevcode/dsh-tool-workspace-dependencies": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-file-upload": "workspace:*",
+    "@hackdevcode/dsh-workspace": "workspace:*",
+    "@hackdevcode/dsh-schedule": "workspace:*",
+    "@hackdevcode/dsh-time-context": "workspace:*",
+    "@hackdevcode/dsh-tool-schedule": "workspace:*",
+    "@hackdevcode/dsh-tool-ask-user": "workspace:*",
+    "@hackdevcode/dsh-tool-present": "workspace:*",
+    "@hackdevcode/dsh-file-reference-local": "workspace:*",
+    "@hackdevcode/dsh-deliverable-file-references": "workspace:*"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis-plugin-include": "workspace:~",
+    "@hackdevcode/cordis": "workspace:~"
+  }
+}

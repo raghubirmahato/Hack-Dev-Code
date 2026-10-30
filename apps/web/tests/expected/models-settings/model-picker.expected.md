@@ -1,0 +1,18 @@
+- dialog "Choose models":
+  - heading "Choose models" [level=2]
+  - button "Close"
+  - paragraph: These are the models this provider has available. Checked models make up the list.
+  - searchbox "Search models"
+  - button "Deselect all"
+  - list:
+    - listitem:
+      - checkbox "MiniMax-M2.7" [checked]
+      - text: MiniMax-M2.7
+    - listitem:
+      - checkbox "MiniMax-M2.7-highspeed" [checked]
+      - text: MiniMax-M2.7-highspeed
+    - listitem:
+      - checkbox "MiniMax-M3" [checked]
+      - text: MiniMax-M3
+  - button "Cancel"
+  - button "Update list"

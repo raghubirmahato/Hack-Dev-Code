@@ -1,0 +1,22 @@
+- img "Change request state: Needs attention"
+- text: "Add the pull request panel #7"
+- button "Open in browser"
+- button "All 2 files"
+- text: +4 −2
+- button "Refresh changes"
+- button "Collapse all files"
+- button "Side by side" [pressed]
+- button "Wrap lines" [pressed]
+- button "Collapse panel.ts" [expanded]
+- 'button "Copy path: src/panel.ts"': src/panel.ts
+- text: +2 −2
+- button "More actions for panel.ts"
+- text: 1 export const n1 = 1 1 export const n1 = 1 2 export const n2 = 2 2 export const n2 = 'two' 3 export const n3 = 3 3 export const n3 = 3 4 export const n4 = 4 4 export const n4 = 4 5 export const n5 = 5 5 export const n5 = 5
+- button "6 unchanged lines"
+- text: 12 export const n12 = 12 12 export const n12 = 12 13 export const n13 = 13 13 export const n13 = 13 14 export const n14 = 14 14 export const n14 = 14 15 export const n15 = 15 15 export const n15 = 'fifteen' 16 export const n16 = 16 16 export const n16 = 16 17 export const n17 = 17 17 export const n17 = 17 18 export const n18 = 18 18 export const n18 = 18
+- button "Remaining unchanged lines"
+- button "Collapse panel.md" [expanded]
+- 'button "Copy path: docs/panel.md"': docs/panel.md
+- text: New file +2 −0
+- button "More actions for panel.md"
+- text: "1 + # Panel 2 + Shows the change requests of a Session."

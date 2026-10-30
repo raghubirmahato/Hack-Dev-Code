@@ -1,0 +1,5 @@
+- menu:
+  - menuitem "Read Only"
+  - menuitem "Workspace Write"
+  - menuitem "Full access"
+  - menuitem "Auto review EXP"

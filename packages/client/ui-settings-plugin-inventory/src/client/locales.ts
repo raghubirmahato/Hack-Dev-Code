@@ -1,0 +1,45 @@
+/** Copy dictionaries for the plugin inventory Settings section. */
+
+/** Plugin inventory locale key union. */
+export type PluginInventoryLocaleKey = keyof typeof en
+
+/** English dictionary (the key-set source of truth). */
+export const en = {
+  tab: 'Plugin list',
+  loading: 'Reading plugins…',
+  clientSyncing: 'Syncing plugins on this page…',
+  clientSyncFailed: 'Some plugins could not sync on this page. Host enablement is unchanged.',
+  clientSyncRetry: 'Retry this page',
+  error: 'Plugins are temporarily unavailable.',
+  metadataError: 'Package metadata error: {error}',
+  retry: 'Retry',
+  search: 'Search plugins',
+  empty: 'No plugins are available.',
+  emptySearch: 'No matching plugins.',
+  presetTitle: 'Session plugins',
+  presetSubtitle: 'Composed per session by agent presets',
+  switcherLabel: 'Choose the agent preset to inspect',
+  presetOptionDefault: '{name} (default)',
+  presetOptionBroken: '{name} (failed to load)',
+  globalTitle: 'Global plugins',
+  globalSubtitle: 'Shared by the system and every session',
+  presetProvidedDetail: 'Disabled globally; agent presets provide it per session',
+  enabledIn: 'Enabled in',
+  matchesInOtherPresets: '{count} more matches in other presets: ',
+  enabledTag: 'Enabled',
+  disabledTag: 'Disabled',
+  conditionalTag: 'Conditional',
+  presetEnabledTag: 'Via presets',
+  failedTag: 'Failed',
+  moduleLabel: 'Module',
+  fromPreset: 'From',
+  condition: 'Disabled when',
+  configuration: 'Configuration',
+  runtime: 'Status',
+  unobserved: 'Not running',
+  pending: 'Waiting for dependencies',
+  loadingPhase: 'Loading',
+  active: 'Running',
+  failed: 'Failed to start',
+  unloading: 'Unloading',
+} satisfies Record<string, string>

@@ -1,0 +1,18 @@
+- dialog "Installed":
+  - button "Close"
+  - status: Installed
+  - paragraph: mirrored-package
+  - paragraph: Version 2.0.0
+  - button "Hide install details" [expanded]
+  - paragraph: Installs into {{cwd}}/.dsh-home/profiles/scaffold
+  - paragraph: Attempt 1 · Mainland China mirror
+  - text: Failed $
+  - group "Command line 1": pnpm add mirrored-package --registry=https://registry.npmmirror.com/
+  - text: exit code 1
+  - button "Copy"
+  - text: "ERR_PNPM_META_FETCH_FAIL GET https://registry.npmmirror.com/mirrored-package: socket hang up"
+  - paragraph: Attempt 2 · Official npm registry
+  - text: Completed $ pnpm add mirrored-package
+  - button "Copy"
+  - text: Installed from the registry pnpm names
+  - button "Enable now"

@@ -1,0 +1,72 @@
+{
+  "name": "@hackdevcode/dsh-ptc-runtime-node",
+  "description": "Node PTC execution with async function, REPL and VM Script evaluators and optional retained state",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/ptc-runtime/ptc-runtime-node"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json",
+    "./configuration": {
+      "types": "./lib/types/configuration.d.ts",
+      "default": "./lib/configuration.js"
+    },
+    "./process": {
+      "types": "./lib/types/process-entry.d.ts",
+      "default": "./lib/process.js"
+    },
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/configuration.js",
+    "lib/process.js",
+    "lib/persistent-process.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-ptc-runtime": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/dsh-fs": "workspace:*",
+    "@hackdevcode/dsh-subprocess": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*"
+  },
+  "dependencies": {
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "acorn": "^8.18.0",
+    "acorn-walk": "^8.3.5",
+    "birpc": "4.2.0"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-ptc-runtime": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/dsh-fs": "workspace:*",
+    "@hackdevcode/dsh-subprocess": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*",
+    "@hackdevcode/dsh-fs-local": "workspace:*",
+    "@hackdevcode/dsh-subprocess-local": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-sandbox-local": "workspace:*"
+  }
+}

@@ -1,0 +1,6 @@
+- dialog "Cannot access GitHub":
+  - heading "Cannot access GitHub" [level=2]
+  - button "Close"
+  - paragraph: Try another installation source.
+  - button "Cancel"
+  - button "Try another way"

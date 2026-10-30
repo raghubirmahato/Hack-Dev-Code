@@ -1,0 +1,104 @@
+{
+  "name": "@hackdevcode/dsh-api-remotes",
+  "description": "Remote BFF assembly for application-selected Host capabilities",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/api/remotes"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@hackdevcode/dsh-api-gateway"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "license": "MIT",
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "dependencies": {
+    "@hackdevcode/dsh-deque": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-scope": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-agent-preset-registry": "workspace:*",
+    "@hackdevcode/dsh-api-gateway": "workspace:*",
+    "@hackdevcode/dsh-api-job-controller": "workspace:*",
+    "@hackdevcode/dsh-api-session-controller": "workspace:*",
+    "@hackdevcode/dsh-api-settings-controller": "workspace:*",
+    "@hackdevcode/dsh-api-workspace-controller": "workspace:*",
+    "@hackdevcode/dsh-api-workspace-files": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-file-upload": "workspace:*",
+    "@hackdevcode/dsh-commands": "workspace:*",
+    "@hackdevcode/dsh-cordis-host-runner": "workspace:*",
+    "@hackdevcode/dsh-credentials": "workspace:*",
+    "@hackdevcode/dsh-file-reference": "workspace:*",
+    "@hackdevcode/dsh-goal": "workspace:*",
+    "@hackdevcode/dsh-host-plugin-inventory": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-message-feedback": "workspace:*",
+    "@hackdevcode/dsh-permission-presets": "workspace:*",
+    "@hackdevcode/dsh-schedule": "workspace:*",
+    "@hackdevcode/dsh-scope": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-reference": "workspace:*",
+    "@hackdevcode/dsh-settings": "workspace:*",
+    "@hackdevcode/dsh-subagent": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/dsh-user-approval": "workspace:*",
+    "@hackdevcode/dsh-user-questions": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~",
+    "zod": "4.4.3",
+    "@hackdevcode/dsh-command-feedback": "workspace:*",
+    "@hackdevcode/dsh-api-terminal-controller": "workspace:*",
+    "@hackdevcode/dsh-plugin-manager": "workspace:*",
+    "@hackdevcode/dsh-plugin-market": "workspace:*",
+    "@hackdevcode/dsh-client-ui-plugin-manager": "workspace:*",
+    "@hackdevcode/dsh-office-to-pdf": "workspace:*",
+    "@hackdevcode/dsh-api-account-controller": "workspace:*",
+    "@hackdevcode/dsh-deepseek-account": "workspace:*",
+    "@hackdevcode/dsh-client-product-analytics": "workspace:*",
+    "@hackdevcode/dsh-client-ui-trajectory": "workspace:*"
+  }
+}

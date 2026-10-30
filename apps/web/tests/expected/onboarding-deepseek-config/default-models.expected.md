@@ -1,0 +1,62 @@
+- dialog "Settings":
+  - text: Settings
+  - navigation:
+    - button "General"
+    - button "Model"
+    - button "Built-in plugins"
+    - button "Agent presets"
+  - button "Open configuration file"
+  - button "Close"
+  - heading "Model" [level=2]
+  - paragraph: Enter your API keys to use models from the following providers.
+  - list:
+    - listitem:
+      - text: DeepSeek
+      - img "API key configured"
+      - button "Edit DeepSeek (deepseek-official)": Edit
+      - text: DeepSeek deepseek-official API key
+      - button "Authentication details": "?"
+      - textbox "API key":
+        - /placeholder: Leave blank to use saved credentials
+      - group:
+        - text: Customized settings Base URL
+        - textbox "Base URL":
+          - /placeholder: https://api.deepseek.com/anthropic (Default to use DEEPSEEK_BASE_URL)
+        - text: Use an API endpoint compatible with Anthropic Messages.
+        - region "Models":
+          - text: Models Using the adapter defaults
+          - button "Reorder model 1"
+          - textbox "Model ID 1":
+            - /placeholder: Model ID
+            - text: deepseek-flash
+          - textbox "Display name 1":
+            - /placeholder: Display name
+            - text: DeepSeek-V4.1-Flash
+          - button "Model options 1" [expanded]
+          - button "Delete model 1"
+          - text: Context window
+          - textbox "Context window 1":
+            - /placeholder: 1M
+            - text: "1048576"
+          - text: Max output tokens
+          - textbox "Max output tokens 1":
+            - /placeholder: 256K
+          - group "Input types 1":
+            - text: Input types
+            - checkbox "Text" [checked]
+            - text: Text
+            - checkbox "Image" [checked]
+            - text: Image
+          - button "Reorder model 2"
+          - textbox "Model ID 2":
+            - /placeholder: Model ID
+            - text: deepseek-v4-pro
+          - textbox "Display name 2":
+            - /placeholder: Display name
+            - text: DeepSeek-V4-Pro
+          - button "Model options 2"
+          - button "Delete model 2"
+          - button "Add model"
+      - button "Cancel"
+      - button "Apply"
+  - button "Add model provider"

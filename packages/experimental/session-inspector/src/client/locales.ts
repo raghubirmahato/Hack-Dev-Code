@@ -1,0 +1,70 @@
+/** Session Inspector tab, table controls, and object navigation labels. */
+
+/** Namespace owned by the Session Inspector plugin. */
+export const NS = 'session-inspector'
+
+/** Dictionary keys accepted by this plugin's translator. */
+export type SessionInspectorKey = keyof typeof en
+
+declare module '@hackdevcode/dsh-client-ui-slots' {
+  interface LocaleNamespaceMap {
+    /** Session Inspector tab and table labels. */
+    'session-inspector': SessionInspectorKey
+  }
+}
+
+/** English labels and dictionary keys. */
+export const en = {
+  'tab.title': 'Session log',
+  'tab.description': 'Analyze raw logs and grouped chat messages for the current session in the sidebar.',
+  'view.presentation': 'Presentation',
+  'view.sessionLog': 'Raw log',
+  'view.chatNode': 'Chat group',
+  'picker.pick': 'Pick an element in the chat view',
+  'picker.cancel': 'Cancel picking (Esc)',
+  'picker.instructions': 'Hover in the main chat to preview, then click to select. Esc cancels.',
+  'picker.noMatch': 'No matching record in this table. Pick another element or press Esc to cancel.',
+  'picker.noChat': 'Open this session in the main chat before picking.',
+  'table.id': 'Index',
+  'table.type': 'Type',
+  'filter.title': 'Filter types',
+  'filter.input': 'Type keyword',
+  'filter.placeholder': 'Type a fragment, e.g. delta',
+  'filter.help': 'Contains matching (*keyword*). Enter confirms; Esc cancels.',
+  'filter.candidates': 'Type suggestions',
+  'filter.loading': 'Finding suggestions…',
+  'filter.failed': 'Type suggestions could not be loaded.',
+  'filter.noCandidates': 'No suggestions. You can still apply this keyword.',
+  'filter.clear': 'Clear',
+  'filter.cancel': 'Cancel',
+  'filter.apply': 'Apply filter',
+  'filter.context': 'Parent context of a matching record',
+  'table.location': 'T/S',
+  'table.time': 'Time (UTC)',
+  'table.data': 'Data',
+  'table.older': 'Load earlier',
+  'table.loading': 'Loading…',
+  'table.latest': 'Follow latest',
+  'table.empty': 'No records',
+  'table.raw': 'Raw data',
+  'table.rawError': 'This record could not be serialized. Select another record to continue.',
+  'table.resizeDetails': 'Resize raw data panel',
+  'table.close': 'Close',
+  'table.expand': 'Expand children',
+  'table.collapse': 'Collapse children',
+  'table.removed': 'This record was removed or settled. Select a current record.',
+  'object.node': 'Node',
+  'object.nodeData': 'Node data',
+  'object.group': 'Group',
+  'object.groupData': 'Group data',
+  'object.turn': 'Turn',
+  'object.turnData': 'Turn data',
+  'object.step': 'Step',
+  'object.stepData': 'Step data',
+  'object.accessor': '[Getter / setter, not evaluated]',
+  'object.empty': 'Empty',
+  'object.absent': '[Empty slot]',
+  'object.properties': 'Other properties',
+  'object.more': 'Show more',
+  'object.navigation': 'Raw data navigation',
+} satisfies Record<string, string>

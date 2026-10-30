@@ -1,0 +1,65 @@
+- dialog "Settings":
+  - text: Settings
+  - navigation:
+    - button "General"
+    - button "Model"
+    - button "Built-in plugins"
+    - button "Agent presets"
+  - button "Open configuration file"
+  - button "Close"
+  - heading "Model" [level=2]
+  - paragraph: Enter your API keys to use models from the following providers.
+  - list:
+    - listitem:
+      - text: minimax-cn
+      - img "API key configured"
+      - button "Edit minimax-cn": Edit
+      - button "Delete minimax-cn": Delete
+    - listitem:
+      - text: openai
+      - button "Edit openai": Edit
+      - button "Delete openai": Delete
+      - text: openai API key
+      - button "Authentication details": "?"
+      - textbox "API key":
+        - /placeholder: Leave blank to use env as auth (OPENAI_API_KEY)
+      - paragraph: Env var detected. (OPENAI_API_KEY)
+      - group:
+        - text: Customized settings Base URL
+        - textbox "Base URL":
+          - /placeholder: https://api.openai.com/v1
+        - region "Models":
+          - text: Models Customized model catalog
+          - button "Restore defaults"
+          - button "Fetch available models"
+          - button "Reorder model 1"
+          - textbox "Model ID 1":
+            - /placeholder: Model ID
+            - text: gpt-6-astra
+          - textbox "Display name 1":
+            - /placeholder: Display name
+            - text: GPT-6 Astra
+          - button "Model options 1" [expanded]
+          - button "Delete model 1"
+          - text: Context window
+          - textbox "Context window 1":
+            - /placeholder: 1M
+            - text: 272K
+          - text: Max output tokens
+          - textbox "Max output tokens 1":
+            - /placeholder: 128K
+            - text: 128K
+          - group "Input types 1":
+            - text: Input types
+            - checkbox "Text" [checked]
+            - text: Text
+            - checkbox "Image" [checked]
+            - text: Image
+          - button "Add model"
+      - button "Cancel"
+      - button "Apply"
+    - listitem:
+      - text: Acme Gateway Custom
+      - button "Edit Acme Gateway (acme-gateway)": Edit
+      - button "Delete Acme Gateway (acme-gateway)": Delete
+  - button "Add model provider"

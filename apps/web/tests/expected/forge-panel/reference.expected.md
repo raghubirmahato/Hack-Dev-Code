@@ -1,0 +1,12 @@
+- listitem:
+  - img "Change request state: Needs attention"
+  - link "Add the pull request panel":
+    - /url: https://github.com/octo/demo/pull/7
+  - text: "#7 feat → main"
+  - button "Open in browser"
+  - button "Copy change request link"
+  - 'button "Remove from this Session #7"'
+  - 'button "Collapse #7" [expanded]'
+  - button "Check 1 failed · 1 passed"
+  - text: Review Review required · 1 unresolved Merge No conflicts
+  - 'button "View the changes of #7: 128 lines added, 14 lines deleted"': Changes +128 −14

@@ -1,0 +1,8 @@
+- dialog "Enable Auto review (experimental)?":
+  - heading "Enable Auto review (experimental)?" [level=2]
+  - button "Close"
+  - paragraph: Auto review runs without a sandbox. Before every native tool call and PTC inner call, the same model as the current agent reviews whether to allow it; you approve or reject each call it denies. This feature is experimental, can falsely allow or deny actions, and uses additional tokens.
+  - checkbox "I understand these risks and want to continue"
+  - text: I understand these risks and want to continue
+  - button "Cancel"
+  - button "Enable Auto review" [disabled]

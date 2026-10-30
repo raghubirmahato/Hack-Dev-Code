@@ -1,0 +1,4 @@
+- id: sandbox
+  name: '@hackdevcode/dsh-sandbox-local'
+- id: skills
+  name: '@hackdevcode/dsh-skill'

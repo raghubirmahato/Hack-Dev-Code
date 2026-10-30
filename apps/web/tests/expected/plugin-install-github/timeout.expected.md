@@ -1,0 +1,6 @@
+- dialog "GitHub connection timed out":
+  - heading "GitHub connection timed out" [level=2]
+  - button "Close"
+  - paragraph: Try another installation source.
+  - button "Cancel"
+  - button "Use mainland China mirror"

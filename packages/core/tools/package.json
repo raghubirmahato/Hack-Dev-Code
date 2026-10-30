@@ -1,0 +1,69 @@
+{
+  "name": "@hackdevcode/dsh-tools",
+  "description": "Tool registry and execution pipeline for the Hack Dev Code",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/core/tools"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./presentation": {
+      "types": "./lib/types/presentation.d.ts",
+      "default": "./lib/types/presentation.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./pipeline": {
+      "types": "./lib/types/pipeline.d.ts",
+      "default": "./lib/pipeline.js"
+    }
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/pipeline.js",
+    "lib/shared-*.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-scope": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-user-approval": "workspace:*"
+  },
+  "dependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-scope": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-tool-executor-native": "workspace:*",
+    "@hackdevcode/dsh-tool-testkit": "workspace:*",
+    "@hackdevcode/dsh-user-approval": "workspace:*",
+    "@hackdevcode/dsh-agent-loop-testkit": "workspace:*"
+  }
+}

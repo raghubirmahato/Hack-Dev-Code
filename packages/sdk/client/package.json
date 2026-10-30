@@ -1,0 +1,44 @@
+{
+  "name": "@hackdevcode/dsh-sdk-client",
+  "description": "TypeScript client SDK for driving a Hack Dev Code runtime subprocess over stdio JSON-RPC: the HackDevCode high-level turns API and the lower-level HarnessClient",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/sdk/client"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@hackdevcode/dsh": "workspace:*"
+  },
+  "peerDependencies": {
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-sdk-protocol": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-sdk-protocol": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-experimental-translator": "workspace:*"
+  }
+}

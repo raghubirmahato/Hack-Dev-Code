@@ -1,0 +1,5 @@
+- menu "Model and reasoning effort":
+  - menuitemradio "Default" [checked]
+  - menuitemradio "Off"
+  - menuitemradio "High"
+  - menuitemradio "Max"

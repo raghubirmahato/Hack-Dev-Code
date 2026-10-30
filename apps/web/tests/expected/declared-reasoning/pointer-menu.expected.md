@@ -1,0 +1,12 @@
+- group "Model and reasoning effort":
+  - searchbox "Search models…"
+  - menu "Model":
+    - group "DeepSeek":
+      - text: DeepSeek
+      - menuitemradio "DeepSeek-V4-Flash"
+      - menuitemradio "DeepSeek-V4-Flash-Vision-Exp"
+    - group "Acme Gateway":
+      - text: Acme Gateway
+      - menuitemradio "Acme Think"
+      - menuitemradio "Acme Swift" [checked]
+      - menuitemradio "Acme Lite"

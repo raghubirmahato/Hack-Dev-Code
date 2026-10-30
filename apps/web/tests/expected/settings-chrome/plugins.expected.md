@@ -1,0 +1,5 @@
+- listitem:
+  - button "tool-subagent, tool-subagent, Enabled":
+    - strong: tool-subagent
+    - text: Let the AI hand tasks to subagents and get their results.
+    - code: tool-subagent

@@ -1,0 +1,25 @@
+- button "Back to plugins": Plugins
+- heading "Subagent" [level=3]
+- paragraph: Set Subagent recursion depth, count, and models.
+- region "Limits":
+  - heading "Limits" [level=3]
+  - text: Maximum recursion depth
+  - button "About maximum recursion depth"
+  - text: Overridden
+  - button "Reset to default"
+  - textbox "Maximum recursion depth":
+    - /placeholder: ""
+    - text: "2"
+  - text: Subagent parallelism limit
+  - button "About the Subagent parallelism limit"
+  - text: Overridden
+  - button "Reset to default"
+  - textbox "Subagent parallelism limit":
+    - /placeholder: ""
+    - text: "12"
+- region "Model selection":
+  - heading "Model selection" [level=3]
+  - text: Allow agents to choose models for Subagents
+  - switch "Allow agents to choose models for Subagents"
+  - paragraph: Subagents use configured defaults or inherit the parent agent's model. Saved model choices are retained.
+- button "Save" [disabled]

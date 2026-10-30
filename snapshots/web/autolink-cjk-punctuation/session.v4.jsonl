@@ -1,0 +1,10 @@
+{"version":4,"isSeeded":false,"createdAt":0,"cwd":"{{cwd}}","delegationDepth":0,"type":"session","id":"{{session:1}}"}
+{"type":"turn/start","data":{"turn":1}}
+{"type":"step/start","data":{"turn":1,"step":1}}
+{"type":"system/message","data":{"turn":1,"step":1,"message":{"role":"system","content":[{"type":"text","text":"{{system}}"}],"source":{"kind":"system-prompt"},"id":"{{message:1}}"}},"surfaceOp":"append"}
+{"type":"user/message","data":{"content":[{"type":"text","text":"How should I prepare the meeting demo?"}],"source":{"kind":"user","rpcId":"{{rpc:1}}"},"role":"user","id":"{{message:2}}"},"surfaceOp":"append"}
+{"type":"session/title","data":{"title":"Meeting demo","messageSeqs":[3],"source":{"kind":"fallback"}}}
+{"type":"request/header","data":{"header":{"config":{"provider":"deepseek-official","model":"deepseek-v4-flash"},"tools":"{{tools}}"},"reason":"initial"}}
+{"type":"assistant/message","data":{"turn":1,"step":1,"message":{"role":"assistant","content":[{"type":"text","text":"\u539f\u7efc\u8ff0\u9876\u90e8\u4e5f\u52a0\u4e86\u8bb2\u7a3f\u7248\u5165\u53e3\uff1b\u5b8c\u6574\u7248\u4ecd\u7136\u4fdd\u7559\uff0c\u65b9\u4fbf\u4f1a\u540e\u8865\u7ec6\u8282\u3002\n\nIf the team meeting needs a live demo, the workbench is still http://127.0.0.1:8790/\u3002Suggest running through the timeline first\uff1bif it runs past 18 minutes, drop the backup segments in Step 6 and Step 8, and leave Section 11 untouched\u3002"}],"source":{"kind":"model","provider":"deepseek-official","model":"deepseek-v4-flash"},"id":"{{message:3}}"},"stream":[]},"surfaceOp":"append"}
+{"type":"step/end","data":{"turn":1,"step":1}}
+{"type":"turn/end","data":{"turn":1,"reason":{"kind":"completed"}}}

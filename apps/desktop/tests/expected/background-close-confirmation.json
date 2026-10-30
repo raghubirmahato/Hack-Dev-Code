@@ -1,0 +1,5 @@
+{
+  "message": "Running tasks will continue. You can reopen the window from the system tray.",
+  "buttons": ["Confirm"],
+  "detailHidden": true
+}

@@ -1,0 +1,28 @@
+{
+  "darwin:en-US": {
+    "menu": [
+      { "label": "About Hack Dev Code", "role": "about" },
+      { "type": "separator" }
+    ],
+    "options": {
+      "applicationName": "Hack Dev Code",
+      "applicationVersion": "1.0.0",
+      "version": "",
+      "copyright": "",
+      "iconPath": "<app icon>"
+    }
+  },
+  "win32:en-US": {
+    "menu": [
+      { "label": "About Hack Dev Code" },
+      { "type": "separator" }
+    ],
+    "options": {
+      "applicationName": "Hack Dev Code",
+      "applicationVersion": "1.0.0",
+      "version": "",
+      "copyright": "",
+      "iconPath": "<app icon>"
+    }
+  }
+}

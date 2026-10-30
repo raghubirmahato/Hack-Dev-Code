@@ -1,0 +1,380 @@
+// @vitest-environment jsdom
+/**
+ * Impact-matrix projection tests (row by row): what each
+ * phase projects onto the InputBar — enter routing, visuals (command chip /
+ * hint / pending), edit freedom, and the published currency's claim seat.
+ * React over jsdom per the client testing discipline; the machine is real.
+ */
+import './control-row-dom.ts'
+import type { GlobalStandardProps } from '@hackdevcode/dsh-client-ui-slots'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
+import type { Context } from '@hackdevcode/cordis'
+import type { SessionSnapshot } from '@hackdevcode/dsh-api-session-controller/client'
+import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
+import {
+  allowAllAccess, bindSnapshotSelector, conversationSnapshot, sessionSnapshot,
+} from '@hackdevcode/dsh-client-test-runtime'
+import type { SessionStatusSnapshot } from '@hackdevcode/dsh-client-ui-session/client'
+import type { SessionId } from '@hackdevcode/dsh-session/types'
+import type { SubmitAttachment, SubmitOutcome } from '../src/client/contract/input.ts'
+import { makeTranslate } from '@hackdevcode/dsh-client-test-runtime'
+
+import type { DraftAttachmentId } from '../src/client/contract/input.ts'
+import { SessionInputShell } from '../src/client/input/facade.ts'
+import { InputBar } from '../src/client/skeleton/InputBar.tsx'
+import type { InputBarProps } from '../src/client/skeleton/InputBar.tsx'
+import { en } from '../src/client/locales.ts'
+import { en as commonEn } from '@hackdevcode/dsh-client-locale/src/locales/en.ts'
+
+// Every fixture carries the resource hook the resources plugin merges into GlobalStandardProps.
+const useResource = (() => ({ status: 'none' as const, value: undefined, failure: undefined })) as GlobalStandardProps['useResource']
+
+// jsdom implements no Range geometry (Lexical's scroll-into-view measures the
+// caret with one once the surface is genuinely contenteditable).
+Range.prototype.getBoundingClientRect = () => ({
+  top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}),
+})
+
+
+afterEach(cleanup)
+
+const SCTX = {} as Context
+const SID = 's1' as SessionId
+
+/** Standard-props InputBar mount over a real shell (the composer-bar entry shape). */
+function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled?: boolean }) {
+  const session = createSnapshotStore<SessionSnapshot>({
+    ...sessionSnapshot(SID),
+    running: over?.running ?? false,
+    removed: over?.disabled ?? false,
+  })
+  const props: InputBarProps = {
+    usePanelInfo: selector => selector({ activePanelId: null }),
+    sessionId: SID,
+    SessionProvider: ({ children }) => children,
+    useSession: bindSnapshotSelector(session),
+    useSessions: bindSnapshotSelector(createSnapshotStore({
+      ids: [], byId: {}, current: undefined, phase: 'ready',
+      projectionsBySession: {}, currentAddress: undefined,
+    })),
+    useSessionStatus: bindSnapshotSelector(
+      createSnapshotStore<SessionStatusSnapshot>(new Map()),
+    ),
+    useSessionRetainInfo: () => undefined,
+    useResource,
+    useWorkspaces: bindSnapshotSelector(createSnapshotStore({
+      items: [], archivedSessionIds: [], pinnedSessionIds: [], state: 'idle', phase: 'ready', error: null,
+      baselinesReady: true, recentWorkspaceId: undefined,
+    })),
+    ...allowAllAccess,
+    useProjection: (() => undefined),
+    useConversation: bindSnapshotSelector(createSnapshotStore(conversationSnapshot())),
+    useInput: bindSnapshotSelector(shell.state),
+    inputActions: shell.actions,
+    keyboard: shell,
+    addFiles: () => null,
+    useFileUploads: bindSnapshotSelector(createSnapshotStore({})),
+    retryFileUpload: undefined,
+    removeAttachment: () => {},
+    // Every id resolves so the bar's registry prune never drops a test image.
+    resolveDraftAttachments: ids => ids.map(id => ({
+      kind: 'image' as const, id,
+      file: new File([Uint8Array.of(1)], `${id}.png`, { type: 'image/png' }),
+      previewUrl: `blob:${id}`,
+    })),
+    toggleCommandMenu: vi.fn(),
+    useBusyEnter: bindSnapshotSelector(createSnapshotStore<'queue' | 'steer'>('queue')),
+    useStopShortcut: bindSnapshotSelector(createSnapshotStore<readonly string[]>([])),
+    useNotices: bindSnapshotSelector(shell.notices),
+    useLexicon: bindSnapshotSelector(shell.lexicon),
+    useMenuLauncher: bindSnapshotSelector(createSnapshotStore<string | null>(null)),
+    renderSlot: (() => null) as InputBarProps['renderSlot'],
+    stop: vi.fn(),
+    t: makeTranslate(en, commonEn),
+    variant: 'composer',
+  }
+  return render(<InputBar {...props} />)
+}
+
+function bench(over?: {
+  running?: boolean
+  disabled?: boolean
+  submit?: (args: string) => Promise<SubmitOutcome>
+  serialize?: (ids: readonly DraftAttachmentId[]) => Promise<readonly SubmitAttachment[]>
+}) {
+  const sink = vi.fn(() => Promise.resolve<SubmitOutcome>({ kind: 'success' }))
+  const serialize = vi.fn(over?.serialize ?? (() => Promise.resolve<readonly SubmitAttachment[]>([])))
+  const release = vi.fn()
+  const shell = new SessionInputShell({ actx: SCTX, defaultSink: sink, commandAttachments: { serialize, release, unsupportedNotice: (token: string) => `${token.trim()} attachments-unsupported` } })
+  const wiring = shell
+  const view = mountBar(shell, over)
+  const textarea = view.container.querySelector<HTMLDivElement>('[data-composer-input]')!
+  const claim = (token = '/goal ', hint = 'Goal', attachments?: true) => {
+    act(() => {
+      shell.setDraft(token)
+      shell.beginCommand(
+        {
+          name: token.slice(1).trim(), token, hint,
+          ...(attachments === true ? { attachments: true } : {}),
+          submit: over?.submit ?? (() => Promise.resolve({ kind: 'success' as const, source: 'command', name: 'goal' })),
+        },
+        { start: 0, end: token.length, draftRev: shell.snapshot.draftRev },
+      )
+    })
+  }
+  /** Type at the live caret, as keyboard input after the claimed chip does. */
+  const typeAtCaret = (text: string) => {
+    act(() => { shell.actions.insertText(text, shell.actions.captureInsertion()) })
+  }
+  return { view, textarea, shell, wiring, sink, claim, typeAtCaret, serialize, release }
+}
+
+describe('matrix row: plain', () => {
+  it('unsubscribes from the Inbox projection when disposed', () => {
+    const unsubscribe = vi.fn()
+    const subscribe = vi.fn(() => unsubscribe)
+    const shell = new SessionInputShell({
+      actx: SCTX,
+      defaultSink: () => Promise.resolve({ kind: 'success' }),
+      inbox: { getSnapshot: () => undefined, subscribe },
+      commandAttachments: {
+        serialize: () => Promise.resolve([]),
+        release: () => {},
+        unsupportedNotice: token => `${token.trim()} attachments-unsupported`,
+      },
+    })
+
+    expect(subscribe).toHaveBeenCalledOnce()
+    shell.dispose()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
+  it('enter falls to the default sink; no claim on the currency; the draft clears once accepted', async () => {
+    const { textarea, shell, sink } = bench()
+    act(() => { shell.setDraft('queued draft') })
+    expect(shell.snapshot.claim).toBeUndefined()
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(sink).toHaveBeenCalledWith('queued draft', [], 'queue', expect.any(AbortSignal), expect.any(Function))
+    // The composer holds the message, read-only, until the Host accepts it.
+    expect(shell.snapshot).toMatchObject({ phase: 'sending', draft: 'queued draft' })
+    await vi.waitFor(() => { expect(shell.snapshot.phase).toBe('plain') })
+    expect(shell.snapshot.draft).toBe('')
+    expect(shell.snapshot.claim).toBeUndefined()
+  })
+})
+
+describe('matrix row: claimed', () => {
+  it('publishes the claim currency, renders the command chip, hints while args are blank, and edits stay free', () => {
+    const { view, textarea, shell, claim, typeAtCaret } = bench()
+    claim()
+    expect(shell.snapshot.claim).toEqual({ name: 'goal', token: '/goal ', hint: 'Goal' })
+    const chip = view.container.querySelector('[data-composer-command="goal"]')
+    expect(chip?.textContent).toBe('/goal')
+    expect(chip?.getAttribute('contenteditable')).toBe('false')
+    expect(shell.snapshot.draft).toBe('/goal ')
+    // The zh dictionary owns a hint.goal entry, which overrides the raw claim hint (production behavior).
+    expect(textarea.style.getPropertyValue('--dsh-composer-hint')).toBe(JSON.stringify('describe the objective for a long-running task'))
+    expect(textarea.getAttribute('contenteditable')).toBe('true')
+    // Free editing after the chip: hint drops, claim holds.
+    typeAtCaret('task args')
+    expect(shell.snapshot.draft).toBe('/goal task args')
+    expect(shell.snapshot.phase).toBe('claimed')
+    expect(textarea.style.getPropertyValue('--dsh-composer-hint')).toBe('')
+  })
+
+  it('enter routes to claim.submit (command lane, never the queue sink)', async () => {
+    const submit = vi.fn(() => Promise.resolve({ kind: 'success' as const, text: 'Done', source: 'command', name: 'goal' }))
+    const { view, textarea, shell, sink, claim, typeAtCaret } = bench({ submit })
+    claim()
+    typeAtCaret('task')
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(sink).not.toHaveBeenCalled()
+    await vi.waitFor(() => { expect(submit).toHaveBeenCalledWith('task', SCTX, []) })
+    // Commit: draft cleared, notice surfaced, back to plain.
+    await vi.waitFor(() => { expect(shell.snapshot.draft).toBe('') })
+    expect(view.getByText('Done')).toBeTruthy()
+  })
+
+  it('replacing the whole draft removes the chip and releases to plain', () => {
+    const { view, shell, claim } = bench()
+    claim()
+    act(() => { shell.setDraft('/goal task') })
+    expect(shell.snapshot.phase).toBe('plain')
+    expect(shell.snapshot.claim).toBeUndefined()
+    expect(view.container.querySelector('[data-composer-command]')).toBeNull()
+  })
+})
+
+describe('matrix row: claimed with attachments', () => {
+  const img = 'img-1' as DraftAttachmentId
+
+  it('a claim without attachment acceptance blocks enter: one notice and the full draft retained', async () => {
+    const submit = vi.fn(() => Promise.resolve({ kind: 'success' as const }))
+    const { view, textarea, shell, sink, claim } = bench({ submit })
+    claim()
+    act(() => { shell.addAttachments([img]) })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    await Promise.resolve()
+    expect(shell.snapshot.phase).toBe('claimed')
+    expect(submit).not.toHaveBeenCalled()
+    expect(sink).not.toHaveBeenCalled()
+    expect(view.getByText('/goal attachments-unsupported')).toBeTruthy()
+    expect(shell.snapshot.attachmentIds).toEqual([img])
+    expect(shell.snapshot.draft).toBe('/goal ')
+  })
+
+  it('an accepting claim serializes and forwards a mixed batch; success consumes and clears', async () => {
+    const submit = vi.fn(() => Promise.resolve({ kind: 'success' as const }))
+    const png: SubmitAttachment = { type: 'image', mediaType: 'image/png', data: 'AA==' }
+    const file: SubmitAttachment = { type: 'file', receiptId: 'receipt-x' }
+    const { textarea, shell, claim, serialize, release } = bench({ submit, serialize: () => Promise.resolve([png, file]) })
+    claim('/goal ', 'Goal', true)
+    // The claim currency carries the acceptance flag the pre-gate reads.
+    expect(shell.snapshot.claim).toEqual({ name: 'goal', token: '/goal ', hint: 'Goal', attachments: true })
+    act(() => { shell.addAttachments([img]) })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    await vi.waitFor(() => { expect(submit).toHaveBeenCalledWith('', SCTX, [png, file]) })
+    expect(serialize).toHaveBeenCalledWith([img])
+    await vi.waitFor(() => { expect(shell.snapshot.draft).toBe('') })
+    expect(release).toHaveBeenCalledWith([img])
+    expect(shell.snapshot.attachmentIds).toEqual([])
+    expect(shell.snapshot.phase).toBe('plain')
+  })
+
+  it('a handler error keeps a serialized file unreleased beside the notice and draft', async () => {
+    const submit = vi.fn(() => Promise.resolve({ kind: 'error' as const, text: 'Failed' }))
+    const file: SubmitAttachment = { type: 'file', receiptId: 'receipt-x' }
+    const { view, textarea, shell, claim, release } = bench({ submit, serialize: () => Promise.resolve([file]) })
+    claim('/goal ', 'Goal', true)
+    act(() => { shell.addAttachments([img]) })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    await vi.waitFor(() => { expect(view.getByText('Failed')).toBeTruthy() })
+    expect(shell.snapshot.phase).toBe('claimed')
+    expect(shell.snapshot.attachmentIds).toEqual([img])
+    expect(release).not.toHaveBeenCalled()
+    expect(shell.snapshot.draft).toBe('/goal ')
+  })
+
+  it('a serialize rejection blocks the transaction: notice, no submit call, images kept', async () => {
+    const submit = vi.fn(() => Promise.resolve({ kind: 'success' as const }))
+    const { view, textarea, shell, claim, release } = bench({ submit, serialize: () => Promise.reject(new Error('serialize failed')) })
+    claim('/goal ', 'Goal', true)
+    act(() => { shell.addAttachments([img]) })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    await vi.waitFor(() => { expect(view.getByText('serialize failed')).toBeTruthy() })
+    expect(submit).not.toHaveBeenCalled()
+    expect(shell.snapshot.attachmentIds).toEqual([img])
+    expect(release).not.toHaveBeenCalled()
+    expect(shell.snapshot.phase).toBe('claimed')
+  })
+
+  it('a disposed shell never lets a pending serialization reach claim.submit', async () => {
+    const submit = vi.fn(() => Promise.resolve({ kind: 'success' as const }))
+    let resolveSerialize!: (images: readonly SubmitAttachment[]) => void
+    const { shell, textarea, claim } = bench({
+      submit,
+      serialize: () => new Promise((resolve) => { resolveSerialize = resolve }),
+    })
+    claim('/goal ', 'Goal', true)
+    act(() => { shell.addAttachments([img]) })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    await vi.waitFor(() => { expect(resolveSerialize).toBeDefined() })
+    shell.dispose()
+    resolveSerialize([{ type: 'image', mediaType: 'image/png', data: 'AA==' }])
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(submit).not.toHaveBeenCalled()
+  })
+
+  it('image removal is refused while a command submit is in flight', async () => {
+    const submit = vi.fn(() => new Promise<SubmitOutcome>(() => {})) // never settles
+    const { shell, textarea, claim } = bench({ submit, serialize: () => Promise.resolve([]) })
+    claim('/goal ', 'Goal', true)
+    act(() => { shell.addAttachments([img]) })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(shell.snapshot.phase).toBe('submitting')
+    const draft = shell.snapshot.draft
+    expect(shell.addFiles([{
+      source: 'reference', ref: '@note.txt', label: 'note.txt', clipboardText: '@note.txt',
+    }], ['new-file' as DraftAttachmentId])).toBe(false)
+    expect(shell.snapshot.draft).toBe(draft)
+    let removed = true
+    act(() => { removed = shell.removeAttachment(img) })
+    expect(removed).toBe(false)
+    expect(shell.snapshot.attachmentIds).toEqual([img])
+  })
+})
+
+describe('matrix row: submitting', () => {
+  it('locks enter, renders pending + read-only, keeps the claim snapshot on the currency', async () => {
+    const submit = vi.fn(() => new Promise<SubmitOutcome>(() => {})) // never settles
+    const { textarea, shell, sink, claim } = bench({ submit })
+    claim()
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(shell.snapshot.phase).toBe('submitting')
+    expect(shell.snapshot.claim).toBeDefined()
+    expect(textarea.getAttribute('contenteditable')).toBe('false')
+    // Enter is dead inside the lock (submit dispatch is microtask-deferred).
+    await vi.waitFor(() => { expect(submit).toHaveBeenCalledTimes(1) })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    await Promise.resolve()
+    expect(submit).toHaveBeenCalledTimes(1)
+    expect(sink).not.toHaveBeenCalled()
+  })
+
+  it('rollback with unchanged draft returns to claimed with the notice; drifted draft only notices', async () => {
+    let rejectSubmit!: (e: Error) => void
+    const submit = vi.fn(() => new Promise<SubmitOutcome>((_res, rej) => { rejectSubmit = rej }))
+    const first = bench({ submit })
+    first.claim()
+    fireEvent.keyDown(first.textarea, { key: 'Enter' })
+    await vi.waitFor(() => { expect(submit).toHaveBeenCalled() })
+    act(() => { rejectSubmit(new Error('submit failed')) })
+    await vi.waitFor(() => { expect(first.shell.snapshot.phase).toBe('claimed') })
+    expect(first.shell.snapshot.draft).toBe('/goal ')
+    expect(first.view.getByText('submit failed')).toBeTruthy()
+    cleanup()
+    // Drift: typing during flight wins; no restore, plain, notice only.
+    const submit2 = vi.fn(() => new Promise<SubmitOutcome>((_res, rej) => { rejectSubmit = rej }))
+    const second = bench({ submit: submit2 })
+    second.claim()
+    fireEvent.keyDown(second.textarea, { key: 'Enter' })
+    await vi.waitFor(() => { expect(submit2).toHaveBeenCalled() })
+    act(() => { second.shell.setDraft('second draft') })
+    act(() => { rejectSubmit(new Error('second failure')) })
+    await vi.waitFor(() => { expect(second.shell.snapshot.phase).toBe('plain') })
+    expect(second.shell.snapshot.draft).toBe('second draft')
+    expect(second.view.getByText('second failure')).toBeTruthy()
+  })
+})
+
+describe('matrix row: locked (session disabled)', () => {
+  it('disables the textarea and chrome; the machine currency is untouched', () => {
+    const { view, textarea, shell } = bench({ disabled: true })
+    expect(textarea.getAttribute('aria-disabled')).toBe('true')
+    expect((view.getByLabelText('Add files or run commands') as HTMLButtonElement).disabled).toBe(true)
+    expect(shell.snapshot.phase).toBe('plain')
+  })
+
+  it('running does NOT lock: typing and enter-queue stay live', () => {
+    const { textarea, shell, sink } = bench({ running: true })
+    expect(textarea.getAttribute('aria-disabled')).not.toBe('true')
+    act(() => { shell.setDraft('queue draft') })
+    fireEvent.keyDown(textarea, { key: 'Enter' })
+    expect(sink).toHaveBeenCalledWith('queue draft', [], 'queue', expect.any(AbortSignal), expect.any(Function))
+  })
+})
+
+describe('matrix row: takeover (orthogonal axis)', () => {
+  it('the machine state survives outside the render tree (claim lives on the shell, not the DOM)', () => {
+    const { view, shell, claim } = bench()
+    claim()
+    // Takeover hides the composer (overlay chain keeps it mounted-but-hidden);
+    // even a full unmount keeps the claim: state lives on the resident shell.
+    view.unmount()
+    expect(shell.snapshot.phase).toBe('claimed')
+    expect(shell.snapshot.claim?.token).toBe('/goal ')
+    expect(shell.snapshot.draft).toBe('/goal ')
+  })
+})

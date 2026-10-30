@@ -1,0 +1,126 @@
+[
+  {
+    "id": "cot_original",
+    "prompt": "I want the model's reasoning shown in Chinese; right now it is sometimes in English.",
+    "expected": "Look up the catalog, offer exactly one matching cot-translation-bundle card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "cot_paraphrase",
+    "prompt": "Reading expanded English reasoning is hard work; can I read it in Chinese directly?",
+    "expected": "Look up the catalog, offer exactly one matching cot-translation-bundle card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "badge",
+    "prompt": "From now on, whenever you create a PR for me, include the powered by dsh badge.",
+    "expected": "Look up the catalog, offer exactly one matching badge-skill-bundle card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "voice",
+    "prompt": "I want to dictate long requests in DSH by voice instead of typing everything.",
+    "expected": "Look up the catalog, offer exactly one matching voice-input-bundle card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "titles",
+    "prompt": "The topic of my session drifts but the title stays at the first sentence; I want it to follow the conversation.",
+    "expected": "Look up the catalog, offer exactly one matching session-titles-bundle card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "search",
+    "prompt": "I want to find a plan we discussed in an earlier session of this workspace; is there an existing feature?",
+    "expected": "Look up the catalog, offer exactly one matching session-search card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "terminal",
+    "prompt": "I want terminals you open to persist across tool calls, keep shell state, and keep accepting input for the same interactive program.",
+    "expected": "Look up the catalog, offer exactly one matching terminal-bundle card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "worktree",
+    "prompt": "I want you to open an independent branch and working directory in DSH for new changes while the current changes stay put.",
+    "expected": "Look up the catalog, offer exactly one matching tool-worktree card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "team",
+    "prompt": "I want multiple agents to divide work, talk to each other, and coordinate progress on a shared task board.",
+    "expected": "Look up the catalog, offer exactly one matching agent-team-profile card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "auto_review",
+    "prompt": "Confirming every tool call in DSH breaks my flow; can the model decide based on my authorization first?",
+    "expected": "Look up the catalog, offer exactly one matching auto-review card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "ralph",
+    "prompt": "I want to iterate on one goal in a loop, each round continuing in a new agent with a clean context.",
+    "expected": "Look up the catalog, offer exactly one matching ralph-bundle card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "inspector",
+    "prompt": "I want to inspect a session's raw events and message grouping in the DSH UI to debug a display problem.",
+    "expected": "Look up the catalog, offer exactly one matching inspector-profile card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "market",
+    "prompt": "I have a third-party plugin market index and want to add it to DSH to browse and install its plugins.",
+    "expected": "Look up the catalog, offer exactly one matching plugin-market-bundle card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "cua",
+    "prompt": "I want you to inspect and click desktop app interfaces and fill forms on my Mac; what does DSH already offer?",
+    "expected": "Look up the catalog, offer exactly one matching cua-bundle card, explain its actual scope, and do not enable or edit files before the user acts."
+  },
+  {
+    "id": "translation_once",
+    "prompt": "Translate this sentence into English: Let me check the failing test first.",
+    "expected": "No recommendation card or file edits; clarify if the request is vague, otherwise answer the request."
+  },
+  {
+    "id": "ordinary_question",
+    "prompt": "Explain the difference between Git merge and rebase in two sentences.",
+    "expected": "No recommendation card or file edits; clarify if the request is vague, otherwise answer the request."
+  },
+  {
+    "id": "one_off",
+    "prompt": "Write me a short sentence celebrating finishing work today.",
+    "expected": "No recommendation card or file edits; clarify if the request is vague, otherwise answer the request."
+  },
+  {
+    "id": "vague",
+    "prompt": "I want this interface to be easier to use.",
+    "expected": "No recommendation card or file edits; clarify if the request is vague, otherwise answer the request."
+  },
+  {
+    "id": "decline",
+    "prompt": "I want the reasoning content shown in Chinese, but only discuss it first; do not recommend plugins or change settings.",
+    "expected": "No recommendation card or file edits; clarify if the request is vague, otherwise answer the request."
+  },
+  {
+    "id": "two_cards_ambiguous_counter",
+    "setup": "Both experiments enabled; badge disabled.",
+    "prompt": "I need the DSH badge on every PR, plus a right-sidebar counter. Offer two entries: one card for an existing plugin and one to create it, but do not act yet.",
+    "expected": "Exactly one badge proposal, no rejected extra call. Explain the remaining need and clarify what to count; do not invent PR aggregation or promise an automatic later card."
+  },
+  {
+    "id": "creation_first_without_priority",
+    "setup": "Both experiments enabled; badge disabled.",
+    "prompt": "I want a manual achievement counter in the right sidebar of this session that can increment, reset, and save per session. I also want the DSH badge on every PR. Give me entries for both, but do not act yet.",
+    "expected": "Choose the existing badge plugin despite mention order; discuss the independent counter without proposing a second card or claiming it exists."
+  },
+  {
+    "id": "explicit_creation_priority",
+    "setup": "Both experiments enabled; badge disabled.",
+    "prompt": "I want the DSH badge on every PR and also a manual achievement counter in the right sidebar of this session that can increment, reset, and save per session. This round, prioritize the counter creation entry; only explain the badge and do not act.",
+    "expected": "Exactly one create_personalized_page card with slot sidebar-right for the manual counter; no badge proposal and no generation before clicking Create."
+  },
+  {
+    "id": "later_independent_need",
+    "setup": "Same conversation after a badge-only recommendation; both experiments enabled.",
+    "prompt": "Now give me the counter plan: a manual achievement counter in the right sidebar of this session that can increment, reset, and save per session; do not create it yet.",
+    "expected": "One creation card in the new turn, without a turn-limit rejection or requiring badge activation; preserve manual counting and per-Session data."
+  },
+  {
+    "id": "two_existing_plugins",
+    "prompt": "Reading expanded English reasoning is hard, and I also want the DSH badge on every PR. Give recommendation entries for both existing plugins, but do not enable them yet.",
+    "expected": "Select one eligible plugin before calling propose_action, explain the other need, no rejected second call or claim that both cards exist."
+  }
+]

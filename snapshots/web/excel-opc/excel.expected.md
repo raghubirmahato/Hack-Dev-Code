@@ -1,0 +1,22 @@
+# Independent-writer Excel previews
+
+- comments.xlsx: Data opened; Item copied
+- table.xlsx: Data opened; Item copied
+- prefix.xlsx: Data opened; Item copied
+- part-name.xlsx: Data opened; Item copied
+- relative.xlsx: Data opened; Item copied
+- combined.xlsx: Data opened; Item copied
+- strict.xlsx: Data opened; Item copied
+- case-root.xlsx: Data opened; Item copied
+- case-parts.xlsx: Data opened; Item copied
+- orphan-drawing.xlsx: Data opened; Item copied
+- rich.xlsx: Data opened; Item copied
+- utf16-sheet.xlsx: Data opened; Item copied
+- utf16-metadata.xlsx: Data opened; Item copied
+- workbook-path.xlsx: Data opened; Item copied
+- styles-path.xlsx: Data opened; Item copied
+- strings-path.xlsx: Data opened; Item copied
+- cdata.xlsx: Data opened; Item copied
+- parts-path.xlsx: Data opened; Item copied
+- Relocated workbook: hidden sheet omitted
+- Relocated workbook notice: This preview does not support charts, images, shapes, conditional formatting in this workbook. Open it in a system application for the full experience.

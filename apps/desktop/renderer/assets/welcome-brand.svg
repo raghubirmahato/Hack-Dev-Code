@@ -1,0 +1,14 @@
+<svg width="472" height="40" viewBox="0 0 472 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+<style>
+  :root {
+    --dsw-alias-label-primary: #0f1115;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --dsw-alias-label-primary: #f9fafb;
+    }
+  }
+</style>
+<path d="M106 5.267C115 8.1 133 8.1 142 5.267L141 10.433C138.833 11.433 136.667 12.017 134.667 12.267L133.833 12.267L134.05 16.1L137.167 16.1L137.167 18.767L134.2 18.767L135.167 35.933L131.333 35.933L130.6 18.767L117.4 18.767L116.667 35.933L112.833 35.933L113.8 18.767L110.833 18.767L110.833 16.1L113.95 16.1L114.167 12.267L113.333 12.267C111.333 12.017 109.167 11.433 107 10.433ZM117.667 12.267L130.333 12.267L130.5 16.1L117.5 16.1ZM119.333 22.1L121.167 20.267L126.5 25.6L121.167 30.933L119.333 29.1L122.833 25.6ZM125 30.6L129.333 30.6L129.333 32.767L125 32.767Z" fill="var(--dsw-alias-label-primary)" fill-rule="evenodd"/>
+<text x="154" y="29" fill="var(--dsw-alias-label-primary)" font-family="Segoe UI, -apple-system, Helvetica, Arial, sans-serif" font-size="28" font-weight="700" textLength="194" lengthAdjust="spacingAndGlyphs">Hack Dev Code</text>
+</svg>

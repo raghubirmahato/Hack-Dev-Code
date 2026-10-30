@@ -1,0 +1,9 @@
+- dialog "Add plugin":
+  - heading "Add plugin" [level=2]
+  - button "Close"
+  - textbox "Plugin package name":
+    - /placeholder: for example dsh-plugin-example-pet
+  - button "Install guide and examples"
+  - button "Registry Mainland China mirror"
+  - note: Install only plugins you trust: they run with your permissions and can damage Hack Dev Code or leak your data. On-demand official plugins offer Update when their version differs from DSH. To update other plugins, uninstall and reinstall them.
+  - button "Install" [disabled]

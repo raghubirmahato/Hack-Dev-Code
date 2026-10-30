@@ -1,0 +1,60 @@
+- heading "Plugins" [level=1]
+- text: Install, enable, and configure plugins
+- button "About plugins"
+- button "Refresh"
+- group "Add plugin":
+  - button "Add plugin"
+  - button "Choose how to add a plugin"
+- heading "Built-in plugin settings" [level=3]
+- list:
+  - listitem:
+    - button "View Subagent": Subagent
+    - text: Set Subagent recursion depth, count, and models.
+  - listitem:
+    - button "View Web search": Web search
+    - text: Set up the DeepSeek search provider.
+  - listitem:
+    - button "View Agent loop": Agent loop
+    - text: Control how the Agent dispatches tool calls.
+  - listitem:
+    - button "View Shell": Shell
+    - text: Limit how long each command may run and how much it may output.
+- heading "Experimental plugins" [level=3]
+- button "More"
+- list:
+  - listitem:
+    - button "View Agent teams": Agent teams
+    - text: Experimental Lets the agent you talk to split a job among named teammates, track it on a shared task board, and report back with their results.
+    - status
+    - switch "Enable Agent teams"
+  - listitem:
+    - button "View Voice input": Voice input
+    - text: Experimental Transcribe recordings locally with SenseVoice; first use requires installing dependencies.
+    - status
+    - switch "Enable Voice input"
+  - listitem:
+    - button "View Custom plugin indexes": Custom plugin indexes
+    - text: Experimental Adds a Discover tab to Plugins, where you browse and install plugins from plugin indexes you add.
+    - status
+    - switch "Enable Custom plugin indexes"
+  - listitem:
+    - button "View Auto authorization review": Auto authorization review
+    - text: Experimental Adds an Auto review access mode: before each tool call, a model checks it against what you asked for, runs allowed calls at once, and holds denied calls for your approval.
+    - status
+    - switch "Enable Auto authorization review"
+  - listitem:
+    - button "View Change requests & worktrees": Change requests & worktrees
+    - text: Experimental Track each Session's change requests with their checks and reviews, and start new Sessions in a Git worktree; uses the gh CLI for GitHub.
+    - status
+    - switch "Enable Change requests & worktrees"
+- heading "Installed plugins" [level=3]
+- list:
+  - listitem:
+    - button "View @fixture/bundle": "@fixture/bundle"
+    - text: Registry description for the fixture bundle.
+    - status
+    - switch "Enable @fixture/bundle"
+  - listitem:
+    - button "View dsh-web-scaffold-defaults": dsh-web-scaffold-defaults
+    - status
+    - switch "Enable dsh-web-scaffold-defaults" [checked]

@@ -1,0 +1,40 @@
+/** Product copy for native permission onboarding and application revocation. */
+export const NS = 'cuaPermissions'
+/** English permission-page dictionary. */
+export const en = {
+  title: 'Authorize computer use',
+  applicationsTitle: 'Manage applications computer use can access',
+  setupTitle: 'Set up computer use before use',
+  setupBody: 'Computer use is enabled. Before using it, switch to PTC mode and grant Accessibility and Screen Recording permissions. Open the plugin details to complete setup.',
+  setupQueryFailed: 'Computer use is enabled, but system permissions could not be checked. Open the plugin details to see the error and retry.',
+  defaultTitle: 'Default mode for new sessions',
+  defaultBody: 'Computer use is available only in PTC mode.',
+  defaultConfirm: 'Set to PTC', defaultSet: 'PTC is the default',
+  defaultUnavailable: 'Could not read the default mode. Check it in Settings.',
+  defaultReadOnly: 'Default-mode settings are read-only.',
+  defaultNotSaved: 'The default mode was not saved. Try again.',
+  defaultFailed: 'Could not change the default mode: {message}',
+  persistentTitle: 'PTC execution mode',
+  persistentBody: 'Keep variables and application objects across tool calls. Switching restarts the PTC runtime.',
+  persistentConfirm: 'Use persistent mode', persistentSet: 'Persistent mode enabled',
+  persistentUnavailable: 'Could not read the PTC execution mode. Check it in Settings.',
+  persistentReadOnly: 'PTC execution settings are read-only.',
+  persistentNotSaved: 'The PTC execution mode was not saved. Try again.',
+  persistentFailed: 'Could not change the PTC execution mode: {message}',
+  openSetup: 'Open settings', later: 'Later', close: 'Close',
+  accessibility: 'Accessibility', screenRecording: 'Screen Recording',
+  accessibilityUse: 'Read interface controls, click, and type.', screenRecordingUse: 'Capture the selected application window.',
+  accessibilityPermission: 'In System Settings, allow {application} to read interface controls, click, and type.',
+  screenRecordingPermission: 'In System Settings, allow {application} to capture application windows.',
+  permissionHint: 'Manage permissions in System Settings for the application named by macOS.',
+  granted: 'Allowed', unknown: 'Unknown', request: 'Request permission', settings: 'Open System Settings', retry: 'Retry',
+  allowedApps: 'Always-allowed applications',
+  blockedApps: 'Applications not allowed', retryApproval: 'Allow asking again',
+  retryAllowed: 'The next application selection will ask again; access has not been granted',
+  noApps: 'No always-allowed or blocked applications.',
+  revoke: 'Revoke', revoked: 'Application access revoked', requested: 'Review the macOS prompt, or open System Settings if no prompt appears', opened: 'System Settings opened',
+  applicationsFailed: 'Could not load application access: {message}', iconsFailed: 'Could not load application icons: {message}',
+  failed: 'Could not update permissions: {message}', queryFailed: 'Could not check permissions: {message}',
+}
+/** Keys shared by all supported locale dictionaries. */
+export type CuaPermissionLocaleKey = keyof typeof en

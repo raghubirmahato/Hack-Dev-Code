@@ -1,0 +1,85 @@
+{
+  "name": "@hackdevcode/dsh-api-gateway",
+  "description": "Typert Remote Host dispatcher and Client API endpoint",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/api/gateway"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "node": "./lib/client.node.js",
+      "browser": "./lib/client.browser.js",
+      "default": "./lib/client.browser.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./stream-protocol": {
+      "types": "./lib/types/stream-protocol.d.ts",
+      "default": "./lib/types/stream-protocol.js"
+    },
+    "./locale/*.json": "./locale/*.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@hackdevcode/dsh-typert-registry",
+        "@hackdevcode/dsh-client-connection"
+      ],
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.browser.js",
+    "lib/client.node.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@hackdevcode/dsh-deque": "workspace:*",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "ws": "^8.21.3",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-api-remote-access": "workspace:*",
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-cmdline": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-host-webserver": "workspace:*",
+    "@hackdevcode/dsh-remote-mock": "workspace:*",
+    "@hackdevcode/dsh-typert-registry": "workspace:*",
+    "@hackdevcode/dsh-util-crypto": "workspace:*",
+    "@types/ws": "^8.18.1",
+    "@hackdevcode/cordis": "workspace:~",
+    "zod": "4.4.3"
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "name": "@hackdevcode/dsh-experimental-agent-team-profile",
+  "description": "Agent Teams collaboration, tools, and Web UI in one experimental bundle",
+  "version": "0.2.2-alpha.2",
+  "icon": "./icon.svg",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/experimental/agent-team-profile"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "icon.svg",
+    "locale/*.json",
+    "docs",
+    "lib/index.js",
+    "cordis.patch.yml",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "dependencies": {
+    "@hackdevcode/dsh-experimental-agent-team": "workspace:*",
+    "@hackdevcode/dsh-experimental-client-ui-agent-team": "workspace:*",
+    "@hackdevcode/dsh-experimental-tool-agent-team": "workspace:*"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis-plugin-include": "workspace:~",
+    "@hackdevcode/cordis": "workspace:~",
+    "js-yaml": "^4.3.2"
+  }
+}

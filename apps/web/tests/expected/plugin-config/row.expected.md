@@ -1,0 +1,16 @@
+- button "Back to @fixture/live-client": "@fixture/live-client"
+- button "Fixture action"
+- heading "@fixture/live-client" [level=3]
+- text: Fixture badge
+- paragraph:
+  - code: fixture-live-client
+- paragraph:
+  - code: "@fixture/live-client"
+- paragraph: An example setting
+- form "Live plugin configuration":
+  - text: Greeting
+  - textbox "Greeting": hello
+  - button "Save"
+- region "Fixture section":
+  - heading "Fixture section" [level=4]
+  - paragraph: Section content from the fixture

@@ -1,0 +1,4 @@
+- menu:
+  - menuitem "Settings"
+  - menuitem "Feedback"
+  - menuitem "Sign in"

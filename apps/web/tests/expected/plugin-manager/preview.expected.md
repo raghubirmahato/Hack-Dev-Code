@@ -1,0 +1,24 @@
+- button "Back to Experimental plugins": Experimental plugins
+- status
+- switch "Enable DSH badge skill"
+- heading "DSH badge skill" [level=3]
+- text: v{{version}} Experimental
+- paragraph:
+  - code: "@hackdevcode/dsh-experimental-badge-skill-bundle"
+- paragraph: Let agents add a “powered by dsh” badge to documents, pull requests, and other outputs.
+- region "Details":
+  - paragraph:
+    - img "DSH badge skill feature preview"
+- heading "Components" [level=4]
+- text: 1 total · 1 off
+- list:
+  - listitem:
+    - text: DSH Provide the official powered-by-DSH badge skill.
+    - code: skill-badge
+    - code: "@hackdevcode/dsh-skill-badge"
+    - text: Off
+- heading "Source" [level=4]
+- term: Code source
+- definition: Built in
+- term: Current version
+- definition: {{version}}

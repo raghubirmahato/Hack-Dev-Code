@@ -1,0 +1,100 @@
+- dialog "Settings":
+  - text: Settings
+  - navigation:
+    - button "General"
+    - button "Model"
+    - button "Built-in plugins"
+    - button "Agent presets"
+  - button "Open configuration file"
+  - button "Close"
+  - heading "Model" [level=2]
+  - paragraph: Enter your API keys to use models from the following providers.
+  - list:
+    - listitem:
+      - text: minimax-cn
+      - img "API key configured"
+      - button "Edit minimax-cn": Edit
+      - button "Delete minimax-cn": Delete
+    - listitem:
+      - text: Acme Gateway Custom
+      - button "Edit Acme Gateway (acme-gateway)": Edit
+      - button "Delete Acme Gateway (acme-gateway)": Delete
+      - text: Acme Gateway acme-gateway API key
+      - textbox "API key":
+        - /placeholder: Enter your API key
+      - group:
+        - text: Customized settings Display name
+        - textbox "Display name":
+          - /placeholder: acme-gateway
+          - text: Acme Gateway
+        - text: Base URL
+        - textbox "Base URL":
+          - /placeholder: https://gateway.acme.example/v1
+          - text: https://gateway.acme.example/v1
+        - text: API protocol
+        - combobox "API protocol":
+          - option "OpenAI Chat Completions" [selected]
+          - option "OpenAI Responses"
+          - option "Anthropic Messages"
+        - region "Models":
+          - text: Models Customized model catalog
+          - button "Restore defaults"
+          - button "Fetch available models"
+          - button "Reorder model 1"
+          - textbox "Model ID 1":
+            - /placeholder: Model ID
+            - text: acme-large
+          - textbox "Display name 1":
+            - /placeholder: Display name
+          - button "Model options 1" [expanded]
+          - button "Delete model 1"
+          - text: Context window
+          - textbox "Context window 1":
+            - /placeholder: 1M
+          - text: Max output tokens
+          - textbox "Max output tokens 1":
+            - /placeholder: 128K
+          - group "Input types 1":
+            - text: Input types
+            - checkbox "Text" [checked]
+            - text: Text
+            - checkbox "Image" [checked]
+            - text: Image
+          - group "Reasoning levels 1":
+            - text: Reasoning levels
+            - button "About reasoning levels": "?"
+            - switch "Reasoning levels 1" [checked]
+            - combobox "Level 1":
+              - option "off" [selected]
+              - option "minimal"
+              - option "medium"
+              - option "xhigh"
+              - option "max"
+            - textbox "off API value" [disabled]:
+              - /placeholder: Turns reasoning off
+            - button "Delete level off"
+            - combobox "Level 2":
+              - option "minimal"
+              - option "low" [selected]
+              - option "medium"
+              - option "xhigh"
+              - option "max"
+            - textbox "low API value":
+              - /placeholder: low
+              - text: low
+            - button "Delete level low"
+            - combobox "Level 3":
+              - option "minimal"
+              - option "medium"
+              - option "high" [selected]
+              - option "xhigh"
+              - option "max"
+            - textbox "high API value":
+              - /placeholder: high
+              - text: high
+            - button "Delete level high"
+            - button "Add level"
+          - button "Add model"
+      - button "Cancel"
+      - button "Apply"
+  - button "Add model provider"

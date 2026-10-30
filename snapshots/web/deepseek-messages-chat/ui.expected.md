@@ -1,0 +1,28 @@
+- banner:
+  - navigation "Session hierarchy": Reply with MESSAGES_WEB_READY only, do not call
+  - text: Standard mode
+  - button "More actions"
+  - button "Open right sidebar"
+  - tablist:
+    - tab "Chat" [selected]
+    - tab "Trajectory"
+  - button "More conversation views"
+- text: Reply with MESSAGES_WEB_READY only; do not call tools. {{clock}}
+- button "Copy"
+- status: Completed
+- button "Completed in {{duration}}" [disabled]
+- paragraph: MESSAGES_WEB_READY
+- button "Copy"
+- button "Good response"
+- button "Bad response"
+- button "Branch into a new conversation"
+- button "Usage 8.2K tok"
+- text: {{clock}}
+- textbox "Message or run a task, / commands, @ files or sessions"
+- button "Add files or run commands"
+- button "Access mode, current: workspace-write": workspace-write
+- button "Select model, current DeepSeek-V4-Flash, reasoning effort high": DeepSeek-V4-Flash high
+- button "Send message" [disabled]
+- button "1 turn 1 step · {{throughput}} tok/s": 1 turn 1 step {{throughput}} tok/s
+- button "8.2K tok · Cache hit 16%": 8.2K tok Cache hit 16%
+- button "1% of context used": 1%

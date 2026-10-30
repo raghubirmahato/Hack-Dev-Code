@@ -1,0 +1,5 @@
+- textbox "Describe what you want to build, / commands, @ files or sessions"
+- button "Add files or run commands"
+- button "Access mode, current: Workspace Write": Workspace Write
+- button "Select model"
+- button "Send message" [disabled]

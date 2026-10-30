@@ -1,0 +1,6 @@
+- dialog "Get started":
+  - heading "Get started" [level=2]
+  - button "Close"
+  - paragraph: Sign in to your DeepSeek account or add an API Key to get started. Your projects and files are stored locally.
+  - button "Add API Key"
+  - button "Sign in"

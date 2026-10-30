@@ -1,0 +1,10 @@
+- textbox "Filter options":
+  - /placeholder: Search…
+- listbox "/permission matches":
+  - option "Read Only"
+  - option "Workspace Write" [selected]
+  - option "Full access"
+  - option "Auto review EXP":
+    - text: Auto review
+    - superscript: EXP
+    - text: Run without a sandbox after an experimental same-model review of every native tool call and PTC inner call.

@@ -1,0 +1,1 @@
+- text: "dsh-{{worktree}} Worktree · from release #7 Add the pull request panel Needs attention · Checks failed"

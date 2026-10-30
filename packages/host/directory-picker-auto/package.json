@@ -1,0 +1,56 @@
+{
+  "name": "@hackdevcode/dsh-host-directory-picker-auto",
+  "description": "Adaptive chooser of the directory-picker seam: resolves the host situation at boot and mounts the native or browse backend for the Hack Dev Code web GUI host",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/host/directory-picker-auto"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-ui-directory-picker-browse": "workspace:*",
+    "@hackdevcode/dsh-client-ui-directory-picker-native": "workspace:*",
+    "@hackdevcode/dsh-host-directory-picker-browse": "workspace:*",
+    "@hackdevcode/dsh-host-directory-picker-native": "workspace:*",
+    "@hackdevcode/dsh-host-webserver": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cordis-plugin-include": "workspace:~",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-ui-directory-picker-browse": "workspace:*",
+    "@hackdevcode/dsh-client-ui-directory-picker-native": "workspace:*",
+    "@hackdevcode/dsh-host-directory-picker": "workspace:*",
+    "@hackdevcode/dsh-host-directory-picker-browse": "workspace:*",
+    "@hackdevcode/dsh-host-directory-picker-native": "workspace:*",
+    "@hackdevcode/dsh-host-webserver": "workspace:*"
+  },
+  "dependencies": {
+    "@hackdevcode/dsh-launch-environment": "workspace:*"
+  }
+}

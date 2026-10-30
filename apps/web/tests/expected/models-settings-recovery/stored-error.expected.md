@@ -1,0 +1,27 @@
+- dialog "Settings":
+  - text: Settings
+  - navigation:
+    - button "General"
+    - button "Model"
+    - button "Built-in plugins"
+    - button "Agent presets"
+  - button "Open configuration file"
+  - button "Close"
+  - heading "Model" [level=2]
+  - paragraph: Enter your API keys to use models from the following providers.
+  - list:
+    - listitem:
+      - text: openrouter
+      - button "Edit openrouter": Edit
+      - button "Delete openrouter": Delete
+      - alert: "llm-pi-ai: provider \"openrouter\" model \"111\" needs an api; the installed catalog does not describe it, so set the route's api to the wire protocol its endpoint speaks"
+    - listitem:
+      - text: zai
+      - button "Edit zai": Edit
+      - button "Delete zai": Delete
+    - listitem:
+      - text: acme-gateway Custom
+      - button "Edit acme-gateway": Edit
+      - button "Delete acme-gateway": Delete
+      - alert: "llm-pi-ai: provider \"acme-gateway\" model \"custom-model\" needs an api; the installed catalog does not describe it, so set the route's api to the wire protocol its endpoint speaks"
+  - button "Add model provider"

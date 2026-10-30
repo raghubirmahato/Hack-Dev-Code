@@ -1,0 +1,5 @@
+- listitem:
+  - button "View Auto authorization review": Auto authorization review
+  - text: Experimental Adds an Auto review access mode: before each tool call, a model checks it against what you asked for, runs allowed calls at once, and holds denied calls for your approval.
+  - status
+  - switch "Enable Auto authorization review"
