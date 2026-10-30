@@ -96,12 +96,12 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: 188px minmax(0, 1fr);
+  grid-template-columns: 208px minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas:
     'title header'
     'nav options';
-  width: 800px;
+  width: 860px;
   height: min(800px, calc(100vh - 2 * max(24px, var(--dsh-frame-overlay-top, 24px))));
   max-width: calc(100vw - 48px);
   border-radius: var(--dsw-radius-panel);

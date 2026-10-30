@@ -384,11 +384,13 @@
   margin: 0 calc(var(--dsh-sidebar-paint-inset) + 1px) 10px;
   box-sizing: border-box;
   border: 0.5px solid var(--dsw-alias-border-l3);
+  /* A vermilion edge marks the primary action. */
+  border-left: 3px solid var(--dsw-static-accent-450);
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-button-elevated-fill);
   color: var(--dsw-alias-label-primary);
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 22px;
   cursor: pointer;
   overflow: hidden;
@@ -523,6 +525,8 @@
 .panelRow.panelActive {
   background-color: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-primary);
+  /* The current panel carries a thin accent bar on its leading edge. */
+  box-shadow: inset 2px 0 0 var(--dsw-static-accent-450);
 }
 
 .panelRow:focus-visible {

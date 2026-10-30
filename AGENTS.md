@@ -1,6 +1,6 @@
 # Hack Dev Code: conventions for coding agents and contributors
 
-Hack Dev Code is a TypeScript monorepo (pnpm workspaces, Node 24.9+). The agent harness lives in `packages/` and `apps/`; the product built for the hackathon is the guild in `packages/hackdev`. Read [README.md](README.md) first and [docs/hack-dev-code.md](docs/hack-dev-code.md) for the design.
+Hack Dev Code is a TypeScript monorepo (pnpm workspaces, Node 24.9+). The agent runtime lives in `packages/` and `apps/`; the product built for the hackathon is the guild in `packages/hackdev`. Read [README.md](README.md) first and [docs/hack-dev-code.md](docs/hack-dev-code.md) for the design.
 
 ## Layout
 

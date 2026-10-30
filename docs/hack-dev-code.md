@@ -2,7 +2,7 @@
 
 Hack Dev Code is an autonomous multi-agent engineering system. A human gives it a mission; a planning council maps the project and sizes a team of specialist builder agents, the team builds in parallel waves over a shared blackboard, a fact-checker re-verifies every claim, three independent gate agents verify, review (with screenshots) and harden the result, and an integrator keeps iterating until every acceptance criterion is met or the wave budget is spent.
 
-The orchestration is one plugin, `@hackdevcode/dsh-tool-hackdev` (`packages/hackdev/tool-hackdev`), that sits on two seams of the harness: `ctx.workflowEngine` (script-driven fan-out) and `ctx.subagents` (fresh structured-output children).
+The orchestration is one plugin, `@hackdevcode/dsh-tool-hackdev` (`packages/hackdev/tool-hackdev`), that sits on two seams of the runtime: `ctx.workflowEngine` (script-driven fan-out) and `ctx.subagents` (fresh structured-output children).
 
 ## Pipeline at a glance
 
@@ -81,7 +81,7 @@ The quality/UX gate carries a fixed protocol whenever the software has a UI:
 
 The script enforces the claim: `uiVerified=true` without any `uiEvidence` is rejected and a limitation is added; with none, the report says `UI was NOT visually exercised` and why.
 
-**Why the earlier UI gate could not see the UI.** The harness has real browser tooling, but none of it was available to a spawned gate: the browser-use providers (Playwright MCP, Chrome DevTools MCP, Stagehand) are experimental packages that must be mounted explicitly and are not in the bundled profiles; and `read_image` only works when the calling route declares image input. A gate that is told to "use any browser tool" therefore had nothing to call. The protocol above no longer depends on a mounted provider: a headless Chromium binary or the project's own Playwright, driven from the shell, is enough, and `read_image` works on the default route because the bundled `deepseek-flash` model declares `image` input. To use a different image-capable model, set `visionModel` (for example `deepseek-v4-flash-vision-exp`); only the quality/UX gate is routed to it. Mounting a browser-use provider in the profile still gives richer interaction when wanted (see `docs/subsystems/browser-use.md`).
+**Why the earlier UI gate could not see the UI.** The runtime has real browser tooling, but none of it was available to a spawned gate: the browser-use providers (Playwright MCP, Chrome DevTools MCP, Stagehand) are experimental packages that must be mounted explicitly and are not in the bundled profiles; and `read_image` only works when the calling route declares image input. A gate that is told to "use any browser tool" therefore had nothing to call. The protocol above no longer depends on a mounted provider: a headless Chromium binary or the project's own Playwright, driven from the shell, is enough, and `read_image` works on the default route because the bundled `deepseek-flash` model declares `image` input. To use a different image-capable model, set `visionModel` (for example `deepseek-v4-flash-vision-exp`); only the quality/UX gate is routed to it. Mounting a browser-use provider in the profile still gives richer interaction when wanted (see `docs/subsystems/browser-use.md`).
 
 ## Failure handling
 
@@ -104,7 +104,7 @@ The script enforces the claim: `uiVerified=true` without any `uiEvidence` is rej
 
 - Every agent prompt carries the same rules: workspace only, no destructive or irreversible actions, no secrets in code or logs, no unproven claims. Anything needing a human decision goes into `needsHuman`, which is printed at the top of the report.
 - The pipeline script, schemas and gate order are fixed in `src/script.ts`; the calling model supplies only the mission text and numeric caps within deployment ceilings.
-- Children run under the harness's existing sandbox and approval policy. The API key is read from `DEEPSEEK_API_KEY` or the credential store and is never written into prompts, reports or the repository.
+- Children run under the runtime's existing sandbox and approval policy. The API key is read from `DEEPSEEK_API_KEY` or the credential store and is never written into prompts, reports or the repository.
 - The security gate hardens what it builds (validation, escaping, authz checks, security headers, rate limits, secret hygiene, dependency audit) and writes regression tests. No process can guarantee that software "cannot be hacked"; the report lists residual risk instead.
 
 ## Web UI

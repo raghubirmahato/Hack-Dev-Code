@@ -17,7 +17,7 @@
      resolves to the original 525px on the default column and widens with a
      dragged or adaptive column. The 748px fallback covers mounts outside the
      conversation column, where the axis variable is absent. */
-  max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.702), 82%);
+  max-width: min(calc(var(--dsh-chat-content-width, 748px) * 0.64), 78%);
 }
 .referenceSummary {
   color: var(--dsw-alias-label-tertiary);

@@ -5,7 +5,7 @@
 > Built for hackathon problem statement **PS-001: DevPilot, the Mystic Mikado's Autonomous AI Engineering Guild**.
 > *Plan like a Shogun. Build like a Samurai. Test like a Sentinel. Adapt until the mission is complete.*
 
-Hack Dev Code is a multi-agent layer on top of an existing, production-grade agent harness (sandboxed tools, sessions, subagents, a Web UI and a CLI). The harness is the runtime; the guild in [`packages/hackdev`](packages/hackdev) is the product built for this problem statement.
+Hack Dev Code is a multi-agent engineering platform. The guild in [`packages/hackdev`](packages/hackdev) is what was built for this problem statement; it runs on a sandboxed agent runtime that provides sessions, subagents, tools, a Web UI and a CLI. See [Acknowledgements](#acknowledgements-and-license) for the runtime's origin and license.
 
 ---
 
@@ -25,6 +25,7 @@ Hack Dev Code is a multi-agent layer on top of an existing, production-grade age
 12. [Bonus points](#bonus-points)
 13. [Known limitations](#known-limitations)
 14. [Repository layout, tests and license](#repository-layout-tests-and-license)
+15. [Acknowledgements and license](#acknowledgements-and-license)
 
 ---
 
@@ -37,7 +38,7 @@ Hack Dev Code is a multi-agent layer on top of an existing, production-grade age
 | **C. Testing and verification**: automated tests, failure investigation, independent verification | Gate 1 builds, runs, tests and fixes. It treats a result as passed only with evidence. The gates are separate agents from the builders, so nobody grades their own work. | Sentinel Gates |
 | **D. Review and security**: evidence-based completion, code review, security scanning, cross-agent critique, human oversight | Gate 2 reviews quality and visually tests the UI; Gate 3 audits and hardens security. A fact-checker re-runs claimed evidence. Decisions that need a person are listed in `needsHuman` at the top of every report. | Gates, fact-check, report |
 | **E. Coordination and adaptive autonomy**: inter-agent communication, feedback loops, adaptive orchestration, bounded autonomy | A typed blackboard, handoff notes, waves that open follow-up tasks for unmet criteria, review-fix loops with hard caps, and a fixed agent budget. | Waves, blackboard |
-| **Technical requirements**: an existing agent framework, existing tools, a local model, GitHub is not a prerequisite | Runs on a real agent harness with its sandboxed tools and a DeepSeek model through an API key. Everything runs locally; there is no hosted backend. | `apps/`, `packages/` |
+| **Technical requirements**: an existing agent framework, existing tools, a local model, GitHub is not a prerequisite | Runs on an existing, MIT-licensed agent runtime with its sandboxed tools and a DeepSeek model through an API key. Everything runs locally; there is no hosted backend. | `apps/`, `packages/` |
 | **Evaluation scenarios** | See [Evaluation scenarios](#evaluation-scenarios) for how to run each one. | below |
 
 ---
@@ -51,7 +52,7 @@ The pipeline script, schemas and gate order are fixed in code. The model that ca
 ```mermaid
 flowchart TB
     H(["Human"]) -->|"mission text"| LEAD
-    subgraph HARNESS["Agent harness (sandbox, sessions, approvals)"]
+    subgraph RUNTIME["Agent runtime (sandbox, sessions, approvals)"]
         LEAD["Lead agent<br/>the chat model that calls the hackdev tool"]
         TOOL["hackdev tool<br/>fixed pipeline script + schemas + caps"]
         ENGINE["Workflow engine<br/>agent / parallel / phase"]
@@ -269,12 +270,12 @@ A call to `hackdev` may lower `maxTasks`, `maxWaves` and `maxFixRounds`, never r
 | `hackdev` | Run the whole pipeline for a mission: Council, waves of Forge and Gates, Chronicle. |
 | `hackdev_review` | Run only the three gates on the current workspace, for work done outside the pipeline. |
 
-Agents also use the harness tools that already exist: file read, write and edit, search, shell commands (PowerShell or Bash), image reading for screenshots, structured user questions, MCP resources and optional browser tools. The generated reference of every tool, its arguments and result shape is in [`docs/tool-catalog.md`](docs/tool-catalog.md); every setting is in [`docs/config-catalog.md`](docs/config-catalog.md).
+Agents also use the runtime tools that already exist: file read, write and edit, search, shell commands (PowerShell or Bash), image reading for screenshots, structured user questions, MCP resources and optional browser tools. The generated reference of every tool, its arguments and result shape is in [`docs/tool-catalog.md`](docs/tool-catalog.md); every setting is in [`docs/config-catalog.md`](docs/config-catalog.md).
 
 **Boundaries that always apply:**
 
 - **Workspace only.** Agents work inside the chosen workspace. The default permission mode is *Workspace Write*; reads and writes outside it need approval.
-- **Sandboxed execution.** Shell commands run under the harness sandbox and approval policy.
+- **Sandboxed execution.** Shell commands run under the runtime sandbox and approval policy.
 - **Owned paths.** Parallel builders each own disjoint paths. Editing across the boundary has to be published as a warning on the blackboard.
 - **No destructive or irreversible actions** (deleting data, force operations, external side effects) without a human decision.
 - **No secrets** in code, logs, prompts or reports.
@@ -384,7 +385,7 @@ packages/hackdev/tool-hackdev        mission pipeline plugin (src/script.ts hold
 packages/hackdev/client-ui-hackdev   Web card for mission and gate-review results
 packages/core/system-prompt          prompt sections for the pipeline policy
 packages/bundle/                     product bundles (base, web-app, headless) that mount the tools
-packages/*/ , vendor/                the agent harness: sessions, tools, sandbox, UI, LLM adapters
+packages/*/ , vendor/                the agent runtime: sessions, tools, sandbox, UI, LLM adapters
 apps/cli, apps/web, apps/desktop     command line, Web UI and desktop shell
 docs/                                design doc and generated tool and config references
 ```
@@ -400,3 +401,11 @@ The orchestration tests run the real pipeline scripts in a Node VM with scripted
 Repository conventions for contributors are in [AGENTS.md](AGENTS.md).
 
 [MIT](LICENSE). Third-party dependencies and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+---
+
+## Acknowledgements and license
+
+The runtime layer (sessions, sandboxed tools, subagents, the Web UI shell and the CLI) comes from [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness), an MIT-licensed open-source agent framework. The problem statement allows building on an existing framework. What is new in this repository: the mission pipeline and its gates (`packages/hackdev`), the Web result card, the mission-control home screen, the visual identity and logo, the English-only documentation, and the cleanup of the repository.
+
+The original copyright and permission notice are kept in [LICENSE](LICENSE), and third-party licenses are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), as the MIT license requires.
