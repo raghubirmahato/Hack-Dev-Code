@@ -44,34 +44,138 @@ Hack Dev Code is a multi-agent layer on top of an existing, production-grade age
 
 ## Architecture
 
-```text
-                          ┌───────────────────────────────┐
-   Mission (text)  ─────► │  hackdev tool (fixed pipeline) │ ◄──── human: needsHuman / approvals
-                          └───────────────┬───────────────┘
-                                          │
-        ┌─────────────────────────────────┼─────────────────────────────────┐
-        ▼                                 ▼                                 ▼
- ┌──────────────┐   ┌──────────────────────────────────────┐   ┌────────────────────┐
- │  1. COUNCIL  │   │  2. WAVES  (repeat up to maxWaves)    │   │  3. CHRONICLE      │
- │  analyst     │   │                                       │   │  RUN_REPORT.md     │
- │  scout       │──►│  Forge ─► Fact-check ─► Sentinel ─►   │──►│  PROGRESS.md       │
- │  planner     │   │  builders   re-run       Gates        │   │  MEMORY.md         │
- │  (task DAG)  │   │  (parallel) evidence     verifier     │   └────────────────────┘
- └──────────────┘   │                          quality+UX   │
-                    │             ┌──────────  security     │
-                    │             │  Integrator: every      │
-                    │             │  acceptance criterion   │
-                    │             │  met?  no ─► follow-up  │
-                    │             │  tasks = next wave      │
-                    └─────────────┴─────────────────────────┘
+The pipeline script, schemas and gate order are fixed in code. The model that calls the tool only supplies the mission text and numeric caps inside deployment ceilings, so the orchestration is repeatable and cannot be talked out of its checks. For the full design (failure table, scope discipline, visual verification protocol, Web UI) read [`docs/hack-dev-code.md`](docs/hack-dev-code.md).
 
-        Shared state: typed blackboard (contracts, decisions, facts, risks, warnings,
-        handoffs, questions) + .hackdev/PROJECT_MAP.md + .hackdev/MEMORY.md
+### 1. System overview
+
+```mermaid
+flowchart TB
+    H(["Human"]) -->|"mission text"| LEAD
+    subgraph HARNESS["Agent harness (sandbox, sessions, approvals)"]
+        LEAD["Lead agent<br/>the chat model that calls the hackdev tool"]
+        TOOL["hackdev tool<br/>fixed pipeline script + schemas + caps"]
+        ENGINE["Workflow engine<br/>agent / parallel / phase"]
+        SPAWN["Subagent provider: spawn<br/>fresh agent per role, structured JSON output"]
+        LEAD -->|"mission, optional lower caps"| TOOL
+        TOOL --> ENGINE
+        ENGINE -->|"creates agents on demand"| SPAWN
+    end
+    SPAWN --> COUNCIL["Council<br/>analyst, scout, planner"]
+    SPAWN --> FORGE["Forge<br/>specialist builders"]
+    SPAWN --> CHECK["Fact-checker"]
+    SPAWN --> GATES["Sentinel gates<br/>verifier, quality + UX, security, regression"]
+    SPAWN --> INTEG["Integrator"]
+    SPAWN --> CHRON["Chronicler"]
+    BOARD[("Shared state<br/>typed blackboard, PROJECT_MAP.md,<br/>MEMORY.md, PROGRESS.md")]
+    COUNCIL <--> BOARD
+    FORGE <--> BOARD
+    CHECK <--> BOARD
+    GATES <--> BOARD
+    INTEG <--> BOARD
+    CHRON --> BOARD
+    CHRON -->|"RUN_REPORT.md + needsHuman"| LEAD
+    LEAD -->|"report and open decisions"| H
+    H -.->|"approvals, decisions"| LEAD
 ```
 
-The pipeline script, schemas and gate order are fixed in code. The model that calls the tool only supplies the mission text and numeric caps inside deployment ceilings, so the orchestration is repeatable and cannot be talked out of its checks.
+### 2. How the lead agent generates the agent team
 
-For the full design (failure table, scope discipline, visual verification protocol, Web UI) read [`docs/hack-dev-code.md`](docs/hack-dev-code.md).
+The lead never hand-picks agents. It calls one tool; the pipeline builds the team from the mission.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant L as Lead agent
+    participant T as hackdev tool
+    participant S as Scout and analyst
+    participant P as Planner
+    participant V as Script validator
+    participant F as Forge scheduler
+    participant B as Specialist builders
+    L->>T: hackdev(mission, caps within ceilings)
+    T->>T: compute agent budget from maxTasks, maxWaves, maxFixRounds
+    T->>S: spawn analyst and scout (parallel)
+    S-->>T: requirements, acceptance criteria, PROJECT_MAP.md
+    T->>P: spawn planner with requirements and project map
+    P-->>V: task DAG: id, role, ownedPaths, dependsOn
+    V->>V: unique ids, known dependencies, no cycle (Kahn), size at most maxTasks
+    alt plan invalid
+        V-->>P: reasons, one re-request, then single-task fallback
+    end
+    V-->>F: validated DAG
+    F->>B: spawn one builder per task, role brief and owned paths
+    Note over F,B: a task starts the moment its last dependency settles,<br/>a limiter caps simultaneous builders at maxParallel
+    B-->>F: report: status, files, evidence, handoff, notes
+    alt builder not done
+        F->>B: splitter spawns 2 to 4 ordered subtasks
+    end
+```
+
+**Team sizing.** The planner is told to size the team to the mission: one or two tasks for a trivial change, three to six for a small app, six to fourteen for a medium product, up to `maxTasks` for a large system. Each task carries a **role** (frontend, backend, fullstack, data, api, infra, test, docs, design, security), so each builder gets a matching specialist brief and only owns its own paths.
+
+**Dynamic creation.** Agents are created while the run progresses, not up front: builders per task, a **splitter** when a builder fails to finish, extra tasks from the **integrator** when a wave leaves criteria unmet. A hard agent budget derived from the caps stops runaway spawning.
+
+### 3. Agent-to-agent communication
+
+There is no free-form chat. Agents talk through typed, validated records, and every message is stored.
+
+```mermaid
+flowchart LR
+    subgraph BUILD["Forge (parallel builders)"]
+        B1["Builder A<br/>API"]
+        B2["Builder B<br/>UI"]
+        B3["Builder C<br/>tests"]
+    end
+    BB[("Blackboard<br/>contract, decision, fact,<br/>risk, warning, handoff, question")]
+    PM[["PROJECT_MAP.md<br/>shared mental model"]]
+    MEM[["MEMORY.md<br/>long-term memory"]]
+    B1 -->|"publishes contract and handoff"| BB
+    BB -->|"dependency handoffs injected into prompt"| B2
+    B2 -->|"publishes warning or question"| BB
+    B3 -->|"reads contracts and decisions"| BB
+    PM -.->|"read by every agent"| B1
+    PM -.-> B2
+    PM -.-> B3
+    MEM -.->|"prior runs, compacted"| BB
+    BB -->|"builder handoffs and open questions"| G["Sentinel gates<br/>verifier, quality + UX, security"]
+    G -->|"issues, evidence, deferred items"| BB
+    BB -->|"pinned: contracts and decisions"| MEM
+```
+
+| Channel | Used for | Rule |
+|---|---|---|
+| Structured report | Every agent returns JSON checked against a schema, then re-validated by the script | Invalid output is a failed agent, not silently accepted |
+| Blackboard note | `contract`, `decision`, `fact`, `risk`, `warning`, `handoff`, `question` | Duplicates dropped; contracts and decisions are pinned and always reach the prompt |
+| Handoff | A builder's public interfaces, locations, how to run and test, caveats | A dependent builder receives each dependency's handoff; gates receive all of them |
+| Workspace files | `PROJECT_MAP.md`, `MEMORY.md`, `PROGRESS.md` | Read by every agent; MEMORY is deduplicated and compacted within `maxMemoryChars` |
+| Ownership | Disjoint `ownedPaths` per builder | A cross-boundary edit must be published as a `warning` |
+
+### 4. Waves, gates and the feedback loop
+
+```mermaid
+flowchart TB
+    START(["Validated task DAG"]) --> FORGE["Forge<br/>parallel specialist builders"]
+    FORGE --> FACT["Fact-check<br/>files exist? re-run evidence"]
+    FACT -->|"claim fails: done becomes partial"| FORGE
+    FACT --> VER["Gate 1: Verifier<br/>build, run, test, fix"]
+    VER --> AUD
+    subgraph AUD["Audits run in parallel, read-only"]
+        QX["Gate 2: Quality and UX<br/>code review, screenshots,<br/>desktop and mobile"]
+        SEC["Gate 3: Security<br/>validation, authz, secrets,<br/>dependencies"]
+    end
+    AUD --> FIX["Fix loops, one at a time<br/>review, fix, verify, up to maxFixRounds"]
+    FIX --> REG["Regression verifier<br/>skipped if nothing changed"]
+    REG --> INT{"Integrator<br/>every acceptance criterion met?"}
+    INT -->|"no and waves remain"| NEXT["Follow-up tasks<br/>become the next wave"]
+    NEXT --> FORGE
+    INT -->|"yes, or maxWaves reached"| CHR["Chronicler<br/>RUN_REPORT, PROGRESS, MEMORY"]
+    CHR --> OUT(["Report: complete or needs attention"])
+    FIX -.->|"fix needs a human decision"| HUM["needsHuman<br/>deferred issue"]
+    FORGE -.->|"blocked on a decision"| HUM
+    HUM -.-> OUT
+```
+
+A run is `complete` only when every task is done, every gate passes and every acceptance criterion is met. Anything that needs a person is surfaced at the top of the report instead of being decided silently.
 
 ---
 
