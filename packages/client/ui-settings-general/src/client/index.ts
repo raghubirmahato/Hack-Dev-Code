@@ -34,6 +34,10 @@ import type { ShortcutCommandId } from '@hackdevcode/dsh-client-shortcuts/client
 import { createSettingsShellStore } from './shell-store.ts'
 import { SettingsRoot } from './SettingsRoot.tsx'
 import { DesktopUpdateBadge } from './DesktopUpdateIndicator.tsx'
+import { ToolsSection } from './ToolsSection.tsx'
+import type { ToolsSectionInjected } from './ToolsSection.tsx'
+// Type-only: pulls the ctx.layout merge (panel selection).
+import type {} from '@hackdevcode/dsh-client-ui-layout/client'
 import type { DesktopUpdateBridge } from '../types.ts'
 import { DesktopUpdateSource } from './desktop-update-source.ts'
 import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
@@ -72,7 +76,7 @@ const NS = 'settings'
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registrations depend on their slots through `slots.inject()`.
  */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'remote.settings', 'configForms', 'shortcuts', 'modules', 'remoteAccess']
+export const inject = ['slots', 'locale', 'layout', 'connection', 'remote', 'remote.settings', 'configForms', 'shortcuts', 'modules', 'remoteAccess']
 
 /**
  * Register the `settings` dictionaries, the chrome content, and the General
@@ -253,6 +257,26 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     children: { 'settings.general.item': { kind: 'list', scope: 'root' } },
   }, GeneralSection))
+  // Workspace pages (Plugins, Automation tasks, ...) are opened from Settings, not listed in the sidebar.
+  const toolsInjected = (): ToolsSectionInjected => ({
+    listTools: () => ctx.slots.entriesOfSlot('sidebar.panellist')
+      .map(({ options }) => ({
+        id: String(options.id),
+        order: options.order ?? 0,
+        label: resolveSlotLabel(options.label) ?? String(options.id),
+      }))
+      .sort((a, b) => a.order - b.order)
+      .map(({ id, label }) => ({ id, label })),
+    openTool: (id) => { ctx.layout.selectPanel(id as Parameters<typeof ctx.layout.selectPanel>[0]) },
+  })
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: 'tools',
+    order: 5,
+    label: () => t('tools.nav'),
+    locale: NS,
+    inject: toolsInjected,
+  }, ToolsSection))
   // The page's module system applies no plugin update from another Host release; this dialog offers the reload.
   const releasePromptInjected = (): HostReleasePromptInjected => ({
     dismissRelease: () => { ctx.modules.entries.dismissRelease() },

@@ -18,6 +18,7 @@ import type { DeveloperToolsRowInjected } from '../src/client/DeveloperToolsRow.
 import { HostReleasePrompt, type HostReleasePromptInjected } from '../src/client/HostReleasePrompt.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from '../src/client/chrome.tsx'
 import { GeneralSection } from '../src/client/GeneralSection.tsx'
+import { ToolsSection } from '../src/client/ToolsSection.tsx'
 import { SettingsDocumentAction } from '../src/client/SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from '../src/client/SettingsDocumentAction.tsx'
 
@@ -36,6 +37,7 @@ const SEATS = [
   ['settings.action', SettingsDocumentAction],
   ['settings.close', CloseLabel],
   ['settings.section', GeneralSection],
+  ['settings.section', ToolsSection],
 ] as const
 
 /** One Host view of the locale preference, including its revision fence. */
@@ -84,8 +86,9 @@ function actionInjectedOf(c: TestClient): SettingsDocumentActionInjected {
 }
 
 function expectSeated(c: TestClient): void {
-  for (const [name, component] of SEATS) {
-    expect(ownEntries(c, name).map(entry => entry.component)).toEqual([component])
+  for (const name of new Set(SEATS.map(([seat]) => seat))) {
+    const expected = SEATS.filter(([seat]) => seat === name).map(([, component]) => component)
+    expect(ownEntries(c, name).map(entry => entry.component)).toEqual(expected)
   }
 }
 
@@ -96,7 +99,7 @@ function setPageUrl(url: string): void {
 
 describe('ui-settings-general apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'remote.settings', 'configForms', 'shortcuts', 'modules', 'remoteAccess'])
+    expect(inject).toEqual(['slots', 'locale', 'layout', 'connection', 'remote', 'remote.settings', 'configForms', 'shortcuts', 'modules', 'remoteAccess'])
   })
 
   it('fills the five seats of the shell it declares, with the locale-following General label', async ({ mock, start }) => {
@@ -221,7 +224,7 @@ describe('ui-settings-general apply', () => {
     // subscription), not re-registration.
     SEATS.forEach(([name], i) => {
       expect(c.ctx.slots.getVersion(name)).toBe(versions[i]!)
-      expect(ownEntries(c, name)).toHaveLength(1)
+      expect(ownEntries(c, name)).toHaveLength(name === 'settings.section' ? 2 : 1)
     })
     expect(generalLabel(c)).toBe('General')
     await vi.waitFor(() => {

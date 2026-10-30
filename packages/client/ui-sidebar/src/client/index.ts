@@ -2,8 +2,6 @@
 import type {} from '@hackdevcode/dsh-client-product-analytics/client'
 import type { Context as ClientContext } from '@hackdevcode/cordis'
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
-import { resolveSlotLabel } from '@hackdevcode/dsh-client-ui-slots'
-import type { MainPanelId } from '@hackdevcode/dsh-client-ui-layout/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@hackdevcode/dsh-client-locale/client'
 // Type-only: pulls the SlotRegistry service merge (ctx.slots).
@@ -47,21 +45,8 @@ export function apply(ctx: ClientContext): void {
   const workspaceNavigation = ctx.get('uiWorkspace') as unknown as WorkspaceNavigation
   ctx.effect(() => ctx.locale.register(NS, { en }), 'ui-sidebar: dictionaries')
   const panels = createSnapshotStore<readonly SidebarPanelMetadata[]>([])
-  const syncPanels = (): void => {
-    const next = ctx.slots.entriesOfSlot('sidebar.panellist').map(({ options }) => {
-      // The list registration requires an id; StoredEntry erases the slot kind.
-      const id = options.id as MainPanelId
-      return { id, order: options.order ?? 0, label: resolveSlotLabel(options.label) ?? id }
-    }).sort((a, b) => a.order - b.order)
-    const previous = panels.getSnapshot()
-    if (previous.length === next.length && previous.every((panel, index) => {
-      const candidate = next[index] as SidebarPanelMetadata
-      return panel.id === candidate.id && panel.order === candidate.order && panel.label === candidate.label
-    })) return
-    panels.set(next)
-  }
-  ctx.effect(() => ctx.slots.subscribe('sidebar.panellist', syncPanels), 'ui-sidebar: panel entries')
-  ctx.effect(() => ctx.locale.subscribe(syncPanels), 'ui-sidebar: panel labels')
+  // Workspace pages (Plugins, Automation tasks, ...) are opened from Settings > Tools, so the
+  // sidebar keeps this list empty and renders no panel rows or More menu.
   const panelPins = createPanelPins()
   const entryActions = {
     getSnapshot: () => ctx.slots.entriesOfSlot('sidebar.panellist.actions').length > 0,
@@ -102,5 +87,4 @@ export function apply(ctx: ClientContext): void {
     locale: NS,
     inject: injectProps,
   }, HeaderLeadingControls))
-  syncPanels()
 }

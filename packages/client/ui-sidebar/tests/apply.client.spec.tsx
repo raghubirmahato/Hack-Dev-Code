@@ -144,7 +144,7 @@ describe('ui-sidebar apply', () => {
     disposeReplacement()
   })
 
-  it('projects plugin-owned panel entries and removes them with their owner', async () => {
+  it('keeps the sidebar panel list empty while plugin panels are opened from Settings', async () => {
     const b = await bench()
     const sidebar = b.ctx.plugin({ inject: [...inject], apply })
     await sidebar.await()
@@ -161,11 +161,9 @@ describe('ui-sidebar apply', () => {
     try {
       await panel.await()
       await vi.waitFor(() => {
-        expect(injected.hooks.panels.getSnapshot()).toEqual([
-          { id: 'custom-panel', order: 20, label: 'Custom panel' },
-        ])
+        expect(b.slots.entries('main').map(entry => entry.options.key)).toEqual(['custom-panel'])
       })
-      expect(b.slots.entries('main').map(entry => entry.options.key)).toEqual(['custom-panel'])
+      expect(injected.hooks.panels.getSnapshot()).toEqual([])
       await panel.dispose()
       await vi.waitFor(() => { expect(injected.hooks.panels.getSnapshot()).toEqual([]) })
       expect(b.slots.entries('main')).toEqual([])
