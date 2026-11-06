@@ -1,6 +1,6 @@
 {
   "name": "@hackdevcode/dsh-cua-bundle",
-  "description": "Optional macOS Computer Use and permission setup",
+  "description": "Computer use for the whole desktop and Chrome: apps, windows, mouse, keyboard and browser pages",
   "version": "0.2.2-alpha.2",
   "icon": "./icon.svg",
   "publishConfig": {
@@ -35,16 +35,21 @@
   "license": "MIT",
   "dsh": {
     "bundle": {
-      "listedByDefault": false,
+      "listedByDefault": true,
       "patch": "./cordis.patch.yml",
       "platforms": [
-        "darwin"
+        "darwin",
+        "win32",
+        "linux"
       ]
     }
   },
   "dependencies": {
+    "@hackdevcode/dsh-browser-use": "workspace:*",
     "@hackdevcode/dsh-computer-use": "workspace:*",
-    "@hackdevcode/dsh-cua": "workspace:*"
+    "@hackdevcode/dsh-cua": "workspace:*",
+    "@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp": "workspace:*",
+    "@hackdevcode/dsh-experimental-computer-use-cua-driver-native": "workspace:*"
   },
   "peerDependencies": {
     "@hackdevcode/cordis": "workspace:~"

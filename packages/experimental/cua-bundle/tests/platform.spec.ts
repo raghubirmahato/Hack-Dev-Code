@@ -6,7 +6,7 @@ import { entryListSchema } from '@hackdevcode/cordis-plugin-include'
 import { load } from 'js-yaml'
 import { expect, it, vi } from 'vitest'
 
-it.each(['darwin', 'win32', 'linux'])('loads the exported patch directly on %s and imports the native provider only on Darwin', async (platform) => {
+it.each(['darwin', 'win32', 'linux'])('loads the exported patch directly on %s with the native provider of that platform and Chrome control', async (platform) => {
   const patch = load(await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8'), {
     schema: entryListSchema,
   }) as { insert: EntryOptions[] }[]
@@ -28,6 +28,9 @@ it.each(['darwin', 'win32', 'linux'])('loads the exported patch directly on %s a
     expect(imports).toContain('@hackdevcode/dsh-cua')
     expect(imports).toContain('@hackdevcode/dsh-computer-use')
     expect(imports.includes('@hackdevcode/dsh-experimental-cua-macos')).toBe(platform === 'darwin')
+    expect(imports.includes('@hackdevcode/dsh-experimental-computer-use-cua-driver-native')).toBe(platform !== 'darwin')
+    expect(imports).toContain('@hackdevcode/dsh-browser-use')
+    expect(imports).toContain('@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp')
   } finally {
     await ctx.fiber.dispose()
     imported.mockRestore()

@@ -219,6 +219,7 @@ export function apply(ctx: Context, config: Config): void {
   const adapter = new PiAiAdapter({
     profiles,
     resolveApiKey,
+    apiKeyReadyInMs: key => keyPool.readyInMs(key),
     rotateApiKey: async (_provider, profile, refused) => {
       const ref = profile.apiKeyEnv
       if (ref === undefined) return undefined

@@ -1,7 +1,7 @@
 {
   "meta": {
     "title": "Computer use",
-    "description": "Currently supports macOS; Windows support is in development. Loads computer use for existing and new PTC sessions. Switch to PTC mode and grant Accessibility and Screen Recording permissions to use it.",
+    "description": "Lets agents operate the whole desktop (apps, windows, mouse, keyboard, clipboard, accessibility tree) and Chrome (pages, forms, screenshots, coordinate clicks) on Windows, Linux and macOS. Every action follows your permission mode.",
     "detail": "docs/DETAIL.md"
   }
 }

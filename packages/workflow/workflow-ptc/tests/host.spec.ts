@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { setSandboxMode } from '@hackdevcode/dsh-sandbox-policy'
 import { provideWorkingDirectoryFixture } from '@hackdevcode/dsh-agent-loop-testkit'
 import { Context } from '@hackdevcode/cordis'
@@ -102,6 +103,7 @@ describe('workflow host callback validation', () => {
       entered.resolve(undefined)
       await release.promise
       await bindings.startChild!({ prompt: 'child' })
+      await bindings.startChild!({ prompt: 'isolated', cwd: 'worktrees/t1' })
       return completed
     })
     const initial = `${process.cwd()}/selected`
@@ -115,7 +117,8 @@ describe('workflow host callback validation', () => {
       expect((await run.result).stopReason).toBe('completed')
       expect(launched?.cwd).toBe(initial)
       expect(launched?.sandboxPolicy?.workspaceRoot).toBe(parent.session.header.cwd)
-      expect(childStart).toHaveBeenCalledOnce()
+      expect(childStart).toHaveBeenCalledTimes(2)
+      expect(childStart.mock.calls[1]![0].request.cwd).toBe(resolve(initial, 'worktrees/t1'))
       const selected = childStart.mock.calls[0]![0]
       expect(selected.provider).toBe('stub')
       expect(selected.request.cwd).toBe(initial)

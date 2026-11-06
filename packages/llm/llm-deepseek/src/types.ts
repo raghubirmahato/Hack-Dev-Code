@@ -93,6 +93,8 @@ export interface DeepSeekRequestAuth {
    * position; returning `undefined` surfaces the original failure.
    */
   rotate?: (failure: DeepSeekAuthRefusal) => Promise<DeepSeekRequestAuth | undefined>
+  /** Milliseconds this credential still rests after a refusal; the request waits that long before it is sent. */
+  readyInMs?: number
 }
 
 /** Facts about a refused request that decide whether another credential is worth trying. */

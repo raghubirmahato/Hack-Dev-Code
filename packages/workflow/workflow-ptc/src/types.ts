@@ -44,6 +44,8 @@ export interface ChildStartRequest {
   provider?: string
   /** The per-child model override, if the call passed one. */
   model?: string
+  /** The child's working directory, relative to the run's directory unless absolute. */
+  cwd?: string
 }
 
 /**

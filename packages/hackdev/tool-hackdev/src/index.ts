@@ -44,6 +44,11 @@ export interface Config {
   maxResultChars?: number
   /** Commands the fact-checker may re-run per wave (default 8). */
   maxFactChecks?: number
+  /**
+   * Where parallel builders work: `shared` (one workspace, disjoint owned paths) or `worktree` (each task in its
+   * own git worktree, merged back one at a time; falls back to shared outside a git repository). Default `shared`.
+   */
+  builderIsolation?: 'shared' | 'worktree'
   /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
   customInstructions?: string
 }
@@ -59,6 +64,7 @@ export const Config: z<Config> = z.object({
   maxMemoryChars: z.number().step(1).min(500).max(100_000).default(6000),
   maxResultChars: z.number().step(1).min(1000).max(Number.MAX_SAFE_INTEGER).default(16_384),
   maxFactChecks: z.number().step(1).min(1).max(40).default(8),
+  builderIsolation: z.union(['shared', 'worktree'] as const).default('shared'),
   customInstructions: z.string().role('textarea').default(''),
 })
 
@@ -75,6 +81,7 @@ interface ResolvedConfig {
   readonly maxMemoryChars: number
   readonly maxResultChars: number
   readonly maxFactChecks: number
+  readonly builderIsolation: 'shared' | 'worktree'
   readonly customInstructions: string
 }
 
@@ -124,6 +131,7 @@ function resolveConfig(config: Config): ResolvedConfig {
     maxMemoryChars: config.maxMemoryChars ?? 6000,
     maxResultChars: config.maxResultChars ?? 16_384,
     maxFactChecks: config.maxFactChecks ?? 8,
+    builderIsolation: config.builderIsolation ?? 'shared',
     customInstructions: (config.customInstructions ?? '').trim().slice(0, MAX_CUSTOM_INSTRUCTIONS),
   }
   if (resolved.subagentProvider.length === 0 || resolved.subagentProvider !== resolved.subagentProvider.trim()) {
@@ -181,12 +189,14 @@ export const ENGINE_AGENT_CEILING = 1000
  * adds a fact-checker and an integrator; follow-up waves plan at most
  * FOLLOW_UP_TASK_CAP tasks. One chronicler at the end.
  */
-export function agentBudget(maxTasks: number, maxFixRounds: number, withBuild: boolean, maxWaves = 1): number {
+export function agentBudget(maxTasks: number, maxFixRounds: number, withBuild: boolean, maxWaves = 1, isolated = false): number {
   const rounds = maxFixRounds + 1
   const gates = 4 * rounds + 2
   const chronicle = 1
   if (!withBuild) return Math.min(ENGINE_AGENT_CEILING, gates + chronicle)
-  const wave = (tasks: number): number => AGENTS_PER_TASK * tasks + 1 + gates + 1
+  // An isolated task adds its worktree manager and its merge manager.
+  const perTask = AGENTS_PER_TASK + (isolated ? 2 : 0)
+  const wave = (tasks: number): number => perTask * tasks + 1 + gates + 1
   const later = Math.min(maxTasks, FOLLOW_UP_TASK_CAP)
   return Math.min(ENGINE_AGENT_CEILING, 4 + wave(maxTasks) + (maxWaves - 1) * wave(later) + chronicle)
 }
@@ -373,10 +383,11 @@ export function apply(ctx: Context, config: Config): void {
           maxMemoryChars: resolved.maxMemoryChars,
           visionModel: resolved.visionModel,
           maxFactChecks: resolved.maxFactChecks,
+          builderIsolation: resolved.builderIsolation,
           customInstructions: missionInstructions(),
         },
         // Planner retry, splits, fact-checks, integrators and regression passes are inside the budget formula.
-        agentBudget(maxTasks, maxFixRounds, true, maxWaves),
+        agentBudget(maxTasks, maxFixRounds, true, maxWaves, resolved.builderIsolation === 'worktree'),
       )
     },
     presentCall: presentCall('hackdev'),

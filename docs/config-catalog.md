@@ -928,12 +928,54 @@ export interface Config {
 ## `@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp`
 
 - `inject`: `browserUse` · `agents` · `tools` · `systemPrompt` · `workingDirectory`
-- `refs`: `BrowserMcpConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`)
-- `source`: [`packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts:15`](../packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts)
+- `refs`: `BrowserMcpAttachConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`) · `BrowserMcpLaunchConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`)
+- `source`: [`packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts:59`](../packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts)
 
 ```ts config-catalog
-/** Fixed Chromium launch or existing-browser attachment settings. */
-export type Config = BrowserMcpConfig
+/** Fixed Chromium launch, debugging-endpoint attachment, or connection to the running Chrome. */
+export type Config = ChromeLaunchConfig | ChromeAttachConfig | ChromeConnectConfig
+
+/** Launch Chrome for each live Session. */
+export interface ChromeLaunchConfig extends BrowserMcpLaunchConfig, ChromeCapabilities {
+  /**
+   * Use a throwaway profile that is deleted when the browser closes; defaults to true. With false the
+   * browser keeps one persistent profile, so sign-ins and cookies survive between sessions.
+   */
+  isolated?: boolean
+  /** Persistent profile directory used when `isolated` is false; omission uses the upstream default. */
+  userDataDir?: string
+  /** Chrome channel to launch; omission uses stable. */
+  channel?: ChromeChannel
+  /** Initial window size such as `1280x800`. */
+  viewport?: string
+}
+
+/** Attach to a browser through its debugging endpoint. */
+export interface ChromeAttachConfig extends BrowserMcpAttachConfig, ChromeCapabilities {}
+
+/**
+ * Connect to the person's own running Chrome (version 144 or newer) with its tabs and sign-ins. Chrome must
+ * have remote debugging switched on once from chrome://inspect/#remote-debugging.
+ */
+export interface ChromeConnectConfig extends ChromeCapabilities {
+  /** Connect to the running Chrome profile of this channel. */
+  mode: 'connect'
+  /** Chrome channel whose running browser is used; omission uses stable. */
+  channel?: ChromeChannel
+  /** Per-call timeout override in milliseconds; omission uses the MCP client default. */
+  toolCallTimeoutMs?: number
+}
+
+/** Capabilities shared by every Chrome connection mode. */
+export interface ChromeCapabilities {
+  /** Add coordinate tools such as click_at(x, y) for screenshot-driven control; defaults to false. */
+  vision?: boolean
+  /** Downscale screenshots wider than this many pixels, which keeps image tokens bounded. */
+  screenshotMaxWidth?: number
+}
+
+/** Chrome release channel whose installation and profile are used. */
+export type ChromeChannel = 'stable' | 'beta' | 'dev' | 'canary'
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp -->
 
@@ -4114,6 +4156,11 @@ export interface Config {
   maxResultChars?: number
   /** Commands the fact-checker may re-run per wave (default 8). */
   maxFactChecks?: number
+  /**
+   * Where parallel builders work: `shared` (one workspace, disjoint owned paths) or `worktree` (each task in its
+   * own git worktree, merged back one at a time; falls back to shared outside a git repository). Default `shared`.
+   */
+  builderIsolation?: 'shared' | 'worktree'
   /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
   customInstructions?: string
 }

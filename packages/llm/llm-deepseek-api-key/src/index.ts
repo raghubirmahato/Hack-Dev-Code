@@ -74,6 +74,7 @@ export function apply(ctx: Context, config: Config): void {
   /** Auth for one key; a refusal rests that key and offers the next one for the same request. */
   const authWith = (connection: ResolvedDeepSeekOptions, key: string, tried: Set<string>): DeepSeekRequestAuth => ({
     headers: { 'x-api-key': key },
+    readyInMs: pool.readyInMs(key),
     rotate: async ({ status, retryAfterMs }) => {
       if (!ROTATING_STATUSES.has(status)) return undefined
       pool.report(key, retryAfterMs)

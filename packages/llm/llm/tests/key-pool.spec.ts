@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ApiKeyPool, splitApiKeys } from '../src/key-pool.ts'
+import { ApiKeyPool, splitApiKeys, waitForKey } from '../src/key-pool.ts'
 
 describe('splitApiKeys', () => {
   it('splits on commas and semicolons and drops blanks and duplicates', () => {
@@ -49,5 +49,29 @@ describe('ApiKeyPool', () => {
 
   it('counts distinct keys', () => {
     expect(ApiKeyPool.count('a,b,a')).toBe(2)
+  })
+})
+
+describe('resting keys', () => {
+  it('reports the remaining rest of a key and zero once it recovers', () => {
+    let now = 0
+    const pool = new ApiKeyPool(() => now, 1000)
+    expect(pool.readyInMs('a')).toBe(0)
+    pool.report('a')
+    now = 400
+    expect(pool.readyInMs('a')).toBe(600)
+    now = 1000
+    expect(pool.readyInMs('a')).toBe(0)
+  })
+
+  it('waits for a resting key and stops early on abort', async () => {
+    const started = Date.now()
+    await waitForKey(30)
+    expect(Date.now() - started).toBeGreaterThanOrEqual(25)
+    const controller = new AbortController()
+    const waiting = waitForKey(60_000, controller.signal)
+    controller.abort()
+    await waiting
+    await waitForKey(-5)
   })
 })

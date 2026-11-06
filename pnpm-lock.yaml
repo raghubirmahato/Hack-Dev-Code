@@ -8215,6 +8215,9 @@ importers:
       '@hackdevcode/dsh-experimental-browser-use-runtime':
         specifier: workspace:*
         version: link:../browser-use-runtime
+      '@hackdevcode/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
       chrome-devtools-mcp:
         specifier: 1.9.0
         version: 1.9.0
@@ -9550,12 +9553,21 @@ importers:
 
   packages/experimental/cua-bundle:
     dependencies:
+      '@hackdevcode/dsh-browser-use':
+        specifier: workspace:*
+        version: link:../../browser-use/browser-use
       '@hackdevcode/dsh-computer-use':
         specifier: workspace:*
         version: link:../../computer-use/computer-use
       '@hackdevcode/dsh-cua':
         specifier: workspace:*
         version: link:../cua
+      '@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp':
+        specifier: workspace:*
+        version: link:../browser-use-chrome-devtools-mcp
+      '@hackdevcode/dsh-experimental-computer-use-cua-driver-native':
+        specifier: workspace:*
+        version: link:../computer-use-cua-driver-native
     devDependencies:
       '@hackdevcode/cordis':
         specifier: workspace:~

@@ -32,6 +32,15 @@ function fixture(body: string, overrides: Partial<WorkflowGuestHost> = {}, limit
 }
 
 describe('workflow guest callbacks', () => {
+  it('forwards a child working directory and ignores a blank one', async () => {
+    const test = fixture(`
+      await agent('a', { cwd: '.hackdev/worktrees/t1' })
+      return await agent('b', { cwd: '  ' })
+    `, { childResult: async () => ({ output: [], stopReason: 'completed' }) })
+    await runWorkflowGuest(test.host)
+    expect(test.requests).toEqual([{ prompt: 'a', cwd: '.hackdev/worktrees/t1' }, { prompt: 'b' }])
+  })
+
   it('runs the six-global script API and forwards structured child options and progress', async () => {
     const test = fixture(`
       phase('Read')

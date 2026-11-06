@@ -23,7 +23,7 @@ describe('Shipped profile templates', () => {
   it('stack each mode bundle on base except the standalone minimal SDK', () => {
     expect(PROFILE_TEMPLATES).toEqual({
       acp: { bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-acp-app'] },
-      web: { bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app'] },
+      web: { bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app', '@hackdevcode/dsh-cua-bundle'] },
       headless: { bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-headless'] },
       sdk: { bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-sdk-app'] },
       'sdk-minimal': { bundles: ['@hackdevcode/dsh-sdk-minimal'] },

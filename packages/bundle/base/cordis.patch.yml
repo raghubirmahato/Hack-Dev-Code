@@ -415,6 +415,7 @@
         maxParallel: 6
         maxWaves: 3
         maxFixRounds: 2
+        builderIsolation: worktree
 
     - id: timeout-policy
       name: '@hackdevcode/dsh-tool-call-timeout-policy'

@@ -782,8 +782,16 @@ function builderPrompt(task, tasks, depResults, extra) {
   ].filter(function (s) { return s.length > 0 }).join('\n\n')
 }
 
+// Isolated worktree of each task (and of its subtasks) when builders do not share the workspace.
+const worktreeOf = {}
+
 async function buildOnce(task, tasks, depResults, extra, label, wave) {
-  const raw = await limit(function () { return agent(builderPrompt(task, tasks, depResults, extra), { label: label, phase: 'Forge', schema: workerSchema }) })
+  const tree = worktreeOf[task.id]
+  const where = tree === undefined ? '' : 'You work in your own isolated git worktree at ' + tree + ' (it is your current directory and holds the whole project). Edit and test only there; your changes are merged back into the main workspace automatically when you finish.'
+  const prompt = builderPrompt(task, tasks, depResults, [where, extra].filter(function (s) { return s.length > 0 }).join('\n\n'))
+  const options = { label: label, phase: 'Forge', schema: workerSchema }
+  if (tree !== undefined) options.cwd = tree
+  const raw = await limit(function () { return agent(prompt, options) })
   if (raw === null || typeof raw !== 'object') return null
   addNotes(task.id, raw.memoryNotes)
   const result = validateWorker(raw, task, wave)
@@ -820,6 +828,7 @@ async function splitTask(task, previous, failure) {
 
 async function runSubtasks(task, subtasks, depResults, wave) {
   const done = []
+  for (const sub of subtasks) worktreeOf[sub.id] = worktreeOf[task.id]
   for (const sub of subtasks) {
     const subDeps = depResults.concat(done.filter(function (r) { return sub.dependsOn.indexOf(r.id) >= 0 }))
     const r = await buildOnce(sub, subtasks, subDeps, 'This is a SUBTASK of ' + task.id + ' (' + task.title + '); an earlier attempt did not finish it, so continue from what is already in the workspace.', 'Builder: ' + sub.id + ' (subtask)', wave)
@@ -844,10 +853,85 @@ async function runSubtasks(task, subtasks, depResults, wave) {
   }
 }
 
+const worktreeSchema = {
+  type: 'object',
+  properties: {
+    created: { type: 'boolean' },
+    path: { type: 'string' },
+    reason: { type: 'string' },
+  },
+  required: ['created', 'path', 'reason'],
+}
+
+const mergeSchema = {
+  type: 'object',
+  properties: {
+    merged: { type: 'boolean' },
+    conflicts: { type: 'array', items: { type: 'string' } },
+    summary: { type: 'string' },
+  },
+  required: ['merged', 'conflicts', 'summary'],
+}
+
+const mergeLimit = makeLimiter(1)
+
+/** Give one task its own git worktree holding the workspace as it stands now, uncommitted work included. */
+async function isolate(task, wave) {
+  const path = '.hackdev/worktrees/w' + wave + '-' + task.id
+  const raw = await agent([
+    'You are the WORKSPACE ISOLATION MANAGER. Create an isolated git worktree for builder task ' + task.id + ' at ' + path + ' (relative to the workspace root). Do not change any source file in the main workspace and do not commit there.',
+    '1. If the workspace is not a git repository, or it has no commit yet, create nothing and return created=false with the reason.',
+    '2. Otherwise run: git worktree add --detach ' + path + ' HEAD',
+    '3. Bring the uncommitted state across so the builder starts from exactly what the main workspace holds now: apply the tracked changes (git diff HEAD --binary, applied inside the worktree with git apply) and copy every untracked, not ignored file (git ls-files --others --exclude-standard), except anything under .hackdev/.',
+    '4. Confirm with git -C ' + path + ' status that the worktree matches, then return created=true and path=' + path + '.',
+    'If any step fails, remove the partial worktree (git worktree remove --force ' + path + ') and return created=false with the reason.',
+    BOUNDED_AUTONOMY,
+  ].join('\n\n'), { label: 'Worktree: ' + task.id, phase: 'Forge', schema: worktreeSchema })
+  if (raw === null || typeof raw !== 'object' || raw.created !== true || !isText(raw.path)) {
+    log('Task ' + task.id + ' shares the main workspace: ' + (raw !== null && typeof raw === 'object' && isText(raw.reason) ? raw.reason : 'isolation failed'))
+    return null
+  }
+  return raw.path.trim()
+}
+
+/** Merge one worktree's changes into the main workspace, one merge at a time, and remove the worktree. */
+async function mergeBack(task, tree) {
+  const raw = await mergeLimit(function () {
+    return agent([
+      'You are the MERGE MANAGER. Builder task ' + task.id + ' worked in the isolated git worktree ' + tree + '. Bring every change it made into the main workspace, then remove the worktree. Do not commit in the main workspace.',
+      '1. In the worktree run git add -A, then write its full change set against the worktree base: git -C ' + tree + ' diff --cached --binary HEAD.',
+      '2. Keep only what the builder changed: the worktree started from the main workspace including its uncommitted state, so leave out anything the main workspace already contains.',
+      '3. Apply the result in the main workspace with git apply --3way, or by editing files when a hunk does not apply. Resolve every conflict by keeping both intents and never discard work of another task. List each file whose conflict you resolved in conflicts.',
+      '4. Verify the merged files exist and the project still builds or its quick checks pass, then run git worktree remove --force ' + tree + '.',
+      'Return merged=true only when every change reached the main workspace.',
+      BOUNDED_AUTONOMY,
+      GROUNDING,
+    ].join('\n\n'), { label: 'Merge: ' + task.id, phase: 'Forge', schema: mergeSchema })
+  })
+  if (raw === null || typeof raw !== 'object') return { merged: false, conflicts: [], summary: 'the merge manager returned no report' }
+  return { merged: raw.merged === true, conflicts: textList(raw.conflicts).slice(0, 20), summary: clip(isText(raw.summary) ? raw.summary : '', 600) }
+}
+
 async function runTask(task, tasks, promises, wave) {
   const depResults = await Promise.all(task.dependsOn.map(function (d) { return promises[d] }))
   const failedDep = depResults.find(function (r) { return r.status === 'failed' || r.status === 'blocked' || r.status === 'skipped' })
   if (failedDep !== undefined) return failedResult(task, wave, 'skipped', 'Skipped because dependency ' + failedDep.id + ' ' + failedDep.status)
+  // Dependencies are merged before a dependent starts, so its worktree already holds their work.
+  const tree = args.builderIsolation === 'worktree' ? await isolate(task, wave) : null
+  if (tree === null) return buildTask(task, tasks, depResults, wave)
+  worktreeOf[task.id] = tree
+  const result = await buildTask(task, tasks, depResults, wave)
+  const merge = await mergeBack(task, tree)
+  if (merge.conflicts.length > 0) addNotes('merge', [{ kind: 'warning', text: 'Merging ' + task.id + ' resolved conflicts in: ' + merge.conflicts.join(', ') }])
+  if (merge.merged) return result
+  addNotes('merge', [{ kind: 'risk', text: 'Changes of ' + task.id + ' did not fully reach the main workspace: ' + merge.summary }])
+  return Object.assign({}, result, {
+    status: result.status === 'done' ? 'partial' : result.status,
+    summary: clip(result.summary + ' | Merge from its worktree did not complete: ' + merge.summary, 1000),
+  })
+}
+
+async function buildTask(task, tasks, depResults, wave) {
   const first = await buildOnce(task, tasks, depResults, '', 'Builder: ' + task.id, wave)
   if (first !== null && first.status === 'done') return first
   // Blocked on a human decision: re-planning cannot help, so surface it.

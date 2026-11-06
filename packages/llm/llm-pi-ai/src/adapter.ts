@@ -45,6 +45,7 @@ import {
   LlmError,
   omitOldestImages,
   ReasoningEffortId,
+  waitForKey,
 } from '@hackdevcode/dsh-llm'
 import type {
   GenerateOptions,
@@ -113,6 +114,8 @@ export interface PiAiAdapterOptions {
    * After a provider refused `refused` for rate, quota or key reasons, rest it and return another stored
    * key that this request has not tried, or `undefined` when none is left.
    */
+  /** Milliseconds a stored key still rests after a refusal; omission means keys never rest. */
+  apiKeyReadyInMs?: (key: string) => number
   rotateApiKey?: (
     provider: string,
     profile: ResolvedPiAiProviderProfile,
@@ -443,6 +446,12 @@ export class PiAiAdapter extends LlmAdapter {
       // One attempt per usable key: a provider refusal before any content arrives swaps the key and
       // sends the same context again, so a rate limit never costs the conversation its position.
       while (true) {
+        // Every stored key is resting: wait for the first to recover rather than spend the request on a refusal.
+        const restMs = apiKey === undefined ? 0 : this.config.apiKeyReadyInMs?.(apiKey) ?? 0
+        if (restMs > 0) {
+          await waitForKey(restMs, watchdog.signal)
+          watchdog.signal.throwIfAborted()
+        }
         const events = snapshot.models.streamSimple(model, context, {
           ...profileOptions(profile, reasoning, apiKey),
           ...options.temperature === undefined ? {} : { temperature: options.temperature },

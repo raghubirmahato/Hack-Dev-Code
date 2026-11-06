@@ -70,4 +70,20 @@ describe('credential rotation', () => {
     await expect(chunks(adapter({}, { resolveAuth: async () => ({ headers: { 'x-api-key': 'key-a' }, rotate }) }).stream(options())))
       .rejects.toMatchObject({ code: 'AUTH' })
   })
+
+  it('waits for a resting key before sending, and an abort ends the wait', async () => {
+    const fetchImpl = vi.fn<typeof fetch>(async () => ok())
+    vi.stubGlobal('fetch', fetchImpl)
+    const started = Date.now()
+    await chunks(adapter({}, { resolveAuth: async () => ({ headers: { 'x-api-key': 'key-a' }, readyInMs: 50 }) }).stream(options()))
+    expect(Date.now() - started).toBeGreaterThanOrEqual(45)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+
+    const controller = new AbortController()
+    const pending = chunks(adapter({}, { resolveAuth: async () => ({ headers: { 'x-api-key': 'key-a' }, readyInMs: 60_000 }) })
+      .stream(options({ signal: controller.signal })))
+    setTimeout(() => { controller.abort() }, 10)
+    await expect(pending).rejects.toBeDefined()
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
 })

@@ -114,6 +114,7 @@
                   maxParallel: 6
                   maxWaves: 3
                   maxFixRounds: 2
+                  builderIsolation: worktree
           - id: tool-ask-user
             name: '@hackdevcode/dsh-tool-ask-user'
           - id: tool-todo

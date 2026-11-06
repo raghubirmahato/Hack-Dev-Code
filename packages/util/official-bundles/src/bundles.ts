@@ -12,7 +12,7 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
     bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-acp-app'],
   },
   web: {
-    bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app'],
+    bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app', '@hackdevcode/dsh-cua-bundle'],
   },
   headless: {
     bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-headless'],
@@ -31,6 +31,8 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
  */
 export const INSTALLATION_OWNED_PROFILE_TUPLES: Readonly<Record<string, readonly string[]>> = {
   headless: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app', '@hackdevcode/dsh-headless'],
+  // Web profiles from before desktop and Chrome control was on by default.
+  web: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app'],
 }
 
 /** Bundles an earlier release shipped and the installation no longer carries; app-boot removes them from profiles. */
@@ -54,7 +56,6 @@ export const DEFAULT_PROFILE_BUNDLES: readonly string[] = ['@hackdevcode/dsh-bas
  */
 export const OPTIONAL_BUNDLES: readonly string[] = [
   '@hackdevcode/dsh-personalized-recommendations',
-  '@hackdevcode/dsh-cua-bundle',
   '@hackdevcode/dsh-experimental-session-search',
   '@hackdevcode/dsh-experimental-ralph-bundle',
   '@hackdevcode/dsh-experimental-terminal-bundle',

@@ -1,4 +1,5 @@
 /** Workflow child ownership and progress over the shared sandboxed PTC executor. */
+import { resolve } from 'node:path'
 import type { Context } from '@hackdevcode/cordis'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import type {} from '@hackdevcode/dsh-working-directory'
@@ -47,6 +48,7 @@ function childRequest(value: unknown): ChildStartRequest {
   const prompt = text(request.prompt, 'prompt')
   const provider = request.provider === undefined ? undefined : text(request.provider, 'provider')
   const model = request.model === undefined ? undefined : text(request.model, 'model')
+  const cwd = request.cwd === undefined ? undefined : text(request.cwd, 'cwd')
   let schema: ObjectJsonSchema | undefined
   if (request.schema !== undefined) {
     const candidate = object(request.schema)
@@ -57,6 +59,7 @@ function childRequest(value: unknown): ChildStartRequest {
     prompt,
     ...provider === undefined ? {} : { provider },
     ...model === undefined ? {} : { model },
+    ...cwd === undefined ? {} : { cwd },
     ...schema === undefined ? {} : { schema },
   }
 }
@@ -206,7 +209,8 @@ export class PtcWorkflowRun implements WorkflowRun {
       delivery: 'caller',
       signal: this.controller.signal,
       request: {
-        cwd: await this.cwd,
+        // A child may run in its own directory, such as a builder's worktree; relative paths resolve against the run's.
+        cwd: request.cwd === undefined ? await this.cwd : resolve(await this.cwd, request.cwd),
         prompt: [{ type: 'text', text: request.prompt }],
         parent: this.parent,
         ...request.schema === undefined ? {} : { outputSchema: request.schema },

@@ -7,6 +7,29 @@
 /** Milliseconds a key rests after the provider rejected it for rate limiting. */
 const DEFAULT_COOLDOWN_MS = 60_000
 
+/** Longest a request waits for a resting key before it is sent anyway. */
+export const MAX_KEY_WAIT_MS = 60_000
+
+/**
+ * Wait until a resting key may be used again, so a request does not spend itself on a key that is
+ * certain to be refused. Resolves early when the signal aborts.
+ * @param ms - remaining rest, capped at {@link MAX_KEY_WAIT_MS}.
+ * @param signal - the request's abort signal.
+ */
+export async function waitForKey(ms: number, signal?: AbortSignal): Promise<void> {
+  const wait = Math.min(Math.max(0, ms), MAX_KEY_WAIT_MS)
+  if (wait === 0 || signal?.aborted === true) return
+  await new Promise<void>((resolve) => {
+    const done = (): void => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', done)
+      resolve()
+    }
+    const timer = setTimeout(done, wait)
+    signal?.addEventListener('abort', done, { once: true })
+  })
+}
+
 /**
  * Split one stored credential into its individual keys.
  * Keys are separated by commas or semicolons; a space or line break inside one key is left for key
@@ -74,6 +97,15 @@ export class ApiKeyPool {
    */
   report(key: string, retryAfterMs?: number): void {
     this.restingUntil.set(key, this.now() + (retryAfterMs !== undefined && retryAfterMs > 0 ? retryAfterMs : this.cooldownMs))
+  }
+
+  /**
+   * How long a key still rests; zero once it may be used again.
+   * @param key - a key previously returned by {@link next}.
+   * @returns the remaining rest in milliseconds.
+   */
+  readyInMs(key: string): number {
+    return Math.max(0, (this.restingUntil.get(key) ?? 0) - this.now())
   }
 
   /**

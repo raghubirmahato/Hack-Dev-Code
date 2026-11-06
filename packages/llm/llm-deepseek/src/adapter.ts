@@ -1,6 +1,6 @@
 /** Direct Messages transport with one cancellable lifecycle per model request. */
 
-import { attributionHeaders, LlmAdapter, LlmError } from '@hackdevcode/dsh-llm'
+import { attributionHeaders, LlmAdapter, LlmError, waitForKey } from '@hackdevcode/dsh-llm'
 import type { GenerateOptions, ImageAttachmentAccessResolver, PreparedAdapterCall, StreamChunk } from '@hackdevcode/dsh-llm'
 import type { DeepSeekLlmApiJson } from '@hackdevcode/dsh-deepseek-llm-api-extensions'
 import { idleWatchdog, timeoutOf } from '@hackdevcode/dsh-timeout'
@@ -138,6 +138,11 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
             ? [MESSAGES_TOOL_CHANGES_BETA]
             : [],
         ]
+        // Every stored key is resting: wait for the first to recover rather than spend the request on a refusal.
+        if (auth.readyInMs !== undefined && auth.readyInMs > 0) {
+          await waitForKey(auth.readyInMs, signal)
+          signal.throwIfAborted()
+        }
         const response = await fetch(`${messagesApiRoot(connection.baseURL)}/messages`, {
           method: 'POST', signal, body: extensions.payload, redirect: 'error',
           headers: {

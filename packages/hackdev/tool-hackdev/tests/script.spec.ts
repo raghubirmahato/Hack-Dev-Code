@@ -5,7 +5,14 @@ import { agentBudget, ENGINE_AGENT_CEILING, readReport, resolveCap } from '../sr
 import { boundText, compactReport, PRESENTATION_VERSION, renderReport } from '../src/render.ts'
 import type { HackDevReport } from '../src/render.ts'
 
-interface AgentCall { prompt: string; label: string; phase?: string | undefined; schema?: unknown; model?: string | undefined }
+interface AgentCall {
+  prompt: string
+  label: string
+  phase?: string | undefined
+  schema?: unknown
+  model?: string | undefined
+  cwd?: string | undefined
+}
 type AgentImpl = (call: AgentCall, n: number) => unknown
 
 interface RunGate {
@@ -50,8 +57,8 @@ async function runScript(
     args,
     phase: () => {},
     log: () => {},
-    agent: async (prompt: string, opts: { label?: string; phase?: string; schema?: unknown; model?: string } = {}) => {
-      const call: AgentCall = { prompt, label: opts.label ?? '', phase: opts.phase, schema: opts.schema, model: opts.model }
+    agent: async (prompt: string, opts: { label?: string; phase?: string; schema?: unknown; model?: string; cwd?: string } = {}) => {
+      const call: AgentCall = { prompt, label: opts.label ?? '', phase: opts.phase, schema: opts.schema, model: opts.model, cwd: opts.cwd }
       calls.push(call)
       try {
         return await impl(call, calls.length)
@@ -207,6 +214,56 @@ describe('HACKDEV_SCRIPT', () => {
     expect(wide.calls.find(c => c.label.startsWith('Fact-checker'))!.prompt).toContain('at most 20 commands')
     const normal = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl())
     expect(normal.calls.find(c => c.label.startsWith('Fact-checker'))!.prompt).toContain('at most 8 commands')
+  })
+
+  it('gives each builder its own worktree when isolation is on and merges every task back one at a time', async () => {
+    const order: string[] = []
+    let merging = 0
+    const { value, calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, builderIsolation: 'worktree' }, defaultImpl({
+      'Worktree: ': (call) => {
+        const id = call.label.split(': ')[1]!
+        return { created: true, path: `.hackdev/worktrees/w1-${id}`, reason: '' }
+      },
+      'Merge: ': async (call) => {
+        merging += 1
+        expect(merging).toBe(1)
+        order.push(`merge:${call.label.split(': ')[1]!}`)
+        await delay(2)
+        merging -= 1
+        return { merged: true, conflicts: [], summary: 'merged' }
+      },
+      Builder: (call) => {
+        order.push(`build:${call.label.split(': ')[1]!}`)
+        return worker()
+      },
+    }))
+    const builders = calls.filter(c => c.label.startsWith('Builder'))
+    expect(builders.map(c => c.cwd).sort()).toEqual(['.hackdev/worktrees/w1-a', '.hackdev/worktrees/w1-b', '.hackdev/worktrees/w1-c'])
+    expect(builders.every(c => c.prompt.includes('isolated git worktree'))).toBe(true)
+    // b depends on a, so a is merged before b's worktree is even created.
+    expect(order.indexOf('merge:a')).toBeLessThan(order.indexOf('build:b'))
+    expect(order.filter(entry => entry.startsWith('merge:'))).toHaveLength(3)
+    expect(value.tasks.every(t => t.status === 'done')).toBe(true)
+  })
+
+  it('falls back to the shared workspace when a worktree cannot be created, and flags a failed merge', async () => {
+    const { value, calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, builderIsolation: 'worktree' }, defaultImpl({
+      'Worktree: a': () => ({ created: false, path: '', reason: 'not a git repository' }),
+      'Worktree: ': call => ({ created: true, path: `.hackdev/worktrees/w1-${call.label.split(': ')[1]!}`, reason: '' }),
+      'Merge: c': () => ({ merged: false, conflicts: ['src/c.ts'], summary: 'patch did not apply' }),
+      'Merge: ': () => ({ merged: true, conflicts: [], summary: 'merged' }),
+    }))
+    expect(calls.find(c => c.label === 'Builder: a')!.cwd).toBeUndefined()
+    expect(calls.some(c => c.label === 'Merge: a')).toBe(false)
+    const c = value.tasks.find(t => t.id === 'c')!
+    expect(c.status).toBe('partial')
+    expect(c.summary).toContain('patch did not apply')
+  })
+
+  it('keeps every builder in the shared workspace by default', async () => {
+    const { calls } = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl())
+    expect(calls.some(c => c.label.startsWith('Worktree') || c.label.startsWith('Merge'))).toBe(false)
+    expect(calls.filter(c => c.label.startsWith('Builder')).every(c => c.cwd === undefined)).toBe(true)
   })
 
   it('adds no custom-instruction block when none is set', async () => {
@@ -671,6 +728,7 @@ describe('helpers', () => {
     expect(agentBudget(12, 2, true)).toBe(4 + (72 + 1 + 14 + 1) + 1)
     expect(agentBudget(24, 2, true, 3)).toBe(4 + 160 + 2 * 64 + 1)
     expect(agentBudget(1, 0, false)).toBe(7)
+    expect(agentBudget(12, 2, true, 1, true)).toBe(4 + (96 + 1 + 14 + 1) + 1)
     expect(agentBudget(64, 6, true, 10)).toBe(ENGINE_AGENT_CEILING)
   })
 

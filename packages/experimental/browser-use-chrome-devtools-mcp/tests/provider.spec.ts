@@ -35,3 +35,28 @@ it('rejects trailing endpoint garbage before mounting any browser resources', ()
   expect(() => { Provider.apply(new Context(), Provider.Config({ mode: 'attach', endpoint: 'http://localhost trailing-junk' })) }).toThrow('browser endpoint')
   expect(mountSessionMcp).not.toHaveBeenCalled()
 })
+
+it('keeps one persistent profile with a chosen channel, size and vision tools when isolation is off', () => {
+  Provider.apply(new Context(), Provider.Config({
+    mode: 'launch', headless: false, isolated: false, userDataDir: 'C:/profiles/agent', channel: 'beta', viewport: '1440x900',
+    vision: true, screenshotMaxWidth: 1280,
+  }))
+  const options = vi.mocked(mountSessionMcp).mock.calls[0]![1]
+  expect(options.exclusive).toBe(false)
+  expect(options.args.slice(1)).toEqual([
+    '--no-usage-statistics', '--headless=false', '--user-data-dir', 'C:/profiles/agent', '--channel', 'beta',
+    '--viewport', '1440x900', '--experimental-vision', '--screenshot-max-width', '1280',
+  ])
+})
+
+it('connects exclusively to the running Chrome profile', () => {
+  Provider.apply(new Context(), Provider.Config({ mode: 'connect', channel: 'stable', vision: true }))
+  const options = vi.mocked(mountSessionMcp).mock.calls[0]![1]
+  expect(options.exclusive).toBe(true)
+  expect(options.args.slice(1)).toEqual(['--no-usage-statistics', '--auto-connect', '--channel', 'stable', '--experimental-vision'])
+})
+
+it('rejects an unknown channel and a malformed viewport', () => {
+  expect(() => Provider.Config({ mode: 'connect', channel: 'nightly' } as never)).toThrow()
+  expect(() => Provider.Config({ mode: 'launch', viewport: 'wide' } as never)).toThrow()
+})
