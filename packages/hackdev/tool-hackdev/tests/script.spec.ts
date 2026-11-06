@@ -194,6 +194,19 @@ describe('HACKDEV_SCRIPT', () => {
     expect(b.prompt).toContain('.hackdev/MEMORY.md')
   })
 
+  it('gives the custom instructions to every builder and gate prompt', async () => {
+    const { calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, customInstructions: 'Use tabs and never add dependencies.' }, defaultImpl())
+    const builder = calls.find(c => c.label === 'Builder: a')!
+    expect(builder.prompt).toContain('User custom instructions')
+    expect(builder.prompt).toContain('Use tabs and never add dependencies.')
+    expect(calls.find(c => c.label.startsWith('Gate 1'))!.prompt).toContain('Use tabs and never add dependencies.')
+  })
+
+  it('adds no custom-instruction block when none is set', async () => {
+    const { calls } = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl())
+    expect(calls.every(c => !c.prompt.includes('User custom instructions'))).toBe(true)
+  })
+
   it('keeps pinned contracts visible even when many facts crowd the board', async () => {
     const facts = Array.from({ length: 60 }, (_, i) => ({ kind: 'fact', text: `fact number ${i} ${'x'.repeat(80)}` }))
     const { calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, maxMemoryChars: 1200 }, defaultImpl({

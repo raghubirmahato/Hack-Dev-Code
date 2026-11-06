@@ -249,6 +249,9 @@ function applyLauncherIdentities(
   })
 }
 
+/** Longest custom instruction text placed in a prompt, so one setting cannot crowd out the rest. */
+const MAX_CUSTOM_INSTRUCTIONS_CHARS = 8000
+
 /** Agent-loop plugin configuration. */
 export interface Config {
   /**
@@ -256,6 +259,11 @@ export interface Config {
    * omission defaults to {@link DEFAULT_MAX_PARALLEL_TOOL_CALLS}.
    */
   maxParallelToolCalls: Volatile<number>
+  /**
+   * Standing instructions from the user, added to every agent's system prompt and read afresh at each
+   * request so an edit applies from the next one. Empty adds nothing.
+   */
+  customInstructions: Volatile<string>
   /** Agents created or resumed at plugin startup; a resumed agent records its configured route as the Session's model selection. */
   agents: (AgentOptions & {
     /** Stable config label used in logs and as the fresh combined-id prefix. */
@@ -292,8 +300,9 @@ export class AgentLoop extends Service implements AgentFactory {
   static inject = ['agents', 'sessions', 'llm', 'tools', 'systemPrompt', 'sessionProjections']
 
   /** Runtime schema for declarative agents. */
-  static Config: z<{ agents?: Config['agents']; maxParallelToolCalls?: number }, Config> = z.object({
+  static Config: z<{ agents?: Config['agents']; maxParallelToolCalls?: number; customInstructions?: string }, Config> = z.object({
     maxParallelToolCalls: z.number().step(1).min(1).default(DEFAULT_MAX_PARALLEL_TOOL_CALLS).volatile(),
+    customInstructions: z.string().role('textarea').default('').volatile(),
     agents: z.array(z.object({
       id: z.string().required(),
       sessionId: z.string().min(1),
@@ -304,7 +313,7 @@ export class AgentLoop extends Service implements AgentFactory {
       cwd: z.string(),
       resumeSessionId: z.string(),
     })).default([]),
-  }) as z<{ agents?: Config['agents']; maxParallelToolCalls?: number }, Config>
+  }) as z<{ agents?: Config['agents']; maxParallelToolCalls?: number; customInstructions?: string }, Config>
 
   /** Validated configuration owned by the agent-loop service. */
   readonly config: Config
@@ -320,6 +329,7 @@ export class AgentLoop extends Service implements AgentFactory {
     this.config = {
       agents: applyLauncherIdentities(config.agents, ctx.get(CONFIGURED_AGENT_IDENTITIES_KEY)),
       maxParallelToolCalls: config.maxParallelToolCalls,
+      customInstructions: config.customInstructions,
     }
     validateConfiguredAgents(this.config.agents)
     this.ownership = new FactoryOwnership(ctx.fiber)
@@ -336,6 +346,19 @@ export class AgentLoop extends Service implements AgentFactory {
     ctx.effect(() => ctx.agents.setFactory(this), 'agentLoop.setFactory()')
     ctx.systemPrompt.variable('provider', context => context.modelSelection?.provider ?? context.agent?.options.provider)
     ctx.systemPrompt.variable('model', context => context.modelSelection?.model ?? context.agent?.options.model)
+    ctx.systemPrompt.section({
+      name: 'policy:custom-instructions',
+      order: ctx.systemPrompt.getSectionOrder('HACKDEV_POLICY'),
+      interpolate: false,
+      text: () => {
+        const text = this.config.customInstructions.get().trim().slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS)
+        return text.length === 0
+          ? ''
+          : `User custom instructions. Follow them in every task unless they conflict with safety:
+
+${text}`
+      },
+    })
 
     for (const { id, sessionId, cwd, resumeSessionId, ...options } of this.config.agents) {
       const meta = cwd === undefined ? {} : { cwd }

@@ -2424,3 +2424,10 @@ it('renders the localized account row as signed in without an edit action', asyn
   expect(within(item).getByText(en.accountSignedIn)).toBeTruthy()
   expect(within(item).queryByText(en.edit)).toBeNull()
 })
+
+describe('apiKeyFailure with several keys', () => {
+  it('accepts comma and semicolon separated keys and checks each one', () => {
+    expect(apiKeyFailure('sk-one,sk-two;sk-three')).toBeUndefined()
+    expect(apiKeyFailure('sk-one, sk-t wo')).toBe('keyIllegalCharacters')
+  })
+})

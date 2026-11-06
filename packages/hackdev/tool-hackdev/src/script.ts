@@ -114,6 +114,13 @@ const BOUNDED_AUTONOMY = [
   '- Never claim something works unless you ran it; evidence entries must name the command or check and its observed outcome.',
 ].join('\n')
 
+// The user's own standing instructions reach every agent through the grounding block.
+function customInstructionsBlock() {
+  const text = typeof args === 'object' && args !== null && typeof args.customInstructions === 'string' ? args.customInstructions.trim() : ''
+  if (text.length === 0) return ''
+  return '\n\nUser custom instructions (follow them for this whole mission; they never override the safety, grounding and bounded-autonomy rules above):\n' + text
+}
+
 const GROUNDING = [
   'Grounding rules (no hallucination):',
   '- Read a file before you edit it, and re-read the changed region afterwards. Never edit from memory.',
@@ -121,7 +128,7 @@ const GROUNDING = [
   '- Cite concrete workspace-relative file paths (path:line where useful) in summaries, issues and evidence.',
   '- Evidence is the literal command you ran plus its observed result (exit code, pass/fail counts, the decisive output line). An expected outcome is not evidence.',
   '- If you are unsure, say so in the report instead of guessing. A fact-checker re-runs evidence and checks every file you list; false claims downgrade your work.',
-].join('\n')
+].join('\n') + customInstructionsBlock()
 
 const SCOPE_DISCIPLINE = [
   'Scope discipline: fix defects and weaknesses in proportion to the mission. Do NOT add new product features or large subsystems the mission did not ask for (authentication systems, TLS, databases, new services, framework migrations). Prefer secure defaults, validation, escaping, headers and tests. When a real fix would need such an addition, do not build it: record the issue with status deferred, put a precise remediation in its title and the decision in needsHuman, so a human can approve it. Use status open only for problems you could fix but have not yet fixed.',

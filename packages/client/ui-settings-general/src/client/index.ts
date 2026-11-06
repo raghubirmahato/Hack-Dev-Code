@@ -44,6 +44,8 @@ import { CloseLabel, HeaderContent, TriggerContent } from './chrome.tsx'
 import { GeneralSection } from './GeneralSection.tsx'
 import { CurrentVersionRow } from './CurrentVersionRow.tsx'
 import { DeveloperToolsRow, type DeveloperToolsRowInjected } from './DeveloperToolsRow.tsx'
+import { CustomInstructionsRow, type CustomInstructionsRowInjected } from './CustomInstructionsRow.tsx'
+import type { ObservableSnapshot } from '@hackdevcode/dsh-client-store'
 import { SettingsDocumentAction } from './SettingsDocumentAction.tsx'
 import type { SettingsDocumentActionInjected } from './SettingsDocumentAction.tsx'
 import { SettingsDocumentStore } from './settings-document-store.ts'
@@ -70,6 +72,11 @@ declare module '@hackdevcode/dsh-client-ui-slots' {
 
 /** Dictionary namespace owned by this plugin (shell chrome + General copy). */
 const NS = 'settings'
+
+/** Settings namespace of the agent loop, spelled here because a client package must not depend on a Host package. */
+const INSTRUCTIONS_NS = 'agent-loop'
+/** Mirrors the Host's cap on custom instruction text. */
+const CUSTOM_INSTRUCTIONS_LIMIT = 8000
 
 /**
  * Required services (cordis fiber inject). The target slots are declared by
@@ -99,6 +106,25 @@ export function apply(ctx: ClientContext): void {
       },
     }),
   }, DeveloperToolsRow))
+  // Standing instructions live on the agent loop's settings; the row exists while the Host serves that namespace.
+  const instructions = ctx.configForms.get<{ customInstructions?: string }>(INSTRUCTIONS_NS)
+  const instructionsText: ObservableSnapshot<string> = {
+    subscribe: listener => instructions.subscribe(listener),
+    getSnapshot: () => instructions.getSnapshot().value?.customInstructions ?? '',
+  }
+  ctx.effect(() => ctx.configForms.whileServed([INSTRUCTIONS_NS], () => ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item', id: 'custom-instructions', order: 20, locale: NS,
+    inject: (): CustomInstructionsRowInjected => ({
+      hooks: { customInstructions: instructionsText },
+      limit: CUSTOM_INSTRUCTIONS_LIMIT,
+      save: text => instructions.mutate(
+        text.length === 0
+          ? [{ op: 'unset', path: ['customInstructions'] }]
+          : [{ op: 'set', path: ['customInstructions'], value: text }],
+        instructions.getSnapshot().revision,
+      ),
+    }),
+  }, CustomInstructionsRow))), 'ui-settings-general: custom instructions row')
   // Version information follows the core preferences.
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item', id: 'current-version', order: 100, locale: NS,

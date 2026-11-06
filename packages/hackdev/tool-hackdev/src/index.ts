@@ -42,6 +42,8 @@ export interface Config {
   maxMemoryChars?: number
   /** Maximum characters in the parent-facing report (default 16384). */
   maxResultChars?: number
+  /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
+  customInstructions?: string
 }
 
 /** Schemastery configuration for the Hack Dev Code tools. */
@@ -54,7 +56,11 @@ export const Config: z<Config> = z.object({
   maxFixRounds: z.number().step(1).min(0).max(6).default(2),
   maxMemoryChars: z.number().step(1).min(500).max(100_000).default(6000),
   maxResultChars: z.number().step(1).min(1000).max(Number.MAX_SAFE_INTEGER).default(16_384),
+  customInstructions: z.string().role('textarea').default(''),
 })
+
+/** Longest custom instruction text accepted, so one setting cannot crowd out every agent prompt. */
+const MAX_CUSTOM_INSTRUCTIONS = 8000
 
 interface ResolvedConfig {
   readonly subagentProvider: string
@@ -65,6 +71,7 @@ interface ResolvedConfig {
   readonly maxFixRounds: number
   readonly maxMemoryChars: number
   readonly maxResultChars: number
+  readonly customInstructions: string
 }
 
 interface MissionArgs {
@@ -112,6 +119,7 @@ function resolveConfig(config: Config): ResolvedConfig {
     maxFixRounds: config.maxFixRounds ?? 2,
     maxMemoryChars: config.maxMemoryChars ?? 6000,
     maxResultChars: config.maxResultChars ?? 16_384,
+    customInstructions: (config.customInstructions ?? '').trim().slice(0, MAX_CUSTOM_INSTRUCTIONS),
   }
   if (resolved.subagentProvider.length === 0 || resolved.subagentProvider !== resolved.subagentProvider.trim()) {
     throw new TypeError('subagentProvider must be a non-empty normalized string')
@@ -248,6 +256,21 @@ export function apply(ctx: Context, config: Config): void {
     order: ctx.systemPrompt.getSectionOrder('HACKDEV_POLICY'),
     text: POLICY,
   })
+  if (resolved.customInstructions.length > 0) {
+    ctx.systemPrompt.section({
+      name: 'policy:custom-instructions',
+      order: ctx.systemPrompt.getSectionOrder('HACKDEV_POLICY'),
+      text: 'User custom instructions. Follow them in every task unless they conflict with safety:\n\n' + resolved.customInstructions,
+    })
+  }
+
+  /** This tool's own instructions plus the user's global ones from Settings, read afresh for each mission. */
+  const missionInstructions = (): string => {
+    const loop = (ctx as unknown as { get(name: string): unknown }).get('agentLoop') as
+      { config?: { customInstructions?: { get(): string } } } | undefined
+    const global = (loop?.config?.customInstructions?.get() ?? '').trim()
+    return [resolved.customInstructions, global].filter(text => text.length > 0).join('\n\n').slice(0, MAX_CUSTOM_INSTRUCTIONS)
+  }
 
   // The same durable run records the generic workflow tool writes, so the existing
   // workflow-run chat node shows this pipeline's phases and agents live.
@@ -344,6 +367,7 @@ export function apply(ctx: Context, config: Config): void {
           maxParallel: resolved.maxParallel,
           maxMemoryChars: resolved.maxMemoryChars,
           visionModel: resolved.visionModel,
+          customInstructions: missionInstructions(),
         },
         // Planner retry, splits, fact-checks, integrators and regression passes are inside the budget formula.
         agentBudget(maxTasks, maxFixRounds, true, maxWaves),
@@ -387,7 +411,7 @@ export function apply(ctx: Context, config: Config): void {
         exec,
         HACKDEV_REVIEW_SCRIPT,
         HACKDEV_REVIEW_META,
-        { mission, focus: (args.focus ?? '').trim(), maxFixRounds, maxMemoryChars: resolved.maxMemoryChars, visionModel: resolved.visionModel },
+        { mission, focus: (args.focus ?? '').trim(), maxFixRounds, maxMemoryChars: resolved.maxMemoryChars, visionModel: resolved.visionModel, customInstructions: missionInstructions() },
         agentBudget(1, maxFixRounds, false),
       )
     },

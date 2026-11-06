@@ -39,3 +39,39 @@ it('records the prompt and fails the request when the official endpoint has a ma
   })
   expect(fetch).not.toHaveBeenCalled()
 })
+
+it('continues the same turn on the next stored key after a rate limit', async () => {
+  vi.stubEnv('DEEPSEEK_API_KEY', 'key-a,key-b')
+  const sent: string[] = []
+  const reply = (events: unknown[]) => events.map(event => `event: ${(event as { type: string }).type}\ndata: ${JSON.stringify(event)}\n\n`).join('')
+  vi.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+    const target = typeof url === 'string' ? url : url instanceof URL ? url.href : url.url
+    if (!target.endsWith('/messages')) return new Response('{}', { status: 404 })
+    const key = (init?.headers as Record<string, string>)['x-api-key'] ?? ''
+    sent.push(key)
+    if (key === 'key-a') return new Response(JSON.stringify({ error: { type: 'rate_limit_error', message: 'slow down' } }), { status: 429 })
+    return new Response(reply([
+      { type: 'message_start', message: { id: 'm1', model: 'deepseek-v4-flash', usage: { input_tokens: 3, output_tokens: 1 } } },
+      { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
+      { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'done' } },
+      { type: 'content_block_stop', index: 0 },
+      { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 2 } },
+      { type: 'message_stop' },
+    ]), { headers: { 'content-type': 'text/event-stream' } })
+  })
+  const ctx = new Context()
+  contexts.push(ctx)
+  for (const plugin of [LlmRuntime, SessionStore, SessionProjectionRegistry, SystemPrompt, ToolRuntime, AgentRegistry]) {
+    await ctx.plugin(plugin)
+  }
+  await ctx.plugin(NativeToolExecutor)
+  await ctx.plugin(AgentLoop, { agents: [] })
+  await ctx.plugin(DeepSeek, {})
+  const agent = await ctx.agentLoop.create(SessionId('rotating-official-key'), { provider: 'deepseek-official', model: 'deepseek-flash' })
+  agent.followup(createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } }))
+  await agent.whenIdle()
+  expect(sent).toEqual(['key-a', 'key-b'])
+  const attempts = agent.session.snapshotEvents().filter(event => event.type === 'assistant/message')
+  expect(attempts).toHaveLength(1)
+  expect(JSON.stringify(attempts[0]?.data)).toContain('done')
+})

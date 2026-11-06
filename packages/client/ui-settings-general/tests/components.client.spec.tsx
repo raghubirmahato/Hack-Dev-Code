@@ -9,6 +9,7 @@ import { CloseLabel, HeaderContent, TriggerContent } from '../src/client/chrome.
 import type { TriggerContentProps } from '../src/client/chrome.tsx'
 import { SettingsDocumentAction } from '../src/client/SettingsDocumentAction.tsx'
 import { DeveloperToolsRow } from '../src/client/DeveloperToolsRow.tsx'
+import { CustomInstructionsRow } from '../src/client/CustomInstructionsRow.tsx'
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
 import { SettingsDescribeMirror } from '@hackdevcode/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { SettingsDocumentStore } from '../src/client/settings-document-store.ts'
@@ -91,6 +92,37 @@ it('toggles developer tools using the accepted setting and disables duplicate wr
   finish()
   await waitFor(() => { expect(toggle.getAttribute('aria-checked')).toBe('true') })
   expect(toggle.hasAttribute('disabled')).toBe(false)
+})
+
+describe('custom instructions row', () => {
+  it('saves edited text, keeps Save off until something changed, and refuses text over the limit', async () => {
+    const state = createSnapshotStore('Use tabs.')
+    const save = vi.fn(async (text: string) => { state.set(text); return true })
+    render(<CustomInstructionsRow {...kit} t={t} useCustomInstructions={bindSnapshotSelector(state)} limit={30} save={save} />)
+    const box = screen.getByRole('textbox', { name: 'Custom instructions' }) as HTMLTextAreaElement
+    const saveButton = screen.getByRole('button', { name: 'Save' })
+    expect(box.value).toBe('Use tabs.')
+    expect(saveButton.hasAttribute('disabled')).toBe(true)
+    fireEvent.change(box, { target: { value: 'x'.repeat(31) } })
+    expect(saveButton.hasAttribute('disabled')).toBe(true)
+    fireEvent.change(box, { target: { value: ' Prefer small commits. ' } })
+    fireEvent.click(saveButton)
+    expect(save).toHaveBeenCalledWith('Prefer small commits.')
+    await waitFor(() => { expect(screen.getByRole('status').textContent).toBe('Saved') })
+  })
+
+  it('reports a refused save and keeps the draft', async () => {
+    const state = createSnapshotStore('')
+    const save = vi.fn(async () => false)
+    render(<CustomInstructionsRow {...kit} t={t} useCustomInstructions={bindSnapshotSelector(state)} limit={100} save={save} />)
+    const box = screen.getByRole('textbox', { name: 'Custom instructions' }) as HTMLTextAreaElement
+    fireEvent.change(box, { target: { value: 'Never add dependencies.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+    await waitFor(() => { expect(screen.getByRole('alert').textContent).toBe(en['customInstructions.error']) })
+    expect(box.value).toBe('Never add dependencies.')
+    fireEvent.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(box.value).toBe('')
+  })
 })
 
 describe('chrome content', () => {

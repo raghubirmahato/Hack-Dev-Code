@@ -52,3 +52,15 @@ it('defaults to ten and restores that default without remounting the loop', asyn
   expect(ctx.agentLoop.config.maxParallelToolCalls.get()).toBe(10)
   expect(live.entry.fiber === live.fiber).toBe(true)
 })
+
+it('adds live custom instructions to the system prompt and drops them when cleared', async () => {
+  const { ctx, live } = await boot()
+  const sectionText = async (): Promise<string | undefined> =>
+    (await ctx.systemPrompt.assemble()).sections.find(section => section.name === 'policy:custom-instructions')?.text
+  expect(await sectionText()).toBe('')
+  await live.update({ customInstructions: '  Use tabs, never {{variables}}.  ' })
+  expect(await sectionText()).toContain('Use tabs, never {{variables}}.')
+  expect(live.entry.fiber === live.fiber).toBe(true)
+  await live.update({ customInstructions: '' })
+  expect(await sectionText()).toBe('')
+})

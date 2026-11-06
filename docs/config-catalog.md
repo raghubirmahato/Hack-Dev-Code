@@ -111,7 +111,7 @@ export interface Config {
 
 - `inject`: `agents` · `sessions` · `llm` · `tools` · `systemPrompt` · `sessionProjections`
 - `refs`: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md) · `Volatile` (`@hackdevcode/cosmokit`)
-- `source`: [`packages/core/agent-loop/src/index.ts:253`](../packages/core/agent-loop/src/index.ts)
+- `source`: [`packages/core/agent-loop/src/index.ts:256`](../packages/core/agent-loop/src/index.ts)
 
 ```ts config-catalog
 /** Agent-loop plugin configuration. */
@@ -121,6 +121,11 @@ export interface Config {
    * omission defaults to {@link DEFAULT_MAX_PARALLEL_TOOL_CALLS}.
    */
   maxParallelToolCalls: Volatile<number>
+  /**
+   * Standing instructions from the user, added to every agent's system prompt and read afresh at each
+   * request so an edit applies from the next one. Empty adds nothing.
+   */
+  customInstructions: Volatile<string>
   /** Agents created or resumed at plugin startup; a resumed agent records its configured route as the Session's model selection. */
   agents: (AgentOptions & {
     /** Stable config label used in logs and as the fresh combined-id prefix. */
@@ -4107,6 +4112,8 @@ export interface Config {
   maxMemoryChars?: number
   /** Maximum characters in the parent-facing report (default 16384). */
   maxResultChars?: number
+  /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
+  customInstructions?: string
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-tool-hackdev -->

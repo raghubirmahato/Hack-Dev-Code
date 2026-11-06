@@ -1,6 +1,6 @@
 /** Write-only credential input with the same reveal behavior as masked conversation text. */
 import { useState } from 'react'
-import type { InputHTMLAttributes, ReactNode } from 'react'
+import type { ChangeEvent, InputHTMLAttributes, ReactNode } from 'react'
 import type { en } from './locales.ts'
 import styles from './ModelsSection.module.css'
 
@@ -32,6 +32,17 @@ export function ApiKeyInput({ value, t, ...props }: ApiKeyInputProps): ReactNode
         type={revealed ? 'text' : 'password'}
         autoComplete="new-password"
         value={value}
+        onPaste={(event) => {
+          // A single-line field flattens pasted lines into one run; keep them apart as separate keys.
+          const text = event.clipboardData.getData('text')
+          if (!/[\r\n]/.test(text)) return
+          event.preventDefault()
+          const joined = text.trim().split(/\s*[\r\n]+\s*/).join(',')
+          const input = event.currentTarget
+          const next = `${value.slice(0, input.selectionStart ?? value.length)}${joined}${value.slice(input.selectionEnd ?? value.length)}`
+          setRevealedValue(undefined)
+          props.onChange?.({ target: { value: next } } as ChangeEvent<HTMLInputElement>)
+        }}
         onChange={(event) => {
           setRevealedValue(undefined)
           props.onChange?.(event)

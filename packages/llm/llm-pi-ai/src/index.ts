@@ -60,7 +60,7 @@ import type {} from '@hackdevcode/cordis-plugin-loader'
 
 import type { Context } from '@hackdevcode/cordis'
 import { launchEnvironmentOf } from '@hackdevcode/dsh-launch-environment'
-import { assertUsableApiKey, LlmError, resolveImageAttachmentAccess } from '@hackdevcode/dsh-llm'
+import { ApiKeyPool, assertUsableApiKey, LlmError, splitApiKeys, resolveImageAttachmentAccess } from '@hackdevcode/dsh-llm'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@hackdevcode/dsh-llm'
 import type {} from '@hackdevcode/dsh-fs'
 import { deepEqualJson } from '@hackdevcode/dsh-util-values'
@@ -185,6 +185,8 @@ export function apply(ctx: Context, config: Config): void {
     return raw
   })
 
+  // A credential may hold several keys for one platform; requests rotate through them.
+  const keyPool = new ApiKeyPool()
   const resolveApiKey = async (
     provider: string,
     profile: ResolvedPiAiProviderProfile,
@@ -201,7 +203,7 @@ export function apply(ctx: Context, config: Config): void {
       ? (await credentials.resolve(ref))?.value
       // Without the seam the environment is the whole credential plane.
       : launchEnvironmentOf(ctx).get(ref)?.value
-    if (hit !== undefined && hit.length > 0) return assertUsableApiKey(hit, 'llm-pi-ai', ref)
+    if (hit !== undefined && hit.length > 0) return assertUsableApiKey(keyPool.next(ref, hit), 'llm-pi-ai', ref)
     throw new LlmError(
       `llm-pi-ai: no credential for provider route "${provider}"; its profile resolves ${ref}, which is not`
       + ` set — store ${ref} through the credentials service (the web Models page writes it) or export it,`
@@ -217,6 +219,21 @@ export function apply(ctx: Context, config: Config): void {
   const adapter = new PiAiAdapter({
     profiles,
     resolveApiKey,
+    rotateApiKey: async (_provider, profile, refused) => {
+      const ref = profile.apiKeyEnv
+      if (ref === undefined) return undefined
+      const credentials = ctx.get('credentials')
+      const stored = credentials !== undefined
+        ? (await credentials.resolve(ref))?.value
+        : launchEnvironmentOf(ctx).get(ref)?.value
+      if (stored === undefined || stored.length === 0) return undefined
+      for (const key of refused) keyPool.report(key)
+      for (let attempt = 0; attempt < splitApiKeys(stored).length; attempt++) {
+        const key = assertUsableApiKey(keyPool.next(ref, stored), 'llm-pi-ai', ref)
+        if (!refused.has(key)) return key
+      }
+      return undefined
+    },
     auth,
     resolveAttachments: () => ctx.get('attachments'),
     resolveImageAccess: (attachments, ref) => resolveImageAttachmentAccess(

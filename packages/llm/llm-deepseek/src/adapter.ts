@@ -95,7 +95,7 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
     const { messages, versions } = await prepareImages(
       options.messages, connection, options.model, this.dependencies.resolveAttachments?.(), this.imageAccess, signal,
     )
-    const auth = await this.dependencies.resolveAuth(connection)
+    let auth = await this.dependencies.resolveAuth(connection)
     try {
       const files = new RequestFiles(this.files, {
         baseURL: connection.baseURL, headers: auth.headers,
@@ -157,6 +157,18 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
           const detail = providerErrorDetail(raw)
           if (await files.retry(detail)) continue
           const failure = providerError(raw, response.status, response.headers)
+          // A refused credential is swapped for the next one and the same request is sent again,
+          // so a rate limit never costs the conversation its position. Uploaded file ids belong to
+          // the refused credential, so the retry carries images inline.
+          const next = await auth.rotate?.({
+            status: response.status,
+            ...failure.failure.providerRetryAfterMs === undefined ? {} : { retryAfterMs: failure.failure.providerRetryAfterMs },
+          })
+          if (next !== undefined) {
+            auth = next
+            inline = true
+            continue
+          }
           const message = files.errorMessage(response.status, failure.message, detail)
           throw new LlmError(message, failure.code, { ...failure.failure, cause: new Error(text) })
         }

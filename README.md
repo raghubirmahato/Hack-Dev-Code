@@ -218,6 +218,10 @@ export DEEPSEEK_API_KEY=...          # PowerShell: $env:DEEPSEEK_API_KEY = "..."
 
 You can also open **Settings → Models** in the Web UI and paste the key there.
 
+**Use several keys for one platform.** Paste more than one key into the same field, separated by commas (pasting one key per line also works, and the variable may hold a comma-separated list). Requests rotate through the keys in turn, so several free-tier keys share the load. If the provider refuses a key (rate limit, exhausted quota or an invalid key), that key rests for a minute and the identical request is sent again with the next key, so the conversation continues from the same position with nothing lost; the failure is reported only when every key was refused. A key can be refused before any output is streamed, which is when a rate limit is reported; a request that already started streaming is not restarted. The pool applies to DeepSeek and to every other provider added in Settings → Models.
+
+**Custom instructions.** Open **Settings → General → Custom instructions**, type the instructions and press Save; they reach the lead agent and every pipeline agent from the next request. The same text can also live in an `AGENTS.md` file: `~/.dsh/AGENTS.md` for all projects, `AGENTS.md` in the project root for one project, or `AGENTS.local.md` for private notes. They are loaded into each session. The `customInstructions` option below also hands the same text to every agent in a mission pipeline.
+
 **Run the Web UI** (live phases, agents and gate results):
 
 ```sh
@@ -257,6 +261,7 @@ The pipeline is configured on the `tool-hackdev` row of [`packages/bundle/base/c
 | `maxMemoryChars` | 6000 | Blackboard text injected into one prompt, and the compaction target for `MEMORY.md` |
 | `maxResultChars` | 16384 | Size of the report returned to the calling model |
 | `visionModel` | empty | Optional image-capable model for the UI gate; empty inherits the default route |
+| `customInstructions` | empty | Your standing instructions (up to 8000 characters), added to the lead agent's prompt and to every pipeline agent |
 
 A call to `hackdev` may lower `maxTasks`, `maxWaves` and `maxFixRounds`, never raise them above these ceilings. The total number of agents is capped by a computed budget (`maxTasks`, `maxFixRounds` and `maxWaves` together), so a run cannot spawn without bound. Lower the caps for quick demos.
 

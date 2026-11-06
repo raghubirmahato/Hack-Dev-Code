@@ -73,6 +73,9 @@ const ANTHROPIC_TOOL_UPDATE_PLACEHOLDER: ToolSchema = {
   parameters: { type: 'object', properties: {} },
 }
 
+/** Failure codes another stored key can cure: refused key, exhausted quota and rate limit. */
+const ROTATING_CODES: ReadonlySet<string> = new Set(['AUTH', 'QUOTA', 'RATE_LIMIT'])
+
 /** One resolution's frozen view: the profiles and the collection built from them. */
 interface PiAiSnapshot {
   /** The resolved profiles this collection was built from, used as its identity. */
@@ -95,6 +98,15 @@ export interface PiAiAdapterOptions {
    * `MISSING_CREDENTIAL` rather than falling back.
    */
   resolveApiKey: (provider: string, profile: ResolvedPiAiProviderProfile) => Promise<string | undefined>
+  /**
+   * After a provider refused `refused` for rate, quota or key reasons, rest it and return another stored
+   * key that this request has not tried, or `undefined` when none is left.
+   */
+  rotateApiKey?: (
+    provider: string,
+    profile: ResolvedPiAiProviderProfile,
+    refused: ReadonlySet<string>,
+  ) => Promise<string | undefined>
   /**
    * How every collection this adapter builds resolves auth the request-level
    * `apiKey` override does not cover. Required rather than optional: a
@@ -381,7 +393,8 @@ export class PiAiAdapter extends LlmAdapter {
       model,
       options.reasoningEffort ?? profile.reasoning,
     )
-    const apiKey = await this.config.resolveApiKey(options.provider, profile)
+    let apiKey = await this.config.resolveApiKey(options.provider, profile)
+    const refusedKeys = new Set<string>()
 
     const consumer = new AbortController()
     const upstream = options.signal === undefined
@@ -413,35 +426,69 @@ export class PiAiAdapter extends LlmAdapter {
             maxBytes: profile.requestImageMaxBytes,
           },
         }, onReplayDegrade, updates.systemPromptUpdate === 'in-history')
-      const events = snapshot.models.streamSimple(model, context, {
-        ...profileOptions(profile, reasoning, apiKey),
-        ...options.temperature === undefined ? {} : { temperature: options.temperature },
-        ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
-        ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
-        signal: watchdog.signal,
-        // Profile headers are deployment-owned; attribution names are
-        // Harness-owned and therefore win collisions.
-        headers: requestHeaders(profile.headers),
-      })
-      const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]()
-      let exhausted = false
-      try {
-        while (true) {
-          const result = await watchdog.next(iterator)
-          if (result.done) {
-            exhausted = true
-            return
+      // One attempt per usable key: a provider refusal before any content arrives swaps the key and
+      // sends the same context again, so a rate limit never costs the conversation its position.
+      while (true) {
+        const events = snapshot.models.streamSimple(model, context, {
+          ...profileOptions(profile, reasoning, apiKey),
+          ...options.temperature === undefined ? {} : { temperature: options.temperature },
+          ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
+          ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
+          signal: watchdog.signal,
+          // Profile headers are deployment-owned; attribution names are
+          // Harness-owned and therefore win collisions.
+          headers: requestHeaders(profile.headers),
+        })
+        const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]()
+        let exhausted = false
+        const retryKeys: string[] = []
+        try {
+          const leading: StreamChunk[] = []
+          let started = false
+          while (true) {
+            const result = await watchdog.next(iterator)
+            if (result.done) {
+              exhausted = true
+              for (const pending of leading.splice(0)) yield pending
+              return
+            }
+            const chunk = result.value
+            if (started) {
+              yield chunk
+              continue
+            }
+            if (chunk.type === 'usage') {
+              leading.push(chunk)
+              continue
+            }
+            if (chunk.type === 'finish' && chunk.reason.kind === 'error' && ROTATING_CODES.has(chunk.reason.failure.code)
+              && apiKey !== undefined && this.config.rotateApiKey !== undefined) {
+              refusedKeys.add(apiKey)
+              const next = await this.config.rotateApiKey(options.provider, profile, refusedKeys)
+              if (next !== undefined) {
+                // The refused stream has ended; let it finish so the shared consumer stays usable.
+                await watchdog.next(iterator)
+                exhausted = true
+                retryKeys.push(next)
+                break
+              }
+            }
+            started = true
+            for (const pending of leading.splice(0)) yield pending
+            yield chunk
           }
-          yield result.value
+        } finally {
+          if (!exhausted) {
+            consumer.abort('pi-ai stream consumer stopped')
+            // A demand the deadline abandoned can stay pending forever, and this
+            // generator queues its return behind it; the abort above owns SDK termination.
+            /* v8 ignore next -- the detached drain only rejects while unwinding an abandoned stream. */
+            void iterator.return(undefined).catch(() => {})
+          }
         }
-      } finally {
-        if (!exhausted) {
-          consumer.abort('pi-ai stream consumer stopped')
-          // A demand the deadline abandoned can stay pending forever, and this
-          // generator queues its return behind it; the abort above owns SDK termination.
-          /* v8 ignore next -- the detached drain only rejects while unwinding an abandoned stream. */
-          void iterator.return(undefined).catch(() => {})
-        }
+        const [retryKey] = retryKeys
+        if (retryKey === undefined) return
+        apiKey = retryKey
       }
     } catch (error: unknown) {
       if (timeoutOf(watchdog.signal, 'LLM_STREAM_IDLE_TIMEOUT') !== undefined) {

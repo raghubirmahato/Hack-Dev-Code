@@ -87,6 +87,20 @@ export interface DeepSeekRequestAuth {
   headers: Readonly<Record<string, string>>
   /** Classify a failure using the captured credential; callback failure preserves the original error. */
   onRequestError?: (error: unknown) => Promise<unknown>
+  /**
+   * Offer another credential after the provider refused this one for quota, rate or key reasons.
+   * Returning auth retries the identical request, so the conversation continues from the same
+   * position; returning `undefined` surfaces the original failure.
+   */
+  rotate?: (failure: DeepSeekAuthRefusal) => Promise<DeepSeekRequestAuth | undefined>
+}
+
+/** Facts about a refused request that decide whether another credential is worth trying. */
+export interface DeepSeekAuthRefusal {
+  /** HTTP status of the refusal. */
+  readonly status: number
+  /** Provider wait hint in milliseconds, when it gave one. */
+  readonly retryAfterMs?: number
 }
 
 /** Constructor options for {@link DeepSeekAdapter}: the operation-local resolution hooks the plugin owns. */

@@ -39,7 +39,7 @@ export const en = {
   keyInput: 'API key',
   keyReveal: 'Show secret',
   keyHide: 'Hide secret',
-  keyPlaceholder: 'Enter your API key',
+  keyPlaceholder: 'Enter your API key (add several, separated by commas, to rotate them)',
   keyPlaceholderFallback: 'Leave blank to use env as auth ({hint})',
   keyPlaceholderSaved: 'Leave blank to use saved credentials',
   keyFallbackMissing: 'Env var not detected. Enter an API key, or configure {hint} in your env.',

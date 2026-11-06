@@ -22,6 +22,9 @@ const LEGAL_API_KEY = /^[\x21-\x7E]+$/
  */
 const ENV_LINE = /^[A-Z][A-Z0-9_]*=[^=]/
 
+/** Separators between several keys of one platform: commas and semicolons; a space inside one key stays illegal. */
+const KEY_SEPARATOR = /[,;]+/
+
 /**
  * Copy key naming why a typed key cannot be saved. A wrapped paste reports the
  * same format failure as an illegal character: the reader's next move is the
@@ -52,7 +55,10 @@ export function apiKeyFailure(draft: string): ApiKeyFailureKey | undefined {
   if (draft.length === 0) return undefined
   const value = draft.trim()
   if (value.length === 0) return 'keyBlank'
-  if (ENV_LINE.test(value) || isQuoted(value)) return 'keyIllegalCharacters'
-  if (!LEGAL_API_KEY.test(value)) return 'keyIllegalCharacters'
+  // Several keys for one platform may be entered together; each must be a legal key on its own.
+  for (const key of value.split(KEY_SEPARATOR).map(part => part.trim()).filter(part => part.length > 0)) {
+    if (ENV_LINE.test(key) || isQuoted(key)) return 'keyIllegalCharacters'
+    if (!LEGAL_API_KEY.test(key)) return 'keyIllegalCharacters'
+  }
   return undefined
 }
