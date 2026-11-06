@@ -55,4 +55,21 @@ describe('pi-ai key rotation', () => {
     expect(server.requests).toHaveLength(2)
     expect(asked).toHaveLength(2)
   })
+
+  it('marks a refusal after output began as retryable and rests the key for the next attempt', async () => {
+    const server = await mockServer([{
+      events: [
+        '{"choices":[{"delta":{"role":"assistant","content":"par"},"index":0,"finish_reason":null}]}',
+        '{"error":{"message":"429 Too Many Requests: rate limit exceeded"}}',
+      ],
+    }])
+    const { ctx, asked } = await contextWith(server.url, ['key-a', 'key-b'])
+
+    const result = await assemble(ctx, { model: 'deepseek-flash', messages: hello() })
+
+    expect(result.finish).toMatchObject({ kind: 'error', failure: { code: 'RATE_LIMIT' } })
+    expect(server.requests).toHaveLength(1)
+    expect(asked).toHaveLength(1)
+    expect(asked[0]?.has('key-a')).toBe(true)
+  })
 })

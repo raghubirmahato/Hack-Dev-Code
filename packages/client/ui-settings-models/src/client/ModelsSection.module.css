@@ -765,6 +765,13 @@ select.input {
   position: relative;
 }
 
+.keyCount {
+  margin: 6px 0 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .keyInputFilled {
   padding-right: 40px;
 }

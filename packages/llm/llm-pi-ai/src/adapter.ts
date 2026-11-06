@@ -454,6 +454,17 @@ export class PiAiAdapter extends LlmAdapter {
             }
             const chunk = result.value
             if (started) {
+              // Output already reached the caller, so the request cannot be resent in place. Rest the key and
+              // mark the failure retryable so the next attempt of this step continues on another key.
+              if (chunk.type === 'finish' && chunk.reason.kind === 'error' && ROTATING_CODES.has(chunk.reason.failure.code)
+                && apiKey !== undefined && this.config.rotateApiKey !== undefined) {
+                refusedKeys.add(apiKey)
+                const next = await this.config.rotateApiKey(options.provider, profile, refusedKeys)
+                if (next !== undefined) {
+                  yield { ...chunk, reason: { kind: 'error', failure: { ...chunk.reason.failure, code: 'RATE_LIMIT' } } }
+                  continue
+                }
+              }
               yield chunk
               continue
             }

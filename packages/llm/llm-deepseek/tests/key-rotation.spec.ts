@@ -48,4 +48,26 @@ describe('credential rotation', () => {
     await expect(chunks(adapter().stream(options()))).rejects.toMatchObject({ code: 'RATE_LIMIT' })
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
+
+  const midStreamRefusal = (type: string) => new Response(sse([
+    ...textEvents.slice(0, 3),
+    { type: 'error', error: { type, message: 'refused mid stream' } },
+  ]), { headers: { 'content-type': 'text/event-stream' } })
+
+  it('rests the key after a mid-stream refusal and reports it retryable so the next attempt uses another key', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async () => midStreamRefusal('authentication_error')))
+    const rotate = vi.fn(async () => authFor(['key-b']))
+
+    await expect(chunks(adapter({}, { resolveAuth: async () => ({ headers: { 'x-api-key': 'key-a' }, rotate }) }).stream(options())))
+      .rejects.toMatchObject({ code: 'RATE_LIMIT' })
+    expect(rotate).toHaveBeenCalledWith(expect.objectContaining({ status: 401 }))
+  })
+
+  it('leaves a mid-stream refusal unchanged when no other key exists', async () => {
+    vi.stubGlobal('fetch', vi.fn<typeof fetch>(async () => midStreamRefusal('authentication_error')))
+    const rotate = vi.fn(async () => undefined)
+
+    await expect(chunks(adapter({}, { resolveAuth: async () => ({ headers: { 'x-api-key': 'key-a' }, rotate }) }).stream(options())))
+      .rejects.toMatchObject({ code: 'AUTH' })
+  })
 })

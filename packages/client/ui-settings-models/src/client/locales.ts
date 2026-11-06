@@ -39,6 +39,7 @@ export const en = {
   keyInput: 'API key',
   keyReveal: 'Show secret',
   keyHide: 'Hide secret',
+  keyPoolCount: '{count} keys entered: requests rotate through them, and a key the provider refuses is skipped automatically.',
   keyPlaceholder: 'Enter your API key (add several, separated by commas, to rotate them)',
   keyPlaceholderFallback: 'Leave blank to use env as auth ({hint})',
   keyPlaceholderSaved: 'Leave blank to use saved credentials',

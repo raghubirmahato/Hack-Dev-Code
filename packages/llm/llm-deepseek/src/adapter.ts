@@ -18,6 +18,9 @@ import { providerError, providerErrorDetail } from './transport.ts'
 import type { ImageAttachmentRef } from '@hackdevcode/dsh-attachment'
 import { resolveRequestImageTarget } from './request-pricing.ts'
 
+/** Failure codes after which another stored key may be tried, mid-stream included. */
+const MIDSTREAM_REFUSALS: ReadonlySet<string> = new Set(['AUTH', 'QUOTA', 'RATE_LIMIT'])
+
 /** DeepSeek provider using Messages content and native thinking replay. */
 export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapter {
   private readonly files: DeepSeekFileStore
@@ -174,7 +177,24 @@ export class DeepSeekAdapter<C extends Connection = Connection> extends LlmAdapt
         }
         await extensions.accept()
         if (response.body === null) throw new LlmError('DeepSeek Messages returned no response body', 'EMPTY_RESPONSE')
-        yield* translate(parseSse(response.body, activity), options.model)
+        try {
+          yield* translate(parseSse(response.body, activity), options.model)
+        } catch (error) {
+          // A refusal that arrives after output began cannot be resent in place. Rest the key so the next
+          // attempt of this step takes another one, and report it as retryable so that attempt happens.
+          if (error instanceof LlmError && MIDSTREAM_REFUSALS.has(error.code) && auth.rotate !== undefined) {
+            const status = error.failure.status ?? (error.code === 'QUOTA' ? 402 : error.code === 'AUTH' ? 401 : 429)
+            const next = await auth.rotate({
+              status,
+              ...error.failure.providerRetryAfterMs === undefined ? {} : { retryAfterMs: error.failure.providerRetryAfterMs },
+            })
+            // The wait hint belonged to the refused key, so it is dropped: another key can go at once.
+            if (next !== undefined) {
+              throw new LlmError(error.message, 'RATE_LIMIT', { status, cause: error })
+            }
+          }
+          throw error
+        }
         return
       }
     } catch (error) {

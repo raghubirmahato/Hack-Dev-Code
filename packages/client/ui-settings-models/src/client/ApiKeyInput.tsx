@@ -24,42 +24,46 @@ interface ApiKeyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, '
 export function ApiKeyInput({ value, t, ...props }: ApiKeyInputProps): ReactNode {
   const [revealedValue, setRevealedValue] = useState<string | undefined>()
   const revealed = value.length > 0 && revealedValue === value
+  const keyCount = value.split(/[,;]+/).filter(part => part.trim().length > 0).length
   return (
-    <div className={styles['keyInput']}>
-      <input
-        {...props}
-        className={`${styles['input']} ${value.length > 0 ? styles['keyInputFilled'] : ''}`}
-        type={revealed ? 'text' : 'password'}
-        autoComplete="new-password"
-        value={value}
-        onPaste={(event) => {
-          // A single-line field flattens pasted lines into one run; keep them apart as separate keys.
-          const text = event.clipboardData.getData('text')
-          if (!/[\r\n]/.test(text)) return
-          event.preventDefault()
-          const joined = text.trim().split(/\s*[\r\n]+\s*/).join(',')
-          const input = event.currentTarget
-          const next = `${value.slice(0, input.selectionStart ?? value.length)}${joined}${value.slice(input.selectionEnd ?? value.length)}`
-          setRevealedValue(undefined)
-          props.onChange?.({ target: { value: next } } as ChangeEvent<HTMLInputElement>)
-        }}
-        onChange={(event) => {
-          setRevealedValue(undefined)
-          props.onChange?.(event)
-        }}
-      />
-      {value.length === 0 ? null : <button
-        type="button"
-        className={styles['keyToggle']}
-        aria-label={t(revealed ? 'keyHide' : 'keyReveal')}
-        aria-pressed={revealed}
-        disabled={props.disabled}
-        onClick={() => { setRevealedValue(revealed ? undefined : value) }}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" aria-hidden="true">
-          <path d={revealed ? EYE_OFF_PATH : EYE_PATH} />
-        </svg>
-      </button>}
-    </div>
+    <>
+      <div className={styles['keyInput']}>
+        <input
+          {...props}
+          className={`${styles['input']} ${value.length > 0 ? styles['keyInputFilled'] : ''}`}
+          type={revealed ? 'text' : 'password'}
+          autoComplete="new-password"
+          value={value}
+          onPaste={(event) => {
+            // A single-line field flattens pasted lines into one run; keep them apart as separate keys.
+            const text = event.clipboardData.getData('text')
+            if (!/[\r\n]/.test(text)) return
+            event.preventDefault()
+            const joined = text.trim().split(/\s*[\r\n]+\s*/).join(',')
+            const input = event.currentTarget
+            const next = `${value.slice(0, input.selectionStart ?? value.length)}${joined}${value.slice(input.selectionEnd ?? value.length)}`
+            setRevealedValue(undefined)
+            props.onChange?.({ target: { value: next } } as ChangeEvent<HTMLInputElement>)
+          }}
+          onChange={(event) => {
+            setRevealedValue(undefined)
+            props.onChange?.(event)
+          }}
+        />
+        {value.length === 0 ? null : <button
+          type="button"
+          className={styles['keyToggle']}
+          aria-label={t(revealed ? 'keyHide' : 'keyReveal')}
+          aria-pressed={revealed}
+          disabled={props.disabled}
+          onClick={() => { setRevealedValue(revealed ? undefined : value) }}
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" aria-hidden="true">
+            <path d={revealed ? EYE_OFF_PATH : EYE_PATH} />
+          </svg>
+        </button>}
+      </div>
+      {keyCount > 1 && <p className={styles['keyCount']} role="status">{t('keyPoolCount').replace('{count}', String(keyCount))}</p>}
+    </>
   )
 }

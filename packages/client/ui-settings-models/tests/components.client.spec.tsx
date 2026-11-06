@@ -2431,3 +2431,15 @@ describe('apiKeyFailure with several keys', () => {
     expect(apiKeyFailure('sk-one, sk-t wo')).toBe('keyIllegalCharacters')
   })
 })
+
+describe('ApiKeyInput key count', () => {
+  it('announces how many keys are entered only when there are several', async () => {
+    const { ApiKeyInput } = await import('../src/client/ApiKeyInput.tsx')
+    const t = (key: keyof typeof en): string => en[key]
+    const one = render(<ApiKeyInput value="sk-one" t={t} onChange={() => {}} />)
+    expect(one.queryByRole('status')).toBeNull()
+    one.unmount()
+    render(<ApiKeyInput value="sk-one, sk-two;sk-three" t={t} onChange={() => {}} />)
+    expect(screen.getByRole('status').textContent).toContain('3 keys entered')
+  })
+})
