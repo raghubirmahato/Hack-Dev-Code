@@ -870,13 +870,17 @@ async function runForge(tasks, wave) {
 }
 
 /** Re-check claimed files and evidence; unverifiable claims downgrade a done task to partial. */
+function factCheckLimit() {
+  return typeof args === 'object' && args !== null && Number.isInteger(args.maxFactChecks) && args.maxFactChecks > 0 ? args.maxFactChecks : 8
+}
+
 async function factCheck(results, wave) {
   const claims = results.filter(function (r) { return r.status === 'done' || r.status === 'partial' })
   if (claims.length === 0) return
   phase('Fact-check')
   const raw = await agent([
     'You are the FACT-CHECKER. Builders claimed the work below. Verify the claims against the real workspace; do not modify source files.',
-    'For every task: (1) check that each listed file exists (list or stat it) and report the missing ones; (2) re-run the cheapest decisive evidence command(s) (tests, build, a smoke run) — at most 8 commands in total across all tasks — and set evidenceConfirmed=false when a claimed result does not reproduce or the evidence is not a real command and outcome. Put the commands you ran in commandsRun.',
+    'For every task: (1) check that each listed file exists (list or stat it) and report the missing ones; (2) re-run the cheapest decisive evidence command(s) (tests, build, a smoke run) — at most ' + factCheckLimit() + ' commands in total across all tasks — and set evidenceConfirmed=false when a claimed result does not reproduce or the evidence is not a real command and outcome. Put the commands you ran in commandsRun.',
     'Claims (JSON):\n' + clip(JSON.stringify(claims.map(function (r) { return { id: r.id, status: r.status, filesChanged: r.filesChanged.slice(0, 30), evidence: r.evidence.slice(0, 8) } })), 12000),
     GROUNDING,
   ].join('\n\n'), { label: 'Fact-checker (wave ' + wave + ')', phase: 'Fact-check', schema: factCheckSchema })

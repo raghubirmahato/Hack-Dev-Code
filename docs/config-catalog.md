@@ -4112,6 +4112,8 @@ export interface Config {
   maxMemoryChars?: number
   /** Maximum characters in the parent-facing report (default 16384). */
   maxResultChars?: number
+  /** Commands the fact-checker may re-run per wave (default 8). */
+  maxFactChecks?: number
   /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
   customInstructions?: string
 }

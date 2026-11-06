@@ -4,6 +4,8 @@ import type { AttachmentStore, ImageMediaType } from '@hackdevcode/dsh-attachmen
 import {
   ToolCallId,
   contentHasFile,
+  countRequestImages,
+  omitOldestImages,
   createDeveloperMessage,
   createToolResultMessage,
   createUserMessage,
@@ -540,5 +542,24 @@ describe('projectToolUpdates', () => {
     expect(roles(inHistory.messages)).toHaveLength(3)
     const additionOnly = projectToolUpdates(messages, [search, fetch], 'addition-only', history)
     expect(roles(additionOnly.messages)).toEqual([[{ type: 'tool-addition', toolName: 'fetch' }]])
+  })
+})
+
+describe('omitOldestImages', () => {
+  const message = () => createUserMessage({ content: [image(1), { type: 'text', text: 'x' }], source })
+
+  it('replaces only the oldest images with the note', () => {
+    const messages = [message(), message(), message()]
+    expect(countRequestImages(messages)).toBe(3)
+    const trimmed = omitOldestImages(messages, 2, 'NOTE')
+    expect(countRequestImages(trimmed)).toBe(1)
+    expect(trimmed[0]?.content[0]).toEqual({ type: 'text', text: 'NOTE' })
+    expect(trimmed[1]?.content[0]).toEqual({ type: 'text', text: 'NOTE' })
+    expect(trimmed[2]).toBe(messages[2])
+  })
+
+  it('returns the same list when nothing is omitted', () => {
+    const messages = [message()]
+    expect(omitOldestImages(messages, 0, 'NOTE')).toBe(messages)
   })
 })

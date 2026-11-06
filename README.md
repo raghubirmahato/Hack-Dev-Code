@@ -261,6 +261,7 @@ The pipeline is configured on the `tool-hackdev` row of [`packages/bundle/base/c
 | `maxMemoryChars` | 6000 | Blackboard text injected into one prompt, and the compaction target for `MEMORY.md` |
 | `maxResultChars` | 16384 | Size of the report returned to the calling model |
 | `visionModel` | empty | Optional image-capable model for the UI gate; empty inherits the default route |
+| `maxFactChecks` | 8 | Commands the fact-checker may re-run per wave; raise it for stricter evidence checks |
 | `customInstructions` | empty | Your standing instructions (up to 8000 characters), added to the lead agent's prompt and to every pipeline agent |
 
 A call to `hackdev` may lower `maxTasks`, `maxWaves` and `maxFixRounds`, never raise them above these ceilings. The total number of agents is capped by a computed budget (`maxTasks`, `maxFixRounds` and `maxWaves` together), so a run cannot spawn without bound. Lower the caps for quick demos.
@@ -377,7 +378,7 @@ Each run ends with `.hackdev/RUN_REPORT.md`: what the agents did, the decisions 
 - Visual verification needs a headless browser, the project's own Playwright, or a mounted browser provider, plus an image-capable model route. Without them the report says the UI was not visually exercised.
 - Parallel builders share one working directory. Disjoint owned paths make collisions unlikely, not impossible; the quality and security audits run read-only for that reason.
 - The blackboard is bounded: older, non-pinned entries drop out of prompts (they stay in `MEMORY.md` until compacted).
-- The fact-checker re-runs at most eight commands per wave, so it samples evidence rather than repeating everything.
+- The fact-checker re-runs at most `maxFactChecks` commands per wave (eight by default), so it samples evidence rather than repeating everything.
 - Some repository tests need a POSIX environment (symlinks, git) and fail on Windows for that reason alone.
 
 ---

@@ -490,3 +490,32 @@ export function projectToolUpdates(
     tools: [...declarations.values()],
   }
 }
+
+/** Count the image occurrences of request history. */
+export function countRequestImages(messages: readonly RequestMessage[]): number {
+  let count = 0
+  for (const message of messages) visitImageBlocks(message.content, () => { count += 1 })
+  return count
+}
+
+/**
+ * Replace the oldest image occurrences with a short text note, for a provider that refused a request for
+ * carrying more images than it accepts. Newer images, which the current work depends on, are kept.
+ * @param messages - complete request history.
+ * @param count - how many of the oldest images to replace.
+ * @param note - the model-visible text standing in for one omitted image.
+ * @returns the original list when nothing was replaced, otherwise shallow message copies.
+ */
+export function omitOldestImages(messages: readonly RequestMessage[], count: number, note: string): readonly RequestMessage[] {
+  if (count <= 0) return messages
+  let remaining = count
+  return messages.map((message) => {
+    if (remaining <= 0 || !contentHasImage(message.content)) return message
+    const content = message.content.map((block): ContentBlock => {
+      if (block.type !== 'image' || remaining <= 0) return block
+      remaining -= 1
+      return { type: 'text', text: note }
+    })
+    return { ...message, content }
+  })
+}

@@ -202,6 +202,13 @@ describe('HACKDEV_SCRIPT', () => {
     expect(calls.find(c => c.label.startsWith('Gate 1'))!.prompt).toContain('Use tabs and never add dependencies.')
   })
 
+  it('lets the fact-check sample size be configured and defaults to eight commands', async () => {
+    const wide = await runScript(HACKDEV_SCRIPT, { ...ARGS, maxFactChecks: 20 }, defaultImpl())
+    expect(wide.calls.find(c => c.label.startsWith('Fact-checker'))!.prompt).toContain('at most 20 commands')
+    const normal = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl())
+    expect(normal.calls.find(c => c.label.startsWith('Fact-checker'))!.prompt).toContain('at most 8 commands')
+  })
+
   it('adds no custom-instruction block when none is set', async () => {
     const { calls } = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl())
     expect(calls.every(c => !c.prompt.includes('User custom instructions'))).toBe(true)

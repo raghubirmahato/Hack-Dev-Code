@@ -42,6 +42,8 @@ export interface Config {
   maxMemoryChars?: number
   /** Maximum characters in the parent-facing report (default 16384). */
   maxResultChars?: number
+  /** Commands the fact-checker may re-run per wave (default 8). */
+  maxFactChecks?: number
   /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
   customInstructions?: string
 }
@@ -56,6 +58,7 @@ export const Config: z<Config> = z.object({
   maxFixRounds: z.number().step(1).min(0).max(6).default(2),
   maxMemoryChars: z.number().step(1).min(500).max(100_000).default(6000),
   maxResultChars: z.number().step(1).min(1000).max(Number.MAX_SAFE_INTEGER).default(16_384),
+  maxFactChecks: z.number().step(1).min(1).max(40).default(8),
   customInstructions: z.string().role('textarea').default(''),
 })
 
@@ -71,6 +74,7 @@ interface ResolvedConfig {
   readonly maxFixRounds: number
   readonly maxMemoryChars: number
   readonly maxResultChars: number
+  readonly maxFactChecks: number
   readonly customInstructions: string
 }
 
@@ -119,6 +123,7 @@ function resolveConfig(config: Config): ResolvedConfig {
     maxFixRounds: config.maxFixRounds ?? 2,
     maxMemoryChars: config.maxMemoryChars ?? 6000,
     maxResultChars: config.maxResultChars ?? 16_384,
+    maxFactChecks: config.maxFactChecks ?? 8,
     customInstructions: (config.customInstructions ?? '').trim().slice(0, MAX_CUSTOM_INSTRUCTIONS),
   }
   if (resolved.subagentProvider.length === 0 || resolved.subagentProvider !== resolved.subagentProvider.trim()) {
@@ -367,6 +372,7 @@ export function apply(ctx: Context, config: Config): void {
           maxParallel: resolved.maxParallel,
           maxMemoryChars: resolved.maxMemoryChars,
           visionModel: resolved.visionModel,
+          maxFactChecks: resolved.maxFactChecks,
           customInstructions: missionInstructions(),
         },
         // Planner retry, splits, fact-checks, integrators and regression passes are inside the budget formula.

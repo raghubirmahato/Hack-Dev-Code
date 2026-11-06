@@ -40,8 +40,10 @@ import type {
 import {
   attributionHeaders,
   contentHasImage,
+  countRequestImages,
   LlmAdapter,
   LlmError,
+  omitOldestImages,
   ReasoningEffortId,
 } from '@hackdevcode/dsh-llm'
 import type {
@@ -51,6 +53,7 @@ import type {
   LlmProviderInfo,
   LlmResolvedModelInfo,
   PreparedAdapterCall,
+  RequestMessage,
   ReasoningEffortId as ReasoningEffortIdType,
   ResolvedRetryPolicy,
   StreamChunk,
@@ -72,6 +75,14 @@ const ANTHROPIC_TOOL_UPDATE_PLACEHOLDER: ToolSchema = {
   description: 'Reserved placeholder that keeps deferred tool loading active; never call this tool.',
   parameters: { type: 'object', properties: {} },
 }
+
+/** Provider wording for a request that carries more images than it accepts. */
+const IMAGE_LIMIT_PATTERN =
+  /too many images|image count|maximum (?:of )?\d+ images?|more than \d+ images?|images? (?:in|per) (?:a |the )?request/i
+/** How many times one request may shed old images before the failure is reported. */
+const MAX_IMAGE_OMISSIONS = 3
+/** Model-visible stand-in for an image dropped to fit the provider's limit. */
+const IMAGE_OMITTED_NOTE = '[An earlier image was omitted because the provider limits images per request.]'
 
 /** Failure codes another stored key can cure: refused key, exhausted quota and rate limit. */
 const ROTATING_CODES: ReadonlySet<string> = new Set(['AUTH', 'QUOTA', 'RATE_LIMIT'])
@@ -415,9 +426,9 @@ export class PiAiAdapter extends LlmAdapter {
       const onReplayDegrade = (reason: string): void => {
         this.config.onReplayDegrade?.({ provider: options.provider, model: options.model, reason })
       }
-      const context = attachments === undefined
-        ? toPiContext(request, undefined, onReplayDegrade, updates.systemPromptUpdate === 'in-history')
-        : await toPiContext({ ...request, signal: watchdog.signal }, {
+      const buildContext = async (source: typeof request) => attachments === undefined
+        ? toPiContext(source, undefined, onReplayDegrade, updates.systemPromptUpdate === 'in-history')
+        : await toPiContext({ ...source, signal: watchdog.signal }, {
           attachments,
           resolveImageAccess: ref => this.config.resolveImageAccess?.(attachments, ref),
           maxRequestImageBytes: profile.maxRequestImageBytes,
@@ -426,6 +437,9 @@ export class PiAiAdapter extends LlmAdapter {
             maxBytes: profile.requestImageMaxBytes,
           },
         }, onReplayDegrade, updates.systemPromptUpdate === 'in-history')
+      let context = await buildContext(request)
+      let imageMessages: readonly RequestMessage[] = request.messages
+      let imageOmissions = 0
       // One attempt per usable key: a provider refusal before any content arrives swaps the key and
       // sends the same context again, so a rate limit never costs the conversation its position.
       while (true) {
@@ -472,6 +486,19 @@ export class PiAiAdapter extends LlmAdapter {
               leading.push(chunk)
               continue
             }
+            if (chunk.type === 'finish' && chunk.reason.kind === 'error' && IMAGE_LIMIT_PATTERN.test(chunk.reason.failure.message)
+              && imageOmissions < MAX_IMAGE_OMISSIONS && countRequestImages(imageMessages) > 0) {
+              // The provider accepts fewer images per request than the history holds: drop the oldest half,
+              // keep the newest, and send the same request again instead of failing the step for good.
+              imageOmissions += 1
+              const dropped = Math.max(1, Math.ceil(countRequestImages(imageMessages) / 2))
+              imageMessages = omitOldestImages(imageMessages, dropped, IMAGE_OMITTED_NOTE)
+              context = await buildContext({ ...request, messages: [...imageMessages] })
+              await watchdog.next(iterator)
+              exhausted = true
+              retryKeys.push(apiKey ?? '')
+              break
+            }
             if (chunk.type === 'finish' && chunk.reason.kind === 'error' && ROTATING_CODES.has(chunk.reason.failure.code)
               && apiKey !== undefined && this.config.rotateApiKey !== undefined) {
               refusedKeys.add(apiKey)
@@ -499,7 +526,7 @@ export class PiAiAdapter extends LlmAdapter {
         }
         const [retryKey] = retryKeys
         if (retryKey === undefined) return
-        apiKey = retryKey
+        apiKey = retryKey === '' ? undefined : retryKey
       }
     } catch (error: unknown) {
       if (timeoutOf(watchdog.signal, 'LLM_STREAM_IDLE_TIMEOUT') !== undefined) {

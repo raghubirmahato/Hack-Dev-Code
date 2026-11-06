@@ -130,6 +130,7 @@ Web presets mount tools per agent, so `tool-hackdev` is declared in `packages/bu
 | `maxMemoryChars` | 6000 | Blackboard characters injected into one prompt, and the `.hackdev/MEMORY.md` compaction target |
 | `maxResultChars` | 16384 | Size of the report returned to the calling model |
 | `visionModel` | empty | Optional image-capable model for the quality/UX gate; empty inherits the default route |
+| `maxFactChecks` | 8 | Commands the fact-checker may re-run per wave |
 | `customInstructions` | empty | The user's standing instructions (up to 8000 characters) for the lead agent and every pipeline agent |
 
 The `hackdev` tool also accepts per-call `maxTasks`, `maxWaves` and `maxFixRounds`, bounded by these ceilings.
@@ -152,4 +153,4 @@ The `hackdev` tool also accepts per-call `maxTasks`, `maxWaves` and `maxFixRound
 - Visual verification needs a headless browser binary, the project's own Playwright, or a mounted browser-use provider in the environment, and an image-capable route. Without them the report says the UI was not visually exercised.
 - Parallel builders share one working directory. Disjoint `ownedPaths` make collisions unlikely but not impossible; the quality and security audits are read-only for the same reason.
 - The blackboard is bounded; older non-pinned entries drop out of prompts (they remain in `.hackdev/MEMORY.md` until compacted).
-- The fact-checker re-runs at most eight commands per wave, so it samples evidence rather than re-running everything.
+- The fact-checker re-runs at most `maxFactChecks` commands per wave (eight by default), so it samples evidence rather than re-running everything.
