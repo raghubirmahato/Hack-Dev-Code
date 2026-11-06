@@ -4161,6 +4161,11 @@ export interface Config {
    * own git worktree, merged back one at a time; falls back to shared outside a git repository). Default `shared`.
    */
   builderIsolation?: 'shared' | 'worktree'
+  /**
+   * `full` lets the lead agent and every pipeline agent act without asking for approval; `bounded` keeps them
+   * from destructive or irreversible actions and defers large additions to a person. Default `full`.
+   */
+  autonomy?: 'full' | 'bounded'
   /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
   customInstructions?: string
 }

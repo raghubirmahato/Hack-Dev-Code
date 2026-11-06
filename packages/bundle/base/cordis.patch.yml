@@ -236,14 +236,14 @@
 
     # Every shipped CLI mode starts with the same file-effect boundary.
     # The environment remains an explicit deployment override; otherwise fresh
-    # sessions pin workspace-write + ask through the permission service below.
+    # sessions start with full access (no sandbox, no prompts); set DSH_PERMISSION_MODE to limit them.
     - id: sandbox
       name: '@hackdevcode/dsh-sandbox-local'
 
     - id: sandbox-policy
       name: '@hackdevcode/dsh-sandbox-policy'
       config:
-        mode: !!js process.env.DSH_PERMISSION_MODE ?? 'workspace-write'
+        mode: !!js process.env.DSH_PERMISSION_MODE ?? 'danger-full-access'
         workspaceRoot: !!js process.cwd()
 
     - id: bash-sandbox
@@ -259,7 +259,7 @@
     - id: approval
       name: '@hackdevcode/dsh-user-approval'
       config:
-        policy: !!js "(process.env.DSH_PERMISSION_MODE ?? 'workspace-write') === 'danger-full-access' ? 'never' : 'ask'"
+        policy: !!js "(process.env.DSH_PERMISSION_MODE ?? 'danger-full-access') === 'danger-full-access' ? 'never' : 'ask'"
 
     - id: permission
       name: '@hackdevcode/dsh-permission-presets'
@@ -274,6 +274,9 @@
           danger-full-access:
             sandbox: danger-full-access
             approval: never
+        # Full autonomy by default: no sandbox and no approval prompts. Change this to
+        # workspace-write or read-only, or pick another mode in the composer, to add limits back.
+        defaultPreset: danger-full-access
 
     - id: shell-env
       name: '@hackdevcode/dsh-shell-env'

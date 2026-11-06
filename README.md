@@ -222,7 +222,7 @@ You can also open **Settings → Models** in the Web UI and paste the key there.
 
 **Custom instructions.** Open **Settings → General → Custom instructions**, type the instructions and press Save; they reach the lead agent and every pipeline agent from the next request. The same text can also live in an `AGENTS.md` file: `~/.dsh/AGENTS.md` for all projects, `AGENTS.md` in the project root for one project, or `AGENTS.local.md` for private notes. They are loaded into each session. The `customInstructions` option below also hands the same text to every agent in a mission pipeline.
 
-**Desktop and Chrome control.** The Web profile turns on the Computer use bundle: agents can list and launch apps, read windows and their accessibility trees, take screenshots, click, type, use shortcuts, menus and the clipboard (Cua Driver on Windows and Linux, the native provider on macOS), and drive Chrome through Chrome DevTools: pages, forms, scripts, screenshots and coordinate clicks. Chrome keeps one persistent profile, so sign-ins made there stay; to drive the Chrome you already use, enable remote debugging in `chrome://inspect/#remote-debugging` and set the `chrome` row to `mode: connect`. Every action goes through your permission mode, so pick the mode that matches how much the agents may do without asking.
+**Desktop and Chrome control.** The Web profile turns on the Computer use bundle: agents can list and launch apps, read windows and their accessibility trees, take screenshots, click, type, use shortcuts, menus and the clipboard (Cua Driver on Windows and Linux, the native provider on macOS), and drive Chrome through Chrome DevTools: pages, forms, scripts, screenshots and coordinate clicks. Chrome keeps one persistent profile, so sign-ins made there stay; to drive the Chrome you already use, enable remote debugging in `chrome://inspect/#remote-debugging` and set the `chrome` row to `mode: connect`. Every action goes through your permission mode, which starts at Full access (see below).
 
 **Run the Web UI** (live phases, agents and gate results):
 
@@ -265,6 +265,7 @@ The pipeline is configured on the `tool-hackdev` row of [`packages/bundle/base/c
 | `visionModel` | empty | Optional image-capable model for the UI gate; empty inherits the default route |
 | `maxFactChecks` | 8 | Commands the fact-checker may re-run per wave; raise it for stricter evidence checks |
 | `builderIsolation` | `worktree` in shipped profiles | `worktree` gives each parallel builder its own git worktree, merged back one at a time (falls back to `shared` outside a git repository); `shared` keeps one workspace |
+| `autonomy` | `full` | `full` lets agents act without asking for approval; `bounded` forbids destructive or irreversible actions and defers large additions to you |
 | `customInstructions` | empty | Your standing instructions (up to 8000 characters), added to the lead agent's prompt and to every pipeline agent |
 
 A call to `hackdev` may lower `maxTasks`, `maxWaves` and `maxFixRounds`, never raise them above these ceilings. The total number of agents is capped by a computed budget (`maxTasks`, `maxFixRounds` and `maxWaves` together), so a run cannot spawn without bound. Lower the caps for quick demos.
@@ -296,10 +297,10 @@ Agents also use the runtime tools that already exist: file read, write and edit,
 
 1. Every report opens with **Needs attention**: unfinished tasks, open issues, decisions deferred to a person, and anything that requires approval.
 2. A builder that is blocked on a human decision is *not* retried: it is surfaced in `needsHuman`.
-3. A gate that would have to grow the project (adding authentication, TLS, a database) does not do it silently. It records a `deferred` issue with a precise remediation and asks for your approval.
+3. With `autonomy: bounded`, a gate that would have to grow the project (adding authentication, TLS, a database) records a `deferred` issue with a precise remediation and asks for your approval instead. Under the default full autonomy it builds the fix itself.
 4. A run is `complete` only when every task is done, every gate passes and every acceptance criterion is met. Otherwise it reports **needs attention**, with the evidence for each item.
 5. In the Web UI the same list is the first section of the mission card, and the agent can ask structured questions mid-run.
-6. The sandbox's own approval prompts (for example, writing outside the workspace) stay in force for every agent.
+6. **Full autonomy is the default.** New sessions start in the Full access permission mode (no sandbox, no approval prompts), and mission agents run with `autonomy: full`: they install, edit, delete and run commands anywhere without asking. Secrets stay private and results must still be real. To add limits back, pick Workspace Write or Read Only in the composer, set `DSH_PERMISSION_MODE=workspace-write` (or `read-only`) before starting, change `defaultPreset` on the `permission` row, or set `autonomy: bounded` on `tool-hackdev`.
 
 ---
 
@@ -325,7 +326,7 @@ There is no free-form chat between agents. Communication is explicit, typed and 
 
 ## Security
 
-- The platform enforces sandboxing, approvals and bounded autonomy (see above).
+- Sandboxing, approval prompts and bounded autonomy are available but switched off by default: agents run with full access until you choose a stricter permission mode or `autonomy: bounded` (see above).
 - The **security reviewer** gate audits and hardens whatever the guild builds: input validation, output escaping, authorization checks, security headers, rate limits, secret handling and dependency audit, and it adds regression tests for what it fixes.
 - No process can guarantee that software "cannot be hacked". The report therefore lists what was checked, what was fixed, and what remains open or deferred.
 - The API key is read from `DEEPSEEK_API_KEY` or the app's credential store. Never commit it.

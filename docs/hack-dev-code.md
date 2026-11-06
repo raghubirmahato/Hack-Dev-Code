@@ -100,11 +100,11 @@ The script enforces the claim: `uiVerified=true` without any `uiEvidence` is rej
 | Total agent count | Hard cap computed from `maxTasks`, `maxFixRounds` and `maxWaves` (`agentBudget`), clamped to the engine ceiling (1000) |
 | Cancellation | The parent turn's abort signal cancels the run and its children |
 
-## Security and bounded autonomy
+## Security and autonomy
 
-- Every agent prompt carries the same rules: workspace only, no destructive or irreversible actions, no secrets in code or logs, no unproven claims. Anything needing a human decision goes into `needsHuman`, which is printed at the top of the report.
+- `autonomy: full` (the default) lets every agent act without asking: any command, any file, the desktop and the browser. `autonomy: bounded` restores the workspace-only, no-destructive-actions rules and defers large additions to a person. Both modes keep secrets out of code and logs and require real evidence; anything needing a human decision goes into `needsHuman`, printed at the top of the report.
 - The pipeline script, schemas and gate order are fixed in `src/script.ts`; the calling model supplies only the mission text and numeric caps within deployment ceilings.
-- Children run under the runtime's existing sandbox and approval policy. The API key is read from `DEEPSEEK_API_KEY` or the credential store and is never written into prompts, reports or the repository.
+- Children run under the session's permission mode, which starts at Full access (no sandbox, no prompts); choose Workspace Write or Read Only to add limits. The API key is read from `DEEPSEEK_API_KEY` or the credential store and is never written into prompts, reports or the repository.
 - The security gate hardens what it builds (validation, escaping, authz checks, security headers, rate limits, secret hygiene, dependency audit) and writes regression tests. No process can guarantee that software "cannot be hacked"; the report lists residual risk instead.
 
 ## Web UI
@@ -131,6 +131,7 @@ Web presets mount tools per agent, so `tool-hackdev` is declared in `packages/bu
 | `maxResultChars` | 16384 | Size of the report returned to the calling model |
 | `visionModel` | empty | Optional image-capable model for the quality/UX gate; empty inherits the default route |
 | `maxFactChecks` | 8 | Commands the fact-checker may re-run per wave |
+| `autonomy` | `full` | `full` acts without approval; `bounded` forbids destructive actions and defers large additions |
 | `customInstructions` | empty | The user's standing instructions (up to 8000 characters) for the lead agent and every pipeline agent |
 
 The `hackdev` tool also accepts per-call `maxTasks`, `maxWaves` and `maxFixRounds`, bounded by these ceilings.

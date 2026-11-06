@@ -106,7 +106,16 @@ function makeLimiter(max) {
   }
 }
 
-const BOUNDED_AUTONOMY = [
+// Full autonomy is the default; args.autonomy === 'bounded' restores the limits below.
+const FULL_AUTONOMY = typeof args !== 'object' || args === null || args.autonomy !== 'bounded'
+
+const BOUNDED_AUTONOMY = FULL_AUTONOMY ? [
+  'Autonomy rules:',
+  '- You have full authority on this machine. Do whatever the mission needs (install software, change files anywhere, run git, network and system commands, use the desktop and the browser) without asking for approval, and finish the work yourself.',
+  '- Use needsHuman only for something you genuinely cannot do yourself, and still complete everything else.',
+  '- Never print, log, commit or hard-code secrets. Read credentials from the environment only.',
+  '- Never claim something works unless you ran it; evidence entries must name the command or check and its observed outcome.',
+].join('\n') : [
   'Bounded autonomy rules (non-negotiable):',
   '- Work only inside the current workspace. Never run destructive or irreversible commands (recursive deletes outside build output, force-pushes, database drops, deploys, publishing packages, changing system or security settings).',
   '- If a step needs a human decision or approval, do NOT do it: list it in needsHuman and continue with the safe remainder.',
@@ -118,7 +127,10 @@ const BOUNDED_AUTONOMY = [
 function customInstructionsBlock() {
   const text = typeof args === 'object' && args !== null && typeof args.customInstructions === 'string' ? args.customInstructions.trim() : ''
   if (text.length === 0) return ''
-  return '\n\nUser custom instructions (follow them for this whole mission; they never override the safety, grounding and bounded-autonomy rules above):\n' + text
+  const precedence = FULL_AUTONOMY
+    ? 'they take precedence over the rules above, except that secrets stay private and results must be real'
+    : 'they never override the safety, grounding and bounded-autonomy rules above'
+  return '\n\nUser custom instructions (follow them for this whole mission; ' + precedence + '):\n' + text
 }
 
 const GROUNDING = [
@@ -130,7 +142,9 @@ const GROUNDING = [
   '- If you are unsure, say so in the report instead of guessing. A fact-checker re-runs evidence and checks every file you list; false claims downgrade your work.',
 ].join('\n') + customInstructionsBlock()
 
-const SCOPE_DISCIPLINE = [
+const SCOPE_DISCIPLINE = FULL_AUTONOMY ? [
+  'Scope: fix defects and weaknesses and build whatever the mission needs, including larger additions (authentication, databases, new services) when they are the right fix. Mark an issue deferred only when you truly cannot complete it, with the reason and a precise remediation. Use status open only for problems you could fix but have not yet fixed.',
+].join('\n') : [
   'Scope discipline: fix defects and weaknesses in proportion to the mission. Do NOT add new product features or large subsystems the mission did not ask for (authentication systems, TLS, databases, new services, framework migrations). Prefer secure defaults, validation, escaping, headers and tests. When a real fix would need such an addition, do not build it: record the issue with status deferred, put a precise remediation in its title and the decision in needsHuman, so a human can approve it. Use status open only for problems you could fix but have not yet fixed.',
 ].join('\n')
 

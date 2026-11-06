@@ -49,6 +49,11 @@ export interface Config {
    * own git worktree, merged back one at a time; falls back to shared outside a git repository). Default `shared`.
    */
   builderIsolation?: 'shared' | 'worktree'
+  /**
+   * `full` lets the lead agent and every pipeline agent act without asking for approval; `bounded` keeps them
+   * from destructive or irreversible actions and defers large additions to a person. Default `full`.
+   */
+  autonomy?: 'full' | 'bounded'
   /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
   customInstructions?: string
 }
@@ -65,6 +70,7 @@ export const Config: z<Config> = z.object({
   maxResultChars: z.number().step(1).min(1000).max(Number.MAX_SAFE_INTEGER).default(16_384),
   maxFactChecks: z.number().step(1).min(1).max(40).default(8),
   builderIsolation: z.union(['shared', 'worktree'] as const).default('shared'),
+  autonomy: z.union(['full', 'bounded'] as const).default('full'),
   customInstructions: z.string().role('textarea').default(''),
 })
 
@@ -82,6 +88,7 @@ interface ResolvedConfig {
   readonly maxResultChars: number
   readonly maxFactChecks: number
   readonly builderIsolation: 'shared' | 'worktree'
+  readonly autonomy: 'full' | 'bounded'
   readonly customInstructions: string
 }
 
@@ -103,8 +110,12 @@ const POLICY = [
   '- For any substantial build, feature, migration or multi-file bug-fix request, call the hackdev tool with the full mission instead of working alone: it sizes a team of specialist agents to the mission, builds in parallel waves with a shared blackboard and project map, fact-checks every claim, then runs three independent gates (syntax/logic/runtime verifier, quality and UI/UX reviewer with screenshots, security reviewer) that fix what they find, and keeps iterating until every acceptance criterion is met or the wave budget is spent. Relay its report faithfully, including unmet criteria, open issues, limitations and items needing human approval.',
   '- For small edits you make yourself, finish by calling hackdev_review so the same three gates check the result before you declare it done.',
   '- Never claim software is finished, secure or unhackable on your own say-so: cite gate evidence, and state residual risk honestly.',
-  '- Never take destructive or irreversible actions (deploys, force-pushes, deletions outside the workspace, secret handling) without the human approving them first.',
 ].join('\n')
+
+/** Policy line under bounded autonomy: destructive actions wait for the person. */
+const BOUNDED_POLICY = '- Never take destructive or irreversible actions (deploys, force-pushes, deletions outside the workspace, secret handling) without the human approving them first.'
+/** Policy line under full autonomy: act without asking, keep secrets private. */
+const FULL_POLICY = '- You may act on your own without asking for approval: run any command, change any file and use the desktop and browser as the task needs. Keep secrets private and report what you did.'
 
 const MISSION_DESCRIPTION = 'Run the full Hack Dev Code pipeline for one mission: a planning council maps the project and decomposes the mission '
   + 'into a team of specialist tasks sized to its complexity; parallel builder agents execute the dependency graph with a shared blackboard, '
@@ -132,6 +143,7 @@ function resolveConfig(config: Config): ResolvedConfig {
     maxResultChars: config.maxResultChars ?? 16_384,
     maxFactChecks: config.maxFactChecks ?? 8,
     builderIsolation: config.builderIsolation ?? 'shared',
+    autonomy: config.autonomy ?? 'full',
     customInstructions: (config.customInstructions ?? '').trim().slice(0, MAX_CUSTOM_INSTRUCTIONS),
   }
   if (resolved.subagentProvider.length === 0 || resolved.subagentProvider !== resolved.subagentProvider.trim()) {
@@ -269,7 +281,7 @@ export function apply(ctx: Context, config: Config): void {
   ctx.systemPrompt.section({
     name: 'policy:hackdev',
     order: ctx.systemPrompt.getSectionOrder('HACKDEV_POLICY'),
-    text: POLICY,
+    text: `${POLICY}\n${resolved.autonomy === 'full' ? FULL_POLICY : BOUNDED_POLICY}`,
   })
   if (resolved.customInstructions.length > 0) {
     ctx.systemPrompt.section({
@@ -384,6 +396,7 @@ export function apply(ctx: Context, config: Config): void {
           visionModel: resolved.visionModel,
           maxFactChecks: resolved.maxFactChecks,
           builderIsolation: resolved.builderIsolation,
+          autonomy: resolved.autonomy,
           customInstructions: missionInstructions(),
         },
         // Planner retry, splits, fact-checks, integrators and regression passes are inside the budget formula.
@@ -428,7 +441,7 @@ export function apply(ctx: Context, config: Config): void {
         exec,
         HACKDEV_REVIEW_SCRIPT,
         HACKDEV_REVIEW_META,
-        { mission, focus: (args.focus ?? '').trim(), maxFixRounds, maxMemoryChars: resolved.maxMemoryChars, visionModel: resolved.visionModel, customInstructions: missionInstructions() },
+        { mission, focus: (args.focus ?? '').trim(), maxFixRounds, maxMemoryChars: resolved.maxMemoryChars, visionModel: resolved.visionModel, customInstructions: missionInstructions(), autonomy: resolved.autonomy },
         agentBudget(1, maxFixRounds, false),
       )
     },

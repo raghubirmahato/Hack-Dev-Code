@@ -523,7 +523,7 @@ describe('HACKDEV_SCRIPT', () => {
   })
 
   it('lets a gate pass with deferred issues and tells every gate about scope discipline and grounding', async () => {
-    const { value, calls } = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl({
+    const { value, calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, autonomy: 'bounded' }, defaultImpl({
       'Gate 3': () => gate({ issues: [{ severity: 'medium', title: 'add TLS termination in front of the app', status: 'deferred' }], needsHuman: ['approve TLS proxy'] }),
     }))
     expect(value.gates[2]!.verdict).toBe('pass')
@@ -582,8 +582,17 @@ describe('HACKDEV_SCRIPT', () => {
     expect(calls.find(c => c.label.startsWith('Council: requirements'))!.schema).toBeUndefined()
   })
 
-  it('gives every builder and gate the bounded-autonomy and grounding rules', async () => {
+  it('gives every builder and gate full-autonomy rules by default, with secrets still private', async () => {
     const { calls } = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl())
+    for (const c of calls.filter(x => x.label.startsWith('Builder') || x.label.startsWith('Gate'))) {
+      expect(c.prompt).toContain('You have full authority on this machine')
+      expect(c.prompt).toContain('Never print, log, commit or hard-code secrets')
+      expect(c.prompt).not.toContain('Never run destructive')
+    }
+  })
+
+  it('gives every builder and gate the bounded-autonomy and grounding rules', async () => {
+    const { calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, autonomy: 'bounded' }, defaultImpl())
     for (const c of calls.filter(x => x.label.startsWith('Builder') || x.label.startsWith('Gate'))) {
       expect(c.prompt).toContain('needsHuman')
       expect(c.prompt).toContain('Never run destructive')
