@@ -112,8 +112,8 @@
                   subagentProvider: spawn
                   maxTasks: 24
                   maxParallel: 6
-                  maxWaves: 3
-                  maxFixRounds: 2
+                  maxWaves: 6
+                  maxFixRounds: 4
                   builderIsolation: worktree
           - id: tool-ask-user
             name: '@hackdevcode/dsh-tool-ask-user'

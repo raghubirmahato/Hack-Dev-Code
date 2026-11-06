@@ -3,7 +3,7 @@
  * files exist, templates parse, and no skill bans reading DSH sources.
  */
 import { execFileSync } from 'node:child_process'
-import { lstatSync, readdirSync, readFileSync, readlinkSync, realpathSync, statSync } from 'node:fs'
+import { existsSync, lstatSync, readdirSync, readFileSync, readlinkSync, realpathSync, statSync } from 'node:fs'
 import { dirname, join, matchesGlob, resolve } from 'node:path'
 import { Context } from '@hackdevcode/cordis'
 import { fileURLToPath } from 'node:url'
@@ -41,9 +41,13 @@ describe('the shipped creator skills', () => {
   const alias = join(repositorySkills, 'agent-experience/SKILL.md')
   const canonical = join(skills, 'agent-experience/SKILL.md')
 
-  it('keeps agent-experience in the package with a repository alias, not a second copy', () => {
+  it('ships agent-experience in the package', () => {
     expect(names).toContain('agent-experience')
     expect(lstatSync(canonical).isFile()).toBe(true)
+  })
+
+  // The repository-level .agents alias exists only in checkouts that keep developer skills.
+  it.skipIf(!existsSync(alias))('keeps a repository alias to the package copy, not a second copy', () => {
     const linked = lstatSync(alias).isSymbolicLink()
     // Git can materialize link targets as plain files on Windows with core.symlinks=false.
     if (!linked) expect(process.platform).toBe('win32')
@@ -52,6 +56,7 @@ describe('the shipped creator skills', () => {
   })
 
   it.for(['package', 'repository'] as const)('loads agent-experience from the %s skill root', async (source, test) => {
+    if (source === 'repository' && !existsSync(alias)) test.skip(true, 'This checkout keeps no repository skill alias.')
     if (source === 'repository' && process.platform === 'win32' && !lstatSync(alias).isSymbolicLink()) {
       test.skip(true, 'Repository discovery requires a checkout with symbolic links enabled.')
     }

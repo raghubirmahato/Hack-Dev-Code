@@ -162,7 +162,9 @@ const coveragePartitionMode = coveragePartitionRaw === '1'
 // together through DSH_COVERAGE_TEST_TIMEOUT_MS; it lands in each inline
 // project below because CLI flags do not reach them (coverageTestTimeoutOptions
 // owns the rule and its reach).
-const laneTestBudget = coverageTestTimeoutOptions(process.env[COVERAGE_TEST_TIMEOUT_ENV])
+// Windows starts processes several times slower than Linux, so suites that run many git or node children need
+// more than Vitest's 5 s default there; an explicit timeout in the environment still wins.
+const laneTestBudget = coverageTestTimeoutOptions(process.env[COVERAGE_TEST_TIMEOUT_ENV] ?? (process.platform === 'win32' ? '20000' : undefined))
 // Outside CI, forks follow the local worker budget; CI keeps Vitest's own default for its runner.
 const localWorkerBudget = process.env.CI === 'true' ? {} : { maxWorkers: defaultParallelism(process.env, undefined, LOCAL_TEST_PARALLELISM_CAP) }
 

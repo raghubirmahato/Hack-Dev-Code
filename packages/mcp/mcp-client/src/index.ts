@@ -49,6 +49,20 @@ const activeServerNames = new WeakMap<object, Set<string>>()
 // ---- Config ----
 
 /** Config for connecting to an MCP server via a spawned child process over stdio. */
+/** An on-demand group the server's tools join: they reach a model only after it loads the group. */
+export interface McpToolGroup {
+  /** Group name the model passes to load_tools, such as `chrome`. */
+  name: string
+  /** What the group's tools do, shown to the model in the list of groups. */
+  description: string
+}
+
+/** Optional group: absent, or both fields. */
+const McpToolGroupSchema: z<McpToolGroup | undefined> = z.union([
+  z.object({ name: z.string().required(), description: z.string().required() }),
+  z.const(undefined),
+])
+
 export interface StdioConfig {
   /** Selects child-process stdio transport. */
   transport: 'stdio'
@@ -72,6 +86,8 @@ export interface StdioConfig {
   failOnStartupError: boolean
   /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
   maxInstructionBytes?: number
+  /** On-demand tool group for this server's tools; omission keeps them always available. */
+  toolGroup?: McpToolGroup
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -96,6 +112,8 @@ export interface StreamableHttpConfig {
   failOnStartupError: boolean
   /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
   maxInstructionBytes?: number
+  /** On-demand tool group for this server's tools; omission keeps them always available. */
+  toolGroup?: McpToolGroup
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -125,6 +143,7 @@ export const Config = z.union([
     env: z.dict(String).default({}),
     cwd: z.string().default(''),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
+    toolGroup: McpToolGroupSchema,
     failOnStartupError: z.boolean().default(false),
     maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
     reconnect: Reconnect,
@@ -135,6 +154,7 @@ export const Config = z.union([
     url: z.string().required(),
     headers: z.dict(String).default({}),
     toolCallTimeoutMs: z.number().default(DEFAULT_TOOL_CALL_TIMEOUT_MS),
+    toolGroup: McpToolGroupSchema,
     failOnStartupError: z.boolean().default(false),
     maxInstructionBytes: z.number().step(1).min(1).default(DEFAULT_MAX_INSTRUCTION_BYTES),
     reconnect: Reconnect,

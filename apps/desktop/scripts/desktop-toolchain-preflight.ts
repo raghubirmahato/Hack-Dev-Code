@@ -13,6 +13,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
+import { tarExecutable } from '../../../scripts/release/tarball.ts'
 
 const run = promisify(execFile)
 
@@ -30,8 +31,8 @@ async function probeTar(): Promise<string | undefined> {
     const member = join(directory, 'probe.txt')
     await writeFile(member, 'probe\n')
     const archive = join(directory, 'probe.tar.gz')
-    await run('tar', ['-czf', basename(archive), basename(member)], { cwd: directory, windowsHide: true, timeout: 20_000 })
-    const listed = await run('tar', ['-tzf', basename(archive)], { cwd: dirname(archive), windowsHide: true, timeout: 20_000 })
+    await run(tarExecutable(), ['-czf', basename(archive), basename(member)], { cwd: directory, windowsHide: true, timeout: 20_000 })
+    const listed = await run(tarExecutable(), ['-tzf', basename(archive)], { cwd: dirname(archive), windowsHide: true, timeout: 20_000 })
     if (!listed.stdout.includes('probe.txt')) return `tar listed ${JSON.stringify(listed.stdout)} instead of the archived member`
     return undefined
   }

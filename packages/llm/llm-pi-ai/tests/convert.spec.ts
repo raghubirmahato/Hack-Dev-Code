@@ -648,11 +648,24 @@ describe('toPiContext', () => {
     expect(onDegrade).toHaveBeenCalledWith(expect.stringContaining(message))
   }
 
-  it.each([
-    ['provider', { ...validReplay, response: { ...validResponse, provider: 'openai' } }],
-    ['model', { ...validReplay, response: { ...validResponse, model: 'deepseek-v4-pro' } }],
-  ])('degrades replay metadata whose %s differs from assistant source', (field, replayState) => {
-    expectDegraded(replayState, `${field} does not match assistant source`)
+  it('degrades replay metadata whose provider differs from assistant source', () => {
+    expectDegraded({ ...validReplay, response: { ...validResponse, provider: 'openai' } }, 'provider does not match assistant source')
+  })
+
+  it('keeps replay metadata from a fallback model of the same provider', () => {
+    const fallback = { ...validReplay, response: { ...validResponse, model: 'deepseek-v4-pro' } }
+    const onDegrade = vi.fn()
+    const context = toPiContext({
+      provider: 'deepseek',
+      model: 'deepseek-v4-pro',
+      messages: [createMessage({
+        role: 'assistant',
+        content: [{ type: 'text', text: 'done' }],
+        source: { kind: 'model', provider: 'deepseek', model: 'deepseek-v4-flash', replayState: fallback },
+      })],
+    }, undefined, onDegrade)
+    expect(onDegrade).not.toHaveBeenCalled()
+    expect(context.messages[0]).toMatchObject({ role: 'assistant', provider: 'deepseek', model: 'deepseek-v4-pro' })
   })
 
   it.each([

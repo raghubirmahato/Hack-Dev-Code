@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import yaml from 'js-yaml'
@@ -331,7 +331,8 @@ describe('client build environment', () => {
   })
 
   it('keeps public client values out of workflow-wide environments', () => {
-    for (const name of dshBuildWorkflows) {
+    // Only workflows present in this checkout are checked; a repository without CI has none to leak values into.
+    for (const name of dshBuildWorkflows.filter(workflow => existsSync(resolve(root, `.github/workflows/${workflow}`)))) {
       const path = `.github/workflows/${name}`
       const document: unknown = yaml.load(readFileSync(resolve(root, path), 'utf8'))
       if (typeof document !== 'object' || document === null || Array.isArray(document)) {

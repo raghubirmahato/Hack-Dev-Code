@@ -10,6 +10,8 @@ import type { ToolSchema } from '@hackdevcode/dsh-llm'
 import { projectToolSchema } from './schema.ts'
 import { assertSupportedJsonSchema } from './json-schema.ts'
 import { RUN_CODE_NAME, ToolActivationError } from './contracts.ts'
+import { LOAD_TOOLS_NAME, ToolGroups } from './groups.ts'
+import { defineTool } from './schema.ts'
 import type {
   ToolDefinition, ToolRestriction, ToolExecution, ToolGuard,
   ResolvedToolSet, ToolActivationContext, ToolRegistrationOptions,
@@ -108,6 +110,9 @@ export class ToolsService extends Service {
   private root: Registration | undefined
   private readonly guards = new ScopedLayers(() => new GuardLayer(), () => {})
 
+  /** On-demand tool groups and which agents loaded them. */
+  readonly groups: ToolGroups = new ToolGroups()
+
   constructor(ctx: Context) {
     super(ctx, 'tools')
     ctx.systemPrompt.tools(({ scope, toolSet }) => {
@@ -115,8 +120,43 @@ export class ToolsService extends Service {
       const description = executor.describe(this.definitions(scope, toolSet))
       return { ...description, knownNames: description.knownNames ?? [...this.view(scope).knownNames] }
     })
+    ctx.systemPrompt.section({
+      name: 'tools:groups',
+      order: ctx.systemPrompt.getSectionOrder('TOOL_COMPUTER_USE') - 1,
+      interpolate: false,
+      text: ({ scope }) => this.groups.size === 0
+        ? ''
+        : `More tools are available on demand. Call ${LOAD_TOOLS_NAME} with a group name to add that group's tools from your next step:\n`
+          + this.groups.describe(scope),
+    })
   }
 
+
+  /** Disposer of the `load_tools` registration while at least one group exists. */
+  private unloadLoader: (() => void) | undefined
+
+  /** Register the model-facing tool that loads a group; it exists only while groups do. */
+  private registerLoader(): () => void {
+    return this.register(defineTool({
+      name: LOAD_TOOLS_NAME,
+      description: 'Add an on-demand tool group (listed in your instructions) to this conversation. Its tools are available from your next step.',
+      parameters: {
+        group: { type: 'string', required: true, description: 'Name of the tool group to load.' },
+      },
+      output: {
+        schema: { type: 'object', additionalProperties: false, properties: { result: { type: 'string', required: true } } },
+        render: (_args, value) => [{ type: 'text', text: value.result }],
+      },
+      execute: (args: { group: string }, exec) => {
+        if (exec.agent === undefined) return Promise.reject(new Error(`${LOAD_TOOLS_NAME} needs a calling agent`))
+        const name = args.group.trim()
+        if (!this.groups.load(exec.agent, name)) {
+          return Promise.reject(new Error(`no tool group "${name}"; available groups:\n${this.groups.describe(exec.agent) || '(none)'}`))
+        }
+        return Promise.resolve({ result: `Loaded the ${name} tools; they are available from your next step.` })
+      },
+    }))
+  }
 
   /**
    * Register globally or in the calling agent scope. Scoped tools shadow
@@ -147,7 +187,25 @@ export class ToolsService extends Service {
     }
     return this.layers.effect(
       this.ctx,
-      layer => layer.tools.insert(name, { definition, when: options.when }),
+      (layer) => {
+        const group = options.group
+        if (group === undefined) return layer.tools.insert(name, { definition, when: options.when })
+        if (this.groups.size === 0) this.unloadLoader = this.registerLoader()
+        const leave = this.groups.join(group.name, group.description)
+        const own = options.when
+        const remove = layer.tools.insert(name, {
+          definition,
+          when: async context => this.groups.isLoaded(context.agent, group.name) && (own === undefined || await own(context)),
+        })
+        return () => {
+          leave()
+          remove()
+          if (this.groups.size === 0) {
+            this.unloadLoader?.()
+            this.unloadLoader = undefined
+          }
+        }
+      },
       { label: 'tools.register()' },
     )
   }

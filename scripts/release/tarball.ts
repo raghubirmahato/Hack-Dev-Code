@@ -6,7 +6,7 @@
  * currently says.
  */
 
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { capture } from './process.ts'
 
@@ -26,9 +26,20 @@ export interface PackedIdentity {
  * @param tarball - absolute tarball path.
  * @returns Every path inside the archive.
  */
+/**
+ * The tar to run. On Windows, Git for Windows often puts its GNU tar first on PATH, and GNU tar reads `C:\...` as a
+ * remote host named `C`; the bsdtar that Windows ships in System32 handles drive paths.
+ * @returns the executable path or name.
+ */
+export function tarExecutable(): string {
+  if (process.platform !== 'win32') return 'tar'
+  const system = join(process.env['SystemRoot'] ?? 'C:\\Windows', 'System32', 'tar.exe')
+  return existsSync(system) ? system : 'tar'
+}
+
 export function tarballFiles(tarball: string): string[] {
   // GNU tar reads the colon in a Windows drive path as a remote-host separator, so tar runs beside the tarball.
-  return capture('tar', ['-tzf', basename(tarball)], { cwd: dirname(tarball) }).split(/\r?\n/u).filter(line => line !== '')
+  return capture(tarExecutable(), ['-tzf', basename(tarball)], { cwd: dirname(tarball) }).split(/\r?\n/u).filter(line => line !== '')
 }
 
 /**
@@ -37,7 +48,7 @@ export function tarballFiles(tarball: string): string[] {
  * @returns The packed package.json object.
  */
 export function packedManifest(tarball: string): Record<string, unknown> {
-  const manifest: unknown = JSON.parse(capture('tar', ['-xOzf', basename(tarball), 'package/package.json'], { cwd: dirname(tarball) }))
+  const manifest: unknown = JSON.parse(capture(tarExecutable(), ['-xOzf', basename(tarball), 'package/package.json'], { cwd: dirname(tarball) }))
   if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) throw new Error(`${tarball} has no manifest`)
   return manifest as Record<string, unknown>
 }

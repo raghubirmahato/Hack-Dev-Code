@@ -22,6 +22,12 @@ export interface ChromeCapabilities {
   vision?: boolean
   /** Downscale screenshots wider than this many pixels, which keeps image tokens bounded. */
   screenshotMaxWidth?: number
+  /** Expose performance tracing, Lighthouse and memory tools; defaults to false, which keeps every request smaller. */
+  performanceTools?: boolean
+  /** Expose device and network emulation tools; defaults to false. */
+  emulationTools?: boolean
+  /** Keep the Chrome tools out of every request until the agent loads the `chrome` group; defaults to true. */
+  onDemand?: boolean
 }
 
 /** Launch Chrome for each live Session. */
@@ -60,6 +66,12 @@ export type Config = ChromeLaunchConfig | ChromeAttachConfig | ChromeConnectConf
 
 const channel = Schema.union(['stable', 'beta', 'dev', 'canary'] as const)
 
+/** The on-demand group holding the Chrome tools. */
+export const CHROME_GROUP = {
+  name: 'chrome',
+  description: 'control Google Chrome: open, read and switch tabs, click, fill forms, run page scripts, take screenshots, read console and network.',
+}
+
 /** Accepted input: a launch may leave `headless` out, which means true. */
 export type ConfigInput = (Omit<ChromeLaunchConfig, 'headless'> & { headless?: boolean }) | ChromeAttachConfig | ChromeConnectConfig
 
@@ -76,6 +88,9 @@ export const Config: Schema<ConfigInput, Config> = Schema.union([
     viewport: Schema.string().pattern(/^\d+x\d+$/u),
     vision: Schema.boolean(),
     screenshotMaxWidth: Schema.natural().min(320),
+    performanceTools: Schema.boolean(),
+    emulationTools: Schema.boolean(),
+    onDemand: Schema.boolean(),
   }),
   Schema.object({
     mode: Schema.const('attach').required(),
@@ -83,6 +98,9 @@ export const Config: Schema<ConfigInput, Config> = Schema.union([
     toolCallTimeoutMs: Schema.number().min(1),
     vision: Schema.boolean(),
     screenshotMaxWidth: Schema.natural().min(320),
+    performanceTools: Schema.boolean(),
+    emulationTools: Schema.boolean(),
+    onDemand: Schema.boolean(),
   }),
   Schema.object({
     mode: Schema.const('connect').required(),
@@ -90,6 +108,9 @@ export const Config: Schema<ConfigInput, Config> = Schema.union([
     toolCallTimeoutMs: Schema.number().min(1),
     vision: Schema.boolean(),
     screenshotMaxWidth: Schema.natural().min(320),
+    performanceTools: Schema.boolean(),
+    emulationTools: Schema.boolean(),
+    onDemand: Schema.boolean(),
   }),
 ])
 
@@ -115,6 +136,8 @@ export function chromeArgs(config: Config): string[] {
   }
   if (config.vision === true) args.push('--experimental-vision')
   if (config.screenshotMaxWidth !== undefined) args.push('--screenshot-max-width', String(config.screenshotMaxWidth))
+  if (config.performanceTools !== true) args.push('--category-performance=false')
+  if (config.emulationTools !== true) args.push('--category-emulation=false')
   return args
 }
 
@@ -133,6 +156,7 @@ export function apply(ctx: Context, config: Config): void {
     exclusive: config.mode !== 'launch',
     command: process.execPath,
     args: [cli, ...chromeArgs(config)],
+    ...config.onDemand === false ? {} : { toolGroup: CHROME_GROUP },
     ...config.toolCallTimeoutMs === undefined ? {} : { toolCallTimeoutMs: config.toolCallTimeoutMs },
   })
 }

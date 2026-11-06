@@ -44,6 +44,7 @@ import {
   LlmAdapter,
   LlmError,
   omitOldestImages,
+  QUOTA_EXCEEDED_CODE,
   ReasoningEffortId,
   waitForKey,
 } from '@hackdevcode/dsh-llm'
@@ -80,6 +81,17 @@ const ANTHROPIC_TOOL_UPDATE_PLACEHOLDER: ToolSchema = {
 /** Provider wording for a request that carries more images than it accepts. */
 const IMAGE_LIMIT_PATTERN =
   /too many images|image count|maximum (?:of )?\d+ images?|more than \d+ images?|images? (?:in|per) (?:a |the )?request/i
+/** Provider wording for a model that is temporarily overloaded rather than broken. */
+const OVERLOADED_PATTERN = /\b(?:503|529)\b|high demand|overloaded|UNAVAILABLE|temporarily unavailable/i
+
+/** How long later steps stay on the fallback model after an overload. */
+const OVERLOAD_FALLBACK_MS = 10 * 60_000
+/** How long later steps stay on the fallback model after the requested model ran out of quota. */
+const QUOTA_FALLBACK_MS = 60 * 60_000
+
+/** Provider wording for a quota that resets in hours or days rather than within the minute. */
+const LONG_QUOTA_PATTERN = /per day|daily|PerDay|retry in \d+h|retry in \d{2,}m/i
+
 /** How many times one request may shed old images before the failure is reported. */
 const MAX_IMAGE_OMISSIONS = 3
 /** Model-visible stand-in for an image dropped to fit the provider's limit. */
@@ -256,6 +268,12 @@ function requestHeaders(headers: Readonly<Record<string, string>> | undefined): 
  */
 export class PiAiAdapter extends LlmAdapter {
   private snapshot: PiAiSnapshot | undefined
+  /**
+   * Requested models that recently fell back, by `provider/model`, with the model that answered and until when. Later
+   * steps go straight to that model: the conversation's replay data (such as Gemini thought signatures) then stays
+   * with one model, and no request is spent on a model known to be out of quota or overloaded.
+   */
+  private readonly fallenBack = new Map<string, { readonly model: string; readonly until: number }>()
 
   constructor(private readonly config: PiAiAdapterOptions) {
     super()
@@ -392,7 +410,16 @@ export class PiAiAdapter extends LlmAdapter {
     // mid-request builds a separate snapshot, so this request finishes under
     // the one it started with and the next call picks up the new one.
     const profile = this.profileOf(snapshot, options.provider)
-    const model = this.modelOf(snapshot, options.provider, options.model)
+    const fallbackKey = `${options.provider}/${options.model}`
+    const recent = this.fallenBack.get(fallbackKey)
+    if (recent !== undefined && recent.until <= Date.now()) this.fallenBack.delete(fallbackKey)
+    const sticky = recent !== undefined && recent.until > Date.now() ? recent.model : undefined
+    let model = this.modelOf(snapshot, options.provider, sticky ?? options.model)
+    const fallbacks = (profile.fallbackModels ?? []).filter(id => id !== model.id && id !== options.model)
+    /** Remember a fallback so the following steps start on the model that answered. */
+    const rememberFallback = (to: string, quota: boolean): void => {
+      this.fallenBack.set(fallbackKey, { model: to, until: Date.now() + (quota ? QUOTA_FALLBACK_MS : OVERLOAD_FALLBACK_MS) })
+    }
     const updates = conversationUpdates(model)
     // pi-ai collapses Anthropic tool updates without an initially active declaration.
     const tools = options.tools ?? []
@@ -403,12 +430,13 @@ export class PiAiAdapter extends LlmAdapter {
     const request = needsPlaceholder
       ? { ...options, tools: [ANTHROPIC_TOOL_UPDATE_PLACEHOLDER, ...tools] }
       : options
-    const reasoning = resolveReasoningLevel(
+    let reasoning = resolveReasoningLevel(
       model,
       options.reasoningEffort ?? profile.reasoning,
     )
     let apiKey = await this.config.resolveApiKey(options.provider, profile)
     const refusedKeys = new Set<string>()
+    let switchedModel = false
 
     const consumer = new AbortController()
     const upstream = options.signal === undefined
@@ -447,7 +475,9 @@ export class PiAiAdapter extends LlmAdapter {
       // sends the same context again, so a rate limit never costs the conversation its position.
       while (true) {
         // Every stored key is resting: wait for the first to recover rather than spend the request on a refusal.
-        const restMs = apiKey === undefined ? 0 : this.config.apiKeyReadyInMs?.(apiKey) ?? 0
+        // A key rested for another model's quota is fine for a fallback model, so a model switch skips the wait once.
+        const restMs = apiKey === undefined || switchedModel ? 0 : this.config.apiKeyReadyInMs?.(apiKey) ?? 0
+        switchedModel = false
         if (restMs > 0) {
           await waitForKey(restMs, watchdog.signal)
           watchdog.signal.throwIfAborted()
@@ -462,6 +492,7 @@ export class PiAiAdapter extends LlmAdapter {
           // Harness-owned and therefore win collisions.
           headers: requestHeaders(profile.headers),
         })
+        // Replay data names the model that actually answered, so its signatures go back to that model on later steps.
         const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]()
         let exhausted = false
         const retryKeys: string[] = []
@@ -508,6 +539,20 @@ export class PiAiAdapter extends LlmAdapter {
               retryKeys.push(apiKey ?? '')
               break
             }
+            if (chunk.type === 'finish' && chunk.reason.kind === 'error' && OVERLOADED_PATTERN.test(chunk.reason.failure.message)) {
+              const fallback = fallbacks.shift()
+              if (fallback !== undefined) {
+                // The model is overloaded; send the same request to the next configured model instead of waiting.
+                model = this.modelOf(snapshot, options.provider, fallback)
+                rememberFallback(fallback, false)
+                switchedModel = true
+                reasoning = resolveReasoningLevel(model, options.reasoningEffort ?? profile.reasoning)
+                await watchdog.next(iterator)
+                exhausted = true
+                retryKeys.push(apiKey ?? '')
+                break
+              }
+            }
             if (chunk.type === 'finish' && chunk.reason.kind === 'error' && ROTATING_CODES.has(chunk.reason.failure.code)
               && apiKey !== undefined && this.config.rotateApiKey !== undefined) {
               refusedKeys.add(apiKey)
@@ -518,6 +563,30 @@ export class PiAiAdapter extends LlmAdapter {
                 exhausted = true
                 retryKeys.push(next)
                 break
+              }
+              // Every stored key is used up for this model. Quotas are kept per model, so a configured fallback model
+              // can usually answer the same request right away.
+              if (chunk.reason.failure.code === QUOTA_EXCEEDED_CODE) {
+                const fallback = fallbacks.shift()
+                if (fallback !== undefined) {
+                  model = this.modelOf(snapshot, options.provider, fallback)
+                  rememberFallback(fallback, true)
+                  switchedModel = true
+                  reasoning = resolveReasoningLevel(model, options.reasoningEffort ?? profile.reasoning)
+                  refusedKeys.clear()
+                  await watchdog.next(iterator)
+                  exhausted = true
+                  retryKeys.push(apiKey)
+                  break
+                }
+                // A per-minute quota recovers soon: report a rate limit so the step is retried once a key recovers.
+                // A daily quota does not, and retrying it every few seconds only spends the retry budget.
+                if (!LONG_QUOTA_PATTERN.test(chunk.reason.failure.message)) {
+                  started = true
+                  for (const pending of leading.splice(0)) yield pending
+                  yield { ...chunk, reason: { kind: 'error', failure: { ...chunk.reason.failure, code: 'RATE_LIMIT' } } }
+                  continue
+                }
               }
             }
             started = true

@@ -84,6 +84,8 @@ export interface SessionMcpOptions {
   env?: Record<string, string>
   /** Per-call timeout override; omission retains the MCP client default. */
   toolCallTimeoutMs?: number
+  /** On-demand tool group the browser tools belong to; omission keeps them always available. */
+  toolGroup?: { name: string; description: string }
 }
 
 interface ClientState {
@@ -153,6 +155,7 @@ export function mountSessionMcp(ctx: Context, options: SessionMcpOptions): void 
             ...options.env === undefined ? {} : { env: options.env },
             cwd: await workingDirectory.ensure(agent, signal),
             ...options.toolCallTimeoutMs === undefined ? {} : { toolCallTimeoutMs: options.toolCallTimeoutMs },
+            ...options.toolGroup === undefined ? {} : { toolGroup: options.toolGroup },
             failOnStartupError: true,
             reconnect: { enabled: false },
           }))

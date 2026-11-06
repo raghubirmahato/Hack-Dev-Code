@@ -23,6 +23,18 @@ import {
 import { isExperimentalPackageName } from './experimental-package-policy.ts'
 // The independently published entry package owns platform-engine dependencies.
 const EXTERNAL_KIT_PACKAGES = new Set(['@deepseek-ai/libreoffice-kit'])
+/**
+ * Experimental packages the product deliberately ships switched on: desktop and Chrome control is part of the
+ * default Web profile. Remove a name here (and from the profile template) to make it opt-in again.
+ */
+export const DEFAULT_ON_EXPERIMENTAL: ReadonlySet<string> = new Set([
+  '@hackdevcode/dsh-cua-bundle',
+  '@hackdevcode/dsh-cua',
+  '@hackdevcode/dsh-experimental-cua-macos',
+  '@hackdevcode/dsh-experimental-computer-use-cua-driver-native',
+  '@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp',
+  '@hackdevcode/dsh-experimental-browser-use-runtime',
+])
 const PROFILE_SOURCE = 'packages/util/official-bundles/src/bundles.ts'
 const PRESET_PATTERN = 'packages/bundle/web-app/presets/*.patch.yml'
 const RUNTIME_SECTIONS = ['dependencies', 'optionalDependencies', 'peerDependencies'] as const
@@ -107,8 +119,8 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
   const sources = new Set<string>()
   const configs = new Set<string>()
   let webPluginCount = 0
-  const isExperimental = (pkg: Package): boolean => isExperimentalPackageName(pkg.manifest.name)
-    || display(pkg.directory).startsWith('packages/experimental/')
+  const isExperimental = (pkg: Package): boolean => !DEFAULT_ON_EXPERIMENTAL.has(pkg.manifest.name)
+    && (isExperimentalPackageName(pkg.manifest.name) || display(pkg.directory).startsWith('packages/experimental/'))
   const add = (pkg: Package, origin: string): void => {
     if (isExperimental(pkg)) {
       failures.push(`${origin} -> ${pkg.manifest.name}: default product must not include experimental packages`)
@@ -136,7 +148,7 @@ export function verifyDefaultProductIsolation(root: string): ProductIsolationRes
       return
     }
     const packageName = barePackageName(name)
-    if (isExperimentalPackageName(packageName)) {
+    if (isExperimentalPackageName(packageName) && !DEFAULT_ON_EXPERIMENTAL.has(packageName)) {
       failures.push(`${origin} -> ${name}: default product must not include experimental packages`)
       return
     }

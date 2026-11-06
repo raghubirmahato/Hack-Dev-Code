@@ -7,7 +7,7 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, isAbsolute, join, parse } from 'node:path'
+import { dirname, isAbsolute, join, parse, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { FiberState, type Context } from '@hackdevcode/cordis'
 import z from '@hackdevcode/schemastery'
@@ -84,16 +84,29 @@ function barePackageManifest(
   return undefined
 }
 
-/** Find the nearest owning manifest for a relative or absolute plugin module. */
-function nearestManifest(modulePath: string): string | undefined {
+/**
+ * Find the nearest owning manifest for a relative or absolute plugin module, searching no higher than `boundary`.
+ * A loose module has no manifest of its own; climbing past the composition's base folder would adopt whatever
+ * unrelated package.json sits above it (a home or temp folder) and report a package the person never installed.
+ */
+function nearestManifest(modulePath: string, boundary: string | undefined): string | undefined {
   let current = dirname(modulePath)
   const root = parse(current).root
+  const limit = boundary === undefined ? undefined : resolve(boundary)
   while (true) {
     const manifest = join(current, 'package.json')
     if (existsSync(manifest)) return manifest
-    if (current === root) return undefined
+    if (current === root || (limit !== undefined && resolve(current) === limit)) return undefined
     current = dirname(current)
   }
+}
+
+/** The folder a Loader tree's base URL names: the URL itself when it ends in a slash, else its parent. */
+function baseFolder(base: string): string | undefined {
+  const url = new URL(base)
+  if (url.protocol !== 'file:') return undefined
+  const path = fileURLToPath(url)
+  return base.endsWith('/') ? path : dirname(path)
 }
 
 /** Exact package identity resolver with immutable per-process manifest caching. */
@@ -125,7 +138,13 @@ class PackageIdentityResolver {
       const moduleUrl = isAbsolute(moduleName)
         ? pathToFileURL(moduleName)
         : new URL(moduleName, treeBase)
-      if (moduleUrl.protocol === 'file:') manifest = nearestManifest(fileURLToPath(moduleUrl))
+      if (moduleUrl.protocol === 'file:') {
+        const modulePath = fileURLToPath(moduleUrl)
+        const boundary = baseFolder(treeBase)
+        // A module outside the base folder keeps the unbounded search for its own package.
+        const inside = boundary !== undefined && !relative(boundary, modulePath).startsWith('..') && !isAbsolute(relative(boundary, modulePath))
+        manifest = nearestManifest(modulePath, inside ? boundary : undefined)
+      }
     }
     const identity = manifest === undefined ? undefined : identityFromManifest(manifest)
     this.cache.set(key, identity)

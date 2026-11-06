@@ -30,6 +30,8 @@ export interface ToolBridgeOptions {
   registrationFailure: 'contain' | 'throw'
   serverName: string
   toolCallTimeoutMs: number
+  /** On-demand group for this server's tools; omitted tools are always available. */
+  toolGroup?: { name: string; description: string }
 }
 
 /** State for one sync generation: the current set of disposers keyed by public name. */
@@ -147,7 +149,7 @@ export async function syncTools(
   const disposers: ToolDisposers = new Map()
   try {
     for (const [publicName, definition] of definitions) {
-      disposers.set(publicName, ctx.tools.register(definition))
+      disposers.set(publicName, ctx.tools.register(definition, opts.toolGroup === undefined ? {} : { group: opts.toolGroup }))
     }
   } catch (error) {
     // A conflict on an `mcp__<serverName>__`-qualified name means a foreign

@@ -78,6 +78,7 @@ it('loads from cordis.yml and logs the native screenshot before the next model r
   await writeFile(configPath, [...modules.keys()].flatMap(name => [
     `- name: '${name}'`,
     ...name === '@hackdevcode/dsh-attachment-local' ? ['  config:', `    dshHome: ${JSON.stringify(root)}`] : [],
+    ...name === '@hackdevcode/dsh-experimental-computer-use-cua-driver-native' ? ['  config:', '    onDemand: false'] : [],
   ]).join('\n') + '\n')
 
   const context = ctx = new Context()

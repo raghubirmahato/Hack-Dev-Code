@@ -187,7 +187,8 @@ function foreignAssistant(message: HarnessAssistantMessage): AssistantMessage {
 function replayedAssistant(message: HarnessAssistantMessage, source: ModelMessageSource, rawState: unknown): AssistantMessage {
   const state = readReplayState(rawState)
   if (state.response.provider !== source.provider) return invalidReplay('provider does not match assistant source')
-  if (state.response.model !== source.model) return invalidReplay('model does not match assistant source')
+  // A configured fallback model of the same provider may have answered in place of the requested one; its replay data
+  // stays usable, and pi-ai keeps or drops each signature by comparing that model with the request's target.
   if (state.blocks.length !== message.content.length) return invalidReplay('block count does not match assistant content')
   const content: AssistantMessage['content'] = message.content.map((block, index) => {
     const replay = state.blocks[index]

@@ -164,3 +164,29 @@ it('reports condition failures without treating them as disabled tools', async (
   })
   expect(h.calls()).toBe(0)
 })
+
+it('keeps a grouped tool out until the agent loads its group, and removes the group with its last tool', async () => {
+  const h = await setup()
+  const remove = h.ctx.tools.register(h.tool, { group: { name: 'desktop', description: 'operate the desktop' } })
+  const before = await h.resolve()
+  const names = h.ctx.tools.schemas(h.agent, before).map(tool => tool.name)
+  expect(names).toEqual(['load_tools'])
+  expect(h.ctx.tools.groups.describe(h.agent)).toBe('- desktop: operate the desktop')
+
+  const missing = await h.execute({ name: 'load_tools', arguments: { group: 'nope' }, toolSet: before })
+  expect(missing.isError).toBe(true)
+  const loaded = await h.execute({ name: 'load_tools', arguments: { group: 'desktop' }, toolSet: before })
+  expect(loaded.isError).toBe(false)
+  expect(h.ctx.tools.groups.describe(h.agent)).toBe('- desktop (loaded): operate the desktop')
+
+  const after = await h.resolve()
+  expect(h.ctx.tools.schemas(h.agent, after).map(tool => tool.name).sort()).toEqual(['conditional', 'load_tools'])
+  expect((await h.execute({ toolSet: after })).isError).toBe(false)
+
+  const other = { id: SessionId('other') } as Agent
+  expect(h.ctx.tools.groups.isLoaded(other, 'desktop')).toBe(false)
+
+  remove()
+  expect(h.ctx.tools.groups.size).toBe(0)
+  expect(h.ctx.tools.schemas(h.agent, await h.resolve())).toEqual([])
+})

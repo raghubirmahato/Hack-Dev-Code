@@ -929,7 +929,7 @@ export interface Config {
 
 - `inject`: `browserUse` · `agents` · `tools` · `systemPrompt` · `workingDirectory`
 - `refs`: `BrowserMcpAttachConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`) · `BrowserMcpLaunchConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`)
-- `source`: [`packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts:59`](../packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts)
+- `source`: [`packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts:65`](../packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts)
 
 ```ts config-catalog
 /** Fixed Chromium launch, debugging-endpoint attachment, or connection to the running Chrome. */
@@ -972,6 +972,12 @@ export interface ChromeCapabilities {
   vision?: boolean
   /** Downscale screenshots wider than this many pixels, which keeps image tokens bounded. */
   screenshotMaxWidth?: number
+  /** Expose performance tracing, Lighthouse and memory tools; defaults to false, which keeps every request smaller. */
+  performanceTools?: boolean
+  /** Expose device and network emulation tools; defaults to false. */
+  emulationTools?: boolean
+  /** Keep the Chrome tools out of every request until the agent loads the `chrome` group; defaults to true. */
+  onDemand?: boolean
 }
 
 /** Chrome release channel whose installation and profile are used. */
@@ -1152,6 +1158,29 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-computer-use-cua-driver-mcp -->
+
+<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-experimental-computer-use-cua-driver-native -->
+<a id="hackdevcodedsh-experimental-computer-use-cua-driver-native"></a>
+
+## `@hackdevcode/dsh-experimental-computer-use-cua-driver-native`
+
+- `inject`: `computerUse` · `tools` · `systemPrompt`
+- `source`: [`packages/experimental/computer-use-cua-driver-native/src/index.ts:25`](../packages/experimental/computer-use-cua-driver-native/src/index.ts)
+
+```ts config-catalog
+/** Which part of the driver catalog the model sees. */
+export interface Config {
+  /**
+   * `essential` (default) leaves out tools agents rarely need (trajectory recording and replay, the agent cursor
+   * overlay, driver configuration and session bookkeeping, ffmpeg installation), which keeps every request smaller;
+   * `all` exposes the whole catalog.
+   */
+  toolset?: 'essential' | 'all'
+  /** Keep the desktop tools out of every request until the agent loads the `desktop` group; defaults to true. */
+  onDemand?: boolean
+}
+```
+<!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-computer-use-cua-driver-native -->
 
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-experimental-cua-macos -->
 <a id="hackdevcodedsh-experimental-cua-macos"></a>
@@ -2007,7 +2036,7 @@ export interface Config extends ProtocolConfig, ModelListingConfig {
 
 - `inject`: `llm`
 - `refs`: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`) · `Volatile` (`@hackdevcode/cordis`)
-- `source`: [`packages/llm/llm-pi-ai/src/config.ts:222`](../packages/llm/llm-pi-ai/src/config.ts)
+- `source`: [`packages/llm/llm-pi-ai/src/config.ts:227`](../packages/llm/llm-pi-ai/src/config.ts)
 
 ```ts config-catalog
 /** Plugin configuration: the provider routes this instance owns. */
@@ -2112,6 +2141,11 @@ export interface PiAiProviderProfile {
   requestImageMaxBytes?: number
   /** Provider-owned model-request retry policy; omission uses normal mode with five retries. */
   retryPolicy?: RetryPolicyConfig
+  /**
+   * Models of this provider to try, in order, when the requested model is overloaded (HTTP 503 or 529, "high
+   * demand", "overloaded") before it starts answering. The same request is sent again to the next model.
+   */
+  fallbackModels?: string[]
 }
 
 /** One configured model entry: an id plus the catalog fields it overrides. */
@@ -2421,13 +2455,12 @@ export interface LspLocalServerConfig {
 ## `@hackdevcode/dsh-mcp-client`
 
 - `inject`: `tools`
-- `source`: [`packages/mcp/mcp-client/src/index.ts:104`](../packages/mcp/mcp-client/src/index.ts)
+- `source`: [`packages/mcp/mcp-client/src/index.ts:122`](../packages/mcp/mcp-client/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for one stdio or Streamable HTTP MCP server. */
 export type Config = StdioConfig | StreamableHttpConfig
 
-/** Config for connecting to an MCP server via a spawned child process over stdio. */
 export interface StdioConfig {
   /** Selects child-process stdio transport. */
   transport: 'stdio'
@@ -2451,6 +2484,8 @@ export interface StdioConfig {
   failOnStartupError: boolean
   /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
   maxInstructionBytes?: number
+  /** On-demand tool group for this server's tools; omission keeps them always available. */
+  toolGroup?: McpToolGroup
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
 }
@@ -2475,8 +2510,18 @@ export interface StreamableHttpConfig {
   failOnStartupError: boolean
   /** Maximum UTF-8 bytes of attributed server instructions (default 32768). */
   maxInstructionBytes?: number
+  /** On-demand tool group for this server's tools; omission keeps them always available. */
+  toolGroup?: McpToolGroup
   /** Automatic reconnect policy after a lost connection; omission uses the defaults. */
   reconnect?: ReconnectConfig
+}
+
+/** An on-demand group the server's tools join: they reach a model only after it loads the group. */
+export interface McpToolGroup {
+  /** Group name the model passes to load_tools, such as `chrome`. */
+  name: string
+  /** What the group's tools do, shown to the model in the list of groups. */
+  description: string
 }
 
 /** Automatic reconnect policy for one MCP server connection. */
@@ -4133,7 +4178,7 @@ export interface Config {
 ## `@hackdevcode/dsh-tool-hackdev`
 
 - `inject`: `tools` · `workflowEngine` · `subagents` · `systemPrompt`
-- `source`: [`packages/hackdev/tool-hackdev/src/index.ts:28`](../packages/hackdev/tool-hackdev/src/index.ts)
+- `source`: [`packages/hackdev/tool-hackdev/src/index.ts:33`](../packages/hackdev/tool-hackdev/src/index.ts)
 
 ```ts config-catalog
 /** Deployment policy for the fixed Hack Dev Code pipelines. */
@@ -4987,7 +5032,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@hackdevcode/dsh-experimental-client-ui-claude-code-mods` | — | [`packages/experimental/client-ui-claude-code-mods/src/index.ts`](../packages/experimental/client-ui-claude-code-mods/src/index.ts) |
 | `@hackdevcode/dsh-experimental-client-ui-stats` | — | [`packages/experimental/client-ui-stats/src/index.ts`](../packages/experimental/client-ui-stats/src/index.ts) |
 | `@hackdevcode/dsh-experimental-client-ui-voice-input` | — | [`packages/experimental/client-ui-voice-input/src/index.ts`](../packages/experimental/client-ui-voice-input/src/index.ts) |
-| `@hackdevcode/dsh-experimental-computer-use-cua-driver-native` | `computerUse` · `tools` · `systemPrompt` | [`packages/experimental/computer-use-cua-driver-native/src/index.ts`](../packages/experimental/computer-use-cua-driver-native/src/index.ts) |
 | `@hackdevcode/dsh-experimental-session-inspector` | — | [`packages/experimental/session-inspector/src/index.ts`](../packages/experimental/session-inspector/src/index.ts) |
 | `@hackdevcode/dsh-experimental-tool-worktree` | `tools` · `worktrees` | [`packages/experimental/tool-worktree/src/index.ts`](../packages/experimental/tool-worktree/src/index.ts) |
 | `@hackdevcode/dsh-fs-observation-policy` | — | [`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts) |

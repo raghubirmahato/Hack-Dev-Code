@@ -10,6 +10,7 @@ import {
   selectDesktopPackageClosure,
   type PackedDesktopPackage,
 } from '../scripts/prepare-package-set.ts'
+import { tarExecutable } from '../../../scripts/release/tarball.ts'
 
 function packed(name: string, manifest: Record<string, unknown> = {}): PackedDesktopPackage {
   return { tarball: `${name}.tgz`, manifest: { name, version: '1.0.0', ...manifest } }
@@ -153,7 +154,7 @@ it('copies no macOS tarball into the Windows package set', () => {
         writeFileSync(join(folder, file), '')
       }
     }
-    execFileSync('tar', ['-czf', join(inputs, `${stem}.tgz`), '-C', join(folder, '..'), 'package'])
+    execFileSync(tarExecutable(), ['-czf', join(inputs, `${stem}.tgz`), '-C', join(folder, '..'), 'package'])
   }
   const output = join(root, 'output')
   prepareDesktopPackageSet([inputs], output, { platform: 'win32', arch: 'x64' })

@@ -121,6 +121,11 @@ export interface ToolRegistrationOptions {
    * @returns whether the tool participates in this step.
    */
   readonly when?: (context: ToolActivationContext) => boolean | Promise<boolean>
+  /**
+   * Put the tool in an on-demand group: it stays out of an agent's requests until that agent calls `load_tools`
+   * with the group's name. Use it for large tool families an agent needs only for some tasks.
+   */
+  readonly group?: { readonly name: string; readonly description: string }
 }
 
 /** One step's admitted registrations, also used by nested PTC calls. */

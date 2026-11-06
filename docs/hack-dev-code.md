@@ -125,8 +125,8 @@ Web presets mount tools per agent, so `tool-hackdev` is declared in `packages/bu
 | `subagentProvider` | `spawn` | Fresh structured-output provider for every pipeline agent |
 | `maxTasks` | 24 | Ceiling on planned tasks per wave |
 | `maxParallel` | 6 | Builders running at the same time |
-| `maxWaves` | 3 | Ceiling on build waves (follow-up waves for unmet criteria) |
-| `maxFixRounds` | 2 | Extra review-fix rounds per gate |
+| `maxWaves` | 3 (6 in shipped profiles) | Ceiling on build waves (follow-up waves for unmet criteria) |
+| `maxFixRounds` | 2 (4 in shipped profiles) | Extra review-fix rounds per gate |
 | `maxMemoryChars` | 6000 | Blackboard characters injected into one prompt, and the `.hackdev/MEMORY.md` compaction target |
 | `maxResultChars` | 16384 | Size of the report returned to the calling model |
 | `visionModel` | empty | Optional image-capable model for the quality/UX gate; empty inherits the default route |

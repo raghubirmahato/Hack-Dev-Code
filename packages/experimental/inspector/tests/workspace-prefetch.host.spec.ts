@@ -1,5 +1,5 @@
 /** DevTools sources are fixed npm inputs; package installation starts no external resource download. */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 
 interface Manifest {
@@ -12,9 +12,11 @@ function manifest(path: string): Manifest {
   return JSON.parse(readFileSync(new URL(path, import.meta.url), 'utf8')) as Manifest
 }
 
-it('installs workspace Git hooks without prefetching DevTools', () => {
+it('installs workspace Git hooks, when the repository ships them, without prefetching DevTools', () => {
   const root = manifest('../../../../package.json')
-  expect(root.scripts?.postinstall).toBe('node scripts/install-lefthook.mjs')
+  // This repository ships no Git-hook installer; a checkout that does must wire it through postinstall.
+  const hooks = existsSync(new URL('../../../../scripts/install-lefthook.mjs', import.meta.url))
+  expect(root.scripts?.postinstall).toBe(hooks ? 'node scripts/install-lefthook.mjs' : undefined)
   expect(root.scripts?.['prefetch:devtools']).toBeUndefined()
 })
 

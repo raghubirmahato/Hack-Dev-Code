@@ -19,7 +19,12 @@ import type { Agent } from '@hackdevcode/dsh-agent'
 import { createWorkflowRecorder } from '@hackdevcode/dsh-tool-workflow'
 import { HACKDEV_META, HACKDEV_REVIEW_META, HACKDEV_REVIEW_SCRIPT, HACKDEV_SCRIPT } from './script.ts'
 import { compactReport, renderReport } from './render.ts'
+import { describeHost, detectHost } from './host.ts'
+
 import type { HackDevReport } from './render.ts'
+
+/** The host is detected once, when the app starts, and described to every agent. */
+const HOST_DESCRIPTION = describeHost(detectHost())
 
 export const name = 'tool-hackdev'
 export const inject = ['tools', 'workflowEngine', 'subagents', 'systemPrompt']
@@ -283,6 +288,12 @@ export function apply(ctx: Context, config: Config): void {
     order: ctx.systemPrompt.getSectionOrder('HACKDEV_POLICY'),
     text: `${POLICY}\n${resolved.autonomy === 'full' ? FULL_POLICY : BOUNDED_POLICY}`,
   })
+  ctx.systemPrompt.section({
+    name: 'environment:host',
+    order: ctx.systemPrompt.getSectionOrder('HACKDEV_POLICY'),
+    interpolate: false,
+    text: HOST_DESCRIPTION,
+  })
   if (resolved.customInstructions.length > 0) {
     ctx.systemPrompt.section({
       name: 'policy:custom-instructions',
@@ -397,6 +408,7 @@ export function apply(ctx: Context, config: Config): void {
           maxFactChecks: resolved.maxFactChecks,
           builderIsolation: resolved.builderIsolation,
           autonomy: resolved.autonomy,
+          host: HOST_DESCRIPTION,
           customInstructions: missionInstructions(),
         },
         // Planner retry, splits, fact-checks, integrators and regression passes are inside the budget formula.
@@ -441,7 +453,7 @@ export function apply(ctx: Context, config: Config): void {
         exec,
         HACKDEV_REVIEW_SCRIPT,
         HACKDEV_REVIEW_META,
-        { mission, focus: (args.focus ?? '').trim(), maxFixRounds, maxMemoryChars: resolved.maxMemoryChars, visionModel: resolved.visionModel, customInstructions: missionInstructions(), autonomy: resolved.autonomy },
+        { mission, focus: (args.focus ?? '').trim(), maxFixRounds, maxMemoryChars: resolved.maxMemoryChars, visionModel: resolved.visionModel, customInstructions: missionInstructions(), autonomy: resolved.autonomy, host: HOST_DESCRIPTION },
         agentBudget(1, maxFixRounds, false),
       )
     },

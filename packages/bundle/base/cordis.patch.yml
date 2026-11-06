@@ -292,8 +292,11 @@
     - id: tool-jobs
       name: '@hackdevcode/dsh-tool-jobs'
 
+    # Read-before-write guard: off for full autonomy (an agent may write a file it has not read).
+    # Remove `disabled` to require a read before every overwrite or edit again.
     - id: fs-observation-policy
       name: '@hackdevcode/dsh-fs-observation-policy'
+      disabled: true
 
     - id: tool-fs
       name: '@hackdevcode/dsh-tool-fs'
@@ -361,6 +364,9 @@
 
     - id: subagent
       name: '@hackdevcode/dsh-subagent'
+      config:
+        # Children may delegate again, up to three levels deep.
+        maxDepth: 3
 
     - id: subagent-spawn-in-process
       name: '@hackdevcode/dsh-subagent-spawn-in-process'
@@ -416,8 +422,8 @@
         subagentProvider: spawn
         maxTasks: 24
         maxParallel: 6
-        maxWaves: 3
-        maxFixRounds: 2
+        maxWaves: 6
+        maxFixRounds: 4
         builderIsolation: worktree
 
     - id: timeout-policy

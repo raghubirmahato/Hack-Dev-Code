@@ -92,8 +92,8 @@ describe.each(['web', 'desktop'] as const)('%s optional bundle overrides', (surf
 })
 
 describe('optional bundles', () => {
-  it('admits Computer Use only on macOS Hosts', () => {
-    expect(bundles.get('@hackdevcode/dsh-cua-bundle')?.manifest.dsh?.bundle?.platforms).toEqual(['darwin'])
+  it('admits Computer Use on macOS, Windows and Linux Hosts', () => {
+    expect(bundles.get('@hackdevcode/dsh-cua-bundle')?.manifest.dsh?.bundle?.platforms).toEqual(['darwin', 'win32', 'linux'])
   })
   const shipped = ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app'].map(name => bundle(name).patches)
 
@@ -271,12 +271,12 @@ describe('optional bundles', () => {
       || row.name === '@hackdevcode/dsh-tool-schedule')).toBe(false)
   })
 
-  it.each(OPTIONAL_BUNDLES)('%s resolves a title, description, and icon in both shipped languages', (name) => {
+  it.each(OPTIONAL_BUNDLES)('%s resolves a title, description, and icon in the shipped language', (name) => {
     const meta = readPluginMeta(name, pathToFileURL(`${bundle(name).dir}/package.json`).href)
     expect(meta?.error).toBeUndefined()
     for (const field of [meta?.title, meta?.description]) {
       expect(typeof field).toBe('object')
-      for (const language of ['en', 'zh']) expect((field as Record<string, string>)[language]).toMatch(/\S/)
+      expect((field as Record<string, string>)['en']).toMatch(/\S/)
     }
     expect(meta?.icon).toMatch(/^data:image\//)
   })

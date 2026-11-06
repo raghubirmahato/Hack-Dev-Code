@@ -133,6 +133,9 @@ function customInstructionsBlock() {
   return '\n\nUser custom instructions (follow them for this whole mission; ' + precedence + '):\n' + text
 }
 
+// The host machine, detected at app launch, so commands and paths fit the operating system.
+const HOST_TEXT = typeof args === 'object' && args !== null && typeof args.host === 'string' && args.host.length > 0 ? '\n\n' + args.host : ''
+
 const GROUNDING = [
   'Grounding rules (no hallucination):',
   '- Read a file before you edit it, and re-read the changed region afterwards. Never edit from memory.',
@@ -140,7 +143,7 @@ const GROUNDING = [
   '- Cite concrete workspace-relative file paths (path:line where useful) in summaries, issues and evidence.',
   '- Evidence is the literal command you ran plus its observed result (exit code, pass/fail counts, the decisive output line). An expected outcome is not evidence.',
   '- If you are unsure, say so in the report instead of guessing. A fact-checker re-runs evidence and checks every file you list; false claims downgrade your work.',
-].join('\n') + customInstructionsBlock()
+].join('\n') + HOST_TEXT + customInstructionsBlock()
 
 const SCOPE_DISCIPLINE = FULL_AUTONOMY ? [
   'Scope: fix defects and weaknesses and build whatever the mission needs, including larger additions (authentication, databases, new services) when they are the right fix. Mark an issue deferred only when you truly cannot complete it, with the reason and a precise remediation. Use status open only for problems you could fix but have not yet fixed.',

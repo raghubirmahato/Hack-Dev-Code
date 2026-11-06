@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import { EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS } from './experimental-package-policy.ts'
-import { verifyDefaultProductIsolation } from './verify-default-product-isolation.ts'
+import { DEFAULT_ON_EXPERIMENTAL, verifyDefaultProductIsolation } from './verify-default-product-isolation.ts'
 import { writeFixtureFile as write } from './fixture-file.ts'
 
 const roots: string[] = []
@@ -48,7 +48,8 @@ afterEach(() => {
 })
 
 describe('default product isolation', () => {
-  describe.each(Object.entries(EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS))('retained experimental identity %s', (directory, name) => {
+  // Packages the product deliberately ships switched on are allowed, so only the other retained identities are rejected.
+  describe.each(Object.entries(EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS).filter(([, name]) => !DEFAULT_ON_EXPERIMENTAL.has(name)))('retained experimental identity %s', (directory, name) => {
     it.each(['direct dependency', 'transitive dependency', 'npm alias', 'value import', 'subpath import', 'profile row', 'preset row'])(
       'rejects default product use through a %s', (route) => {
         const root = fixture()
