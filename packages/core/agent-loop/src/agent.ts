@@ -24,6 +24,7 @@ import {
   LlmError,
   createAssistantMessage,
   createDeveloperMessage,
+  createUserMessage,
   errorChain,
   markAgentLoopRequest,
 } from '@hackdevcode/dsh-llm'
@@ -74,6 +75,31 @@ type PreparedStep =
     toolSet: ResolvedToolSet
   }
 
+declare module '@hackdevcode/dsh-llm' {
+  interface MessageSourceMap {
+    'agent-loop': { kind: 'agent-loop' }
+  }
+}
+
+/** Source of the loop's own follow-up message after an empty reply. */
+const AGENT_LOOP_SOURCE = { kind: 'agent-loop' } as const
+
+/**
+ * Sent once per turn when a model answers tool results with neither text nor a tool call, which some providers
+ * do mid-task; without it the turn would end silently with the work unfinished and no answer for the person.
+ */
+export const EMPTY_REPLY_FOLLOW_UP = 'Your last reply was empty. Continue the task from where you stopped: check the current state if you need to, '
+  + 'finish the remaining steps, then give your final answer.'
+
+/**
+ * Whether an assistant message says anything to the person.
+ * @param content - the message blocks.
+ * @returns true when a text block has visible characters.
+ */
+function hasVisibleText(content: readonly { type: string; text?: string }[]): boolean {
+  return content.some(block => block.type === 'text' && typeof block.text === 'string' && block.text.trim().length > 0)
+}
+
 /** Remove adapter-derived values before plugins propose the next request config. */
 function requestProposal(header: EpochHeader): LlmCallConfig {
   if (header.adapterDefaults === undefined) return header.config
@@ -114,6 +140,8 @@ export class ReactLoopAgent implements Agent {
   readonly inbox: ReactLoopInbox
   private phase: Phase
   private activityDone: Promise<void> = Promise.resolve()
+  /** The last turn that already received {@link EMPTY_REPLY_FOLLOW_UP}. */
+  private emptyReplyTurn = -1
 
   /** The agent-scoped registration boundary; the lifecycle owner unwinds it after the driver exits. */
   readonly scope: Scope
@@ -584,7 +612,17 @@ export class ReactLoopAgent implements Agent {
         if (finish.kind === 'max-tokens') return { kind: 'max-tokens' }
 
         const toolCalls = message.content.filter(block => block.type === 'tool-call')
-        if (toolCalls.length === 0) return { kind: 'completed' }
+        if (toolCalls.length === 0) {
+          // An empty reply after tool work is a provider hiccup, not an answer: ask once to carry on.
+          if (step > 1 && this.emptyReplyTurn !== turn && !hasVisibleText(message.content)) {
+            this.emptyReplyTurn = turn
+            this.inbox.splice('next-step', this.inbox.nextStep.length, 0, [
+              createUserMessage({ content: [{ type: 'text', text: EMPTY_REPLY_FOLLOW_UP }], source: AGENT_LOOP_SOURCE }),
+            ])
+            return null
+          }
+          return { kind: 'completed' }
+        }
         const maxParallelToolCalls = this.loopCtx.agentLoop.config.maxParallelToolCalls.get()
         try {
           const result = await this.loopCtx.tools.execute({

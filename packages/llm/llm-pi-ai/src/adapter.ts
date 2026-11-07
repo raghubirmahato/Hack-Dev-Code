@@ -65,6 +65,7 @@ import type { AttachmentStore, ImageAttachmentRef } from '@hackdevcode/dsh-attac
 import { idleWatchdog, timeoutOf } from '@hackdevcode/dsh-timeout'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { requestImageTarget, toPiContext } from './context.ts'
+import { adoptForeignGeminiHistory } from './gemini-history.ts'
 import { conversationUpdates, createModels, getSupportedThinkingLevels } from './models.ts'
 import { toStreamChunks } from './stream.ts'
 
@@ -482,7 +483,7 @@ export class PiAiAdapter extends LlmAdapter {
           await waitForKey(restMs, watchdog.signal)
           watchdog.signal.throwIfAborted()
         }
-        const events = snapshot.models.streamSimple(model, context, {
+        const events = snapshot.models.streamSimple(model, adoptForeignGeminiHistory(context, model), {
           ...profileOptions(profile, reasoning, apiKey),
           ...options.temperature === undefined ? {} : { temperature: options.temperature },
           ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },

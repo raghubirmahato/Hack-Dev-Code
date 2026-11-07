@@ -43,6 +43,8 @@ describe('Cua Driver native provider', () => {
     const fiber = ctx.plugin(NativeProvider)
     await fiber
     expect(ctx.tools.groups.describe()).toContain('- desktop:')
+    // Rarely needed driver tools wait in a second group so loading `desktop` stays cheap.
+    expect(ctx.tools.groups.describe()).toContain('- desktop-more:')
     expect(ctx.tools.schemas().map(tool => tool.name)).toContain('load_tools')
     await fiber.dispose()
     expect(ctx.tools.groups.size).toBe(0)
@@ -53,7 +55,10 @@ describe('Cua Driver native provider', () => {
     await fiber
     expect(ctx.computerUse.providerName).toBe('cua-driver-native')
     const displayTools = process.platform === 'win32' || process.platform === 'linux'
-      ? ['desktop_list_displays', 'desktop_screenshot', 'desktop_pointer']
+      ? [
+        'desktop_list_displays', 'desktop_screenshot', 'desktop_pointer', 'desktop_drag', 'desktop_scroll',
+        'desktop_keys', 'desktop_type', 'desktop_window', 'desktop_open', 'desktop_sequence',
+      ]
       : []
     expect(ctx.tools.schemas().map(tool => tool.name)).toEqual([...catalog.tools.map(tool => `cua_driver_native__${tool.name}`), ...displayTools])
     const result = await execute('click', { pid: 9, window_id: 7 })

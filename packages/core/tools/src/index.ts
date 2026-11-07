@@ -120,24 +120,21 @@ export class ToolsService extends Service {
       const description = executor.describe(this.definitions(scope, toolSet))
       return { ...description, knownNames: description.knownNames ?? [...this.view(scope).knownNames] }
     })
-    ctx.systemPrompt.section({
-      name: 'tools:groups',
-      order: ctx.systemPrompt.getSectionOrder('TOOL_COMPUTER_USE') - 1,
-      interpolate: false,
-      text: ({ scope }) => this.groups.size === 0
-        ? ''
-        : `More tools are available on demand. Call ${LOAD_TOOLS_NAME} with a group name to add that group's tools from your next step:\n`
-          + this.groups.describe(scope),
-    })
   }
 
-
-  /** Disposer of the `load_tools` registration while at least one group exists. */
+  /** Disposer of the `load_tools` registration and group listing while at least one group exists. */
   private unloadLoader: (() => void) | undefined
 
-  /** Register the model-facing tool that loads a group; it exists only while groups do. */
+  /** Register the model-facing tool that loads a group and the section listing the groups; both exist only while groups do. */
   private registerLoader(): () => void {
-    return this.register(defineTool({
+    const removeSection = this.ctx.systemPrompt.section({
+      name: 'tools:groups',
+      order: this.ctx.systemPrompt.getSectionOrder('TOOL_COMPUTER_USE') - 1,
+      interpolate: false,
+      text: ({ scope }) => `More tools are available on demand. Call ${LOAD_TOOLS_NAME} with a group name to add that group's tools from your next step:\n`
+        + this.groups.describe(scope),
+    })
+    const removeTool = this.register(defineTool({
       name: LOAD_TOOLS_NAME,
       description: 'Add an on-demand tool group (listed in your instructions) to this conversation. Its tools are available from your next step.',
       parameters: {
@@ -156,6 +153,10 @@ export class ToolsService extends Service {
         return Promise.resolve({ result: `Loaded the ${name} tools; they are available from your next step.` })
       },
     }))
+    return () => {
+      removeTool()
+      removeSection()
+    }
   }
 
   /**
