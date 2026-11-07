@@ -133,7 +133,7 @@ export default class ClassPlugin {
   constructor() { throw new Error('PLUGIN_CONSTRUCTOR_EXECUTED') }
 }`
 
-describe.skipIf(!builtArtifactsExist)('dsh --dump-config-schema assembled output', () => {
+describe.skipIf(!builtArtifactsExist)('hackdev --dump-config-schema assembled output', () => {
   it('prints native namespace and class schemas without applying plugins or evaluating !!js', async () => {
     const fixture = await createFixture({
       namespace: namespaceModule,

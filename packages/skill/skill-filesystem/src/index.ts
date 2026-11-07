@@ -50,7 +50,7 @@ export interface Config {
   providerName?: string
   /** Whether project and user roots are included around custom roots. */
   includeDefaultRoots?: boolean
-  /** Hack Dev Code config root. Defaults to `$DSH_HOME` or `~/.dsh`. */
+  /** Hack Dev Code config root. Defaults to `$DSH_HOME` or `~/.hackdevcode`. */
   dshHome?: string
   /** Shared agent config root. Defaults to `$DSH_AGENTS_HOME` or `~/.agents`. */
   agentsHome?: string

@@ -11,7 +11,7 @@ if ($spec.schemaVersion -ne 1 -or $spec.runId -cnotmatch '^[a-f0-9]{24}$' -or
     $spec.ruleName -cne "DSH-Update-Qualification-$($spec.runId)" -or
     $spec.sha512Hex -cnotmatch '^[A-F0-9]{128}$' -or
     $spec.executable -notmatch '^[A-Za-z]:\\' -or
-    [IO.Path]::GetFileName($spec.executable) -cne "DSH Update Test $($spec.runId).exe" -or
+    [IO.Path]::GetFileName($spec.executable) -cne "Hack Dev Code Update Test $($spec.runId).exe" -or
     [IO.Path]::GetFullPath($spec.executable) -cne $spec.executable) {
     throw 'Invalid test-only network plan; no network changes were made.'
 }

@@ -1,6 +1,6 @@
 {
   "name": "@hackdevcode/dsh-client-ui-settings-web-search",
-  "description": "Settings page of the DeepSeek web-search provider on the dsh web client's Plugins page: its API key, endpoint, and per-request search budget",
+  "description": "Settings page of the DeepSeek web-search provider on the hackdev web client's Plugins page: its API key, endpoint, and per-request search budget",
   "version": "0.2.2-alpha.2",
   "publishConfig": {
     "access": "public"

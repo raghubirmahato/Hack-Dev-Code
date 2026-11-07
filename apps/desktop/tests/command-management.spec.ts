@@ -6,16 +6,16 @@ import { presentCommandManagement } from '../src/command-management.ts'
 
 it('shows installation, repair/removal and shadowed command locations', () => {
   const messages = en
-  const destination = '/usr/local/bin/dsh'
+  const destination = '/usr/local/bin/hackdev'
   const missing = presentCommandManagement({ managed: false, available: false, destination }, messages, 'darwin')
   expect(missing.buttons).toEqual([messages.cliCommandInstall, messages.cancel])
   expect(missing.cancelId).toBe(1)
   const installed = presentCommandManagement({ managed: true, available: true, destination, activeCommand: destination }, messages, 'darwin')
   expect(installed.buttons).toEqual([messages.cliCommandClose, messages.cliCommandRepair, messages.cliCommandRemove])
   expect(installed.cancelId).toBe(0)
-  const shadowed = presentCommandManagement({ managed: true, available: true, destination, activeCommand: '/opt/homebrew/bin/dsh' }, messages, 'darwin')
+  const shadowed = presentCommandManagement({ managed: true, available: true, destination, activeCommand: '/opt/homebrew/bin/hackdev' }, messages, 'darwin')
   expect(shadowed.type).toBe('warning')
-  expect(shadowed.detail).toContain('/opt/homebrew/bin/dsh')
+  expect(shadowed.detail).toContain('/opt/homebrew/bin/hackdev')
   expect(shadowed.detail).toContain(messages.cliCommandShadowed)
   const unknown = presentCommandManagement({ managed: false, available: false, destination, selectionUnknown: true }, messages, 'darwin')
   expect(unknown.detail).toContain(messages.cliCommandSelectionUnknown)
@@ -26,8 +26,8 @@ it.each([
   ['win32', 'en-US'],
 ] as const)('records command status on %s in %s', async (platform, language) => {
   const messages = en
-  const destination = platform === 'darwin' ? '/usr/local/bin/dsh' : 'C:\\Users\\user\\AppData\\Local\\Programs\\Hack Dev Code\\resources\\runtime\\cli\\bin\\dsh.cmd'
-  const other = platform === 'darwin' ? '/opt/homebrew/bin/dsh' : 'C:\\Program Files\\nodejs\\dsh.cmd'
+  const destination = platform === 'darwin' ? '/usr/local/bin/hackdev' : 'C:\\Users\\user\\AppData\\Local\\Programs\\Hack Dev Code\\resources\\runtime\\cli\\bin\\hackdev.cmd'
+  const other = platform === 'darwin' ? '/opt/homebrew/bin/hackdev' : 'C:\\Program Files\\nodejs\\hackdev.cmd'
   const states = [
     { managed: false, available: false, destination },
     { managed: true, available: true, destination, activeCommand: destination },

@@ -28,16 +28,16 @@ kind: "package-bundle"
 Add the package to an initialized profile, then run a task that asks the Lead to delegate work:
 
 ```sh
-dsh plugin --profile headless add @hackdevcode/dsh-experimental-agent-team-profile
-dsh --profile headless "Use Agent Teams to split this task between two teammates, wait, and summarize."
+hackdev plugin --profile headless add @hackdevcode/dsh-experimental-agent-team-profile
+hackdev --profile headless "Use Agent Teams to split this task between two teammates, wait, and summarize."
 ```
 
-The profile must already contain `@hackdevcode/dsh-base`, whose Subagent services and provider rows this layer consumes. Removing the package with `dsh plugin --profile <name> remove @hackdevcode/dsh-experimental-agent-team-profile` removes the bundle from the profile's ordered layer list.
+The profile must already contain `@hackdevcode/dsh-base`, whose Subagent services and provider rows this layer consumes. Removing the package with `hackdev plugin --profile <name> remove @hackdevcode/dsh-experimental-agent-team-profile` removes the bundle from the profile's ordered layer list.
 
 Enable Agent Teams on the Web or Desktop Plugins page to activate both tools and UI. For a CLI Web profile, use:
 
 ```sh
-dsh plugin --profile web add @hackdevcode/dsh-experimental-agent-team-profile
+hackdev plugin --profile web add @hackdevcode/dsh-experimental-agent-team-profile
 ```
 
 In an existing profile’s `package.json`, keep `@hackdevcode/dsh-experimental-agent-team-profile` in `dsh.profile.bundles` and remove the separate `@hackdevcode/dsh-experimental-agent-team-web-profile` entry. User patches targeting `ui-agent-team` still apply.

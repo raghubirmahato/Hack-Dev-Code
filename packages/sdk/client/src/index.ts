@@ -1,6 +1,6 @@
 /**
  * TypeScript client SDK for the Hack Dev Code runtime: spawn the
- * same-version `dsh --profile sdk` runtime as a subprocess and drive agent
+ * same-version `hackdev --profile sdk` runtime as a subprocess and drive agent
  * turns over stdio JSON-RPC. `HackDevCode` is the high-level run API;
  * `HarnessClient` is the lower-level protocol client. A pure library — it
  * registers nothing on a Cordis context; named profiles and ordered patch

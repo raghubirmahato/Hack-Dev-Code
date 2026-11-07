@@ -386,7 +386,7 @@ function packageDirFromPatch(source: string, packageName: string): string | unde
 
 /**
  * Install an authored patch's resolvable bare package into the temporary
- * profile. This mirrors `dsh plugin` while retaining the bare entry
+ * profile. This mirrors `hackdev plugin` while retaining the bare entry
  * name and package identity used by request metadata.
  */
 function linkProfilePackage(source: string, cwd: string, profile: string, packageName: string): void {

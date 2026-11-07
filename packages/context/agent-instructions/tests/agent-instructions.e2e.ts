@@ -41,7 +41,7 @@ async function harness(): Promise<{ ctx: Context; agent: Agent }> {
   })
   await ctx.plugin(LocalFileSystem, { cwd: '/' })
   await ctx.plugin(ToolFs)
-  // Keep the developer's real ~/.dsh and ~/.agents out of the model-visible baseline.
+  // Keep the developer's real ~/.hackdevcode and ~/.agents out of the model-visible baseline.
   vi.stubEnv('DSH_HOME', join(workdir, 'absent-dsh'))
   vi.stubEnv('DSH_AGENTS_HOME', join(workdir, 'absent-agents'))
   await ctx.plugin(AgentInstructions, { maxBytes: 65536 })

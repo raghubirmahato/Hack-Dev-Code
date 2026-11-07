@@ -47,7 +47,7 @@ export async function createInstalledUpdateRun(
   const id = randomBytes(12).toString('hex')
   const run: InstalledUpdateRun = {
     schemaVersion: 1, id, root, createdAt: new Date().toISOString(), source, versions,
-    appId: `com.deepseek.dsh.qualification.q${id}`, productName: `DSH Update Test ${id}`,
+    appId: `dev.hackdevcode.app.qualification.q${id}`, productName: `Hack Dev Code Update Test ${id}`,
     environment: 'test', origin: 'https://download-test.deepseek.com', bucket: 'bj-toc-download-test-1320056602',
     feedKey: `dsh-desk/feeds/qualification/${id}/win-x64/nightly.yml`,
     binPrefix: `dsh-desk/bin/qualification/${id}/win-x64`,
@@ -76,7 +76,7 @@ export async function readInstalledUpdateRun(path: string): Promise<InstalledUpd
   if (row.schemaVersion !== 1 || typeof row.id !== 'string' || !/^[a-f0-9]{24}$/u.test(row.id)
     || row.root !== resolve(dirname(path)) || row.environment !== 'test'
     || row.origin !== 'https://download-test.deepseek.com' || row.bucket !== 'bj-toc-download-test-1320056602'
-    || row.appId !== `com.deepseek.dsh.qualification.q${row.id}` || row.productName !== `DSH Update Test ${row.id}`
+    || row.appId !== `dev.hackdevcode.app.qualification.q${row.id}` || row.productName !== `Hack Dev Code Update Test ${row.id}`
     || row.feedKey !== `dsh-desk/feeds/qualification/${row.id}/win-x64/nightly.yml`
     || row.binPrefix !== `dsh-desk/bin/qualification/${row.id}/win-x64`
     || !Array.isArray(row.versions) || row.versions.length !== 2 || row.versions.some(version => typeof version !== 'string')) {

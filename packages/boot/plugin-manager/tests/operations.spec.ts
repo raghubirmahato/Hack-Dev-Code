@@ -187,7 +187,7 @@ it.each(['service', 'cli'] as const)('reports unsupported activation through %s 
   expect(result.exitCode).toBe(1)
   expect(result.output).toContain('restricted: Bundle supports Host platforms')
   expect(result.output).toContain('installed dependencies remain; bundle selection is unchanged')
-  expect(result.output).toContain('dsh plugin remove <package>')
+  expect(result.output).toContain('hackdev plugin remove <package>')
   expect(readFileSync(result.logPath, 'utf8')).toContain(result.output)
   expect(messages.join('')).toContain(result.output)
   expect(readProfileManifest('test', dir).dependencies).toMatchObject({ supported: '1', restricted: '1' })
@@ -434,7 +434,7 @@ it('reports an unrepaired node_modules when the restoring install fails', async 
   })
   expect(outcome).toMatchObject({ exitCode: 1 })
   expect(outcome.output).toContain('node_modules could not be reinstalled')
-  expect(outcome.output).toContain("run 'dsh plugin install'")
+  expect(outcome.output).toContain("run 'hackdev plugin install'")
 })
 
 it('detects a version update that keeps the dependency spec and removes a lockfile the run created', async () => {

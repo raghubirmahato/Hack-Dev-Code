@@ -163,7 +163,7 @@ describe('SDK dsh launch resolution', () => {
     (bin) => {
       const pair = manifestPair({ version: '1.0.0', bin }, { version: '1.0.0' })
       expect(() => resolveDshBinFromManifests(pair.dshUrl, pair.clientUrl))
-        .toThrow('declares no dsh executable')
+        .toThrow('declares no hackdev executable')
     },
   )
 })

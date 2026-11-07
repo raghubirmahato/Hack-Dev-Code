@@ -89,20 +89,20 @@ const baselineIntro = 'The following workspace instructions may be relevant to y
 const additionalGuidance = 'Use them as guidance when relevant; more specific instructions take precedence. '
   + 'They do not override system, developer, or direct user instructions.'
 
-/** Five 5,000-byte project files from the root down four 10-character directories, with a long budget marker. */
+/** Five 5,000-byte project files from the root down three 10-character directories and a 14-character one, with a long budget marker. */
 const deepProjectFiles = [
   'AGENTS.md',
   'aaaaaaaaaa/AGENTS.md',
   'aaaaaaaaaa/bbbbbbbbbb/AGENTS.md',
   'aaaaaaaaaa/bbbbbbbbbb/cccccccccc/AGENTS.md',
-  'aaaaaaaaaa/bbbbbbbbbb/cccccccccc/dddddddddd/AGENTS.md',
+  'aaaaaaaaaa/bbbbbbbbbb/cccccccccc/dddddddddddddd/AGENTS.md',
 ].map(displayPath => ({ absolutePath: `/repo/${displayPath}`, displayPath, content: 'p'.repeat(5000) }))
 
 /** Budget marker of {@link deepProjectFiles} rendered alone under a `maxBytes` too small to keep any of their content. */
 function deepProjectMarker(maxBytes: number): string {
   return `Workspace instruction budget ${String(maxBytes)} bytes: omitted AGENTS.md, aaaaaaaaaa/AGENTS.md, `
     + 'aaaaaaaaaa/bbbbbbbbbb/AGENTS.md, aaaaaaaaaa/bbbbbbbbbb/cccccccccc/AGENTS.md; '
-    + 'truncated aaaaaaaaaa/bbbbbbbbbb/cccccccccc/dddddddddd/AGENTS.md from 5000 to 0 bytes'
+    + 'truncated aaaaaaaaaa/bbbbbbbbbb/cccccccccc/dddddddddddddd/AGENTS.md from 5000 to 0 bytes'
 }
 
 /** A plain ASCII instruction file of `kib` KiB at a `~/` user-global or project display path. */
@@ -737,9 +737,9 @@ describe('workspace context instruction discovery', () => {
     const root = await tempRepo()
     const emptyHome = await tempRepo()
     // Isolate the default-home fallback: blank DSH_HOME is treated as unset, and
-    // the home dirs point at an empty dir so the default ~/.dsh holds no global
+    // the home dirs point at an empty dir so the default ~/.hackdevcode holds no global
     // scope. Windows homedir() reads USERPROFILE (not HOME), so both must be
-    // stubbed or a real ~/.dsh/AGENTS.md would otherwise leak in.
+    // stubbed or a real ~/.hackdevcode/AGENTS.md would otherwise leak in.
     vi.stubEnv('DSH_HOME', '')
     vi.stubEnv('HOME', emptyHome)
     if (process.platform === 'win32') vi.stubEnv('USERPROFILE', emptyHome)
@@ -870,11 +870,11 @@ describe('workspace context instruction discovery', () => {
     }
   })
 
-  it('labels the default DSH home as ~/.dsh when HOME points at the configured default', async () => {
+  it('labels the default DSH home as ~/.hackdevcode when HOME points at the configured default', async () => {
     const root = await tempRepo()
     const home = await tempRepo()
     try {
-      await write(join(home, '.dsh/AGENTS.md'), 'global default rule')
+      await write(join(home, '.hackdevcode/AGENTS.md'), 'global default rule')
 
       // A set DSH_HOME would override the homedir default and relabel the home.
       vi.stubEnv('DSH_HOME', '')
@@ -883,7 +883,7 @@ describe('workspace context instruction discovery', () => {
       const isolated = await import('@hackdevcode/dsh-agent-instructions')
       const files = await isolated.discoverBaselineInstructionFiles({ cwd: root })
 
-      expect(files.map(file => file.displayPath)).toEqual(['~/.dsh/AGENTS.md'])
+      expect(files.map(file => file.displayPath)).toEqual(['~/.hackdevcode/AGENTS.md'])
     } finally {
       vi.unstubAllEnvs()
       vi.doUnmock('node:os')
@@ -893,19 +893,19 @@ describe('workspace context instruction discovery', () => {
     }
   })
 
-  it('expands a ~/.dsh DSH_HOME to the operating-system home directory', async () => {
+  it('expands a ~/.hackdevcode DSH_HOME to the operating-system home directory', async () => {
     const root = await tempRepo()
     const home = await tempRepo()
     try {
-      await write(join(home, '.dsh/AGENTS.md'), 'global tilde rule')
+      await write(join(home, '.hackdevcode/AGENTS.md'), 'global tilde rule')
 
       vi.resetModules()
       vi.doMock('node:os', () => ({ homedir: () => home }))
       const isolated = await import('@hackdevcode/dsh-agent-instructions')
-      pinHarnessHome('~/.dsh')
+      pinHarnessHome('~/.hackdevcode')
       const files = await isolated.discoverBaselineInstructionFiles({ cwd: root })
 
-      expect(files).toEqual([{ absolutePath: join(home, '.dsh/AGENTS.md'), displayPath: '~/.dsh/AGENTS.md' }])
+      expect(files).toEqual([{ absolutePath: join(home, '.hackdevcode/AGENTS.md'), displayPath: '~/.hackdevcode/AGENTS.md' }])
     } finally {
       vi.unstubAllEnvs()
       vi.doUnmock('node:os')
@@ -1239,7 +1239,7 @@ describe('workspace context rendering', () => {
 
   it('renders a user-global file and project files that fit one budget as one unmarked chain', () => {
     const rendered = renderAgentInstructions([
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'Prefer pnpm.' },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'Prefer pnpm.' },
       { absolutePath: '/repo/AGENTS.md', displayPath: 'AGENTS.md', content: 'root rules' },
       { absolutePath: '/repo/pkg/AGENTS.md', displayPath: 'pkg/AGENTS.md', content: 'package rules' },
     ], { maxBytes: 65536 })
@@ -1249,7 +1249,7 @@ describe('workspace context rendering', () => {
         '<system-reminder>',
         baselineIntro,
         '',
-        'Instructions from: ~/.dsh/AGENTS.md',
+        'Instructions from: ~/.hackdevcode/AGENTS.md',
         '',
         'Prefer pnpm.',
         '',
@@ -1270,10 +1270,10 @@ describe('workspace context rendering', () => {
   it.each([
     {
       layout: '20/30/20 KiB',
-      files: [kibInstruction('~/.dsh/AGENTS.md', 20), kibInstruction('AGENTS.md', 30), kibInstruction('pkg/AGENTS.md', 20)],
+      files: [kibInstruction('~/.hackdevcode/AGENTS.md', 20), kibInstruction('AGENTS.md', 30), kibInstruction('pkg/AGENTS.md', 20)],
     },
-    { layout: '40/30 KiB', files: [kibInstruction('~/.dsh/AGENTS.md', 40), kibInstruction('AGENTS.md', 30)] },
-    { layout: '63.5/8 KiB', files: [kibInstruction('~/.dsh/AGENTS.md', 63.5), kibInstruction('AGENTS.md', 8)] },
+    { layout: '40/30 KiB', files: [kibInstruction('~/.hackdevcode/AGENTS.md', 40), kibInstruction('AGENTS.md', 30)] },
+    { layout: '63.5/8 KiB', files: [kibInstruction('~/.hackdevcode/AGENTS.md', 63.5), kibInstruction('AGENTS.md', 8)] },
   ])('keeps every file of the $layout layout when each chain fits its own budget', ({ files }) => {
     const { rendered, included } = renderAgentInstructionSet(files, { maxBytes: 65536 })
 
@@ -1287,7 +1287,7 @@ describe('workspace context rendering', () => {
 
   it('omits the harness-home file before the shared-root file when only the user-global chain exceeds its budget', () => {
     const files = [
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'home '.repeat(100) },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'home '.repeat(100) },
       { absolutePath: '/home/user/.agents/AGENTS.md', displayPath: '~/.agents/AGENTS.md', content: 'shared rule' },
       { absolutePath: '/repo/AGENTS.md', displayPath: 'AGENTS.md', content: 'root '.repeat(40) },
       { absolutePath: '/repo/pkg/AGENTS.md', displayPath: 'pkg/AGENTS.md', content: 'package rule' },
@@ -1297,7 +1297,7 @@ describe('workspace context rendering', () => {
 
     expect(rendered.text).toBe([
       '<system-reminder>',
-      'Workspace instruction budget 600 bytes: omitted ~/.dsh/AGENTS.md',
+      'Workspace instruction budget 600 bytes: omitted ~/.hackdevcode/AGENTS.md',
       '',
       baselineIntro,
       '',
@@ -1314,7 +1314,7 @@ describe('workspace context rendering', () => {
       'package rule',
       '</system-reminder>',
     ].join('\n'))
-    expect(rendered.omitted).toEqual([{ absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md' }])
+    expect(rendered.omitted).toEqual([{ absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md' }])
     expect(rendered.truncated).toEqual([])
     expect(included).toEqual(files.slice(1))
     expect(Buffer.byteLength(rendered.text, 'utf8')).toBeGreaterThan(600)
@@ -1322,26 +1322,26 @@ describe('workspace context rendering', () => {
   })
 
   it('truncates an oversized user-global file within its own budget while the project chain renders whole', () => {
-    const userGlobal = kibInstruction('~/.dsh/AGENTS.md', 70)
+    const userGlobal = kibInstruction('~/.hackdevcode/AGENTS.md', 70)
     const files = [
       userGlobal,
       { absolutePath: '/repo/AGENTS.md', displayPath: 'AGENTS.md', content: 'root rule' },
       { absolutePath: '/repo/pkg/AGENTS.md', displayPath: 'pkg/AGENTS.md', content: 'package rule' },
     ]
-    const truncated = [{ displayPath: '~/.dsh/AGENTS.md', originalBytes: 71680, includedBytes: 65129 }]
+    const truncated = [{ displayPath: '~/.hackdevcode/AGENTS.md', originalBytes: 71680, includedBytes: 65113 }]
 
     const { rendered, included } = renderAgentInstructionSet(files, { maxBytes: 65536 })
 
     expect(rendered).toEqual({
       text: [
         '<system-reminder>',
-        'Workspace instruction budget 65536 bytes: truncated ~/.dsh/AGENTS.md from 71680 to 65129 bytes',
+        'Workspace instruction budget 65536 bytes: truncated ~/.hackdevcode/AGENTS.md from 71680 to 65113 bytes',
         '',
         baselineIntro,
         '',
-        'Instructions from: ~/.dsh/AGENTS.md',
+        'Instructions from: ~/.hackdevcode/AGENTS.md',
         '',
-        userGlobal.content.slice(0, 65129),
+        userGlobal.content.slice(0, 65113),
         '',
         'Instructions from: AGENTS.md',
         '',
@@ -1368,7 +1368,7 @@ describe('workspace context rendering', () => {
     const projectAlone = renderAgentInstructions(project, { maxBytes: 600 })
 
     const rendered = renderAgentInstructions([
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'Prefer pnpm.' },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'Prefer pnpm.' },
       ...project,
     ], { maxBytes: 600 })
 
@@ -1381,7 +1381,7 @@ describe('workspace context rendering', () => {
       '',
       baselineIntro,
       '',
-      'Instructions from: ~/.dsh/AGENTS.md',
+      'Instructions from: ~/.hackdevcode/AGENTS.md',
       '',
       'Prefer pnpm.',
       '',
@@ -1394,7 +1394,7 @@ describe('workspace context rendering', () => {
   })
 
   it('keeps a user-global file that fills its budget exactly while the project chain fits only its notice and empty heading', () => {
-    const userGlobal = { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'Use pnpm.' }
+    const userGlobal = { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'U' }
     const project = [
       { absolutePath: '/repo/AGENTS.md', displayPath: 'AGENTS.md', content: 'r'.repeat(1000) },
       { absolutePath: '/repo/packages/app/AGENTS.md', displayPath: 'packages/app/AGENTS.md', content: 'a'.repeat(1000) },
@@ -1416,9 +1416,9 @@ describe('workspace context rendering', () => {
       '',
       baselineIntro,
       '',
-      'Instructions from: ~/.dsh/AGENTS.md',
+      'Instructions from: ~/.hackdevcode/AGENTS.md',
       '',
-      'Use pnpm.',
+      'U',
       '',
       'Instructions from: packages/app/src/feature/AGENTS.md',
       '',
@@ -1431,45 +1431,45 @@ describe('workspace context rendering', () => {
   })
 
   it('keeps a user-global file that fills its budget exactly while the project chain fits only its bare notice', () => {
-    const userGlobal = { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'g'.repeat(5) }
-    expect(Buffer.byteLength(renderAgentInstructions([userGlobal], { maxBytes: 316 }).text, 'utf8')).toBe(316)
-    expect(renderAgentInstructions(deepProjectFiles, { maxBytes: 316 }).text).toBe(deepProjectMarker(316))
+    const userGlobal = { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'g'.repeat(5) }
+    expect(Buffer.byteLength(renderAgentInstructions([userGlobal], { maxBytes: 324 }).text, 'utf8')).toBe(324)
+    expect(renderAgentInstructions(deepProjectFiles, { maxBytes: 324 }).text).toBe(deepProjectMarker(324))
 
-    const { rendered, included } = renderAgentInstructionSet([userGlobal, ...deepProjectFiles], { maxBytes: 316 })
+    const { rendered, included } = renderAgentInstructionSet([userGlobal, ...deepProjectFiles], { maxBytes: 324 })
 
     expect(rendered.text).toBe([
       '<system-reminder>',
-      deepProjectMarker(316),
+      deepProjectMarker(324),
       '',
       baselineIntro,
       '',
-      'Instructions from: ~/.dsh/AGENTS.md',
+      'Instructions from: ~/.hackdevcode/AGENTS.md',
       '',
       'g'.repeat(5),
       '</system-reminder>',
     ].join('\n'))
     expect(included).toEqual([userGlobal])
-    expect(Buffer.byteLength(rendered.text, 'utf8')).toBeLessThanOrEqual(2 * 316)
+    expect(Buffer.byteLength(rendered.text, 'utf8')).toBeLessThanOrEqual(2 * 324)
   })
 
   it('merges a frameless project chain at exactly twice the budget and falls back to one budget one byte above', () => {
     const userGlobal = (bytes: number): { absolutePath: string; displayPath: string; content: string } => (
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'g'.repeat(bytes) }
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'g'.repeat(bytes) }
     )
-    const deepestHeading = 'Instructions from: aaaaaaaaaa/bbbbbbbbbb/cccccccccc/dddddddddd/AGENTS.md'
-    expect(renderAgentInstructions(deepProjectFiles, { maxBytes: 318 }).text).toBe(`${deepProjectMarker(318)}\n\n${deepestHeading}\n\n`)
-    expect(renderAgentInstructions([userGlobal(6)], { maxBytes: 318 })).toMatchObject({ omitted: [], truncated: [] })
+    const deepestHeading = 'Instructions from: aaaaaaaaaa/bbbbbbbbbb/cccccccccc/dddddddddddddd/AGENTS.md'
+    expect(renderAgentInstructions(deepProjectFiles, { maxBytes: 326 }).text).toBe(`${deepProjectMarker(326)}\n\n${deepestHeading}\n\n`)
+    expect(renderAgentInstructions([userGlobal(6)], { maxBytes: 326 })).toMatchObject({ omitted: [], truncated: [] })
 
-    const atBound = renderAgentInstructionSet([userGlobal(5), ...deepProjectFiles], { maxBytes: 318 })
-    const overBound = renderAgentInstructionSet([userGlobal(6), ...deepProjectFiles], { maxBytes: 318 })
+    const atBound = renderAgentInstructionSet([userGlobal(5), ...deepProjectFiles], { maxBytes: 326 })
+    const overBound = renderAgentInstructionSet([userGlobal(6), ...deepProjectFiles], { maxBytes: 326 })
 
     expect(atBound.rendered.text).toBe([
       '<system-reminder>',
-      deepProjectMarker(318),
+      deepProjectMarker(326),
       '',
       baselineIntro,
       '',
-      'Instructions from: ~/.dsh/AGENTS.md',
+      'Instructions from: ~/.hackdevcode/AGENTS.md',
       '',
       'g'.repeat(5),
       '',
@@ -1478,18 +1478,18 @@ describe('workspace context rendering', () => {
       '',
       '</system-reminder>',
     ].join('\n'))
-    expect(Buffer.byteLength(atBound.rendered.text, 'utf8')).toBe(2 * 318)
+    expect(Buffer.byteLength(atBound.rendered.text, 'utf8')).toBe(2 * 326)
     expect(atBound.included).toEqual([userGlobal(5)])
-    expect(overBound.rendered.text).toBe('Workspace instruction budget 318 bytes: omitted ~/.dsh/AGENTS.md, AGENTS.md, aaaaaaaaaa/AGENTS.md, '
+    expect(overBound.rendered.text).toBe('Workspace instruction budget 326 bytes: omitted ~/.hackdevcode/AGENTS.md, AGENTS.md, aaaaaaaaaa/AGENTS.md, '
       + 'aaaaaaaaaa/bbbbbbbbbb/AGENTS.md, aaaaaaaaaa/bbbbbbbbbb/cccccccccc/AGENTS.md; '
-      + 'truncated aaaaaaaaaa/bbbbbbbbbb/cccccccccc/dddddddddd/AGENTS.md from 5000 to 0 bytes')
-    expect(overBound.rendered.omitted[0]).toEqual({ absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md' })
+      + 'truncated aaaaaaaaaa/bbbbbbbbbb/cccccccccc/dddddddddddddd/AGENTS.md from 5000 to 0 bytes')
+    expect(overBound.rendered.omitted[0]).toEqual({ absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md' })
     expect(overBound.included).toEqual([])
   })
 
   it('keeps both chains whole when each fills its budget exactly and truncates both one byte lower', () => {
     const files = [
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'g'.repeat(289) },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'g'.repeat(281) },
       { absolutePath: '/repo/AGENTS.md', displayPath: 'AGENTS.md', content: 'p'.repeat(296) },
     ]
     for (const file of files) {
@@ -1503,7 +1503,7 @@ describe('workspace context rendering', () => {
     expect(Buffer.byteLength(exact.rendered.text, 'utf8')).toBe(928)
     expect(exact.included).toEqual(files)
     expect(below.rendered.text.split('\n')[1]).toBe(
-      'Workspace instruction budget 599 bytes: truncated ~/.dsh/AGENTS.md from 289 to 198 bytes, AGENTS.md from 296 to 212 bytes',
+      'Workspace instruction budget 599 bytes: truncated ~/.hackdevcode/AGENTS.md from 281 to 182 bytes, AGENTS.md from 296 to 212 bytes',
     )
     expect(below.rendered.omitted).toEqual([])
     expect(below.included).toEqual(files)
@@ -1512,19 +1512,19 @@ describe('workspace context rendering', () => {
 
   it('frames both chains under the compact intro when neither chain fits the full intro', () => {
     const rendered = renderAgentInstructions([
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'g'.repeat(1000) },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'g'.repeat(1000) },
       { absolutePath: '/repo/pkg/AGENTS.md', displayPath: 'pkg/AGENTS.md', content: 'p'.repeat(1000) },
     ], { maxBytes: 300 })
 
     expect(rendered.text).toBe([
       '<system-reminder>',
-      'Workspace instruction budget 300 bytes: truncated ~/.dsh/AGENTS.md from 1000 to 51 bytes, pkg/AGENTS.md from 1000 to 57 bytes',
+      'Workspace instruction budget 300 bytes: truncated ~/.hackdevcode/AGENTS.md from 1000 to 35 bytes, pkg/AGENTS.md from 1000 to 57 bytes',
       '',
       'Workspace instructions were omitted or truncated to fit the configured byte budget.',
       '',
-      'Instructions from: ~/.dsh/AGENTS.md',
+      'Instructions from: ~/.hackdevcode/AGENTS.md',
       '',
-      'g'.repeat(51),
+      'g'.repeat(35),
       '',
       'Instructions from: pkg/AGENTS.md',
       '',
@@ -1536,15 +1536,15 @@ describe('workspace context rendering', () => {
 
   it('frames the budget notices of both chains without an intro when neither chain fits a frame of its own', () => {
     const { rendered, included } = renderAgentInstructionSet([
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'g'.repeat(1000) },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'g'.repeat(1000) },
       { absolutePath: '/repo/pkg/AGENTS.md', displayPath: 'pkg/AGENTS.md', content: 'p'.repeat(1000) },
     ], { maxBytes: 150 })
 
     expect(rendered.text).toBe([
       '<system-reminder>',
-      'Workspace instruction budget 150 bytes: truncated ~/.dsh/AGENTS.md from 1000 to 0 bytes, pkg/AGENTS.md from 1000 to 0 bytes',
+      'Workspace instruction budget 150 bytes: truncated ~/.hackdevcode/AGENTS.md from 1000 to 0 bytes, pkg/AGENTS.md from 1000 to 0 bytes',
       '',
-      'Instructions from: ~/.dsh/AGENTS.md',
+      'Instructions from: ~/.hackdevcode/AGENTS.md',
       '',
       '',
       '',
@@ -1559,20 +1559,20 @@ describe('workspace context rendering', () => {
 
   it('falls back to the single-budget notice when the merged chain notices would exceed twice the budget', () => {
     const rendered = renderAgentInstructions([
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'g'.repeat(1000) },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'g'.repeat(1000) },
       { absolutePath: '/repo/pkg/AGENTS.md', displayPath: 'pkg/AGENTS.md', content: 'p'.repeat(1000) },
     ], { maxBytes: 50 })
 
     expect(rendered).toEqual({
       text: 'Workspace instruction budget 50 bytes: omitted ~/.',
-      omitted: [{ absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md' }],
+      omitted: [{ absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md' }],
       truncated: [{ displayPath: 'pkg/AGENTS.md', originalBytes: 1000, includedBytes: 0 }],
     })
   })
 
   it('keeps every two-chain baseline and change batch within twice the budget at every limit', () => {
     const files = [
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'home '.repeat(200) },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'home '.repeat(200) },
       { absolutePath: '/home/user/.agents/AGENTS.md', displayPath: '~/.agents/AGENTS.md', content: 'shared '.repeat(30) },
       { absolutePath: '/repo/AGENTS.md', displayPath: 'AGENTS.md', content: 'root '.repeat(200) },
       { absolutePath: '/repo/packages/app/AGENTS.md', displayPath: 'packages/app/AGENTS.md', content: 'app '.repeat(100) },
@@ -1591,24 +1591,24 @@ describe('workspace context rendering', () => {
 
   it('truncates multibyte content in both chains on code point boundaries near the limit', () => {
     const files = [
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: '\u304d'.repeat(400) },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: '\u304d'.repeat(400) },
       { absolutePath: '/repo/AGENTS.md', displayPath: 'AGENTS.md', content: '😀'.repeat(300) },
     ]
 
-    const rendered = renderAgentInstructions(files, { maxBytes: 700 })
+    const rendered = renderAgentInstructions(files, { maxBytes: 704 })
 
     expect(rendered.truncated).toEqual([
-      { displayPath: '~/.dsh/AGENTS.md', originalBytes: 1200, includedBytes: 297 },
-      { displayPath: 'AGENTS.md', originalBytes: 1200, includedBytes: 312 },
+      { displayPath: '~/.hackdevcode/AGENTS.md', originalBytes: 1200, includedBytes: 285 },
+      { displayPath: 'AGENTS.md', originalBytes: 1200, includedBytes: 316 },
     ])
     expect(rendered.text).toContain([
-      'Instructions from: ~/.dsh/AGENTS.md',
+      'Instructions from: ~/.hackdevcode/AGENTS.md',
       '',
-      '\u304d'.repeat(99),
+      '\u304d'.repeat(95),
       '',
       'Instructions from: AGENTS.md',
       '',
-      '😀'.repeat(78),
+      '😀'.repeat(79),
       '</system-reminder>',
     ].join('\n'))
     for (let maxBytes = 640; maxBytes <= 720; maxBytes += 1) {
@@ -1620,7 +1620,7 @@ describe('workspace context rendering', () => {
 
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])('renders nothing from either chain when the budget %s disables loading', (maxBytes) => {
     const files = [
-      { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'global rule' },
+      { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'global rule' },
       { absolutePath: '/repo/AGENTS.md', displayPath: 'AGENTS.md', content: 'root rule' },
     ]
     const items = files.map(file => ({
@@ -1635,8 +1635,8 @@ describe('workspace context rendering', () => {
   it('retains a user-global change beside project changes when each chain fits its own budget', () => {
     const items = [
       {
-        change: { action: 'set' as const, scope: sk(USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE), path: '~/.dsh/AGENTS.md', digest: 'global' },
-        file: { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'Prefer pnpm.' },
+        change: { action: 'set' as const, scope: sk(USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE), path: '~/.hackdevcode/AGENTS.md', digest: 'global' },
+        file: { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'Prefer pnpm.' },
       },
       {
         change: { action: 'set' as const, scope: sk('a', 'AGENTS.md'), path: 'a/AGENTS.md', digest: 'a' },
@@ -1652,7 +1652,7 @@ describe('workspace context rendering', () => {
     expect(rendered.changes).toEqual(items.map(item => item.change))
     expect(rendered.text).toBe([
       '<system-reminder>',
-      'Additional instructions from: ~/.dsh/AGENTS.md',
+      'Additional instructions from: ~/.hackdevcode/AGENTS.md',
       '',
       `These user-global instructions apply to all work. ${additionalGuidance}`,
       '',
@@ -1678,8 +1678,8 @@ describe('workspace context rendering', () => {
   it('drops a user-global change that cannot fit its own budget while retaining the project changes', () => {
     const items = [
       {
-        change: { action: 'set' as const, scope: sk(USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE), path: '~/.dsh/AGENTS.md', digest: 'global' },
-        file: { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'g'.repeat(1000) },
+        change: { action: 'set' as const, scope: sk(USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE), path: '~/.hackdevcode/AGENTS.md', digest: 'global' },
+        file: { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'g'.repeat(1000) },
       },
       {
         change: { action: 'replace' as const, scope: sk('a', 'AGENTS.md'), path: 'a/AGENTS.md', digest: 'a' },
@@ -1696,7 +1696,7 @@ describe('workspace context rendering', () => {
     expect(rendered.changes).toEqual([items[1]!.change, items[2]!.change])
     expect(rendered.text).toBe([
       '<system-reminder>',
-      'Workspace instruction budget 330 bytes: truncated ~/.dsh/AGENTS.md from 1000 to 0 bytes',
+      'Workspace instruction budget 330 bytes: truncated ~/.hackdevcode/AGENTS.md from 1000 to 0 bytes',
       '',
       'Updated instructions from: a/AGENTS.md',
       '',
@@ -1719,8 +1719,8 @@ describe('workspace context rendering', () => {
         file: { absolutePath: '/repo/a/AGENTS.md', displayPath: 'a/AGENTS.md', content: 'a'.repeat(bytes) },
       },
       {
-        change: { action: 'set', scope: sk(USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE), path: '~/.dsh/AGENTS.md', digest: 'global' },
-        file: { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'g'.repeat(bytes) },
+        change: { action: 'set', scope: sk(USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE), path: '~/.hackdevcode/AGENTS.md', digest: 'global' },
+        file: { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'g'.repeat(bytes) },
       },
     ]
     const batchText = (marker: string[], projectBytes: number, userGlobalBytes: number): string => [
@@ -1732,7 +1732,7 @@ describe('workspace context rendering', () => {
       '',
       'a'.repeat(projectBytes),
       '',
-      'Additional instructions from: ~/.dsh/AGENTS.md',
+      'Additional instructions from: ~/.hackdevcode/AGENTS.md',
       '',
       `These user-global instructions apply to all work. ${additionalGuidance}`,
       '',
@@ -1750,7 +1750,7 @@ describe('workspace context rendering', () => {
     expect(split).toEqual(fits)
     expect(Buffer.byteLength(split.text, 'utf8')).toBeGreaterThan(400)
     expect(truncated).toEqual({
-      text: batchText(['Workspace instruction budget 400 bytes: truncated a/AGENTS.md from 1000 to 41 bytes, ~/.dsh/AGENTS.md from 1000 to 25 bytes', ''], 41, 25),
+      text: batchText(['Workspace instruction budget 400 bytes: truncated a/AGENTS.md from 1000 to 41 bytes, ~/.hackdevcode/AGENTS.md from 1000 to 9 bytes', ''], 41, 9),
       changes: large.map(item => item.change),
     })
   })
@@ -1758,30 +1758,30 @@ describe('workspace context rendering', () => {
   it('retains a user-global change beside a frameless project batch at exactly twice the budget and drops it one byte above', () => {
     const items = (globalBytes: number): ChangeRenderItem[] => [
       {
-        change: { action: 'set', scope: sk(USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE), path: '~/.dsh/AGENTS.md', digest: 'global' },
-        file: { absolutePath: '/home/user/.dsh/AGENTS.md', displayPath: '~/.dsh/AGENTS.md', content: 'g'.repeat(globalBytes) },
+        change: { action: 'set', scope: sk(USER_GLOBAL_DIRECTORY, USER_GLOBAL_FILE), path: '~/.hackdevcode/AGENTS.md', digest: 'global' },
+        file: { absolutePath: '/home/user/.hackdevcode/AGENTS.md', displayPath: '~/.hackdevcode/AGENTS.md', content: 'g'.repeat(globalBytes) },
       },
       {
         change: { action: 'set', scope: sk('a', 'AGENTS.md'), path: 'a/AGENTS.md', digest: 'a' },
         file: { absolutePath: '/repo/a/AGENTS.md', displayPath: 'a/AGENTS.md', content: 'p'.repeat(5000) },
       },
     ]
-    const atBoundItems = items(34)
-    expect(renderInstructionChanges(items(35).slice(0, 1), 321).changes).toHaveLength(1)
+    const atBoundItems = items(26)
+    expect(renderInstructionChanges(items(27).slice(0, 1), 321).changes).toHaveLength(1)
 
     const atBound = renderInstructionChanges(atBoundItems, 321)
-    const overBound = renderInstructionChanges(items(35), 321)
+    const overBound = renderInstructionChanges(items(27), 321)
 
     expect(atBound.changes).toEqual([atBoundItems[0]!.change])
     expect(atBound.text).toBe([
       '<system-reminder>',
       'Workspace instruction budget 321 bytes: truncated a/AGENTS.md from 5000 to 0 bytes',
       '',
-      'Additional instructions from: ~/.dsh/AGENTS.md',
+      'Additional instructions from: ~/.hackdevcode/AGENTS.md',
       '',
       `These user-global instructions apply to all work. ${additionalGuidance}`,
       '',
-      'g'.repeat(34),
+      'g'.repeat(26),
       '',
       'Additional instructions from: a/AGENTS.md',
       '',
@@ -1792,7 +1792,7 @@ describe('workspace context rendering', () => {
     ].join('\n'))
     expect(Buffer.byteLength(atBound.text, 'utf8')).toBe(2 * 321)
     expect(overBound).toEqual({
-      text: 'Workspace instruction budget 321 bytes: omitted ~/.dsh/AGENTS.md; truncated a/AGENTS.md from 5000 to 0 bytes',
+      text: 'Workspace instruction budget 321 bytes: omitted ~/.hackdevcode/AGENTS.md; truncated a/AGENTS.md from 5000 to 0 bytes',
       changes: [],
     })
   })
@@ -4133,7 +4133,7 @@ describe('workspace context request injection', () => {
     }
   })
 
-  it('labels a custom DSH_HOME as $DSH_HOME instead of pretending it is ~/.dsh', async () => {
+  it('labels a custom DSH_HOME as $DSH_HOME instead of pretending it is ~/.hackdevcode', async () => {
     const root = await tempRepo()
     const home = await tempRepo()
     try {

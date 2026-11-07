@@ -111,7 +111,7 @@ Read these pages when the client contract is not enough. They move from the wire
 - [JSON-RPC serving plugin](../server/README.md) — the runtime plugin that serves this client.
 - [Python SDK](../../../python/README.md) — the design twin that shares the same runtime peer and protocol.
 - [SDK subagent backend](../../subagent/subagent-dsh-sdk/README.md) — a harness-internal consumer of this client.
-- [SDK application bundle](../../bundle/sdk-app/README.md) — the `dsh --profile sdk` runtime application this client launches.
+- [SDK application bundle](../../bundle/sdk-app/README.md) — the `hackdev --profile sdk` runtime application this client launches.
 
 -----
 

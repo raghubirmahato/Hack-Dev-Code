@@ -1,6 +1,6 @@
 {
   "name": "@hackdevcode/dsh-web-frontend",
-  "description": "Web application entry: vite build over the @hackdevcode/dsh-client-web shell library; dist/ served by apps/cli's dsh web",
+  "description": "Web application entry: vite build over the @hackdevcode/dsh-client-web shell library; dist/ served by apps/cli's hackdev web",
   "version": "0.2.2-alpha.2",
   "publishConfig": {
     "access": "public"

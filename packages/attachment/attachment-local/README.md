@@ -35,7 +35,7 @@ Mount the plugin with no required configuration. The defaults below define what 
 
 | Field | Default | Meaning |
 |---|---|---|
-| `dshHome` | resolved | Explicit harness home; omitted follows `$DSH_HOME`, then `~/.dsh` |
+| `dshHome` | resolved | Explicit harness home; omitted follows `$DSH_HOME`, then `~/.hackdevcode` |
 | `maxImageBytes` | `50 MiB` | Maximum encoded source bytes accepted for one image |
 | `maxImagesPerMessage` | `20` | Maximum image count accepted in one submitted message |
 | `maxMessageImageBytes` | `200 MiB` | Maximum aggregate encoded source bytes in one submitted message |

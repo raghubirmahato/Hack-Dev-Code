@@ -1,6 +1,6 @@
 {
   "name": "@hackdevcode/dsh-client-ui-settings-plugins",
-  "description": "Built-in plugins settings section for the dsh web client: the Settings navigation entry and the tab chrome feature-owned tabs register into",
+  "description": "Built-in plugins settings section for the hackdev web client: the Settings navigation entry and the tab chrome feature-owned tabs register into",
   "version": "0.2.2-alpha.2",
   "publishConfig": {
     "access": "public"

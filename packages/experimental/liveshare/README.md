@@ -25,7 +25,7 @@ Share a Session with colleagues through the normal DSH browser interface. The ow
 
 ### Profile and build requirements
 
-The manifest declares an installable `dsh.bundle` layer and a browser face. The bundle stays hidden until a profile enables it, as described in [Default visibility and enabling](#default-visibility-and-enabling); supported applications still start through `dsh --profile`.
+The manifest declares an installable `dsh.bundle` layer and a browser face. The bundle stays hidden until a profile enables it, as described in [Default visibility and enabling](#default-visibility-and-enabling); supported applications still start through `hackdev --profile`.
 
 Owner, viewer, and the Liveshare server must use matching protocol versions. The build includes the Owner's gateway process; the viewer page has no separate build. Package version, exports, and publication contents are declared in [package.json](package.json).
 

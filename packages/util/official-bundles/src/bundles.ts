@@ -42,7 +42,7 @@ export const RETIRED_BUNDLES: ReadonlySet<string> = new Set([
   '@hackdevcode/dsh-experimental-schedule-bundle',
 ])
 
-/** The bundle list a `dsh plugin` init uses for a name with no shipped template. */
+/** The bundle list a `hackdev plugin` init uses for a name with no shipped template. */
 export const DEFAULT_PROFILE_BUNDLES: readonly string[] = ['@hackdevcode/dsh-base']
 
 /**

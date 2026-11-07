@@ -37,12 +37,12 @@ export const Config: z<Config> = z.object({
  */
 function sdkCommand(profile: string): Command {
   return new Command()
-    .name(`dsh --profile ${profile}`)
+    .name(`hackdev --profile ${profile}`)
     .description('Serve Hack Dev Code SDK clients over stdio JSON-RPC.')
     .helpOption('-h, --help', 'show this help')
     .addHelpText('after', `
 Example:
-  dsh --profile ${profile}     serve one SDK runtime until its client disconnects
+  hackdev --profile ${profile}     serve one SDK runtime until its client disconnects
 `)
 }
 

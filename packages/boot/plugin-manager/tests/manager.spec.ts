@@ -658,7 +658,7 @@ it.each(['throw', 'reject'])('delivers diagnostics to later subscribers when an 
   expect(await manager.setBundleEnabled('extra', false)).toMatchObject({ changed: true, application: 'restart-required' })
   expect(readProfileManifest('test', dir).dsh?.profile?.bundles).not.toContain('extra')
   expect(facts.map(event => event.phase)).toEqual(['started', 'settled'])
-  await vi.waitFor(() => { expect(errors).toHaveBeenCalledWith('dsh plugin-manager: operation diagnostic delivery failed') })
+  await vi.waitFor(() => { expect(errors).toHaveBeenCalledWith('hackdev plugin-manager: operation diagnostic delivery failed') })
 })
 
 it('turns a plugin off and on without leaving a patch override the bundle already implies', async () => {

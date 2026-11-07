@@ -775,7 +775,7 @@ describe('headless runner', () => {
     })
     expect(await test.run()).toMatchObject({
       code: 1,
-      err: 'dsh: a task is required, for example: dsh --profile headless "run the tests"\n',
+      err: 'dsh: a task is required, for example: hackdev --profile headless "run the tests"\n',
     })
     await test.ctx.fiber.dispose()
   })

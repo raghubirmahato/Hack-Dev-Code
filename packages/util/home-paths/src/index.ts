@@ -9,13 +9,19 @@ import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 
 /** Directory name for the default Hack Dev Code home under the OS home. */
-export const DSH_HOME_DIR_NAME = '.dsh'
+export const DSH_HOME_DIR_NAME = '.hackdevcode'
 
 /** Stable user-facing display form for the default Hack Dev Code home. */
 export const DEFAULT_DSH_HOME_DISPLAY = `~/${DSH_HOME_DIR_NAME}`
 
 /** Environment variable that overrides the default Hack Dev Code home. */
 export const DSH_HOME_ENV = 'DSH_HOME'
+
+/**
+ * Product-specific override checked before {@link DSH_HOME_ENV}. A `DSH_HOME` meant for another harness installation
+ * must not redirect Hack Dev Code into that installation's home, so this name wins when both are set.
+ */
+export const HACKDEVCODE_HOME_ENV = 'HACKDEVCODE_HOME'
 
 /** Directory name for the default shared agent configuration root under the OS home. */
 export const AGENTS_HOME_DIR_NAME = '.agents'
@@ -125,7 +131,7 @@ function rootDisplay(resolvedRoot: string, defaultRoot: string, defaultLabel: st
  * Resolve the single-root Hack Dev Code home.
  *
  * Precedence, highest first: an explicit configured path, `$DSH_HOME`, then
- * `~/.dsh`. The harness keeps all user data under one root. An empty or
+ * `~/.hackdevcode`. The harness keeps all user data under one root. An empty or
  * whitespace-only `$DSH_HOME` is treated as unset, so a blank override never
  * resolves the home to the current working directory.
  * @param configured - explicit harness-home override, which has highest precedence.
@@ -133,6 +139,8 @@ function rootDisplay(resolvedRoot: string, defaultRoot: string, defaultLabel: st
  * @returns the normalized absolute harness home path.
  */
 export function resolveDshHome(configured?: string, env: Record<string, string | undefined> = process.env): string {
+  const own = env[HACKDEVCODE_HOME_ENV]
+  if (configured === undefined && own !== undefined && own.trim() !== '') return resolveRoot(undefined, env, HACKDEVCODE_HOME_ENV, defaultDshHome)
   return resolveRoot(configured, env, DSH_HOME_ENV, defaultDshHome)
 }
 
@@ -176,9 +184,9 @@ export function dshCachePath(optionsOrSegment: { dshHome?: string } | string = {
  * Describe a resolved harness home symbolically for user-facing display.
  *
  * It never returns an absolute machine path: the default home is labelled
- * `~/.dsh`, and any configured home is labelled `$DSH_HOME`.
+ * `~/.hackdevcode`, and any configured home is labelled `$DSH_HOME`.
  * @param resolvedHome - the absolute path returned by {@link resolveDshHome}.
- * @returns `~/.dsh` for the default home, otherwise `$DSH_HOME`.
+ * @returns `~/.hackdevcode` for the default home, otherwise `$DSH_HOME`.
  */
 export function dshHomeDisplay(resolvedHome: string): string {
   return rootDisplay(resolvedHome, defaultDshHome(), DEFAULT_DSH_HOME_DISPLAY, DSH_HOME_ENV)

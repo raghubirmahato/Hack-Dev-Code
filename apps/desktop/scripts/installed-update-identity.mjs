@@ -12,7 +12,7 @@ import { join } from 'node:path'
  */
 export function configureInstalledUpdateIdentity(app, run, metadata, environment) {
   if (!/^[a-f0-9]{24}$/u.test(run.id) || run.versions.length !== 2
-    || metadata.dshDesktopAppId !== `com.deepseek.dsh.qualification.q${run.id}`
+    || metadata.dshDesktopAppId !== `dev.hackdevcode.app.qualification.q${run.id}`
     || !run.versions.includes(metadata.version)) {
     throw new Error('installed update: qualification package identity does not match its bootstrap')
   }

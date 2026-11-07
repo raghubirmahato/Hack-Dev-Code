@@ -55,9 +55,10 @@ describe('desktop toolchain preflight', () => {
   it('reports the archive reader when it cannot run', async () => {
     const empty = await mkdtemp(join(tmpdir(), 'dsh-no-tools-'))
     directories.push(empty)
-    const saved = { PATH: process.env.PATH, Path: process.env.Path }
+    const saved = { PATH: process.env.PATH, Path: process.env.Path, SystemRoot: process.env.SystemRoot }
     try {
-      Object.assign(process.env, { PATH: empty, Path: empty })
+      // An empty SystemRoot also hides the Windows tar in System32.
+      Object.assign(process.env, { PATH: empty, Path: empty, SystemRoot: empty })
       const failures = await probeDesktopToolchain('darwin', {})
       expect(failures.map(failure => failure.tool)).toEqual(['tar'])
       expect(failures[0]?.detail).not.toBe('')

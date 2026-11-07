@@ -1,5 +1,5 @@
 /**
- * Isolated real `dsh web` instance for the three-mode acceptance driver.
+ * Isolated real `hackdev web` instance for the three-mode acceptance driver.
  *
  * The harness boots the shipped web profile in a private temp home and workspace and exposes the
  * shipped HTTP carrier. The model route is the deterministic keyless fixture beside this module;
@@ -757,7 +757,7 @@ function registerTeardown(
 }
 
 /**
- * Install one workspace bundle into a profile the way `dsh plugin install` would.
+ * Install one workspace bundle into a profile the way `hackdev plugin install` would.
  *
  * The profile's own `node_modules` is the second anchor bundle resolution reads, so a bundle this
  * checkout provides has to appear there; the profile manifest declares the dependency it links.

@@ -92,7 +92,7 @@ it('names the exact grant command for each package a compatibility check refused
   })
   expect(await runPlugin('test', ['add', '@example/plugin'])).toBe(1)
   expect(stderr.mock.calls.map(call => call[0])).toEqual([
-    'dsh: to accept the risk, run: dsh plugin --profile test allow-version @example/plugin@1.2.3 --dsh-version 0.1.0 --accept-risk\n',
+    'dsh: to accept the risk, run: hackdev plugin --profile test allow-version @example/plugin@1.2.3 --dsh-version 0.1.0 --accept-risk\n',
     'dsh: plugin command failed; diagnostics: /profile/log\n',
   ])
 })
@@ -131,7 +131,7 @@ it.each([
   const args = arguments_.map(value => value === 'CURRENT' ? getDshRuntimeVersion() : value)
   expect(await runPlugin('desktop', args)).toBe(1)
   expect(stderr.mock.calls.map(call => call[0]).join('')).toMatchInlineSnapshot(`
-    "dsh: Error: Open Hack Dev Code Desktop once to initialize its profile, then fully quit it before running dsh plugin --profile desktop.
+    "dsh: Error: Open Hack Dev Code Desktop once to initialize its profile, then fully quit it before running hackdev plugin --profile desktop.
     "
   `)
   expect(existsSync(join(home, 'profiles', 'desktop'))).toBe(false)
