@@ -1,414 +1,265 @@
 # Hack Dev Code
 
-**An autonomous AI engineering guild.** You give it a mission. It maps the project, sizes a team of specialist agents to the work, builds in parallel waves over a shared blackboard, fact-checks every claim, and then proves the result through three independent gates: a verifier, a quality and UI/UX reviewer that looks at real screenshots, and a security reviewer. It keeps iterating until every acceptance criterion is met, and it stops and asks a human whenever a decision is not its to make.
+**An AI agent that works on your computer the way a person does.** It writes and fixes code, runs whole projects with a team of specialist agents, and operates the desktop and the browser: it opens apps, reads windows, clicks, types and checks its own work. It runs on DeepSeek, on any OpenAI-compatible provider, or entirely offline on local Ollama models.
 
-> Built for hackathon problem statement **PS-001: DevPilot, the Mystic Mikado's Autonomous AI Engineering Guild**.
-> *Plan like a Shogun. Build like a Samurai. Test like a Sentinel. Adapt until the mission is complete.*
-
-Hack Dev Code is a multi-agent engineering platform. The guild in [`packages/hackdev`](packages/hackdev) is what was built for this problem statement; it runs on a sandboxed agent runtime that provides sessions, subagents, tools, a Web UI and a CLI.
+Hack Dev Code ships as a desktop app for Windows and macOS, a Web UI, a command line for Windows, macOS and Linux, a VS Code extension and a GitHub Action for pull-request review. Everything runs on your machine; there is no hosted backend and no account to create.
 
 ---
 
 ## Contents
 
-1. [How it answers the problem statement](#how-it-answers-the-problem-statement)
-2. [Architecture](#architecture)
-3. [Agent responsibilities](#agent-responsibilities)
-4. [Setup and run](#setup-and-run)
-5. [Configuration](#configuration)
-6. [Available tools and execution boundaries](#available-tools-and-execution-boundaries)
-7. [Human oversight and approval workflow](#human-oversight-and-approval-workflow)
-8. [Memory and agent communication](#memory-and-agent-communication)
-9. [Security](#security)
-10. [Evaluation scenarios](#evaluation-scenarios)
-11. [Deliverables checklist](#deliverables-checklist)
-12. [Bonus points](#bonus-points)
-13. [Known limitations](#known-limitations)
-14. [Repository layout, tests and license](#repository-layout-tests-and-license)
+1. [What it does](#what-it-does)
+2. [Install](#install)
+3. [Quick start](#quick-start)
+4. [Models and keys](#models-and-keys)
+5. [Desktop and browser control](#desktop-and-browser-control)
+6. [Multi-agent missions](#multi-agent-missions)
+7. [Permissions and safety](#permissions-and-safety)
+8. [Integrations](#integrations)
+9. [Configuration](#configuration)
+10. [Architecture](#architecture)
+11. [Build from source](#build-from-source)
+12. [Known limitations](#known-limitations)
+13. [Contributing, license and acknowledgements](#contributing-license-and-acknowledgements)
 
 ---
 
-## How it answers the problem statement
+## What it does
 
-| PS-001 requirement | What Hack Dev Code does | Where |
-|---|---|---|
-| **A. Planning**: requirement analysis, codebase reconnaissance, task decomposition, shared mental model | An analyst turns the mission into requirements and acceptance criteria; a scout inspects the workspace and writes a project map; a planner returns a dependency graph of small tasks, validated with a topological sort. Every agent receives the same map and plan. | [`script.ts`](packages/hackdev/tool-hackdev/src/script.ts), `.hackdev/PROJECT_MAP.md` |
-| **B. Implementation**: tool selection, context-aware development, adaptive problem solving, controlled execution | One specialist builder per task (frontend, backend, data, test, docs, security...), running in parallel as dependencies allow. A builder that fails is split into ordered subtasks instead of retried blindly. Builders work only inside their owned paths and the workspace sandbox. | Forge phase |
-| **C. Testing and verification**: automated tests, failure investigation, independent verification | Gate 1 builds, runs, tests and fixes. It treats a result as passed only with evidence. The gates are separate agents from the builders, so nobody grades their own work. | Sentinel Gates |
-| **D. Review and security**: evidence-based completion, code review, security scanning, cross-agent critique, human oversight | Gate 2 reviews quality and visually tests the UI; Gate 3 audits and hardens security. A fact-checker re-runs claimed evidence. Decisions that need a person are listed in `needsHuman` at the top of every report. | Gates, fact-check, report |
-| **E. Coordination and adaptive autonomy**: inter-agent communication, feedback loops, adaptive orchestration, bounded autonomy | A typed blackboard, handoff notes, waves that open follow-up tasks for unmet criteria, review-fix loops with hard caps, and a fixed agent budget. | Waves, blackboard |
-| **Technical requirements**: an existing agent framework, existing tools, a local model, GitHub is not a prerequisite | Runs on an existing, MIT-licensed agent runtime with its sandboxed tools and a DeepSeek model through an API key. Everything runs locally; there is no hosted backend. | `apps/`, `packages/` |
-| **Evaluation scenarios** | See [Evaluation scenarios](#evaluation-scenarios) for how to run each one. | below |
+| Area | Capability |
+|---|---|
+| **Coding** | Reads, writes and edits files, runs shell commands (PowerShell or Bash), searches with `glob`, `grep` and a ranked `code_search` over definitions, and keeps a to-do list that it finishes before it reports back. |
+| **Missions** | The `hackdev` tool turns one request into a planned project: an analyst, a scout and a planner size a team, specialist builders work in parallel, and three independent gates verify, review (including real screenshots of the UI) and secure the result. |
+| **Desktop control** | Launches apps by name, lists and reads windows through UI Automation (Windows) or AT-SPI (Linux), acts on numbered controls, reads text with OCR, clicks, drags, scrolls, types and presses shortcuts with real input, across every monitor. |
+| **Browser** | A built-in browser pane in the desktop app, plus agent control of Chrome through Chrome DevTools, with a persistent profile so sign-ins stay. |
+| **Models** | DeepSeek out of the box; OpenAI-compatible providers; local models through Ollama, listed straight from your Ollama install. Several keys per provider rotate and fall back automatically. |
+| **Extensibility** | A directory of well-known MCP servers you can switch on, installable skills, custom instructions and `AGENTS.md` files, and a plugin system for everything else. |
+| **Everywhere you work** | Desktop app, Web UI, CLI, VS Code extension and a GitHub Action. |
+
+Results are evidence-based: tasks that claim success without proof are downgraded, the fact-checker re-runs claimed evidence, and every mission report opens with what still needs your attention.
 
 ---
 
-## Architecture
+## Install
 
-The pipeline script, schemas and gate order are fixed in code. The model that calls the tool only supplies the mission text and numeric caps inside deployment ceilings, so the orchestration is repeatable and cannot be talked out of its checks. For the full design (failure table, scope discipline, visual verification protocol, Web UI) read [`docs/hack-dev-code.md`](docs/hack-dev-code.md).
+### Desktop app (Windows)
 
-### 1. System overview
+Download the latest installer from the [Releases](https://github.com/raghubirmahato/Hack-Dev-Code/releases) page and run it. It installs for the current user and adds the `hackdev` command to your terminal. The app updates itself from GitHub Releases.
+
+- The installer is not code-signed yet, so Windows SmartScreen may ask you to confirm. Choose **More info → Run anyway**.
+- The app asks for administrator rights when it starts, so the agent can install software and operate apps that run as administrator. Decline and it keeps running with normal rights. To never ask, set `HACKDEV_RUN_AS_ADMIN=0` or start it with `--no-admin`.
+- If Hack Dev Code is running when you install, update or uninstall, the installer offers to close it for you.
+
+### macOS and Linux
+
+Build the desktop app for macOS, or use the Web UI and CLI on any platform, from source: see [Build from source](#build-from-source).
+
+On Linux, desktop control needs X11 tools:
+
+```sh
+sudo apt-get install -y x11-xserver-utils xdotool imagemagick wmctrl xdg-utils xclip tesseract-ocr
+```
+
+---
+
+## Quick start
+
+1. Open Hack Dev Code (or run `pnpm run start:web` from a source checkout and open the printed address).
+2. Choose a workspace folder.
+3. Open **Settings → Models** and add a DeepSeek key, another provider, or pick an Ollama model.
+4. Ask for something:
+   - *"Add a health check endpoint and a test for it."*
+   - *"Open Calculator and work out 12 × 7."*
+   - *"Use hackdev to build a single-page expense tracker with tests."*
+
+From a terminal:
+
+```sh
+hackdev "Fix the failing tests in this repository"
+hackdev --profile headless "Use hackdev_review to review this repository"
+```
+
+---
+
+## Models and keys
+
+- **DeepSeek.** Set `DEEPSEEK_API_KEY`, or paste the key in **Settings → Models**.
+- **Other providers.** Add any OpenAI-compatible endpoint in **Settings → Models**.
+- **Local models.** The **Ollama** tab lists every model you have downloaded and adds the one you pick; nothing leaves your machine.
+- **Key pools.** Paste several keys into one field, separated by commas or one per line. Requests rotate through them; a key that is rate limited, out of quota or invalid rests for a minute while the same request continues on the next key, so a conversation never loses its place. Each provider can also list `fallbackModels` for when a model is overloaded on every key.
+- **Storage.** Keys are kept in the app's credential store, encrypted at rest with Windows DPAPI on Windows. They are never written to the repository, prompts, logs or reports.
+
+Hack Dev Code is tuned to work well with smaller and free models: tools return text that a model without vision can act on (numbered controls and OCR coordinates instead of guesses), tool groups load on demand to keep requests small, and the agent is reminded to finish open to-do items before it stops.
+
+---
+
+## Desktop and browser control
+
+The desktop tools work on Windows and Linux (X11); macOS uses its native computer-use provider.
+
+| Tool | Does |
+|---|---|
+| `desktop_screenshot` | Captures one window, a display, a region or the whole desktop and returns the image with its coordinate mapping. On Windows a window behind others is captured without bringing it forward. Optional OCR. |
+| `desktop_window` | Lists windows, including the taskbar and hidden tray icons; reads a window's controls as numbered `[n]` entries with their centre points; focuses, moves, resizes, minimizes or closes; waits for a window or for text to appear. |
+| `desktop_element` | Clicks, invokes, toggles, expands, selects, sets values or focuses a control by number, name or automation id (Windows). |
+| `desktop_pointer`, `desktop_drag`, `desktop_scroll` | Real mouse input on any monitor, with modifier keys. `press: down|up` holds a button over several steps. |
+| `desktop_keys`, `desktop_type` | Key chords and text into the window in front. Long text is pasted through the clipboard, which is restored afterwards. `hold: down|up` keeps a chord pressed. |
+| `desktop_ocr` | The text on screen with the centre point of each line. |
+| `desktop_sequence` | Up to 30 of these steps in one call, stopping at the first failure. |
+
+Anything left pressed is released when the tools unload. Windows prevents a normal process from controlling apps running as administrator, UAC prompts and the lock screen; running Hack Dev Code as administrator covers the first, and the agent never tries to bypass the others.
+
+**Chrome.** The agent drives Chrome through Chrome DevTools: pages, forms, scripts, screenshots and clicks. To let it use the Chrome you already have open, enable remote debugging at `chrome://inspect/#remote-debugging` and set the `chrome` row to `mode: connect`.
+
+---
+
+## Multi-agent missions
+
+Ask the agent to "use hackdev" for work that deserves a team. The pipeline is fixed in code; the model only supplies the mission text and caps within your limits, so the checks always run.
 
 ```mermaid
 flowchart TB
-    H(["Human"]) -->|"mission text"| LEAD
-    subgraph RUNTIME["Agent runtime (sandbox, sessions, approvals)"]
-        LEAD["Lead agent<br/>the chat model that calls the hackdev tool"]
-        TOOL["hackdev tool<br/>fixed pipeline script + schemas + caps"]
-        ENGINE["Workflow engine<br/>agent / parallel / phase"]
-        SPAWN["Subagent provider: spawn<br/>fresh agent per role, structured JSON output"]
-        LEAD -->|"mission, optional lower caps"| TOOL
-        TOOL --> ENGINE
-        ENGINE -->|"creates agents on demand"| SPAWN
-    end
-    SPAWN --> COUNCIL["Council<br/>analyst, scout, planner"]
-    SPAWN --> FORGE["Forge<br/>specialist builders"]
-    SPAWN --> CHECK["Fact-checker"]
-    SPAWN --> GATES["Sentinel gates<br/>verifier, quality + UX, security, regression"]
-    SPAWN --> INTEG["Integrator"]
-    SPAWN --> CHRON["Chronicler"]
-    BOARD[("Shared state<br/>typed blackboard, PROJECT_MAP.md,<br/>MEMORY.md, PROGRESS.md")]
-    COUNCIL <--> BOARD
-    FORGE <--> BOARD
-    CHECK <--> BOARD
-    GATES <--> BOARD
-    INTEG <--> BOARD
-    CHRON --> BOARD
-    CHRON -->|"RUN_REPORT.md + needsHuman"| LEAD
-    LEAD -->|"report and open decisions"| H
-    H -.->|"approvals, decisions"| LEAD
+    M(["Mission"]) --> C["Council<br/>analyst, scout, planner"]
+    C -->|"validated task graph"| F["Forge<br/>parallel specialist builders"]
+    F --> FC["Fact-check<br/>re-run claimed evidence"]
+    FC --> G1["Gate 1: Verifier<br/>build, run, test, fix"]
+    G1 --> G2["Gate 2: Quality and UX<br/>code review, real screenshots"]
+    G1 --> G3["Gate 3: Security<br/>validation, authz, secrets, dependencies"]
+    G2 --> I{"Integrator<br/>every acceptance criterion met?"}
+    G3 --> I
+    I -->|"no, waves remain"| F
+    I -->|"yes"| R(["Report<br/>results, evidence, needs attention"])
 ```
 
-### 2. How the lead agent generates the agent team
+| Agent | Responsibility |
+|---|---|
+| Requirements analyst | Turns the mission into requirements and testable acceptance criteria. |
+| Codebase scout | Maps the stack, commands, conventions and risks into `.hackdev/PROJECT_MAP.md`. |
+| Planner | Sizes the team and returns small tasks with dependencies, owned paths and specialist roles. |
+| Specialist builders | One per task (frontend, backend, data, test, docs, security, ...), each in its own git worktree, merged back one at a time. |
+| Splitter | Breaks a task a builder could not finish into ordered subtasks. |
+| Fact-checker | Confirms listed files exist and re-runs the cheapest decisive evidence. |
+| Verifier, Quality + UX, Security | Independent gates with bounded review-fix loops and a regression pass. |
+| Integrator | Opens follow-up tasks for unmet criteria. |
+| Chronicler | Writes `RUN_REPORT.md` and compacts long-term memory. |
 
-The lead never hand-picks agents. It calls one tool; the pipeline builds the team from the mission.
-
-```mermaid
-sequenceDiagram
-    autonumber
-    participant L as Lead agent
-    participant T as hackdev tool
-    participant S as Scout and analyst
-    participant P as Planner
-    participant V as Script validator
-    participant F as Forge scheduler
-    participant B as Specialist builders
-    L->>T: hackdev(mission, caps within ceilings)
-    T->>T: compute agent budget from maxTasks, maxWaves, maxFixRounds
-    T->>S: spawn analyst and scout (parallel)
-    S-->>T: requirements, acceptance criteria, PROJECT_MAP.md
-    T->>P: spawn planner with requirements and project map
-    P-->>V: task DAG: id, role, ownedPaths, dependsOn
-    V->>V: unique ids, known dependencies, no cycle (Kahn), size at most maxTasks
-    alt plan invalid
-        V-->>P: reasons, one re-request, then single-task fallback
-    end
-    V-->>F: validated DAG
-    F->>B: spawn one builder per task, role brief and owned paths
-    Note over F,B: a task starts the moment its last dependency settles,<br/>a limiter caps simultaneous builders at maxParallel
-    B-->>F: report: status, files, evidence, handoff, notes
-    alt builder not done
-        F->>B: splitter spawns 2 to 4 ordered subtasks
-    end
-```
-
-**Team sizing.** The planner is told to size the team to the mission: one or two tasks for a trivial change, three to six for a small app, six to fourteen for a medium product, up to `maxTasks` for a large system. Each task carries a **role** (frontend, backend, fullstack, data, api, infra, test, docs, design, security), so each builder gets a matching specialist brief and only owns its own paths.
-
-**Dynamic creation.** Agents are created while the run progresses, not up front: builders per task, a **splitter** when a builder fails to finish, extra tasks from the **integrator** when a wave leaves criteria unmet. A hard agent budget derived from the caps stops runaway spawning.
-
-### 3. Agent-to-agent communication
-
-There is no free-form chat. Agents talk through typed, validated records, and every message is stored.
-
-```mermaid
-flowchart LR
-    subgraph BUILD["Forge (parallel builders)"]
-        B1["Builder A<br/>API"]
-        B2["Builder B<br/>UI"]
-        B3["Builder C<br/>tests"]
-    end
-    BB[("Blackboard<br/>contract, decision, fact,<br/>risk, warning, handoff, question")]
-    PM[["PROJECT_MAP.md<br/>shared mental model"]]
-    MEM[["MEMORY.md<br/>long-term memory"]]
-    B1 -->|"publishes contract and handoff"| BB
-    BB -->|"dependency handoffs injected into prompt"| B2
-    B2 -->|"publishes warning or question"| BB
-    B3 -->|"reads contracts and decisions"| BB
-    PM -.->|"read by every agent"| B1
-    PM -.-> B2
-    PM -.-> B3
-    MEM -.->|"prior runs, compacted"| BB
-    BB -->|"builder handoffs and open questions"| G["Sentinel gates<br/>verifier, quality + UX, security"]
-    G -->|"issues, evidence, deferred items"| BB
-    BB -->|"pinned: contracts and decisions"| MEM
-```
-
-| Channel | Used for | Rule |
-|---|---|---|
-| Structured report | Every agent returns JSON checked against a schema, then re-validated by the script | Invalid output is a failed agent, not silently accepted |
-| Blackboard note | `contract`, `decision`, `fact`, `risk`, `warning`, `handoff`, `question` | Duplicates dropped; contracts and decisions are pinned and always reach the prompt |
-| Handoff | A builder's public interfaces, locations, how to run and test, caveats | A dependent builder receives each dependency's handoff; gates receive all of them |
-| Workspace files | `PROJECT_MAP.md`, `MEMORY.md`, `PROGRESS.md` | Read by every agent; MEMORY is deduplicated and compacted within `maxMemoryChars` |
-| Ownership | Disjoint `ownedPaths` per builder | A cross-boundary edit must be published as a `warning` |
-
-### 4. Waves, gates and the feedback loop
-
-```mermaid
-flowchart TB
-    START(["Validated task DAG"]) --> FORGE["Forge<br/>parallel specialist builders"]
-    FORGE --> FACT["Fact-check<br/>files exist? re-run evidence"]
-    FACT -->|"claim fails: done becomes partial"| FORGE
-    FACT --> VER["Gate 1: Verifier<br/>build, run, test, fix"]
-    VER --> AUD
-    subgraph AUD["Audits run in parallel, read-only"]
-        QX["Gate 2: Quality and UX<br/>code review, screenshots,<br/>desktop and mobile"]
-        SEC["Gate 3: Security<br/>validation, authz, secrets,<br/>dependencies"]
-    end
-    AUD --> FIX["Fix loops, one at a time<br/>review, fix, verify, up to maxFixRounds"]
-    FIX --> REG["Regression verifier<br/>skipped if nothing changed"]
-    REG --> INT{"Integrator<br/>every acceptance criterion met?"}
-    INT -->|"no and waves remain"| NEXT["Follow-up tasks<br/>become the next wave"]
-    NEXT --> FORGE
-    INT -->|"yes, or maxWaves reached"| CHR["Chronicler<br/>RUN_REPORT, PROGRESS, MEMORY"]
-    CHR --> OUT(["Report: complete or needs attention"])
-    FIX -.->|"fix needs a human decision"| HUM["needsHuman<br/>deferred issue"]
-    FORGE -.->|"blocked on a decision"| HUM
-    HUM -.-> OUT
-```
-
-A run is `complete` only when every task is done, every gate passes and every acceptance criterion is met. Anything that needs a person is surfaced at the top of the report instead of being decided silently.
+Agents communicate through a typed blackboard (contracts, decisions, facts, risks, warnings, handoffs, questions) rather than free-form chat. Memory persists in `.hackdev/MEMORY.md`, and `.hackdev/PROGRESS.md` lets a rerun plan only the remaining work. Use `hackdev_review` to run only the three gates on work done elsewhere. The full design is in [docs/hack-dev-code.md](docs/hack-dev-code.md).
 
 ---
 
-## Agent responsibilities
+## Permissions and safety
 
-| Agent | Phase | Responsibility | Output |
-|---|---|---|---|
-| **Requirements analyst** | Council | Turns the mission into requirements and testable acceptance criteria. | Requirement list |
-| **Codebase scout** | Council | Inspects the workspace: stack and versions, entry points, verified commands, conventions, key files, risks, prior progress. | `PROJECT_MAP.md` |
-| **Planner** | Council | Sizes the team to the mission and returns small tasks with dependencies, owned paths and specialist roles. | Validated task DAG |
-| **Specialist builders** | Forge | One per task. Implement and test inside owned paths; publish contracts, decisions, warnings and a handoff note. | Code, tests, handoff |
-| **Splitter** | Forge | When a builder does not finish, splits the remaining work into two to four ordered subtasks. | Subtasks |
-| **Fact-checker** | After each Forge | Checks that listed files exist and re-runs the cheapest decisive evidence. | Downgrades false claims |
-| **Verifier (gate 1)** | Sentinel | Builds, runs and tests for syntax, logic and runtime errors; fixes them; investigates failures. | Pass or fail with evidence |
-| **Quality + UX reviewer (gate 2)** | Sentinel | Reviews code quality; starts the UI, takes desktop and mobile screenshots, looks at them, exercises the main flows, fixes defects. | Issues, `uiEvidence` |
-| **Security reviewer (gate 3)** | Sentinel | Audits validation, escaping, authorization, headers, secrets, dependencies; hardens and adds regression tests. | Issues fixed or deferred |
-| **Regression verifier** | Sentinel | Re-runs the verifier after the audits changed code. Skipped when nothing changed. | Final verdict |
-| **Integrator** | End of each wave | Judges every acceptance criterion against evidence and opens follow-up tasks for unmet ones. | `PROGRESS.md` |
-| **Chronicler** | End of run | Writes the run report and compacts long-term memory. | `RUN_REPORT.md`, `MEMORY.md` |
+Hack Dev Code starts with **Full access**: agents install, edit, delete and run commands without asking, and mission agents run with `autonomy: full`. That suits a personal machine. To add limits back:
+
+- choose **Workspace Write** or **Read Only** in the composer;
+- set `DSH_PERMISSION_MODE=workspace-write` (or `read-only`) before starting;
+- change `defaultPreset` on the `permission` row;
+- set `autonomy: bounded` on `tool-hackdev` to keep mission agents from destructive or irreversible actions.
+
+In read-only sessions, installing MCP servers or skills asks for approval. Secrets stay out of code, prompts and reports. The security gate audits and hardens what missions build, but no process can promise software that cannot be broken, so every report lists what was checked, what was fixed and what remains open.
 
 ---
 
-## Setup and run
+## Integrations
 
-**Requirements:** Node.js 24.9 or newer, pnpm 11, and a DeepSeek API key. Windows, macOS and Linux are supported.
+- **VS Code.** The extension in [`extensions/vscode`](extensions/vscode) runs tasks on your workspace, asks about a selection, reviews your changes and opens the full app inside VS Code.
+- **GitHub pull-request review.** The composite action [`.github/actions/hackdev-review`](.github/actions/hackdev-review/action.yml) reviews a pull request in read-only mode and posts the review as a comment:
 
-```sh
-pnpm install
-pnpm run build:artifacts
-```
-
-The build computes a version/commit stamp from git. If the folder is not a git checkout, set one yourself first:
-`DSH_CLIENT_COMMIT_HASH=abcdef1` (PowerShell: `$env:DSH_CLIENT_COMMIT_HASH = 'abcdef1'`).
-
-**Provide the API key** through the environment. It is never written to the repository, prompts or reports.
-
-```sh
-export DEEPSEEK_API_KEY=...          # PowerShell: $env:DEEPSEEK_API_KEY = "..."
-```
-
-You can also open **Settings → Models** in the Web UI and paste the key there.
-
-**Use several keys for one platform.** Paste more than one key into the same field, separated by commas (pasting one key per line also works, and the variable may hold a comma-separated list). Requests rotate through the keys in turn, so several free-tier keys share the load. Each provider can also list `fallbackModels`: when the requested model is overloaded or out of quota on every key, the same request goes to the next model, and later steps stay on it for a while. If the provider refuses a key (rate limit, exhausted quota or an invalid key), that key rests for a minute and the identical request is sent again with the next key, so the conversation continues from the same position with nothing lost; the failure is reported only when every key was refused. If the refusal arrives after the reply already started streaming, the key is rested and the same step is retried automatically on the next key: the conversation, tool results and every earlier step are kept, and only the interrupted reply is generated again. When every key is cooling down, a request waits (up to a minute) for the first key to recover instead of spending itself on a refusal; set `retryPolicy: { mode: always }` on the provider to keep retrying beyond the default five attempts. The pool applies to DeepSeek and to every other provider added in Settings → Models.
-
-**Custom instructions.** Open **Settings → General → Custom instructions**, type the instructions and press Save; they reach the lead agent and every pipeline agent from the next request. The same text can also live in an `AGENTS.md` file: `~/.dsh/AGENTS.md` for all projects, `AGENTS.md` in the project root for one project, or `AGENTS.local.md` for private notes. They are loaded into each session. The `customInstructions` option below also hands the same text to every agent in a mission pipeline.
-
-**The host is detected at launch.** When the app starts it identifies the operating system (Windows, Debian/Ubuntu and other Linux distributions, macOS), CPU, memory, shell, package managers (winget, apt, dnf, snap and others) and whether a graphical desktop is available, and tells every agent, so commands, paths and installs fit the machine.
-
-**Desktop and Chrome control.** The Web profile turns on the Computer use bundle: agents can list and launch apps, read windows and their accessibility trees, take screenshots, click, type, use shortcuts, menus and the clipboard (Cua Driver on Windows and Linux, the native provider on macOS), and drive Chrome through Chrome DevTools: pages, forms, scripts, screenshots and coordinate clicks. Chrome keeps one persistent profile, so sign-ins made there stay; to drive the Chrome you already use, enable remote debugging in `chrome://inspect/#remote-debugging` and set the `chrome` row to `mode: connect`. With several monitors connected, agents see and control all of them: `desktop_list_displays` lists every display and its position, `desktop_screenshot` captures one display or the whole desktop, and `desktop_pointer` moves and clicks the real mouse anywhere (Windows through built-in PowerShell and .NET; Linux X11 through `xrandr`, `xdotool` and ImageMagick: `sudo apt-get install -y x11-xserver-utils xdotool imagemagick`). Window tools work on windows on any monitor. Desktop and Chrome tools load on demand: a request first carries only a short list of tool groups, and the agent calls `load_tools` with `desktop` or `chrome` when a task needs them (set `onDemand: false` on the `cua-driver` or `chrome` row to always include them). To keep every request small, the desktop provider exposes its essential tools (set `toolset: all` on the `cua-driver` row for recording, cursor-overlay and session tools) and Chrome leaves out performance and emulation tools (set `performanceTools` or `emulationTools` to `true` on the `chrome` row). Window snapshots are capped at 400 elements and a 1280-pixel screenshot unless the agent asks for more. Every action goes through your permission mode, which starts at Full access (see below).
-
-**Run the Web UI** (live phases, agents and gate results):
-
-```sh
-pnpm run start:web                   # prints http://127.0.0.1:3080/?token=...
-```
-
-Open the printed address, choose or add a workspace folder, and send a mission such as
-*"Use hackdev to build a single-file tip calculator with tests."* The chat shows the live workflow (Council, Forge, Fact-check, Sentinel Gates, Integrator) and then a **Hack Dev Code mission** card with the status, task results, gate verdicts and everything that needs your attention.
-
-**Run one mission headless** (no server, prints the report):
-
-```sh
-node apps/cli/lib/bin.js --profile headless "Use hackdev to <your mission>"
-```
-
-**Review work done elsewhere** with only the three gates:
-
-```sh
-node apps/cli/lib/bin.js --profile headless "Use hackdev_review to review this repository"
-```
-
-Everything an agent produces lives in the workspace under `.hackdev/` (`PROJECT_MAP.md`, `PROGRESS.md`, `MEMORY.md`, `RUN_REPORT.md`, `screenshots/`).
+  ```yaml
+  - uses: actions/checkout@v4
+    with: { fetch-depth: 0 }
+  - uses: ./.github/actions/hackdev-review
+    with:
+      api-key: ${{ secrets.DEEPSEEK_API_KEY }}
+  ```
+- **MCP servers.** Turn on GitHub, Playwright, filesystem, Context7 docs, fetch, Git, memory, sequential thinking, time or Brave Search from the built-in directory, or add your own.
+- **Skills.** Install skills from a Git repository; they load into every session.
+- **Custom instructions.** **Settings → General → Custom instructions**, or `AGENTS.md` files: `~/.dsh/AGENTS.md` for all projects, `AGENTS.md` in a project, `AGENTS.local.md` for private notes.
 
 ---
 
 ## Configuration
 
-The pipeline is configured on the `tool-hackdev` row of [`packages/bundle/base/cordis.patch.yml`](packages/bundle/base/cordis.patch.yml) (the Web presets in `packages/bundle/web-app/presets/` carry the same values).
+Every setting is documented in [docs/config-catalog.md](docs/config-catalog.md) and every tool in [docs/tool-catalog.md](docs/tool-catalog.md). The mission pipeline is configured on the `tool-hackdev` row of [`packages/bundle/base/cordis.patch.yml`](packages/bundle/base/cordis.patch.yml):
 
 | Option | Default | Meaning |
 |---|---|---|
-| `subagentProvider` | `spawn` | Provider that creates a fresh structured-output agent for each pipeline role |
-| `maxTasks` | 24 | Ceiling on tasks planned per wave |
-| `maxParallel` | 6 | Builders running at the same time |
-| `maxWaves` | 3 (6 in shipped profiles) | Ceiling on build waves (follow-up waves for unmet criteria) |
-| `maxFixRounds` | 2 (4 in shipped profiles) | Extra review-fix rounds per gate |
-| `maxMemoryChars` | 6000 | Blackboard text injected into one prompt, and the compaction target for `MEMORY.md` |
-| `maxResultChars` | 16384 | Size of the report returned to the calling model |
-| `visionModel` | empty | Optional image-capable model for the UI gate; empty inherits the default route |
-| `maxFactChecks` | 8 | Commands the fact-checker may re-run per wave; raise it for stricter evidence checks |
-| `builderIsolation` | `worktree` in shipped profiles | `worktree` gives each parallel builder its own git worktree, merged back one at a time (falls back to `shared` outside a git repository); `shared` keeps one workspace |
-| `autonomy` | `full` | `full` lets agents act without asking for approval; `bounded` forbids destructive or irreversible actions and defers large additions to you |
-| `customInstructions` | empty | Your standing instructions (up to 8000 characters), added to the lead agent's prompt and to every pipeline agent |
+| `maxTasks` | 24 | Tasks planned per wave |
+| `maxParallel` | 6 | Builders running at once |
+| `maxWaves` | 6 | Build waves, including follow-ups for unmet criteria |
+| `maxFixRounds` | 4 | Review-fix rounds per gate |
+| `builderIsolation` | `worktree` | A git worktree per builder; `shared` uses one workspace |
+| `autonomy` | `full` | `bounded` forbids destructive or irreversible actions |
+| `visionModel` | empty | Image-capable model for the UI gate |
+| `customInstructions` | empty | Standing instructions for every pipeline agent |
 
-A call to `hackdev` may lower `maxTasks`, `maxWaves` and `maxFixRounds`, never raise them above these ceilings. The total number of agents is capped by a computed budget (`maxTasks`, `maxFixRounds` and `maxWaves` together), so a run cannot spawn without bound. Lower the caps for quick demos.
+A request may lower these caps but never raise them, and a computed agent budget stops runaway spawning.
 
 ---
 
-## Available tools and execution boundaries
+## Architecture
 
-| Tool | Use |
-|---|---|
-| `hackdev` | Run the whole pipeline for a mission: Council, waves of Forge and Gates, Chronicle. |
-| `hackdev_review` | Run only the three gates on the current workspace, for work done outside the pipeline. |
+Hack Dev Code is a TypeScript monorepo built on the Cordis plugin framework: every capability (a tool, a model adapter, a UI panel) is a plugin, and product bundles choose which plugins to mount.
 
-Agents also use the runtime tools that already exist: file read, write and edit, search, shell commands (PowerShell or Bash), image reading for screenshots, structured user questions, MCP resources and optional browser tools. The generated reference of every tool, its arguments and result shape is in [`docs/tool-catalog.md`](docs/tool-catalog.md); every setting is in [`docs/config-catalog.md`](docs/config-catalog.md).
-
-**Boundaries that always apply:**
-
-- **Workspace only.** Agents work inside the chosen workspace. The default permission mode is *Workspace Write*; reads and writes outside it need approval.
-- **Sandboxed execution.** Shell commands run under the runtime sandbox and approval policy.
-- **Owned paths.** Parallel builders each own disjoint paths. Editing across the boundary has to be published as a warning on the blackboard.
-- **No destructive or irreversible actions** (deleting data, force operations, external side effects) without a human decision.
-- **No secrets** in code, logs, prompts or reports.
-- **Hard caps** on tasks, parallelism, waves, fix rounds, memory size and total agent count.
-- **Cancellation.** Cancelling the parent turn cancels the run and all its children.
-
----
-
-## Human oversight and approval workflow
-
-1. Every report opens with **Needs attention**: unfinished tasks, open issues, decisions deferred to a person, and anything that requires approval.
-2. A builder that is blocked on a human decision is *not* retried: it is surfaced in `needsHuman`.
-3. With `autonomy: bounded`, a gate that would have to grow the project (adding authentication, TLS, a database) records a `deferred` issue with a precise remediation and asks for your approval instead. Under the default full autonomy it builds the fix itself.
-4. A run is `complete` only when every task is done, every gate passes and every acceptance criterion is met. Otherwise it reports **needs attention**, with the evidence for each item.
-5. In the Web UI the same list is the first section of the mission card, and the agent can ask structured questions mid-run.
-6. **Full autonomy is the default.** Agents may also write a file without reading it first (the read-before-write guard row `fs-observation-policy` is disabled), subagents may delegate three levels deep, and missions may run up to 6 waves with 4 fix rounds per gate. New sessions start in the Full access permission mode (no sandbox, no approval prompts), and mission agents run with `autonomy: full`: they install, edit, delete and run commands anywhere without asking. Secrets stay private and results must still be real. To add limits back, pick Workspace Write or Read Only in the composer, set `DSH_PERMISSION_MODE=workspace-write` (or `read-only`) before starting, change `defaultPreset` on the `permission` row, or set `autonomy: bounded` on `tool-hackdev`.
+```text
+apps/cli, apps/web, apps/desktop     command line, Web UI and Electron desktop shell
+packages/core                        agent loop, tools runtime, system prompt
+packages/hackdev                     multi-agent mission pipeline and its result card
+packages/experimental                desktop control (computer use) and browser providers
+packages/llm                         model adapters, key pools and fallbacks
+packages/mcp, packages/skill         MCP client and directory, skills
+packages/bundle                      product bundles (base, web-app, headless)
+packages/*                           sessions, sandbox, credentials, file tools, UI and more
+extensions/vscode                    VS Code extension
+vendor/, native/                     vendored framework libraries, native sandbox helper
+docs/                                design doc and generated references
+```
 
 ---
 
-## Memory and agent communication
+## Build from source
 
-There is no free-form chat between agents. Communication is explicit, typed and auditable.
+Requirements: Node.js 24.9 or newer and pnpm 11.
 
-- **Structured reports.** Builders, gates, the fact-checker and the integrator return JSON checked against a schema.
-- **Typed blackboard.** Notes of kind `contract`, `decision`, `fact`, `risk`, `warning`, `handoff` and `question`. Duplicates are dropped; contracts and decisions are pinned so they always reach the prompt.
-- **Handoff notes.** A dependent builder receives each dependency's summary, files and handoff; the gates receive every builder's handoff and open questions.
-- **Project map** (`.hackdev/PROJECT_MAP.md`): the shared mental model injected into every agent.
-- **Long-term memory** (`.hackdev/MEMORY.md`): persists across runs, deduplicated and compacted within `maxMemoryChars`.
-- **Progress ledger** (`.hackdev/PROGRESS.md`): a rerun in the same workspace plans only the remaining work.
+```sh
+pnpm install
+pnpm run build:artifacts          # outside a git checkout, set DSH_CLIENT_COMMIT_HASH=abcdef1 first
+pnpm run start:web                # Web UI at http://127.0.0.1:3080
+node apps/cli/lib/bin.js "..."    # CLI
+```
 
-### Preventing hallucination
+Package the desktop app:
 
-- Prompts require reading a file before editing, citing paths, and never inventing APIs, packages, flags or results.
-- A task that reports `done` without evidence is downgraded to `partial`.
-- The fact-checker verifies listed files exist and re-runs claimed evidence; claims that do not reproduce downgrade the task.
-- A gate `pass` is accepted only with at least one passing check, no failing check and no open issue. `uiVerified` is rejected without viewed-screenshot evidence.
+```sh
+pnpm run package:desktop:win:x64:unsigned     # Windows installer
+pnpm run package:desktop:mac:arm64:unsigned   # macOS, Apple silicon
+```
 
----
+Pushing a `v*` tag that matches the desktop version builds the Windows installer and publishes it as a GitHub release.
 
-## Security
+Checks:
 
-- Sandboxing, approval prompts and bounded autonomy are available but switched off by default: agents run with full access until you choose a stricter permission mode or `autonomy: bounded` (see above).
-- The **security reviewer** gate audits and hardens whatever the guild builds: input validation, output escaping, authorization checks, security headers, rate limits, secret handling and dependency audit, and it adds regression tests for what it fixes.
-- No process can guarantee that software "cannot be hacked". The report therefore lists what was checked, what was fixed, and what remains open or deferred.
-- The API key is read from `DEEPSEEK_API_KEY` or the app's credential store. Never commit it.
-
----
-
-## Evaluation scenarios
-
-| Scenario | How to exercise it |
-|---|---|
-| **Feature implementation** | `hackdev` with "add X to this repository" in an existing project. |
-| **Bug fix** | `hackdev` with a failing test or reproduction steps in the mission. |
-| **Test-driven recovery** | State in the mission that tests are red. The verifier loops until they are green or reports what stays open. |
-| **Security and code review** | `hackdev_review` on an existing repository: it reviews, finds weaknesses, fixes what is in scope and defers the rest. |
-| **Unexpected condition** | Break a build or remove a dependency mid-run. A failed builder is split into subtasks, a failed dependency makes dependents `skipped`, and a crashed gate is recorded as a failed gate. |
-| **Long-horizon build** | A large mission. The planner sizes a bigger team and the integrator opens follow-up waves until the criteria are met. |
-| **Resume after interruption** | Run again in the same workspace. The scout reads `.hackdev/PROGRESS.md` and only remaining work is planned. |
-
-Each run ends with `.hackdev/RUN_REPORT.md`: what the agents did, the decisions they made, the evidence for each result and the items awaiting a human.
-
----
-
-## Deliverables checklist
-
-| Deliverable | Status |
-|---|---|
-| Source code and a working demonstration | This repository; the Web UI and CLI run a full mission end to end. |
-| Multi-agent planning, implementation and verification workflow | `packages/hackdev/tool-hackdev` |
-| Testing, verification, review and a feedback loop | Three gates with bounded review-fix loops, fact-check, regression pass |
-| At least one mission ending in a working result | Demonstrated with a tip calculator (headless and Web), a notes app (70/70 checks) and a gates-only review that found a real DNS-rebinding weakness |
-| Setup instructions and configuration | [Setup and run](#setup-and-run), [Configuration](#configuration) |
-| Architecture diagram and agent responsibilities | [Architecture](#architecture), [Agent responsibilities](#agent-responsibilities) |
-| Available tools and execution boundaries | [Available tools and execution boundaries](#available-tools-and-execution-boundaries) |
-| Human oversight and approval workflow | [Human oversight and approval workflow](#human-oversight-and-approval-workflow) |
-| Known limitations | [Known limitations](#known-limitations) |
-
----
-
-## Bonus points
-
-- **Parallel and dynamic agent creation.** The team is sized to the mission and builders run in parallel. Failed tasks spawn subtasks on demand.
-- **Automatic review and recovery.** Verifier, quality, security and regression gates with bounded review-fix loops, plus a fact-checker.
-- **Persistent memory.** A shared blackboard, a project map, long-term memory and a progress ledger make runs resumable.
-- **Evidence-based reporting.** Every verdict carries checks and evidence; unproven claims are downgraded.
-- **Live visibility.** The Web UI shows live phases and agents and a final result card with the attention list.
-- **Visual verification.** The UI gate takes real screenshots at desktop and mobile widths and judges them.
+```sh
+pnpm run lint
+npx tsc -b tsconfig.host.json     # NODE_OPTIONS=--max-old-space-size=8192
+npx tsc -b tsconfig.client.json
+npx vitest run <path>
+```
 
 ---
 
 ## Known limitations
 
-- Quality depends on the underlying model. The gates add evidence and loops, not guarantees.
-- Visual verification needs a headless browser, the project's own Playwright, or a mounted browser provider, plus an image-capable model route. Without them the report says the UI was not visually exercised.
-- With `builderIsolation: shared`, parallel builders share one working directory and disjoint owned paths only make collisions unlikely. The default `worktree` isolation needs a git repository with at least one commit.
-- The blackboard is bounded: older, non-pinned entries drop out of prompts (they stay in `MEMORY.md` until compacted).
-- The fact-checker re-runs at most `maxFactChecks` commands per wave (eight by default), so it samples evidence rather than repeating everything.
-- Some repository tests need a POSIX environment (symlinks, git) and fail on Windows for that reason alone.
+- Results depend on the model. The gates add evidence and retry loops, not guarantees.
+- Desktop control does not cover Wayland-only Linux sessions, UAC prompts or the lock screen.
+- The Windows installer is not code-signed yet.
+- Visual checks in missions need an image-capable model route and a browser; without them the report says the UI was not visually exercised.
+- Some repository tests need symlinks, git or a POSIX shell and fail on Windows for that reason alone.
 
 ---
 
-## Repository layout, tests and license
+## Contributing, license and acknowledgements
 
-```text
-packages/hackdev/tool-hackdev        mission pipeline plugin (src/script.ts holds the fixed scripts)
-packages/hackdev/client-ui-hackdev   Web card for mission and gate-review results
-packages/core/system-prompt          prompt sections for the pipeline policy
-packages/bundle/                     product bundles (base, web-app, headless) that mount the tools
-packages/*/ , vendor/                the agent runtime: sessions, tools, sandbox, UI, LLM adapters
-apps/cli, apps/web, apps/desktop     command line, Web UI and desktop shell
-docs/                                design doc and generated tool and config references
-```
+Conventions for contributors and coding agents are in [AGENTS.md](AGENTS.md). Issues and pull requests are welcome.
 
-```sh
-pnpm vitest run packages/hackdev     # orchestration logic, deterministic, no network
-pnpm run typecheck
-pnpm run lint
-```
-
-The orchestration tests run the real pipeline scripts in a Node VM with scripted agents, so DAG scheduling, retries, memory sharing and gate verdicts are verified without a model.
-
-Repository conventions for contributors are in [AGENTS.md](AGENTS.md).
-
-[MIT](LICENSE). Third-party dependencies and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+[MIT](LICENSE). Third-party dependencies and their licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Hack Dev Code builds on the MIT-licensed DeepSeek Harness agent runtime.

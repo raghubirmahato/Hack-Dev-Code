@@ -117,7 +117,8 @@ FunctionEnd
 !macroend
 !insertmacro InstallerValidatePathFunction ""
 
-; A new installation requires an empty directory; updates require the registered executable.
+; A new installation requires an empty directory; updates require the registered executable. A directory an
+; interrupted uninstall left behind (the application executable and its app.asar, no registration) is replaced too.
 Function InstallerPreflight
     Call InstallerValidatePath
     ${If} $InstallerError != ""
@@ -125,8 +126,16 @@ Function InstallerPreflight
     ${EndIf}
     StrCpy $INSTDIR $InstallerPath
     ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" "InstallLocation"
-    ${If} $0 != $INSTDIR
-    ${OrIfNot} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+    StrCpy $1 0
+    ${If} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+    ${AndIf} ${FileExists} "$INSTDIR\resources\app.asar"
+        StrCpy $1 1
+    ${EndIf}
+    ${If} $0 == $INSTDIR
+    ${AndIf} ${FileExists} "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+        StrCpy $1 1
+    ${EndIf}
+    ${If} $1 == 0
         FindFirst $0 $1 "$INSTDIR\*.*"
         ${DoWhile} $1 != ""
             ${If} $1 != "."
