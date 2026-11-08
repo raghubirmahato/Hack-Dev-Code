@@ -60,8 +60,8 @@ const ROUTE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
  * without one, so the preset fills a placeholder.
  */
 const LOCAL_PRESETS = [
-  { id: 'ollama', label: 'presetOllama', displayName: 'Ollama', baseURL: 'http://127.0.0.1:11434/v1', key: 'ollama' },
-  { id: 'lm-studio', label: 'presetLmStudio', displayName: 'LM Studio', baseURL: 'http://127.0.0.1:1234/v1', key: 'lm-studio' },
+  { id: 'ollama', nameKey: 'presetOllama', displayName: 'Ollama', baseURL: 'http://127.0.0.1:11434/v1', key: 'ollama' },
+  { id: 'lm-studio', nameKey: 'presetLmStudio', displayName: 'LM Studio', baseURL: 'http://127.0.0.1:1234/v1', key: 'lm-studio' },
 ] as const
 
 function isHttpUrl(value: string): boolean {
@@ -230,7 +230,8 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
     setRoute(id)
     setDisplayName(preset.displayName)
     setBaseURL(preset.baseURL)
-    if (protocols.includes('openai-completions')) setProtocol('openai-completions')
+    // Presets are only offered when the adapter speaks Chat Completions.
+    setProtocol('openai-completions')
     setKeyDraft(preset.key)
   }
 
@@ -249,7 +250,7 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
                   disabled={profileDisabled}
                   onClick={() => { applyPreset(preset) }}
                 >
-                  {t(preset.label)}
+                  {t(preset.nameKey)}
                 </button>
               ))}
             </div>

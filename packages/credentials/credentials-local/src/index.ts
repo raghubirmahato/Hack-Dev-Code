@@ -42,6 +42,8 @@ import { mkdir, readFile, stat } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { Document, isMap, isScalar, parseDocument, type YAMLError } from 'yaml'
 import { withFileLock, writeFileAtomic } from '@hackdevcode/dsh-atomic-write'
+import { dpapiCodec, SEALED_PREFIX } from './at-rest.ts'
+import type { AtRestCodec } from './at-rest.ts'
 import { canonicalizeWatchPath, resolveDshHome } from '@hackdevcode/dsh-home-paths'
 import { launchEnvironmentOf } from '@hackdevcode/dsh-launch-environment'
 import { CredentialProvider, credentialRef, parseCredentialKey } from '@hackdevcode/dsh-credentials'
@@ -70,6 +72,12 @@ export interface Config {
   watch?: boolean
   /** Watcher write-settle window in milliseconds; defaults to 100. */
   debounceMs?: number
+  /**
+   * Windows: seal the document with the Data Protection API for the signed-in account, so other accounts, copies
+   * and backups cannot read the keys. A plain document written by hand is still read and is sealed on the next
+   * write. Defaults to false; ignored on other platforms, where the document stays owner-only plain text.
+   */
+  encryptAtRest?: boolean
 }
 
 /** Fully resolved provider parameters; defaulting happens here, never inline. */
@@ -77,6 +85,7 @@ interface ResolvedSpec {
   filename: string
   watch: boolean
   debounceMs: number
+  encryptAtRest: boolean
 }
 
 /**
@@ -90,6 +99,7 @@ export function resolveSpec(config: Config): ResolvedSpec {
     filename: resolve(config.path ?? join(resolveDshHome(config.dshHome), CREDENTIALS_FILENAME)),
     watch: config.watch ?? true,
     debounceMs: config.debounceMs ?? 100,
+    encryptAtRest: config.encryptAtRest === true && process.platform === 'win32',
   }
 }
 
@@ -520,6 +530,7 @@ export class LocalCredentialProvider extends CredentialProvider {
     dshHome: z.string(),
     watch: z.boolean().default(true),
     debounceMs: z.number().min(0).default(100),
+    encryptAtRest: z.boolean().default(false),
   })
 
   private readonly spec: ResolvedSpec
@@ -529,6 +540,10 @@ export class LocalCredentialProvider extends CredentialProvider {
    * which is also the self-write suppression.
    */
   private text: string | undefined
+  /** The on-disk form behind {@link text}, so an unchanged sealed file is not opened again on every reload. */
+  private raw: string | undefined
+  /** Seals and opens the document when {@link ResolvedSpec.encryptAtRest} is on. */
+  private readonly codec: AtRestCodec = dpapiCodec()
   /** Parsed reference snapshot; replaced wholesale on every reload. */
   private values = new Map<string, string>()
   /** Parsed record snapshot; replaced wholesale on every reload. */
@@ -700,7 +715,7 @@ export class LocalCredentialProvider extends CredentialProvider {
         else assertStorableApiKey(key, next)
         const nextText = renderRecord(this.text, key, next)
         // 0600: a document holding secrets is never world-readable.
-        await writeFileAtomic(this.spec.filename, nextText, { mode: 0o600, dirMode: 0o700 })
+        await this.writeDocument(nextText)
         this.text = nextText
         this.records.set(key, next)
         // After the commit, on the same terms as a reference write.
@@ -721,7 +736,7 @@ export class LocalCredentialProvider extends CredentialProvider {
         await this.reconcileFromDisk()
         if (!this.records.has(key)) return
         const nextText = renderRecord(this.text, key, undefined)
-        await writeFileAtomic(this.spec.filename, nextText, { mode: 0o600, dirMode: 0o700 })
+        await this.writeDocument(nextText)
         this.text = nextText
         this.records.delete(key)
         this.notifyRecordUpdated(key)
@@ -764,7 +779,7 @@ export class LocalCredentialProvider extends CredentialProvider {
         if (value === undefined && existing === undefined) return
         const nextText = renderRef(this.text, ref, value)
         // 0600: a document holding secrets is never world-readable.
-        await writeFileAtomic(this.spec.filename, nextText, { mode: 0o600, dirMode: 0o700 })
+        await this.writeDocument(nextText)
         this.text = nextText
         if (value === undefined) this.values.delete(ref)
         else this.values.set(ref, value)
@@ -787,7 +802,7 @@ export class LocalCredentialProvider extends CredentialProvider {
     await assertOwnerOnly(this.spec.filename)
     let text: string
     try {
-      text = await readFile(this.spec.filename, 'utf8')
+      text = await this.readDocument()
     } catch (error) {
       if (!isENOENT(error)) throw error
       return
@@ -798,6 +813,48 @@ export class LocalCredentialProvider extends CredentialProvider {
     this.values = document.refs
     this.records = document.records
     this.text = text
+    if (this.spec.encryptAtRest && this.raw !== undefined && !this.raw.startsWith(SEALED_PREFIX) && text.trim().length > 0) {
+      await this.sealPlainDocument()
+    }
+  }
+
+  /**
+   * Read the document as YAML text: a sealed file is opened (once per distinct on-disk content), a plain one is
+   * returned as it is.
+   * @returns the document text.
+   * @throws the read error, such as ENOENT for a missing file.
+   */
+  private async readDocument(): Promise<string> {
+    const raw = await readFile(this.spec.filename, 'utf8')
+    if (!raw.startsWith(SEALED_PREFIX)) {
+      this.raw = raw
+      return raw
+    }
+    if (raw === this.raw && this.text !== undefined) return this.text
+    const text = await this.codec.open(raw)
+    this.raw = raw
+    return text
+  }
+
+  /**
+   * Persist document text, sealed when encryption at rest is on; 0600, since a document holding secrets is never
+   * world-readable.
+   * @param text - the document text.
+   */
+  private async writeDocument(text: string): Promise<void> {
+    const raw = this.spec.encryptAtRest ? await this.codec.seal(text) : text
+    await writeFileAtomic(this.spec.filename, raw, { mode: 0o600, dirMode: 0o700 })
+    this.raw = raw
+  }
+
+  /** Seal a plain document found at boot, under the writer lock and from a fresh read. */
+  private async sealPlainDocument(): Promise<void> {
+    await withFileLock(this.spec.filename, async () => {
+      const current = await this.readDocument()
+      if (this.raw?.startsWith(SEALED_PREFIX) === true || current !== this.text) return
+      await this.writeDocument(current)
+      this.ctx.logger.info('credentials-local: sealed %s for this Windows account', this.spec.filename)
+    }, { waitMs: DOCUMENT_LOCK_WAIT_MS })
   }
 
   /**
@@ -812,7 +869,7 @@ export class LocalCredentialProvider extends CredentialProvider {
    */
   private async migrateFlatDocument(): Promise<string> {
     return withFileLock(this.spec.filename, async () => {
-      const current = await readFile(this.spec.filename, 'utf8')
+      const current = await this.readDocument()
       const migrated = renderFlatLayoutMigration(current)
       /* v8 ignore next 2 -- the losing side of the cross-process migration race:
          another boot rewrote the document between the unlocked recognize and
@@ -821,7 +878,7 @@ export class LocalCredentialProvider extends CredentialProvider {
          decision itself is the recognizer's covered versioned-document decline. */
       if (migrated === undefined) return current
       // 0600: a document holding secrets is never world-readable.
-      await writeFileAtomic(this.spec.filename, migrated, { mode: 0o600, dirMode: 0o700 })
+      await this.writeDocument(migrated)
       this.ctx.logger.info(
         'credentials-local: migrated %s to the version %d layout; values are unchanged',
         this.spec.filename,
@@ -860,7 +917,7 @@ export class LocalCredentialProvider extends CredentialProvider {
     await assertOwnerOnly(this.spec.filename)
     let text: string | undefined
     try {
-      text = await readFile(this.spec.filename, 'utf8')
+      text = await this.readDocument()
     } catch (error) {
       if (!isENOENT(error)) throw error
       text = undefined

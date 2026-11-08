@@ -251,7 +251,7 @@ describe('registration', () => {
     // Registration performs NO load-time probe: the packaged binary is always
     // available, so nothing spawns until a tool call.
     expect(subprocess.spawns).toHaveLength(0)
-    expect(ctx.tools.schemas().map(s => s.name).sort()).toEqual(['glob', 'grep'])
+    expect(ctx.tools.schemas().map(s => s.name).sort()).toEqual(['code_search', 'glob', 'grep'])
     const prompt = renderPrompt(await ctx.systemPrompt.assemble())
     expect(prompt).toContain('Use the glob tool')
     expect(prompt).toContain('Use the grep tool')
@@ -271,7 +271,7 @@ describe('registration', () => {
 
   it('unregisters everything on fiber disposal (HMR safety)', async () => {
     const { ctx, fiber } = await setup()
-    expect(ctx.tools.schemas()).toHaveLength(2)
+    expect(ctx.tools.schemas()).toHaveLength(3)
     await fiber.dispose()
     expect(ctx.tools.schemas()).toHaveLength(0)
     const sections = (await ctx.systemPrompt.assemble()).sections.map(s => s.name)
@@ -1310,15 +1310,19 @@ describe('scope-aware search guidance', () => {
     const { key, scope } = await guidanceScope(ctx)
     try {
       expect(renderPrompt(await ctx.systemPrompt.assemble({ scope: key })))
-        .toBe(withPersona(originalSearchGuidance.glob, originalSearchGuidance.grep))
+        .toBe(withPersona(originalSearchGuidance.glob, CODE_SEARCH_GUIDANCE, originalSearchGuidance.grep))
       scope.ctx.tools.restrict({ deny: ['read'] })
       expect(renderPrompt(await ctx.systemPrompt.assemble({ scope: key })))
-        .toBe(withPersona(originalSearchGuidance.glob, originalSearchGuidance.grep.split(' Use read')[0]!))
+        .toBe(withPersona(originalSearchGuidance.glob, CODE_SEARCH_GUIDANCE, originalSearchGuidance.grep.split(' Use read')[0]!))
     } finally {
       await scope.dispose()
     }
   })
 })
+
+/** The code_search guidance, pinned verbatim. */
+const CODE_SEARCH_GUIDANCE = 'To find where something is defined or implemented when you do not know its exact name, use code_search with a short description '
+  + '("refresh auth token", "parse tool arguments"); use grep for exact text.'
 
 /** Preserve the default persona and exact section separators in the oracle. */
 function withPersona(...sections: string[]): string {

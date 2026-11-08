@@ -14,7 +14,7 @@ export interface DesktopElectronBuilderConfig {
     { readonly from: string, readonly to: 'dsh', readonly filter: readonly ['**/*'] },
     { readonly from: string, readonly to: 'dsh/node_modules', readonly filter: readonly ['**/*'] },
   ]
-  readonly extraMetadata: { readonly dshDesktopAppId: string }
+  readonly extraMetadata: { readonly dshDesktopAppId: string; readonly dshDesktopUpdateChannel: string }
   readonly asarUnpack: readonly string[]
   readonly extraResources: readonly [
     { readonly from: string, readonly to: 'runtime' },
@@ -60,7 +60,10 @@ export interface DesktopElectronBuilderConfig {
   readonly afterPack: (context: AfterPackContext) => Promise<void>
   readonly afterSign: (context: AfterPackContext) => Promise<void>
   readonly artifactBuildCompleted: (artifact: { readonly file: string }) => Promise<void> | undefined
-  readonly publish: readonly [{ readonly provider: 'generic', readonly url: string }] | null
+  readonly publish: readonly [
+    | { readonly provider: 'generic', readonly url: string, readonly channel: string }
+    | { readonly provider: 'github', readonly owner: string, readonly repo: string, readonly channel: string, readonly releaseType: 'prerelease' | 'release' },
+  ] | null
 }
 
 /**
@@ -79,6 +82,13 @@ export function createElectronBuilderConfig(
   preparedRuntime?: string,
   preparedRuntimeVersion?: string,
 ): DesktopElectronBuilderConfig
+
+/**
+ * Parse the GitHub repository that hosts update releases.
+ * @param value - `owner/repo`, or undefined for none.
+ * @returns the repository, or undefined.
+ */
+export function resolveGitHubUpdateRepository(value: string | undefined): { owner: string, repo: string } | undefined
 
 declare const electronBuilderConfig: DesktopElectronBuilderConfig
 

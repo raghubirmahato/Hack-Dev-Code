@@ -64,6 +64,8 @@
     "@hackdevcode/dsh-llm-deepseek-account": "workspace:*",
     "@hackdevcode/dsh-llm-pi-ai": "workspace:*",
     "@hackdevcode/dsh-llm-retry": "workspace:*",
+    "@hackdevcode/dsh-mcp-client": "workspace:*",
+    "@hackdevcode/dsh-mcp-directory": "workspace:*",
     "@hackdevcode/dsh-mcp-resources": "workspace:*",
     "@hackdevcode/dsh-permission-presets": "workspace:*",
     "@hackdevcode/dsh-plan-mode": "workspace:*",

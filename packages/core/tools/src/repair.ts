@@ -14,8 +14,9 @@ export type ParsedArguments =
   | { readonly ok: false; readonly error: string }
 
 /**
- * Close brackets a model forgot at the very end, such as a missing final `}`. Text that ends inside a string is
- * left alone: it was cut off mid-value, and closing it would run the call with truncated content.
+ * Close braces a model forgot at the very end, such as a missing final `}`. Text that ends inside a string or an
+ * array is left alone: it was cut off mid-value, and closing it would run the call with truncated content (some of
+ * the files, questions or weekdays it meant to send), which no validation can notice.
  */
 function closeTruncated(text: string): string | undefined {
   const open: string[] = []
@@ -35,7 +36,7 @@ function closeTruncated(text: string): string | undefined {
       if (open.pop() !== char) return undefined
     }
   }
-  if (open.length === 0 || inString || open.length > 2) return undefined
+  if (open.length === 0 || inString || open.length > 2 || open.includes(']')) return undefined
   return text.replace(/,\s*$/u, '') + open.toReversed().join('')
 }
 
@@ -168,12 +169,11 @@ export function coerceToSchema(schema: JsonSchemaNode, value: unknown): unknown 
     const properties = schema.properties ?? {}
     const out: Record<string, unknown> = {}
     for (const [key, field] of Object.entries(record)) {
-      const declared = properties[key]
-      if (declared === undefined) {
-        out[key] = field
-        continue
-      }
-      out[key] = coerceToSchema(declared, field)
+      const declared = Object.hasOwn(properties, key) ? properties[key] : undefined
+      // Defined rather than assigned: a model-sent "__proto__" stays an ordinary own field, as JSON.parse made it.
+      Object.defineProperty(out, key, {
+        value: declared === undefined ? field : coerceToSchema(declared, field), enumerable: true, writable: true, configurable: true,
+      })
     }
     return out
   }
@@ -237,6 +237,8 @@ export function similarToolNames(requested: string, available: readonly string[]
   if (wanted.length === 0) return []
   const scored = available.map((name) => {
     const candidate = normalizeName(name)
+    // A name with no Latin letters or digits normalizes to nothing and would "contain" every request.
+    if (candidate.length === 0) return { name, score: Number.POSITIVE_INFINITY }
     if (candidate === wanted) return { name, score: 0 }
     if (candidate.includes(wanted) || wanted.includes(candidate)) {
       return { name, score: 1 + Math.abs(candidate.length - wanted.length) / 100 }

@@ -1,0 +1,100 @@
+name: Hack Dev Code review
+description: >-
+  Review a pull request with Hack Dev Code in read-only mode and post the review as a pull request comment.
+  The agent reads the diff and the files it touches, and reports correctness, security and test findings.
+
+inputs:
+  api-key:
+    description: API key of the model provider (DEEPSEEK_API_KEY by default).
+    required: true
+  api-key-env:
+    description: Environment variable the provider reads its key from.
+    default: DEEPSEEK_API_KEY
+  base-ref:
+    description: Branch the pull request merges into.
+    default: ${{ github.event.pull_request.base.ref }}
+  instructions:
+    description: Extra review instructions, such as project conventions to check.
+    default: ''
+  max-diff-lines:
+    description: Diffs longer than this are cut, and the review says so.
+    default: '6000'
+  hackdev-path:
+    description: Checkout of the Hack Dev Code repository that provides the CLI.
+    default: .
+  github-token:
+    description: Token that may comment on the pull request.
+    default: ${{ github.token }}
+
+outputs:
+  review-file:
+    description: Path of the Markdown review.
+    value: ${{ steps.review.outputs.file }}
+
+runs:
+  using: composite
+  steps:
+    - name: Collect the diff
+      id: diff
+      shell: bash
+      env:
+        BASE_REF: ${{ inputs.base-ref }}
+        MAX_LINES: ${{ inputs.max-diff-lines }}
+      run: |
+        git fetch --no-tags --depth=200 origin "$BASE_REF"
+        diff_file="$RUNNER_TEMP/hackdev-review.diff"
+        git diff --unified=3 "origin/$BASE_REF...HEAD" > "$diff_file.full"
+        total=$(wc -l < "$diff_file.full")
+        head -n "$MAX_LINES" "$diff_file.full" > "$diff_file"
+        if [ "$total" -gt "$MAX_LINES" ]; then echo "truncated=$total" >> "$GITHUB_OUTPUT"; fi
+        echo "file=$diff_file" >> "$GITHUB_OUTPUT"
+        echo "lines=$total" >> "$GITHUB_OUTPUT"
+
+    - name: Review with Hack Dev Code
+      id: review
+      shell: bash
+      env:
+        DIFF_FILE: ${{ steps.diff.outputs.file }}
+        TRUNCATED: ${{ steps.diff.outputs.truncated }}
+        EXTRA: ${{ inputs.instructions }}
+        HACKDEV: ${{ inputs.hackdev-path }}
+        KEY_ENV: ${{ inputs.api-key-env }}
+        KEY: ${{ inputs.api-key }}
+      run: |
+        review_file="$RUNNER_TEMP/hackdev-review.md"
+        export "$KEY_ENV=$KEY"
+        prompt="Review the pull request whose diff is in the file $DIFF_FILE, for the repository in the current directory.
+        Read the diff, then read the changed files and the code they call where you need context. Do not change any file.
+        Report only real problems a reviewer should act on: bugs and wrong behaviour, security issues, data loss, race conditions,
+        broken error handling, missing or wrong tests for changed behaviour, and clear violations of the project's documented conventions.
+        Skip style nits and praise. For each finding give the file and line, the severity (high, medium or low), what goes wrong
+        in a concrete scenario, and the fix. Check each finding against the code before reporting it.
+        Write the review in Markdown: a one-line verdict first, then the findings ordered by severity, or the line
+        'No blocking issues found.' when there are none.${TRUNCATED:+ The diff was cut at its first lines of $TRUNCATED; say which files you could not review.}
+        $EXTRA"
+        node --import tsx/esm "$HACKDEV/apps/cli/src/bin.ts" headless \
+          --permission-mode read-only --approval-policy never "$prompt" > "$review_file"
+        echo "file=$review_file" >> "$GITHUB_OUTPUT"
+
+    - name: Post the review
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REVIEW_FILE: ${{ steps.review.outputs.file }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        {
+          echo "### Hack Dev Code review"
+          echo
+          cat "$REVIEW_FILE"
+          echo
+          echo "<sub>Automated review by Hack Dev Code (read-only). Check findings before acting on them.</sub>"
+        } > "$REVIEW_FILE.comment"
+        # One comment per pull request, updated on each push.
+        existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+          --jq '[.[] | select(.body | startswith("### Hack Dev Code review"))][0].id // empty')
+        if [ -n "$existing" ]; then
+          gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F "body=@$REVIEW_FILE.comment" > /dev/null
+        else
+          gh pr comment "$PR" --body-file "$REVIEW_FILE.comment"
+        fi

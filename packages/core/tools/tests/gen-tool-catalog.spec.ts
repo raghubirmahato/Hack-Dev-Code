@@ -26,7 +26,7 @@ describe('gen-tool-catalog collectToolCatalog', () => {
     const catalog = await collectToolCatalog()
     const names = catalog.flatMap(entry => entry.schemas.map(s => s.name)).sort()
     expect(names).toEqual([
-      'ask_user_question', 'bash', 'bash', 'cordis_inspect_list',
+      'ask_user_question', 'bash', 'bash', 'code_search', 'cordis_inspect_list',
       'cordis_inspect_query',
       'create_goal', 'create_worktree', 'edit', 'exit_plan_mode', 'get_goal', 'glob', 'grep', 'hackdev', 'hackdev_review',
       'interrupt_agent', 'interrupt_agent', 'job_kill', 'job_list', 'job_output',
@@ -85,7 +85,7 @@ describe('gen-tool-catalog collectToolCatalog', () => {
       process.env.PATH = ''
       const catalog = await collectToolCatalog()
       const search = catalog.find(entry => entry.pkg === '@hackdevcode/dsh-tool-fs-search')
-      expect(search?.schemas.map(s => s.name).sort()).toEqual(['glob', 'grep'])
+      expect(search?.schemas.map(s => s.name).sort()).toEqual(['code_search', 'glob', 'grep'])
     } finally {
       if (oldPath === undefined) delete process.env.PATH
       else process.env.PATH = oldPath

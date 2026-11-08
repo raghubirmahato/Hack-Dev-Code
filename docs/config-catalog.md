@@ -827,7 +827,7 @@ export interface Config {
 
 ## `@hackdevcode/dsh-credentials-local`
 
-- `source`: [`packages/credentials/credentials-local/src/index.ts:64`](../packages/credentials/credentials-local/src/index.ts)
+- `source`: [`packages/credentials/credentials-local/src/index.ts:66`](../packages/credentials/credentials-local/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: file location and hot-reload behavior. */
@@ -840,6 +840,12 @@ export interface Config {
   watch?: boolean
   /** Watcher write-settle window in milliseconds; defaults to 100. */
   debounceMs?: number
+  /**
+   * Windows: seal the document with the Data Protection API for the signed-in account, so other accounts, copies
+   * and backups cannot read the keys. A plain document written by hand is still read and is sealed on the next
+   * write. Defaults to false; ignored on other platforms, where the document stays owner-only plain text.
+   */
+  encryptAtRest?: boolean
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-credentials-local -->
@@ -2552,6 +2558,34 @@ export interface ReconnectConfig {
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-mcp-client -->
 
+<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-mcp-directory -->
+<a id="hackdevcodedsh-mcp-directory"></a>
+
+## `@hackdevcode/dsh-mcp-directory`
+
+- `inject`: `tools`
+- `refs`: `Volatile` (`@hackdevcode/cosmokit`)
+- `source`: [`packages/mcp/mcp-directory/src/index.ts:44`](../packages/mcp/mcp-directory/src/index.ts)
+
+```ts config-catalog
+/** Plugin config. */
+export interface Config {
+  /** Chosen servers by directory id; edited live by Settings and `mcp_directory`. */
+  servers: Volatile<Record<string, ServerChoice>>
+}
+
+/** One server the person turned on. */
+export interface ServerChoice {
+  /** Run the server; a choice turned off keeps its keys and folders for later. */
+  enabled: boolean
+  /** Values for the keys the server requires; a key left out is read from the environment Hack Dev Code started in. */
+  env?: Readonly<Record<string, string>> | undefined
+  /** Folders for a server that opens folders, such as filesystem. */
+  roots?: readonly string[] | undefined
+}
+```
+<!-- END GENERATED config-catalog:@hackdevcode/dsh-mcp-directory -->
+
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-message-feedback -->
 <a id="hackdevcodedsh-message-feedback"></a>
 
@@ -4139,7 +4173,7 @@ export interface Config {
 ## `@hackdevcode/dsh-tool-fs-search`
 
 - `inject`: `tools` · `systemPrompt` · `subprocess` · `workingDirectory`
-- `source`: [`packages/fs/tool-fs-search/src/index.ts:74`](../packages/fs/tool-fs-search/src/index.ts)
+- `source`: [`packages/fs/tool-fs-search/src/index.ts:77`](../packages/fs/tool-fs-search/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config; over-cap glob sampling is an explicit deployment choice and the remaining fields have defaults. */
@@ -4165,6 +4199,8 @@ export interface Config {
    * `@hackdevcode/dsh-tool-call-timeout-policy` through `exec.signal`.
    */
   timeoutMs?: number
+  /** How long `code_search` reuses a workspace's definition index before collecting it again, in milliseconds. */
+  codeIndexTtlMs?: number
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-tool-fs-search -->

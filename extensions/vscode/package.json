@@ -1,0 +1,63 @@
+{
+  "name": "hack-dev-code",
+  "displayName": "Hack Dev Code",
+  "description": "Run Hack Dev Code agents on your workspace from VS Code: ask, explain or change the selected code, review your changes, or open the full app beside your editor.",
+  "version": "0.2.2",
+  "publisher": "hackdevcode",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raghubirmahato/Hack-Dev-Code.git",
+    "directory": "extensions/vscode"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["AI", "Programming Languages", "Other"],
+  "keywords": ["agent", "ai", "deepseek", "code review", "assistant"],
+  "main": "./extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      { "command": "hackdev.ask", "title": "Ask…", "category": "Hack Dev Code" },
+      { "command": "hackdev.askAboutSelection", "title": "Ask About Selection…", "category": "Hack Dev Code" },
+      { "command": "hackdev.reviewChanges", "title": "Review My Changes", "category": "Hack Dev Code" },
+      { "command": "hackdev.openHere", "title": "Open Hack Dev Code Here", "category": "Hack Dev Code" },
+      { "command": "hackdev.openDesktop", "title": "Open the Desktop App", "category": "Hack Dev Code" },
+      { "command": "hackdev.stop", "title": "Stop the Running Task", "category": "Hack Dev Code" }
+    ],
+    "menus": {
+      "editor/context": [
+        { "command": "hackdev.askAboutSelection", "when": "editorHasSelection", "group": "hackdev@1" }
+      ],
+      "commandPalette": [
+        { "command": "hackdev.askAboutSelection", "when": "editorHasSelection" }
+      ]
+    },
+    "keybindings": [
+      { "command": "hackdev.ask", "key": "ctrl+alt+h", "mac": "cmd+alt+h" },
+      { "command": "hackdev.askAboutSelection", "key": "ctrl+alt+k", "mac": "cmd+alt+k", "when": "editorHasSelection" }
+    ],
+    "configuration": {
+      "title": "Hack Dev Code",
+      "properties": {
+        "hackdev.command": {
+          "type": "string",
+          "default": "hackdev",
+          "markdownDescription": "Command that starts the Hack Dev Code CLI. The desktop installer adds `hackdev`; from a source checkout use `node --import tsx/esm <checkout>/apps/cli/src/bin.ts`."
+        },
+        "hackdev.permissionMode": {
+          "type": "string",
+          "enum": ["", "read-only", "workspace-write", "danger-full-access"],
+          "default": "",
+          "markdownDescription": "Permission preset for tasks started here. Empty uses your Hack Dev Code default. Reviews always run `read-only`."
+        },
+        "hackdev.reviewInstructions": {
+          "type": "string",
+          "default": "",
+          "description": "Extra instructions added to every review, such as project conventions to check."
+        }
+      }
+    }
+  }
+}

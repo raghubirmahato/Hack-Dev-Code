@@ -1,0 +1,45 @@
+name: PR review
+
+# Reviews each pull request with Hack Dev Code and posts the review as one comment, updated on every push.
+# Needs the DEEPSEEK_API_KEY repository secret. Pull requests from forks get no secrets on `pull_request`,
+# so they are skipped rather than reviewed with a key their code could read.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Plugins load from their built lib/ folders.
+      - name: Build
+        run: pnpm run build:artifacts
+
+      - name: Review
+        uses: ./.github/actions/hackdev-review
+        with:
+          api-key: ${{ secrets.DEEPSEEK_API_KEY }}

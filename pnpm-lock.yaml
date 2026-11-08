@@ -2362,6 +2362,12 @@ importers:
       '@hackdevcode/dsh-llm-retry':
         specifier: workspace:*
         version: link:../../llm/llm-retry
+      '@hackdevcode/dsh-mcp-client':
+        specifier: workspace:*
+        version: link:../../mcp/mcp-client
+      '@hackdevcode/dsh-mcp-directory':
+        specifier: workspace:*
+        version: link:../../mcp/mcp-directory
       '@hackdevcode/dsh-mcp-resources':
         specifier: workspace:*
         version: link:../../mcp/mcp-resources
@@ -13384,6 +13390,46 @@ importers:
       zod:
         specifier: 4.4.3
         version: 4.4.3
+
+  packages/mcp/mcp-directory:
+    dependencies:
+      '@hackdevcode/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/cordis-plugin-loader':
+        specifier: workspace:*
+        version: link:../../../vendor/loader
+      '@hackdevcode/cosmokit':
+        specifier: link:../../../vendor/cosmokit
+        version: link:../../../vendor/cosmokit
+      '@hackdevcode/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../../util/home-paths
+      '@hackdevcode/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@hackdevcode/dsh-mcp-client':
+        specifier: workspace:*
+        version: link:../mcp-client
+      '@hackdevcode/dsh-settings':
+        specifier: workspace:*
+        version: link:../../settings/settings
+      '@hackdevcode/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@hackdevcode/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@hackdevcode/dsh-tool-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/tool-testkit
+      '@hackdevcode/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
 
   packages/mcp/mcp-resources:
     dependencies:

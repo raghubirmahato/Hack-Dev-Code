@@ -1,0 +1,79 @@
+name: Release
+
+# Builds the Windows installer and publishes it, with its blockmap and update feed, as a GitHub Release.
+# Installed copies update themselves from these releases (DSH_DESKTOP_UPDATE_GITHUB). Push a tag that matches
+# apps/desktop/package.json, such as v0.2.2-alpha.2; a version with a prerelease suffix becomes a prerelease on
+# the nightly update channel, a plain version a release on the latest channel.
+#
+# The installer is unsigned until a code-signing certificate is configured, so Windows SmartScreen may warn.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    env:
+      DSH_DESKTOP_APP_ID: dev.hackdevcode.app
+      DSH_DESKTOP_UPDATE_GITHUB: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Check the tag against the version
+        id: version
+        shell: bash
+        run: |
+          version=$(node -p "require('./apps/desktop/package.json').version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v$version" ]; then
+            echo "::error::tag ${GITHUB_REF_NAME} does not match apps/desktop/package.json version $version"
+            exit 1
+          fi
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        shell: bash
+        run: DSH_CLIENT_COMMIT_HASH="${GITHUB_SHA::7}" pnpm run build:artifacts
+
+      - name: Package the installer
+        run: pnpm run package:desktop:win:x64:unsigned
+
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dir=apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts
+          files=()
+          for f in "$dir"/*.exe "$dir"/*.exe.blockmap "$dir"/*.yml; do
+            if [ -e "$f" ] && [[ "$f" != *builder-debug.yml ]]; then files+=("$f"); fi
+          done
+          if ! printf '%s\n' "${files[@]}" | grep -qE '(nightly|latest)\.yml$'; then
+            echo "::error::the build wrote no update feed (nightly.yml or latest.yml)"; exit 1
+          fi
+          tag="v$VERSION"
+          prerelease=$([[ "$VERSION" == *-* ]] && echo --prerelease || echo --latest)
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release upload "$tag" "${files[@]}" --clobber
+          else
+            gh release create "$tag" "${files[@]}" --title "Hack Dev Code $VERSION" --generate-notes $prerelease
+          fi

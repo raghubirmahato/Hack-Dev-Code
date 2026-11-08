@@ -28,6 +28,9 @@ describe('parseToolArguments', () => {
   it('never completes a value that was cut off inside a string', () => {
     const cut = parseToolArguments('{"path": "a.ts", "content": "function main() {\\n  return')
     expect(cut.ok).toBe(false)
+    // An array cut off between items would run with only some of them.
+    expect(parseToolArguments('{"files": ["a.ts", "b.ts"').ok).toBe(false)
+    expect(parseToolArguments('{"weekdays": [1, 2, 3,').ok).toBe(false)
     expect(parseToolArguments('not json at all').ok).toBe(false)
   })
 })
@@ -59,6 +62,11 @@ describe('coerceToSchema', () => {
     expect(coerceToSchema(schema, { path: null, mode: null })).toEqual({ path: null, mode: null })
     expect(coerceToSchema(schema, { path: 7 })).toEqual({ path: 7 })
     expect(coerceToSchema(schema, 'text')).toBe('text')
+    // A field named __proto__ stays an own field and changes no prototype.
+    const proto = coerceToSchema(schema, JSON.parse('{"__proto__": {"polluted": true}, "path": "a.ts"}')) as Record<string, unknown>
+    expect(Object.getPrototypeOf(proto)).toBe(Object.prototype)
+    expect(Object.hasOwn(proto, '__proto__')).toBe(true)
+    expect(proto['path']).toBe('a.ts')
   })
 })
 
@@ -78,6 +86,8 @@ describe('error help', () => {
     expect(similarToolNames('click', names)).toEqual(['cua_driver_native__click'])
     expect(similarToolNames('desktop-windows', names)).toEqual(['desktop_window'])
     expect(similarToolNames('teleport', names)).toEqual([])
+    // A name with no Latin letters or digits is never suggested for everything.
+    expect(similarToolNames('reed', ['mcp__srv__工具', 'read'])).toEqual(['read'])
   })
 })
 

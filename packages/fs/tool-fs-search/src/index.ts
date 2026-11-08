@@ -32,10 +32,13 @@ import z from '@hackdevcode/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@hackdevcode/dsh-timeout'
 import { GLOB_MAX_RESULTS, applyGlobTool } from './glob.ts'
 import { GREP_MAX_LINE_BYTES, GREP_MAX_MATCHES, applyGrepTool } from './grep.ts'
+import { applyCodeSearchTool } from './code-search.ts'
 import { RAW_OUTPUT_MAX_BYTES, SEARCH_GRACE_MS, SEARCH_META_MAX_BYTES, SEARCH_STDERR_MAX_BYTES, SEARCH_TIMEOUT_MS } from './search-core.ts'
 
 export { GLOB_MAX_RESULTS, GLOB_VCS_EXCLUDES, applyGlobTool, buildGlobCommand, formatGlobOutput, parseGlobArgs, presentGlobCall, presentGlobResult, sampleAcrossTopLevel } from './glob.ts'
 export type { GlobInput, GlobSample, GlobToolCaps } from './glob.ts'
+export { CODE_GLOBS, DEFINITION_PATTERNS, applyCodeSearchTool, codeTerms, parseDefinition, parseDefinitionLines, parseTermHits, rankSymbols, renderCodeSearch } from './code-search.ts'
+export type { CodeSearchCaps, CodeSearchResult, CodeSymbol } from './code-search.ts'
 export {
   GREP_MAX_LINE_BYTES,
   GREP_MAX_MATCHES,
@@ -93,6 +96,8 @@ export interface Config {
    * `@hackdevcode/dsh-tool-call-timeout-policy` through `exec.signal`.
    */
   timeoutMs?: number
+  /** How long `code_search` reuses a workspace's definition index before collecting it again, in milliseconds. */
+  codeIndexTtlMs?: number
 }
 
 export const Config: z<Config> = z.object({
@@ -105,6 +110,7 @@ export const Config: z<Config> = z.object({
   graceMs: z.number().default(SEARCH_GRACE_MS),
   stderrMaxBytes: z.number().default(SEARCH_STDERR_MAX_BYTES),
   timeoutMs: z.number().default(SEARCH_TIMEOUT_MS),
+  codeIndexTtlMs: z.number().default(60_000),
 })
 
 /** The shape after schemastery applied the defaults. */
@@ -140,6 +146,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   }
   assertPositiveInteger('stderrMaxBytes', resolved.stderrMaxBytes)
   assertPositiveInteger('timeoutMs', resolved.timeoutMs)
+  assertPositiveInteger('codeIndexTtlMs', resolved.codeIndexTtlMs)
   applyGlobTool(ctx, {
     sampleOverCapGlobResults: resolved.sampleOverCapGlobResults,
     maxResults: resolved.globMaxResults,
@@ -157,5 +164,12 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     graceMs: resolved.graceMs,
     stderrMaxBytes: resolved.stderrMaxBytes,
     timeoutMs: resolved.timeoutMs,
+  })
+  applyCodeSearchTool(ctx, {
+    rawOutputMaxBytes: resolved.rawOutputMaxBytes,
+    graceMs: resolved.graceMs,
+    stderrMaxBytes: resolved.stderrMaxBytes,
+    timeoutMs: resolved.timeoutMs,
+    indexTtlMs: resolved.codeIndexTtlMs,
   })
 }

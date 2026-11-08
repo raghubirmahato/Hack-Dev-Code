@@ -1815,12 +1815,12 @@ describe('ModelsSection', () => {
     expect(screen.getByRole('textbox', { name: en.customRoute })).toBeTruthy()
   })
 
-  it('shows the custom form alone when no directory row can be adopted', async () => {
+  it('offers the custom API and Ollama modes, custom first, when no directory row can be adopted', async () => {
     const scripted = scriptedFace()
     scripted.face.llm.listConfigurableProviders.mockResolvedValue(remoteOk([]))
     await mountFace(scripted)
     fireEvent.click(screen.getByRole('button', { name: en.add }))
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual([en.addCustom, en.addOllama])
     expect(screen.queryByRole('combobox', { name: en.provider })).toBeNull()
     expect(screen.getByRole('textbox', { name: en.customRoute })).toBeTruthy()
   })
@@ -1850,7 +1850,7 @@ describe('ModelsSection', () => {
     // custom one, whose panel was never visited.
     face.llm.listConfigurableProviders.mockResolvedValue(remoteOk([]))
     await act(async () => { await controller.load() })
-    expect(screen.queryByRole('tablist')).toBeNull()
+    expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual([en.addCustom, en.addOllama])
     expect(screen.getByRole('textbox', { name: en.customRoute })).toBeTruthy()
   })
 
@@ -1973,12 +1973,46 @@ describe('ModelsSection', () => {
   it('titles a single-mode card with its mode instead of leaving an orphan tabpanel', async () => {
     const scripted = scriptedFace()
     scripted.face.llm.listConfigurableProviders.mockResolvedValue(remoteOk([]))
+    // An adapter without Chat Completions offers no Ollama mode, so the custom API is the only one.
+    const anthropicOnly = JSON.parse(JSON.stringify(
+      Schema.object({ providers: Schema.dict(Schema.object({ api: Schema.union(['anthropic-messages']) })) }).toJSON(),
+    )) as JsonValue
+    scripted.face.settings.describe.mockResolvedValue(remoteOk({
+      writable: true, hasDocument: false,
+      namespaces: wireNamespaces().map(view => view.ns === 'llm-pi-ai' ? { ...view, schema: anthropicOnly } : view),
+    }))
     await mountFace(scripted)
     fireEvent.click(screen.getByRole('button', { name: en.add }))
     expect(screen.queryByRole('tablist')).toBeNull()
     expect(screen.queryByRole('tabpanel')).toBeNull()
     expect(screen.getByText(en.addCustom)).toBeTruthy()
     expect(screen.getByRole('textbox', { name: en.customRoute })).toBeTruthy()
+  })
+
+  it('adds the models Ollama has downloaded from its own mode, then reloads the page', async () => {
+    const scripted = scriptedFace()
+    scripted.face.llm.discoverModels.mockResolvedValue(remoteOk([{ id: 'qwen2.5-coder:7b' }]) as never)
+    const { mutate, set, controller } = await mountFace(scripted)
+    const load = vi.spyOn(controller, 'load')
+    fireEvent.click(screen.getByRole('button', { name: en.add }))
+    fireEvent.click(screen.getByRole('tab', { name: en.addOllama }))
+    expect(screen.getByText(en.addOllamaHint)).toBeTruthy()
+    expect(await screen.findByLabelText('qwen2.5-coder:7b')).toBeTruthy()
+    const panel = screen.getByRole('tabpanel', { name: en.addOllama })
+    fireEvent.click(within(panel).getByText(en.create))
+    await waitFor(() => { expect(load).toHaveBeenCalled() })
+    expect(JSON.stringify(mutate.mock.calls[0])).toContain('qwen2.5-coder:7b')
+    expect(set).toHaveBeenCalledWith('OLLAMA_API_KEY', 'ollama')
+  })
+
+  it('closes the Ollama mode on cancel without reloading', async () => {
+    const { controller } = await mountSection()
+    const load = vi.spyOn(controller, 'load')
+    fireEvent.click(screen.getByRole('button', { name: en.add }))
+    fireEvent.click(screen.getByRole('tab', { name: en.addOllama }))
+    fireEvent.click(within(screen.getByRole('tabpanel', { name: en.addOllama })).getByText(en.cancel))
+    expect(screen.queryByRole('tabpanel', { name: en.addOllama })).toBeNull()
+    expect(load).not.toHaveBeenCalled()
   })
 
   it('explains a locked mode through its hover title', async () => {

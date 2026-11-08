@@ -100,6 +100,24 @@ describe('installer preparation preserves application dependencies', () => {
       DSH_DESKTOP_UNSIGNED: '1',
     }, 'win32', 'x64')
     expect(config.artifactName).toBe('hack-dev-code-${version}-${os}-${arch}-unsigned.${ext}')
+    // Without a GitHub update repository, an unsigned build has no update source.
+    expect(config.publish).toBeNull()
+  })
+
+  it('publishes to and updates from GitHub Releases when a repository is named, signed or not', async () => {
+    const { createElectronBuilderConfig, resolveGitHubUpdateRepository } = await import('../scripts/electron-builder-config.mjs')
+    const config = createElectronBuilderConfig({
+      DSH_DESKTOP_APP_ID: 'com.example.installer',
+      DSH_DESKTOP_TARGET_PLATFORM: 'win32',
+      DSH_DESKTOP_TARGET_ARCH: 'x64',
+      DSH_DESKTOP_UNSIGNED: '1',
+      DSH_DESKTOP_UPDATE_GITHUB: 'example-owner/example-repo',
+    }, 'win32', 'x64')
+    // A prerelease version selects the prerelease channel and its nightly.yml feed.
+    expect(config.publish).toEqual([{ provider: 'github', owner: 'example-owner', repo: 'example-repo', channel: 'nightly', releaseType: 'prerelease' }])
+    expect(config.extraMetadata.dshDesktopUpdateChannel).toBe('nightly')
+    expect(() => resolveGitHubUpdateRepository('not a repository')).toThrow('owner/repo')
+    expect(resolveGitHubUpdateRepository(' ')).toBeUndefined()
   })
 
   it('packages every preload entry point the shell loads', async () => {

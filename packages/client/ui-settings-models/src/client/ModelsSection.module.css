@@ -958,3 +958,21 @@ select.input {
     background: var(--dsw-alias-interactive-bg-hover);
   }
 }
+
+/* The downloaded Ollama models, one checkbox per model. */
+.ollamaModels {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.ollamaModel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--dsw-alias-label-primary);
+}

@@ -29,6 +29,7 @@ import type { LlmNativeAuth, SettingsNamespaceView } from '@hackdevcode/dsh-api-
 // Type-only: pulls this package's SlotMap merge (the two Models child slots).
 import type {} from './slot-contract.ts'
 import { CustomProviderCard } from './CustomProviderCard.tsx'
+import { OllamaProviderCard } from './OllamaProviderCard.tsx'
 import { deriveKeyRef, protocolChoices, providerUsable, reasoningLevelChoices } from './store.ts'
 import type { ModelsSettingsStore, ProviderRow } from './store.ts'
 import type { ModelsOperations } from './operations.ts'
@@ -57,7 +58,7 @@ export interface ModelsSectionInjected {
  * The two ways the add card gains a provider: adopt a directory row the
  * adapter already knows, or declare a route it does not.
  */
-type AddMode = 'catalog' | 'custom'
+type AddMode = 'catalog' | 'custom' | 'ollama'
 
 /** The child slots this section declares and dispatches (see ./slot-contract.ts). */
 type ModelsChildSlots = 'settings.models.provider-card' | 'settings.models.footer'
@@ -387,8 +388,12 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
   const catalogEnabled = addable.length > 0
   const customOffered = piAi !== undefined
   const customEnabled = protocols.length > 0
-  const bothOffered = catalogOffered && customOffered
-  const mode: AddMode = bothOffered ? addMode : customOffered ? 'custom' : 'catalog'
+  // Local Ollama models go through the same adapter as a custom API, over its OpenAI-compatible endpoint.
+  const ollamaOffered = customOffered && protocols.includes('openai-completions')
+  const bothOffered = [catalogOffered, customOffered, ollamaOffered].filter(Boolean).length > 1
+  const mode: AddMode = bothOffered
+    ? addMode === 'catalog' && !catalogOffered ? 'custom' : addMode
+    : customOffered ? 'custom' : 'catalog'
   const mounted = (candidate: AddMode): boolean => mode === candidate || visited.has(candidate)
   const switchLocked = catalogBusy || customBusy
   // The catalog draft: the row the user chose, kept through a refresh that
@@ -578,18 +583,19 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                       value={mode}
                       disabled={switchLocked}
                       options={[
-                        {
-                          value: 'catalog',
+                        ...catalogOffered ? [{
+                          value: 'catalog' as const,
                           label: t('addCatalog'),
                           disabled: !catalogEnabled,
                           ...catalogEnabled ? {} : { title: t('addCatalogExhausted') },
-                        },
+                        }] : [],
                         {
                           value: 'custom',
                           label: t('addCustom'),
                           disabled: !customEnabled,
                           ...customEnabled ? {} : { title: t('addCustomUnavailable') },
                         },
+                        ...ollamaOffered ? [{ value: 'ollama' as const, label: t('addOllama') }] : [],
                       ]}
                       onChange={(next) => {
                         setAddMode(next)
@@ -605,7 +611,7 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                     </div>
                   )}
                 <p className={styles['advancedHint']}>
-                  {t(mode === 'catalog' ? 'addCatalogHint' : 'addCustomHint')}
+                  {t(mode === 'catalog' ? 'addCatalogHint' : mode === 'ollama' ? 'addOllamaHint' : 'addCustomHint')}
                 </p>
               </div>
               {mounted('catalog') && draft !== undefined
@@ -675,6 +681,31 @@ function Loaded({ injected, renderSlot }: { injected: ModelsSectionFace; renderS
                       taken={state.rows.map(row => row.entry.provider)}
                       protocols={protocols}
                       reasoningLevels={reasoningLevels}
+                      revision={piAi.revision}
+                      operations={operations}
+                      t={t}
+                      readOnly={!state.writable}
+                      onClose={(changed) => {
+                        closeAdd()
+                        if (changed) void controller.load()
+                      }}
+                      onBusyChange={setCustomBusy}
+                    />
+                  </div>
+                )
+                : null}
+              {mounted('ollama') && piAi !== undefined
+                ? (
+                  <div
+                    id={`${addId}-ollama-panel`}
+                    // Ollama is only offered beside the custom mode, so its panel always sits under the switch.
+                    role="tabpanel"
+                    aria-labelledby={`${addId}-ollama`}
+                    hidden={mode !== 'ollama'}
+                    className={styles['addPanel']}
+                  >
+                    <OllamaProviderCard
+                      taken={state.rows.map(row => row.entry.provider)}
                       revision={piAi.revision}
                       operations={operations}
                       t={t}

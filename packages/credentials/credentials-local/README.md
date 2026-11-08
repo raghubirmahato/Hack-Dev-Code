@@ -43,6 +43,7 @@ Use it as the default local store: the product's base composition loads it, and 
 | `dshHome` | `$DSH_HOME` or `~/.hackdevcode` | Harness home used when `path` is omitted |
 | `watch` | `true` | Reload the file automatically when it changes on disk |
 | `debounceMs` | `100` | Wait this long after a change before reloading, in milliseconds |
+| `encryptAtRest` | `false` | Windows: seal the document with the Data Protection API for the signed-in account; a plain document is read and sealed on the next write. The product base bundle turns it on |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-credentials-local) is the exhaustive source for every accepted field and its JSDoc.
 
@@ -194,7 +195,8 @@ No direct invalidation; stored values never enter a request prefix.
 These limits define when the provider is a poor fit or needs special operational care. They are current package constraints, not a task backlog.
 
 - **Same-reference concurrent writes are last-write-wins** — the writer lock and the read-modify-write keep concurrent writers from dropping each other's entries, but two writers editing one reference still resolve to the later write; there is no revision check.
-- **A same-UID process can read the document** — the file-effect sandbox modes do not deny reads, and an OS-keychain provider is deferred.
+- **A same-UID process can read the document** — the file-effect sandbox modes do not deny reads. With `encryptAtRest` on Windows the file itself is sealed for the account (DPAPI), so copies, backups and other accounts cannot read it, but a process running as the same signed-in user can still open it through DPAPI. Outside Windows the document is owner-only plain text, and an OS-keychain provider is deferred.
+- **A sealed document is not hand-editable** — write a plain version-1 document in its place to edit keys by hand; it is read as is and sealed again on the next write. Sealing and opening start Windows PowerShell, about half a second per change.
 - **Environment changes are invisible** — the snapshot is frozen at launch, so a variable exported after startup reaches neither resolution nor `describe`; changing an environment-sourced credential takes a restart.
 - **Atomic, not crash-durable** — inherited from `dsh-atomic-write`; the store re-reads on boot.
 

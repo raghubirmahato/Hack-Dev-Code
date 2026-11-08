@@ -110,6 +110,11 @@
       name: '@hackdevcode/dsh-settings'
       disabled: !!js "!ctx.get('profileContext')"
 
+    # The MCP server directory: servers turned on in Settings or through the mcp_directory tool run as mcp-client
+    # instances with on-demand tool groups. Nothing starts until a server is chosen.
+    - id: mcp-directory
+      name: '@hackdevcode/dsh-mcp-directory'
+
     # Credential sources: managed `$DSH_HOME/.credentials.yaml`, then inherited
     # environment, project `.env`, and user `.env` fallbacks.
     # Adapters resolve references per request; the Models page writes only the
@@ -124,6 +129,9 @@
 
     - id: credentials
       name: '@hackdevcode/dsh-credentials-local'
+      config:
+        # Windows: the keys file is sealed for the signed-in account (DPAPI), so other accounts and copies cannot read it.
+        encryptAtRest: true
 
     # The pi-ai multi-provider twin, mounted dormant: zero routes (and no extra
     # models in the picker) until a `llm-pi-ai:` settings section supplies provider

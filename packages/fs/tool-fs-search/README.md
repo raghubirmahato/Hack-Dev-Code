@@ -47,6 +47,7 @@ A subprocess backend, then the tools; the spill backend is optional and makes ca
 |---|---|---|
 | `glob` | `pattern`, `path?` | Finds files whose paths match a glob pattern, including hidden and ignored files but excluding VCS metadata; a pattern with no `/` matches basenames at any depth, so `*` matches the whole tree; complete results stay modification-time ordered |
 | `grep` | `pattern`, `path?`, `include?` | Searches file contents with a ripgrep regex and returns matches grouped by file as `Line N: <preview>`; omitted or exact empty `include` applies no file filter; otherwise `include` is one positive glob, with whitespace-only values, comma-separated lists, and negated values rejected up front |
+| `code_search` | `query`, `path?`, `limit?` | Finds the definitions (functions, classes, interfaces, types, methods, structs and their kin across common languages) that best match a description or a partial name, ranked, as `path:line  kind name  — line`; source files only, `.gitignore` respected, at most three results per file |
 
 Routine budgets stay out of the model-facing schema: a model that needs surrounding context reads the matched file with `read`, and one that needs later results follows the returned spill locator's retrieval hint.
 
@@ -64,6 +65,7 @@ Routine budgets stay out of the model-facing schema: a model that needs surround
 | `timeoutMs` | `30000` | Cooperative tool-call budget on both tools, enforced through `exec.signal` |
 | `graceMs` | `3000` | Terminate-escalation grace the subprocess seam grants past `timeoutMs` |
 | `stderrMaxBytes` | `65536` | Diagnostic-tail budget for `rg` stderr |
+| `codeIndexTtlMs` | `60000` | How long `code_search` reuses a workspace's definition index before collecting it again |
 | `searchMetaMaxBytes` | `65536` | Max bytes of one search's serialized `presentationMeta`; trailing groups/paths drop past it |
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-fs-search) is the exhaustive source for every accepted field and its JSDoc.
@@ -98,6 +100,7 @@ Local workspace discovery is naturally a process-backed `rg` workflow, and putti
 | [`src/glob.ts`](src/glob.ts) | `glob` schema, argv, parsing, inline sampling, formatting |
 | [`src/grep.ts`](src/grep.ts) | `grep` schema, argv, `--json` parsing, preview retention, formatting |
 | [`src/search-core.ts`](src/search-core.ts) | Shared spawn helper, `SEARCH_*` errors, spill handoff, workdir-relative display |
+| [`src/code-search.ts`](src/code-search.ts) | `code_search`: definition patterns, the cached index, term splitting and ranking |
 | [`src/presentation.ts`](src/presentation.ts) | Search-card metadata projection |
 | [`src/direct-call.ts`](src/direct-call.ts) | Direct-call result acceptance for spill post-processing |
 
@@ -157,6 +160,12 @@ At assembly time, each section checks `ctx.tools.get(name, scope)` and renders o
 
 ```markdown
 Use the glob tool — not shell find — to discover files by path pattern.
+```
+
+##### Code search guidance
+
+```markdown
+To find where something is defined or implemented when you do not know its exact name, use code_search with a short description ("refresh auth token", "parse tool arguments"); use grep for exact text.
 ```
 
 ##### Grep guidance
