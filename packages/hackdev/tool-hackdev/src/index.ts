@@ -17,6 +17,7 @@ import type { ToolCallView, ToolResultView } from '@hackdevcode/dsh-tools'
 import type { WorkflowResult, WorkflowRun } from '@hackdevcode/dsh-workflow'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import { createWorkflowRecorder } from '@hackdevcode/dsh-tool-workflow'
+import { parseCustomRules, renderCustomInstructions } from '@hackdevcode/dsh-system-prompt'
 import { HACKDEV_META, HACKDEV_REVIEW_META, HACKDEV_REVIEW_SCRIPT, HACKDEV_SCRIPT } from './script.ts'
 import { compactReport, renderReport } from './render.ts'
 import { describeHost, detectHost } from './host.ts'
@@ -295,19 +296,25 @@ export function apply(ctx: Context, config: Config): void {
     text: HOST_DESCRIPTION,
   })
   if (resolved.customInstructions.length > 0) {
+    // Its own name: the person's global instructions from Settings already use policy:custom-instructions.
     ctx.systemPrompt.section({
-      name: 'policy:custom-instructions',
-      order: ctx.systemPrompt.getSectionOrder('HACKDEV_POLICY'),
-      text: 'User custom instructions. Follow them in every task unless they conflict with safety:\n\n' + resolved.customInstructions,
+      name: 'policy:mission-custom-instructions',
+      order: ctx.systemPrompt.getSectionOrder('CUSTOM_INSTRUCTIONS'),
+      interpolate: false,
+      text: renderCustomInstructions(resolved.customInstructions, { heading: 'Custom instructions configured for the mission tool' }),
     })
   }
 
-  /** This tool's own instructions plus the user's global ones from Settings, read afresh for each mission. */
+  /**
+   * This tool's own instructions plus the person's global ones from Settings, read afresh for each mission, as the
+   * numbered rules every mission prompt repeats so builders and gates can check their work against each one.
+   */
   const missionInstructions = (): string => {
     const loop = (ctx as unknown as { get(name: string): unknown }).get('agentLoop') as
       { config?: { customInstructions?: { get(): string } } } | undefined
     const global = (loop?.config?.customInstructions?.get() ?? '').trim()
-    return [resolved.customInstructions, global].filter(text => text.length > 0).join('\n\n').slice(0, MAX_CUSTOM_INSTRUCTIONS)
+    const text = [resolved.customInstructions, global].filter(part => part.length > 0).join('\n').slice(0, MAX_CUSTOM_INSTRUCTIONS)
+    return parseCustomRules(text).map((rule, index) => `${String(index + 1)}. ${rule}`).join('\n')
   }
 
   // The same durable run records the generic workflow tool writes, so the existing

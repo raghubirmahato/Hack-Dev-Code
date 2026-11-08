@@ -52,6 +52,8 @@ Agents declared in config start automatically when the plugin loads. Each entry 
 
 The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-loop) lists every accepted field. `maxParallelToolCalls` remains a volatile positive-integer Config field with default `10`; `1` selects serial execution. The loop passes its current value to each batch's `execute()` call, taking precedence over executor configuration. Live edits apply to the next batch; `agents` remains startup configuration.
 
+`customInstructions` is a volatile text field (Settings → General → Custom instructions, at most 8000 characters in effect). Each line or list item becomes one numbered rule; a single paragraph is split into sentences. Edits apply from the next request.
+
 A configured resume records the declared route as the Session selection before publication. Programmatic resume preserves the Session choice unless its setup explicitly records another route; initial `agentOptions` alone do not override saved history.
 
 ### Create or resume agents programmatically
@@ -160,6 +162,34 @@ System text and schemas are paid again on every step, and on an `in-history` rou
 #### KV Cache effect
 
 Prefix reuse requires earlier messages and declarations to stay byte-identical under the same provider and model route. An unchanged rendered prompt keeps the cached prefix: a capable route leaves retained in-history system nodes in place even when a new series starts, and only an incapable route, or a series start whose effective text differs, consolidates them. A prompt change that replaces a system node in place makes the request differ from that node's first token — in full when the node is node 0 — so the provider prefix cache misses from there; when the prepared call declares `systemPromptUpdate: 'in-history'`, a non-empty prompt change inside a continuing request series is appended after the cached history, so the prefix through that history stays reusable. Changing a retained tool definition or rebuilding declarations invalidates reuse from the first altered request token.
+
+### Custom instructions
+
+#### What the model sees
+
+With custom instructions set, the system prompt carries a `policy:custom-instructions` section after the tool documentation (order `CUSTOM_INSTRUCTIONS`): the person's standing orders, to be applied directly and completely without asking, debating or weakening them, overriding the model's own defaults and yielding only to an explicit contradicting request in the current conversation, followed by the numbered rules in a `<custom_instructions>` block. On the first step of each turn a context message beside the newest message reads `Apply the person's N custom instructions directly in this turn.`
+
+#### Token effect
+
+The section costs its rules plus about 120 tokens of framing on every request; the reminder adds about 15 tokens per turn. Empty instructions add nothing.
+
+#### KV Cache effect
+
+The section is stable until the text changes, so the cached prefix holds; an edit changes the prompt from that section on. The reminder is appended with each turn's new messages and does not disturb earlier entries.
+
+### Empty reply after tool work
+
+#### What the model sees
+
+When a model answers tool results with neither text nor a tool call, the loop adds one message, `Your last reply was empty. Continue the task from where you stopped: check the current state if you need to, finish the remaining steps, then give your final answer.`, and takes another step. This happens at most once per turn.
+
+#### Token effect
+
+One short message, only in the rare turns that end empty.
+
+#### KV Cache effect
+
+Append-only.
 
 ### Retained message history
 

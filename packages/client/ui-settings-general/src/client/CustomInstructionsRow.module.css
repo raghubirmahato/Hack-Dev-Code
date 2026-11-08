@@ -53,6 +53,22 @@
   font-size: 12px;
 }
 
+.hint {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.preview {
+  margin: 0;
+  padding: 8px 12px 8px 32px;
+  border: 0.5px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  corner-shape: round;
+  font-size: 13px;
+  line-height: 20px;
+}
+
 .actions {
   display: flex;
   gap: 8px;

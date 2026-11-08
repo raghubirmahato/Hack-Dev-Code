@@ -5,6 +5,7 @@ import { Worker } from 'node:worker_threads'
 import { finished } from 'node:stream/promises'
 import { expect, it } from 'vitest'
 import { request } from '../src/worker-rpc.ts'
+import { workerEnvironment } from '../src/worker-client.ts'
 
 it('reports malformed requests before exiting its real Worker', async () => {
   const hooks = new URL('../../../../snapshots/session/browser-use-stagehand-native/native-fixture.mjs', import.meta.url)
@@ -16,7 +17,7 @@ it('reports malformed requests before exiting its real Worker', async () => {
   ].join('\n')
   const worker = new Worker(new URL(`data:text/javascript,${encodeURIComponent(bootstrap)}`), {
     workerData: { model: { modelName: 'openai/gpt-5.4-mini', apiKey: 'fixture-model-key' }, mode: 'attach', cdpEndpoint: 'http://fixture', headless: true, operationTimeoutMs: 30000, shutdownGraceMs: 1000 },
-    env: {}, execArgv: [], stderr: true,
+    env: workerEnvironment(), execArgv: [], stderr: true,
   })
   let diagnostics = ''
   worker.stderr.setEncoding('utf8')
@@ -32,4 +33,9 @@ it('reports malformed requests before exiting its real Worker', async () => {
   } finally {
     await worker.terminate()
   }
+})
+
+it('gives Workers temporary-file locations but no credentials', () => {
+  expect(workerEnvironment({ TEMP: 'C:\t', TMP: 'C:\t', SystemRoot: 'C:\Windows', DEEPSEEK_API_KEY: 'secret', HTTPS_PROXY: 'http://p' }))
+    .toEqual({ TEMP: 'C:\t', TMP: 'C:\t', SystemRoot: 'C:\Windows' })
 })

@@ -10,6 +10,7 @@ import type { TriggerContentProps } from '../src/client/chrome.tsx'
 import { SettingsDocumentAction } from '../src/client/SettingsDocumentAction.tsx'
 import { DeveloperToolsRow } from '../src/client/DeveloperToolsRow.tsx'
 import { CustomInstructionsRow } from '../src/client/CustomInstructionsRow.tsx'
+import { previewRules } from '../src/client/custom-rules.ts'
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
 import { SettingsDescribeMirror } from '@hackdevcode/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { SettingsDocumentStore } from '../src/client/settings-document-store.ts'
@@ -333,5 +334,48 @@ describe('Host release change confirmation', () => {
     cleanup()
     prompt({ page: { version: '0.2.1' }, previous: { version: '0.2.1' }, host: undefined })
     expect(screen.getByRole('dialog').textContent).toContain('Service0.2.1UnknownPage0.2.1Unknown')
+  })
+})
+
+describe('custom instruction rules in Settings', () => {
+  it('counts rules live, previews them numbered, and saves with ctrl+enter', async () => {
+    const state = createSnapshotStore('')
+    const save = vi.fn(async (text: string) => { state.set(text); return true })
+    // Fills in {name} parameters the way the real locale chain does.
+    const tp = ((key: string, params?: Record<string, unknown>) => Object.entries(params ?? {})
+      .reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), (en as Record<string, string>)[key] ?? key)) as typeof t
+    render(<CustomInstructionsRow {...kit} t={tp} useCustomInstructions={bindSnapshotSelector(state)} limit={200} save={save} />)
+    const box = screen.getByRole('textbox', { name: 'Custom instructions' })
+    expect(screen.getByText('0 rules')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Preview rules' }).hasAttribute('disabled')).toBe(true)
+    fireEvent.change(box, { target: { value: '- Use tabs\n- Never add dependencies' } })
+    expect(screen.getByText('2 rules')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Preview rules' }))
+    const preview = screen.getByRole('list', { name: 'Rules as agents receive them' })
+    expect([...preview.querySelectorAll('li')].map(item => item.textContent)).toEqual(['Use tabs', 'Never add dependencies'])
+    fireEvent.click(screen.getByRole('button', { name: 'Hide preview' }))
+    expect(screen.queryByRole('list', { name: 'Rules as agents receive them' })).toBeNull()
+    fireEvent.change(box, { target: { value: 'Only one rule' } })
+    expect(screen.getByText('1 rule')).toBeTruthy()
+    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
+    expect(save).toHaveBeenCalledWith('Only one rule')
+    await waitFor(() => { expect(screen.getByRole('status').textContent).toBe('Saved') })
+  })
+})
+
+// The same expectations as the Host renderer's spec (system-prompt tests/custom-instructions.spec.ts), so the
+// Settings preview shows exactly the rules agents receive.
+describe('custom rules preview', () => {
+  it('splits lines, list items and continuations like the Host renderer', () => {
+    expect(previewRules('- Use TypeScript.\n* Prefer tabs\n\n1. Never add dependencies\n2) Explain briefly\n   with one example')).toEqual([
+      'Use TypeScript.', 'Prefer tabs', 'Never add dependencies', 'Explain briefly with one example',
+    ])
+    expect(previewRules('\u2022 Bullet rule\r\n\u2022 Second')).toEqual(['Bullet rule', 'Second'])
+  })
+
+  it('splits one paragraph into sentences and keeps abbreviations inside them', () => {
+    expect(previewRules('Use TypeScript and tabs. Never add dependencies without asking. Explain trade-offs, e.g. Speed vs size.'))
+      .toEqual(['Use TypeScript and tabs.', 'Never add dependencies without asking.', 'Explain trade-offs, e.g. Speed vs size.'])
+    expect(previewRules('   ')).toEqual([])
   })
 })

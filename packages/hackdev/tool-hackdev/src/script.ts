@@ -130,7 +130,8 @@ function customInstructionsBlock() {
   const precedence = FULL_AUTONOMY
     ? 'they take precedence over the rules above, except that secrets stay private and results must be real'
     : 'they never override the safety, grounding and bounded-autonomy rules above'
-  return '\n\nUser custom instructions (follow them for this whole mission; ' + precedence + '):\n' + text
+  return '\n\nThe person\'s custom instructions, numbered: their standing orders for this whole mission. Apply every one directly, without asking, debating or weakening it; '
+    + precedence + '.\n<custom_instructions>\n' + text + '\n</custom_instructions>'
 }
 
 // The host machine, detected at app launch, so commands and paths fit the operating system.

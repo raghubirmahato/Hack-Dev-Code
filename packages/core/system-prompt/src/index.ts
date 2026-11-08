@@ -10,6 +10,14 @@ import { AnonymousEntries, NamedEntries, ScopedLayers, scopeTarget } from '@hack
 import type { ScopeKey, ScopeLayer, Scoped } from '@hackdevcode/dsh-scope'
 import type { ContextSnapshotSection, ToolSchema } from '@hackdevcode/dsh-llm'
 
+export {
+  MAX_CUSTOM_INSTRUCTIONS_CHARS,
+  customInstructionsReminder,
+  parseCustomRules,
+  renderCustomInstructions,
+} from './custom-instructions.ts'
+export type { CustomInstructionsOptions } from './custom-instructions.ts'
+
 declare module '@hackdevcode/cordis' {
   interface Context {
     systemPrompt: SystemPrompt
@@ -164,6 +172,8 @@ const SECTION_ORDERS = {
   MCP_SERVERS: 3100,
   TOOLS_SDK: 5000,
   DELIVERABLE_FILE_REFERENCES: 9000,
+  // The person's standing instructions sit after the tool documentation, where models weigh them more.
+  CUSTOM_INSTRUCTIONS: 9800,
   STRUCTURED_OUTPUT: 9900,
   // Local paths and endpoints follow reusable instructions.
   HARNESS_SOURCE: 10000,

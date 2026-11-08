@@ -22,12 +22,14 @@ import type {
   ModelSelection,
   ModelSelectionProjectionState,
   InboxState,
+  PreStepDecision,
 } from '@hackdevcode/dsh-agent'
 import { modelSelectionProjectionDefinition } from '@hackdevcode/dsh-agent'
-import { errorChain, ReasoningEffortId } from '@hackdevcode/dsh-llm'
+import { createUserMessage, errorChain, ReasoningEffortId } from '@hackdevcode/dsh-llm'
+import type { ContextFormed } from '@hackdevcode/dsh-llm'
 import { interruptedTurnClosers, SessionLogOffset, SessionPreparation } from '@hackdevcode/dsh-session'
 import type { Session, SessionHeader, SessionId } from '@hackdevcode/dsh-session'
-import type {} from '@hackdevcode/dsh-system-prompt'
+import { MAX_CUSTOM_INSTRUCTIONS_CHARS, customInstructionsReminder, parseCustomRules, renderCustomInstructions } from '@hackdevcode/dsh-system-prompt'
 import type {} from '@hackdevcode/dsh-tools'
 import type { ProjectionHandle } from '@hackdevcode/dsh-session-projection'
 import { SessionPersistenceNotFoundError } from '@hackdevcode/dsh-session-persistence'
@@ -249,8 +251,14 @@ function applyLauncherIdentities(
   })
 }
 
-/** Longest custom instruction text placed in a prompt, so one setting cannot crowd out the rest. */
-const MAX_CUSTOM_INSTRUCTIONS_CHARS = 8000
+/** Message source of the per-turn custom-instructions reminder. */
+const CUSTOM_INSTRUCTIONS_SOURCE = 'custom-instructions'
+
+declare module '@hackdevcode/dsh-llm' {
+  interface MessageSourceMap {
+    'custom-instructions': { kind: 'custom-instructions' } & ContextFormed
+  }
+}
 
 /** Agent-loop plugin configuration. */
 export interface Config {
@@ -346,18 +354,32 @@ export class AgentLoop extends Service implements AgentFactory {
     ctx.effect(() => ctx.agents.setFactory(this), 'agentLoop.setFactory()')
     ctx.systemPrompt.variable('provider', context => context.modelSelection?.provider ?? context.agent?.options.provider)
     ctx.systemPrompt.variable('model', context => context.modelSelection?.model ?? context.agent?.options.model)
+    // Numbered rules late in the system prompt, where models weigh them more, read afresh for each request.
     ctx.systemPrompt.section({
       name: 'policy:custom-instructions',
-      order: ctx.systemPrompt.getSectionOrder('HACKDEV_POLICY'),
+      order: ctx.systemPrompt.getSectionOrder('CUSTOM_INSTRUCTIONS'),
       interpolate: false,
-      text: () => {
-        const text = this.config.customInstructions.get().trim().slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS)
-        return text.length === 0
-          ? ''
-          : `User custom instructions. Follow them in every task unless they conflict with safety:
-
-${text}`
-      },
+      text: () => renderCustomInstructions(this.config.customInstructions.get()),
+    })
+    // A one-line reminder beside the newest message at the start of each turn keeps the rules in view in long
+    // conversations; it names how many rules apply, not their text, so it costs a few tokens.
+    ctx.on('agent/pre-step', async ({ step, signal }, next): Promise<PreStepDecision> => {
+      const decision = await next()
+      if (decision.kind === 'reject' || step !== 1 || signal.aborted) return decision
+      const text = this.config.customInstructions.get().trim()
+      const count = text.length === 0 ? 0 : parseCustomRules(text.slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS)).length
+      if (count === 0) return decision
+      const reminder = customInstructionsReminder(count)
+      return {
+        ...decision,
+        messages: [
+          ...decision.messages,
+          createUserMessage({
+            content: [{ type: 'text', text: reminder }],
+            source: { kind: CUSTOM_INSTRUCTIONS_SOURCE, form: 'snapshot', sections: [{ name: CUSTOM_INSTRUCTIONS_SOURCE, text: reminder }] },
+          }),
+        ],
+      }
     })
 
     for (const { id, sessionId, cwd, resumeSessionId, ...options } of this.config.agents) {

@@ -204,7 +204,8 @@ describe('HACKDEV_SCRIPT', () => {
   it('gives the custom instructions to every builder and gate prompt', async () => {
     const { calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, customInstructions: 'Use tabs and never add dependencies.' }, defaultImpl())
     const builder = calls.find(c => c.label === 'Builder: a')!
-    expect(builder.prompt).toContain('User custom instructions')
+    expect(builder.prompt).toContain("The person's custom instructions, numbered")
+    expect(builder.prompt).toContain('<custom_instructions>')
     expect(builder.prompt).toContain('Use tabs and never add dependencies.')
     expect(calls.find(c => c.label.startsWith('Gate 1'))!.prompt).toContain('Use tabs and never add dependencies.')
   })

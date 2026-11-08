@@ -6,7 +6,28 @@ import type { NativeBrowserConfig, NativeBrowserRuntime } from './native.ts'
 import { request } from './worker-rpc.ts'
 
 /**
- * Connect Stagehand through an isolated Worker that receives no ambient environment.
+ * Where temporary files go, and the tsx configuration for source runs. These carry no credentials. Without them,
+ * Windows resolves the temporary folder to `undefined\temp` relative to the working directory, so caches and
+ * downloads made inside the Worker would land in the person's project.
+ */
+const LOCATION_VARIABLES = ['TEMP', 'TMP', 'TMPDIR', 'SystemRoot', 'windir', 'TSX_TSCONFIG_PATH'] as const
+
+/**
+ * The environment an isolated Worker receives: only the location variables above, nothing ambient.
+ * @param source - the environment to copy from.
+ * @returns the Worker environment.
+ */
+export function workerEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {}
+  for (const name of LOCATION_VARIABLES) {
+    const value = source[name]
+    if (value !== undefined) env[name] = value
+  }
+  return env
+}
+
+/**
+ * Connect Stagehand through an isolated Worker that receives no ambient environment beyond temporary-file locations.
  * @param config - resolved CDP connection and operation options.
  * @param signal - cancellation of lazy browser acquisition.
  * @param warn - report SDK cleanup failures after connection termination.
@@ -18,8 +39,7 @@ export async function openBrowserWorker(
   signal.throwIfAborted()
   const entry = new URL('./worker.js', import.meta.url)
   // Only explicit model credentials cross in workerData; ambient credentials and proxy settings stay outside.
-  const env: NodeJS.ProcessEnv = {}
-  if (process.env.TSX_TSCONFIG_PATH !== undefined) env.TSX_TSCONFIG_PATH = process.env.TSX_TSCONFIG_PATH
+  const env = workerEnvironment()
   let worker: Worker
   /* v8 ignore next 3 -- native.e2e.ts starts the bundled Worker through a plain-Node provider fixture. */
   if (!import.meta.url.endsWith('.ts')) {
