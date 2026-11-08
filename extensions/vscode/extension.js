@@ -6,7 +6,7 @@
  */
 
 const vscode = require('vscode')
-const { spawn } = require('node:child_process')
+const { execFile, spawn } = require('node:child_process')
 const { relative } = require('node:path')
 
 /** @type {vscode.OutputChannel | undefined} */
@@ -20,6 +20,23 @@ let webServer
 function channel() {
   output ??= vscode.window.createOutputChannel('Hack Dev Code')
   return output
+}
+
+/** Permission presets a task may run with; anything else in the setting is ignored. */
+const PERMISSION_MODES = new Set(['read-only', 'workspace-write', 'danger-full-access'])
+
+/**
+ * Stop a CLI process and everything it started. The CLI runs under the platform shell, so on Windows killing the
+ * shell alone would leave the agent running; taskkill /T ends the whole tree.
+ * @param {import('node:child_process').ChildProcess | undefined} child
+ */
+function stopTree(child) {
+  if (child === undefined || child.pid === undefined || child.exitCode !== null) return
+  if (process.platform === 'win32') {
+    execFile('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true }, () => {})
+  } else {
+    child.kill()
+  }
 }
 
 /** @returns {vscode.WorkspaceConfiguration} */
@@ -65,7 +82,8 @@ function runTask(task, options) {
     void vscode.window.showWarningMessage('A Hack Dev Code task is already running. Stop it first with "Hack Dev Code: Stop the Running Task".')
     return Promise.resolve('')
   }
-  const mode = options.readOnly === true ? 'read-only' : String(settings().get('permissionMode') ?? '')
+  const configured = String(settings().get('permissionMode') ?? '')
+  const mode = options.readOnly === true ? 'read-only' : PERMISSION_MODES.has(configured) ? configured : ''
   const args = ['headless', ...mode === '' ? [] : ['--permission-mode', mode, ...options.readOnly === true ? ['--approval-policy', 'never'] : []], '-']
   const out = channel()
   out.show(true)
@@ -143,7 +161,7 @@ async function openHere() {
     return
   }
   const out = channel()
-  if (webServer !== undefined) webServer.kill()
+  stopTree(webServer)
   const child = startCli(['web'], cwd)
   webServer = child
   await vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Starting Hack Dev Code…' }, () => new Promise((resolve) => {
@@ -182,7 +200,8 @@ function stop() {
     void vscode.window.showInformationMessage('No Hack Dev Code task is running.')
     return
   }
-  running.kill()
+  stopTree(running)
+  running = undefined
   channel().appendLine('\nStopped.')
 }
 
@@ -195,13 +214,13 @@ function activate(context) {
     vscode.commands.registerCommand('hackdev.openHere', openHere),
     vscode.commands.registerCommand('hackdev.openDesktop', openDesktop),
     vscode.commands.registerCommand('hackdev.stop', stop),
-    { dispose() { running?.kill(); webServer?.kill(); output?.dispose() } },
+    { dispose() { stopTree(running); stopTree(webServer); output?.dispose() } },
   )
 }
 
 function deactivate() {
-  running?.kill()
-  webServer?.kill()
+  stopTree(running)
+  stopTree(webServer)
 }
 
 module.exports = { activate, deactivate }

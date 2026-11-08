@@ -31,6 +31,18 @@
     },
     {
       "path": "../../util/home-paths"
+    },
+    {
+      "path": "../../credentials/credentials"
+    },
+    {
+      "path": "../../sandbox/sandbox"
+    },
+    {
+      "path": "../../sandbox/sandbox-policy"
+    },
+    {
+      "path": "../../interaction/user-approval"
     }
   ]
 }

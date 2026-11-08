@@ -88,6 +88,30 @@ describe('the Ollama card', () => {
     unmount()
   })
 
+  it('shows a lost connection, and never creates a route for an address it did not list', async () => {
+    const lost = operations({ kind: 'found', models: [] })
+    lost.discoverModels.mockRejectedValueOnce(new Error('connection closed'))
+    const { unmount } = render(<OllamaProviderCard {...base} operations={lost.ops} onClose={vi.fn()} />)
+    expect(await screen.findByText('connection closed')).toBeTruthy()
+    unmount()
+    const silent = operations({ kind: 'found', models: [] })
+    silent.discoverModels.mockRejectedValueOnce('no message')
+    const second = render(<OllamaProviderCard {...base} operations={silent.ops} onClose={vi.fn()} />)
+    expect(await screen.findByText(en.ollamaUnreachable)).toBeTruthy()
+    second.unmount()
+    const listed = operations({ kind: 'found', models: [{ id: 'phi3' }] })
+    render(<OllamaProviderCard {...base} operations={listed.ops} onClose={vi.fn()} />)
+    await screen.findByText(en.ollamaModels)
+    fireEvent.change(screen.getByLabelText(en.baseUrl), { target: { value: 'http://10.0.0.5:11434/v1' } })
+    // The list is gone until the new address is listed, so nothing can be created for it yet.
+    expect(screen.queryByText(en.ollamaModels)).toBeNull()
+    expect(screen.getByText(en.create).closest('button')?.disabled).toBe(true)
+    fireEvent.click(screen.getByText(en.ollamaRefresh))
+    await screen.findByText(en.ollamaModels)
+    fireEvent.click(screen.getByText(en.create))
+    await waitFor(() => { expect(JSON.stringify(listed.writeSettings.mock.calls[0])).toContain('http://10.0.0.5:11434/v1') })
+  })
+
   it('picks a free route id', () => {
     expect(ollamaRoute([])).toBe('ollama')
     expect(ollamaRoute(['ollama', 'ollama-2'])).toBe('ollama-3')

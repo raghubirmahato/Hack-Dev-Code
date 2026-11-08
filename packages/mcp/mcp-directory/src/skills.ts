@@ -57,7 +57,12 @@ export function findSkill(query: string): DirectorySkill | undefined {
 /** Runs git with arguments in a folder; replaceable in tests. */
 export type GitRunner = (args: readonly string[], cwd: string) => Promise<void>
 
-/** Default runner: git without a shell, bounded to two minutes, never prompting for credentials. */
+/**
+ * Default runner: git without a shell, bounded to two minutes, never prompting for credentials.
+ * @param args - git arguments.
+ * @param cwd - folder to run in.
+ * @returns when git exits successfully.
+ */
 export const runGit: GitRunner = (args, cwd) => new Promise((resolve, reject) => {
   execFile('git', [...args], { cwd, timeout: 120_000, windowsHide: true, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }, (error, _stdout, stderr) => {
     if (error === null) resolve()

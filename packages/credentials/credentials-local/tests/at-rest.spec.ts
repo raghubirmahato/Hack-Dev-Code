@@ -69,6 +69,18 @@ describe.runIf(process.platform === 'win32')('sealed documents on this Windows a
     expect(await second.credentials.resolve(KEY)).toEqual({ value: 'sk-sealed-test-value', source: 'file' })
   }, 60_000)
 
+  it('never overwrites a sealed document it cannot parse, however often a write is tried', async () => {
+    const path = await tempFile()
+    const ctx = await boot(path)
+    await ctx.credentials.set(KEY, 'first')
+    // Another build wrote a layout this one does not read.
+    const newer = await dpapiCodec().seal('version: 2\nrefs:\n  DSH_AT_REST_TEST: from-newer-build\n')
+    await writeFile(path, newer)
+    await expect(ctx.credentials.set(KEY, 'second')).rejects.toThrow('version 2')
+    await expect(ctx.credentials.set(KEY, 'third')).rejects.toThrow('version 2')
+    expect(await readFile(path, 'utf8')).toBe(newer)
+  }, 60_000)
+
   it('seals a plain document found at boot, keeping its keys', async () => {
     const path = await tempFile()
     await writeFile(path, 'version: 1\nrefs:\n  DSH_AT_REST_TEST: plain-value\n', { mode: 0o600 })

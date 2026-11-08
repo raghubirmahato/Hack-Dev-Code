@@ -41,6 +41,8 @@ function fakeDesktop(): { backend: DisplayBackend; actions: string[] } {
     window: async (handle, action) => { actions.push(`${action} ${String(handle)}`); if (action === 'focus') front(handle) },
     open: async (target) => { actions.push(`open ${target}`) },
     readText: async handle => handle === 3 ? 'Document: Text editor = hello\n' : '',
+    pressButton: async (x, y, which, down) => { actions.push(`${down ? 'press' : 'release'} ${which} ${String(x)},${String(y)}`) },
+    holdKeys: async (chord, down) => { actions.push(`${down ? 'hold' : 'release'} ${chord.names.join('+')}`) },
     place: async (handle, x, y, width, height) => { actions.push(`place ${String(handle)} ${String(x)},${String(y)} ${String(width)}x${String(height)}`) },
     launch: async (app) => {
       actions.push(`launch ${app}`)
@@ -134,6 +136,22 @@ describe('desktop_sequence', () => {
     expect(text(await run([]))).toContain('steps is empty')
     expect(text(await run(Array.from({ length: 31 }, () => ({ action: 'sleep', ms: 50 }))))).toContain('at most 30 steps')
     expect(text(await run([{ action: 'teleport' }]))).toContain('unknown action \\"teleport\\"')
+  })
+})
+
+describe('holding buttons and keys', () => {
+  it('presses and releases a button and a chord across calls, and releases what is left on unload', async () => {
+    const { backend, actions } = fakeDesktop()
+    const fork = await ctx.plugin({ inject: ['tools'], apply: (inner: Context) => { registerDisplayTools(inner, backend) } })
+    expect(text(await call('desktop_keys', { keys: 'shift', hold: 'down' }))).toContain('Holding shift down')
+    expect(text(await call('desktop_pointer', { x: 10, y: 20, press: 'down' }))).toContain('holding the left button')
+    expect(text(await call('desktop_pointer', { x: 30, y: 40, press: 'up' }))).toContain('Released the left button')
+    expect(text(await call('desktop_pointer', { x: 30, y: 40, press: 'sideways' }))).toContain('press must be down or up')
+    expect(text(await call('desktop_keys', { keys: 'ctrl shift', hold: 'down' }))).toContain('hold takes one chord')
+    expect(actions).toEqual(['hold shift', 'press left 10,20', 'release left 30,40'])
+    await fork.dispose()
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(actions.at(-1)).toBe('release shift')
   })
 })
 

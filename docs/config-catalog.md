@@ -2565,7 +2565,7 @@ export interface ReconnectConfig {
 
 - `inject`: `tools`
 - `refs`: `Volatile` (`@hackdevcode/cosmokit`)
-- `source`: [`packages/mcp/mcp-directory/src/index.ts:44`](../packages/mcp/mcp-directory/src/index.ts)
+- `source`: [`packages/mcp/mcp-directory/src/index.ts:52`](../packages/mcp/mcp-directory/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config. */
@@ -2578,7 +2578,10 @@ export interface Config {
 export interface ServerChoice {
   /** Run the server; a choice turned off keeps its keys and folders for later. */
   enabled: boolean
-  /** Values for the keys the server requires; a key left out is read from the environment Hack Dev Code started in. */
+  /**
+   * Values typed into the profile by hand for the keys the server requires. Prefer the credential store: a key left
+   * out here is read from it, under the key's own name, and then from the environment Hack Dev Code started in.
+   */
   env?: Readonly<Record<string, string>> | undefined
   /** Folders for a server that opens folders, such as filesystem. */
   roots?: readonly string[] | undefined
@@ -4563,7 +4566,7 @@ export interface Config {
 ## `@hackdevcode/dsh-tool-todo`
 
 - `inject`: `tools` · `sessionProjections`
-- `source`: [`packages/todo/tool-todo/src/index.ts:29`](../packages/todo/tool-todo/src/index.ts)
+- `source`: [`packages/todo/tool-todo/src/index.ts:32`](../packages/todo/tool-todo/src/index.ts)
 
 ```ts config-catalog
 /** Model-facing todo tool configuration. */

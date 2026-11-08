@@ -25,6 +25,9 @@ jobs:
     env:
       DSH_DESKTOP_APP_ID: dev.hackdevcode.app
       DSH_DESKTOP_UPDATE_GITHUB: ${{ github.repository }}
+      # Until a code-signing certificate is configured, updates are checked only against the release checksum, so
+      # protect who can publish releases in this repository.
+      DSH_DESKTOP_UPDATE_UNSIGNED: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +44,12 @@ jobs:
         run: |
           version=$(node -p "require('./apps/desktop/package.json').version")
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v$version" ]; then
+          # Manual runs must start from the release tag too, so the release always matches the commit that was built.
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "::error::run this workflow from a tag such as v$version, not from a branch"
+            exit 1
+          fi
+          if [ "${GITHUB_REF_NAME}" != "v$version" ]; then
             echo "::error::tag ${GITHUB_REF_NAME} does not match apps/desktop/package.json version $version"
             exit 1
           fi
@@ -72,8 +80,10 @@ jobs:
           fi
           tag="v$VERSION"
           prerelease=$([[ "$VERSION" == *-* ]] && echo --prerelease || echo --latest)
+          # A published release is never changed: installed apps may be downloading it, and swapping the installer and
+          # its feed one file at a time would fail their checksum check. Publish a new version instead.
           if gh release view "$tag" > /dev/null 2>&1; then
-            gh release upload "$tag" "${files[@]}" --clobber
-          else
-            gh release create "$tag" "${files[@]}" --title "Hack Dev Code $VERSION" --generate-notes $prerelease
+            echo "::error::release $tag already exists; bump the version and tag again"
+            exit 1
           fi
+          gh release create "$tag" "${files[@]}" --target "$GITHUB_SHA" --title "Hack Dev Code $VERSION" --generate-notes $prerelease

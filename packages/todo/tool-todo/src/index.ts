@@ -10,6 +10,9 @@ import z from '@hackdevcode/schemastery'
 import { z as zod } from 'zod'
 import type { ZodType } from 'zod'
 import { defineTool } from '@hackdevcode/dsh-tools'
+import { createUserMessage } from '@hackdevcode/dsh-llm'
+import type {} from '@hackdevcode/dsh-agent'
+import type {} from '@hackdevcode/dsh-session'
 import type { TodoItem } from './types.ts'
 // Type-only: resolves the required ctx.sessionProjections service declaration.
 import type {} from '@hackdevcode/dsh-session-projection'
@@ -210,4 +213,72 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     },
     presentCall: args => ({ card: 'generic', title: 'Update todo list', kind: 'other', rawInput: args.todos }),
   }))
+  registerUnfinishedReminder(ctx)
+}
+
+/** What the reminder tracks for one session, folded from its events. */
+interface TurnTodoState {
+  /** The current turn's latest list, or null before a write in this turn. */
+  todos: TodoItem[] | null
+  /** Whether the latest assistant message in this turn called a tool. */
+  lastReplyCalledTools: boolean
+  /** The turn that already received the reminder. */
+  remindedTurn: number
+}
+
+/**
+ * The message sent when a model ends its turn while its own todo list still shows unfinished items.
+ * @param open - the items not marked completed.
+ * @returns the reminder text.
+ */
+export function unfinishedTodosReminder(open: readonly TodoItem[]): string {
+  const items = open.map(item => `- ${item.content} (${item.status === 'in_progress' ? 'in progress' : 'pending'})`).join('\n')
+  return `Your todo list still shows ${String(open.length)} unfinished ${open.length === 1 ? 'item' : 'items'}:\n${items}\n`
+    + 'Before you finish, call todo_write with the list as it really stands: mark every item you completed as completed, and for an item '
+    + 'you did not do, either do it now or remove it and say why in your answer.'
+}
+
+/**
+ * When a model ends its turn while its todo list still shows unfinished items, the list stays stale for the person.
+ * This asks the model once per turn to bring the list up to date before it finishes.
+ * @param ctx - the plugin context.
+ */
+function registerUnfinishedReminder(ctx: Context): void {
+  // Owned by this plugin instance: per-session turn state, dropped with the session object.
+  const states = new WeakMap<object, TurnTodoState>()
+  const stateOf = (session: object): TurnTodoState => {
+    let state = states.get(session)
+    if (state === undefined) states.set(session, state = { todos: null, lastReplyCalledTools: false, remindedTurn: -1 })
+    return state
+  }
+  ctx.on('session/event', (session, event) => {
+    if (event.type === 'turn/start') {
+      const state = stateOf(session)
+      state.todos = null
+      state.lastReplyCalledTools = false
+    } else if (event.type === 'todo/write') {
+      stateOf(session).todos = event.data.todos
+    } else if (event.type === 'assistant/message') {
+      stateOf(session).lastReplyCalledTools = event.data.message.content.some(block => block.type === 'tool-call')
+    }
+  })
+  // Runs as the turn is about to stop: a message steered here becomes the next step of the same turn.
+  ctx.on('agent/turn-stopping', ({ agent, turn, signal }) => {
+    if (signal.aborted) return
+    const state = states.get(agent.session)
+    if (state === undefined || state.todos === null || state.lastReplyCalledTools || state.remindedTurn === turn) return
+    const open = state.todos.filter(item => item.status !== 'completed')
+    if (open.length === 0) return
+    state.remindedTurn = turn
+    agent.steer(createUserMessage({ content: [{ type: 'text', text: unfinishedTodosReminder(open) }], source: { kind: TODO_REMINDER_SOURCE } }))
+  })
+}
+
+/** Source kind of the reminder message. */
+const TODO_REMINDER_SOURCE = 'todo-reminder'
+
+declare module '@hackdevcode/dsh-llm' {
+  interface MessageSourceMap {
+    'todo-reminder': { kind: 'todo-reminder' }
+  }
 }

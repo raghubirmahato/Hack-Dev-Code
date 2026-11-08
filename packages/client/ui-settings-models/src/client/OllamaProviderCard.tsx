@@ -63,6 +63,8 @@ export function OllamaProviderCard(props: OllamaProviderCardProps): ReactNode {
   const [openedAt] = useState(() => props.revision)
   const [baseURL, setBaseURL] = useState(OLLAMA_BASE_URL)
   const [models, setModels] = useState<readonly LlmDiscoveredModel[] | undefined>(undefined)
+  // The address the shown models came from; the route is created for it, not for an edited, unlisted address.
+  const [listedURL, setListedURL] = useState(OLLAMA_BASE_URL)
   const [picked, setPicked] = useState<ReadonlySet<string>>(() => new Set())
   const [listing, setListing] = useState(false)
   const [creating, setCreating] = useState(false)
@@ -81,7 +83,12 @@ export function OllamaProviderCard(props: OllamaProviderCardProps): ReactNode {
       }
       const unique = [...new Map(answer.models.map(model => [model.id, model])).values()]
       setModels(unique)
+      setListedURL(address.trim())
       setPicked(new Set(unique.map(model => model.id)))
+    } catch (error: unknown) {
+      // A lost connection to the Host rejects instead of refusing; it reads the same to the person.
+      setModels(undefined)
+      setFailure(error instanceof Error && error.message.length > 0 ? error.message : t('ollamaUnreachable'))
     } finally {
       setListing(false)
     }
@@ -106,7 +113,7 @@ export function OllamaProviderCard(props: OllamaProviderCardProps): ReactNode {
           displayName: route === 'ollama' ? 'Ollama' : `Ollama (${route})`,
           apiKeyEnv: keyRef,
           api: 'openai-completions',
-          baseURL: baseURL.trim(),
+          baseURL: listedURL,
           models: chosen.map(model => ({
             id: model.id,
             ...model.name === undefined ? {} : { name: model.name },
@@ -150,7 +157,11 @@ export function OllamaProviderCard(props: OllamaProviderCardProps): ReactNode {
           value={baseURL}
           aria-label={t('baseUrl')}
           disabled={disabled}
-          onChange={(event) => { setBaseURL(event.target.value) }}
+          onChange={(event) => {
+            setBaseURL(event.target.value)
+            // Models listed from another address would not match this one; list again first.
+            setModels(undefined)
+          }}
         />
       </div>
       <div className={styles['presetRow']}>

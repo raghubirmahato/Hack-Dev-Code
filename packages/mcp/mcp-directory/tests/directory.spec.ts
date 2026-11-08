@@ -51,7 +51,7 @@ describe('the directory catalog', () => {
 })
 
 describe('the mcp_directory tool', () => {
-  async function mount(servers: Record<string, ServerChoice> = {}) {
+  async function mount(servers: Record<string, ServerChoice> = {}, sandboxMode?: string) {
     const ctx = new Context()
     onTestFinished(() => ctx.fiber.dispose())
     await ctx.plugin(SystemPrompt)
@@ -63,6 +63,20 @@ describe('the mcp_directory tool', () => {
       update(ns: string, patch: object) { updates.push({ ns, patch }); return Promise.resolve() }
     }
     await ctx.plugin(Settings)
+    const stored = new Map<string, string>()
+    class Credentials extends Service {
+      constructor(inner: Context) { super(inner, 'credentials') }
+      set(ref: string, value: string) { stored.set(ref, value); return Promise.resolve() }
+      resolve(ref: string) { const value = stored.get(ref); return Promise.resolve(value === undefined ? undefined : { value, source: 'file' }) }
+    }
+    await ctx.plugin(Credentials)
+    if (sandboxMode !== undefined) {
+      class Policy extends Service {
+        constructor(inner: Context) { super(inner, 'sandboxPolicy') }
+        resolve() { return { mode: sandboxMode } }
+      }
+      await ctx.plugin(Policy)
+    }
     await ctx.plugin({
       name: 'mcp-directory-test',
       inject: Directory.inject,
@@ -75,7 +89,7 @@ describe('the mcp_directory tool', () => {
       const result = await executeToolFixture(ctx, { name: 'mcp_directory', callId: ToolCallId('d'), arguments: args, signal: new AbortController().signal })
       return { isError: result.isError, text: result.content.map(block => block.type === 'text' ? block.text : '').join('') }
     }
-    return { call, updates }
+    return { call, updates, stored }
   }
 
   it('lists every server with its state and the keys it needs', async () => {
@@ -94,13 +108,24 @@ describe('the mcp_directory tool', () => {
     expect(updates).toEqual([{ ns: 'mcp-directory', patch: { servers: { context7: { enabled: true } } } }])
   })
 
-  it('asks for a missing key instead of saving a server that cannot start', async () => {
-    const { call, updates } = await mount()
+  it('asks for a missing key, and keeps a given key in the credential store rather than the profile', async () => {
+    const { call, updates, stored } = await mount()
     const added = await call({ action: 'add', server: 'brave-search' })
     expect(added.text).toContain('needs BRAVE_API_KEY')
     expect(updates).toEqual([])
     await call({ action: 'add', server: 'brave-search', env: { BRAVE_API_KEY: 'k' } })
-    expect(updates).toEqual([{ ns: 'mcp-directory', patch: { servers: { 'brave-search': { enabled: true, env: { BRAVE_API_KEY: 'k' } } } } }])
+    expect(updates).toEqual([{ ns: 'mcp-directory', patch: { servers: { 'brave-search': { enabled: true } } } }])
+    expect(stored.get('BRAVE_API_KEY')).toBe('k')
+    expect((await call({ action: 'add', server: 'brave-search', env: { OTHER_KEY: 'x' } })).text).toContain('does not use a key named OTHER_KEY')
+  })
+
+  it('refuses to start third-party code from a read-only session without approval', async () => {
+    const { call, updates } = await mount({}, 'read-only')
+    const added = await call({ action: 'add', server: 'filesystem', roots: ['C:/'] })
+    expect(added.isError).toBe(true)
+    expect(added.text).toContain('requires approval')
+    expect(updates).toEqual([])
+    expect((await call({ action: 'list' })).isError).toBe(false)
   })
 
   it('turns a server off, and explains unknown servers and actions', async () => {

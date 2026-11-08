@@ -21,6 +21,9 @@ export type InputOp =
   | { op: 'wheel'; x: number; y: number; clicks: number; horizontal: boolean }
   | { op: 'act'; handle: number; action: 'focus' | 'minimize' | 'maximize' | 'restore' | 'close' }
   | { op: 'place'; handle: number; x: number; y: number; width: number; height: number }
+  | { op: 'keys-down'; vks: readonly number[] }
+  | { op: 'keys-up'; vks: readonly number[] }
+  | { op: 'button'; flag: number }
   | { op: 'sleep'; ms: number }
 
 const int = (value: number): string => String(Math.trunc(Math.round(value)))
@@ -43,6 +46,9 @@ export function opScript(op: InputOp): string {
     case 'wheel': return `[HackDev.Desk]::Wheel(${int(op.x)}, ${int(op.y)}, ${int(op.clicks)}, $${String(op.horizontal)})`
     case 'act': return `[HackDev.Desk]::Act([IntPtr]${int(op.handle)}, '${op.action}')`
     case 'place': return `[HackDev.Desk]::Place([IntPtr]${int(op.handle)}, ${int(op.x)}, ${int(op.y)}, ${int(op.width)}, ${int(op.height)})`
+    case 'keys-down': return `[HackDev.Desk]::KeysDown([uint16[]]@(${vkList(op.vks)}))`
+    case 'keys-up': return `[HackDev.Desk]::KeysUp([uint16[]]@(${vkList(op.vks)}))`
+    case 'button': return `[HackDev.Desk]::Button(${int(op.flag)})`
     case 'sleep': return `Start-Sleep -Milliseconds ${int(op.ms)}`
   }
 }
@@ -62,6 +68,9 @@ export function opCommand(op: InputOp): string {
     case 'wheel': return `wheel ${int(op.x)} ${int(op.y)} ${int(op.clicks)} ${op.horizontal ? '1' : '0'}`
     case 'act': return `act ${int(op.handle)} ${op.action}`
     case 'place': return `place ${int(op.handle)} ${int(op.x)} ${int(op.y)} ${int(op.width)} ${int(op.height)}`
+    case 'keys-down': return `keysdown ${vkList(op.vks) || '0'}`
+    case 'keys-up': return `keysup ${vkList(op.vks) || '0'}`
+    case 'button': return `button ${int(op.flag)}`
     case 'sleep': return `sleep ${int(op.ms)}`
   }
 }
@@ -126,6 +135,12 @@ try {
           [HackDev.Desk]::Act([IntPtr][long]$part[2], $part[3])
         }
         'place' { [HackDev.Desk]::Place([IntPtr][long]$part[2], [int]$part[3], [int]$part[4], [int]$part[5], [int]$part[6]) }
+        'keysdown' { [HackDev.Desk]::KeysDown([uint16[]](& $ints $part[2])) }
+        'keysup' { [HackDev.Desk]::KeysUp([uint16[]](& $ints $part[2])) }
+        'button' {
+          if (@(2, 4, 8, 16, 32, 64) -notcontains [int]$part[2]) { throw "unknown mouse button event $($part[2])" }
+          [HackDev.Desk]::Button([uint32]$part[2])
+        }
         'sleep' { Start-Sleep -Milliseconds ([Math]::Min(10000, [int]$part[2])) }
         default { throw "unknown command $($part[1])" }
       }
@@ -151,7 +166,8 @@ export type SessionRunner = (script: string, timeoutMs?: number, signal?: AbortS
 
 /** Quote a value for a single-quoted PowerShell string. */
 function quote(value: string): string {
-  return `'${value.replace(/'/gu, "''")}'`
+  // PowerShell also ends a single-quoted string at the curly single quotes U+2018 to U+201B; each is doubled too.
+  return `'${value.replace(/['‘’‚‛]/gu, mark => mark + mark)}'`
 }
 
 /**

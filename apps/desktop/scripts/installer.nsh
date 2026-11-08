@@ -179,6 +179,20 @@ ManifestDPIAware true
         ${EndIf}
       ${Loop}
     ${EndIf}
+    ; Offer to close the running application; a silent run closes it. After its startup elevation it may run as
+    ; administrator and refuse a plain taskkill, so taskkill then runs again through the administrator prompt.
+    ${If} $R0 == 0
+    ${AndIf} ${Cmd} `MessageBox MB_YESNO|MB_ICONQUESTION "$(INSTALLER_RUNNING_CLOSE)" /SD IDYES IDYES`
+      nsExec::Exec 'taskkill.exe /F /T /IM "${APP_EXECUTABLE_FILENAME}"'
+      Pop $R1
+      Sleep 800
+      System::Call '$PLUGINSDIR\window-frame.dll::InstallerFindProcess(w "$INSTDIR\${APP_EXECUTABLE_FILENAME}") i.R0 ?c'
+      ${If} $R0 == 0
+        ExecShellWait "runas" "taskkill.exe" '/F /T /IM "${APP_EXECUTABLE_FILENAME}"' SW_HIDE
+        Sleep 800
+        System::Call '$PLUGINSDIR\window-frame.dll::InstallerFindProcess(w "$INSTDIR\${APP_EXECUTABLE_FILENAME}") i.R0 ?c'
+      ${EndIf}
+    ${EndIf}
     ${If} $R0 == 0
       MessageBox MB_OK|MB_ICONINFORMATION "$(INSTALLER_RUNNING)" /SD IDOK
       SetErrorLevel 2

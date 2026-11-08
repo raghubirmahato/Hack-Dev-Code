@@ -33,7 +33,9 @@
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-mcp-client": "workspace:*",
     "@hackdevcode/dsh-tools": "workspace:*",
-    "@hackdevcode/dsh-home-paths": "workspace:*"
+    "@hackdevcode/dsh-home-paths": "workspace:*",
+    "@hackdevcode/dsh-credentials": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*"
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -46,6 +48,10 @@
     "@hackdevcode/dsh-tool-executor-native": "workspace:*",
     "@hackdevcode/dsh-tool-testkit": "workspace:*",
     "@hackdevcode/dsh-tools": "workspace:*",
-    "@hackdevcode/dsh-home-paths": "workspace:*"
+    "@hackdevcode/dsh-home-paths": "workspace:*",
+    "@hackdevcode/dsh-credentials": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*",
+    "@hackdevcode/dsh-user-approval": "workspace:*"
   }
 }

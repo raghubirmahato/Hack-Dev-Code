@@ -20,7 +20,7 @@ it('generates English NSIS strings from the packaged language resource', () => {
   expect(source).toContain('LangString INSTALLER_INSTALL ${LANG_ENGLISH} "Install now"')
   expect(source).toContain('LangString INSTALLER_NATIVE_PROGRESS ${LANG_ENGLISH} "Preparing installation… %d%%"')
   expect(source).toContain('!ifdef LANG_ENGLISH\n')
-  expect(source.match(/^LangString /gmu)).toHaveLength(31)
+  expect(source.match(/^LangString /gmu)).toHaveLength(32)
 })
 
 it('rejects a missing en_US configuration', () => {

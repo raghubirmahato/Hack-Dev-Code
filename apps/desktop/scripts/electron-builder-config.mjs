@@ -105,6 +105,11 @@ export function createElectronBuilderConfig(
   // DSH_DESKTOP_UPDATE_GITHUB=owner/repo publishes to and updates from that repository's GitHub Releases, signed or
   // not; otherwise signed builds use the release update service and unsigned builds do not update.
   const github = resolveGitHubUpdateRepository(env.DSH_DESKTOP_UPDATE_GITHUB)
+  // An unsigned build has no publisher to check, so an update is trusted on the release's own checksum alone:
+  // anyone who can publish a release can update every install. That needs an explicit choice.
+  if (github !== undefined && unsigned && env.DSH_DESKTOP_UPDATE_UNSIGNED !== '1') {
+    throw new Error('desktop package: an unsigned build updates from GitHub only with DSH_DESKTOP_UPDATE_UNSIGNED=1, since no signature protects its updates')
+  }
   const update = github !== undefined
     ? { channel: env.DSH_DESKTOP_UPDATE_CHANNEL ?? (buildVersion.includes('-') ? 'nightly' : 'latest'), github }
     : unsigned ? undefined : resolveDesktopAutoUpdateConfig(env, resolvedPlatform, resolvedArch)

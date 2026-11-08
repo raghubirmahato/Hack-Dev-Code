@@ -69,7 +69,7 @@ The plugin registers four `defineTool` definitions through the context that load
 
 - [Schedule service](../schedule/README.md) — the Host task store, runtime, and delivery behavior these tools manage.
 - [Schedule group map](../README.md) — the sibling packages in this group.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-schedule) — the exact four schemas the model receives.
+- [Generated tool catalog](../../../docs/tool-catalog.md#hackdevcodedsh-tool-schedule) — the exact four schemas the model receives.
 - [Schedule subsystem](../../../docs/subsystems/schedule.md) — the `ctx.schedule` Cordis surface and stored types.
 - [Schedule user guide](../../../docs/user/guide/schedule.md) — the user-facing reminder workflow.
 
@@ -82,7 +82,7 @@ The plugin registers four `defineTool` definitions through the context that load
 
 #### What the model sees
 
-The generated [`schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete` schemas](../../../docs/tool-catalog.md#deepseek-aidsh-tool-schedule) whenever this package is visible in the calling Agent's scope. Title guidance does not rewrite stored titles or add validation beyond the existing non-empty and length checks.
+The generated [`schedule_create`, `schedule_list`, `schedule_update`, and `schedule_delete` schemas](../../../docs/tool-catalog.md#hackdevcodedsh-tool-schedule) whenever this package is visible in the calling Agent's scope. Title guidance does not rewrite stored titles or add validation beyond the existing non-empty and length checks.
 
 #### Token effect
 

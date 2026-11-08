@@ -13,7 +13,7 @@ interface Registered { name: string; execute?: (args: unknown, execution: { sign
 describe.runIf(process.platform === 'win32' && process.env['HACKDEV_LIVE_DESKTOP'] === '1')('live desktop', () => {
   it('drives Calculator like a person', async () => {
     const tools = new Map<string, Registered>()
-    const ctx = { tools: { register: (tool: Registered) => { tools.set(tool.name, tool) } } } as unknown as Context
+    const ctx = { tools: { register: (tool: Registered) => { tools.set(tool.name, tool) } }, effect: () => {} } as unknown as Context
     const backend = windowsBackend()
     registerDisplayTools(ctx, backend)
     const signal = new AbortController().signal

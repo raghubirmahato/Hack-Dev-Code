@@ -45,7 +45,7 @@ Use it as the default local store: the product's base composition loads it, and 
 | `debounceMs` | `100` | Wait this long after a change before reloading, in milliseconds |
 | `encryptAtRest` | `false` | Windows: seal the document with the Data Protection API for the signed-in account; a plain document is read and sealed on the next write. The product base bundle turns it on |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-credentials-local) is the exhaustive source for every accepted field and its JSDoc.
+The generated [configuration catalog](../../../docs/config-catalog.md#hackdevcodedsh-credentials-local) is the exhaustive source for every accepted field and its JSDoc.
 
 ### Storing and removing keys
 

@@ -13,6 +13,7 @@ Desktop runs the Harness workspace in a native application. This reference cover
 - [Application overview](#application-overview)
 - [Terminal command](#terminal-command)
 - [Closing the window and quitting](#closing-the-window-and-quitting)
+- [Administrator access on Windows](#administrator-access-on-windows)
 - [Key technical decisions](#key-technical-decisions)
 - [Bundled command runtime](#bundled-command-runtime)
 - [Installation ownership](#installation-ownership)
@@ -75,9 +76,17 @@ Every ordinary quit entry — ⌘Q, the application menu, the Dock menu, the Win
 
 The mandatory update confirmation includes the installation wait notice on Windows; macOS uses the shorter restart explanation.
 
-The confirmation is skipped when the installer restart already confirmed task interruption, when the fatal-recovery dialog exits or restarts, when the development Restart App and Host command runs, and during operating-system shutdown, restart, or log-off: Windows sets this on the definitive session-end message; macOS sets it on the power-off notification, and because another application can still cancel that shutdown, the next focus or show of the main window clears it. Installer-owned quit cancels any pending ordinary quit decision; late inspection results and dialog answers cannot open another confirmation or repeat cleanup. A user-initiated update download that finishes while the window is hidden defers its Install and Restart confirmation until the window is shown again; the mandatory flow keeps its taskbar and Dock attention. The Windows installer and uninstaller tell a user whose application is still running to quit it from the system tray. Desktop does not enable scheduled tasks by default, so the scheduled-task explanations appear only once that feature is on; reminders fire only in loaded sessions, and unloaded sessions are neither counted nor resumed until they are opened.
+The confirmation is skipped when the installer restart already confirmed task interruption, when the fatal-recovery dialog exits or restarts, when the development Restart App and Host command runs, and during operating-system shutdown, restart, or log-off: Windows sets this on the definitive session-end message; macOS sets it on the power-off notification, and because another application can still cancel that shutdown, the next focus or show of the main window clears it. Installer-owned quit cancels any pending ordinary quit decision; late inspection results and dialog answers cannot open another confirmation or repeat cleanup. A user-initiated update download that finishes while the window is hidden defers its Install and Restart confirmation until the window is shown again; the mandatory flow keeps its taskbar and Dock attention. The Windows installer and uninstaller offer to close a running application (forcing it, through the administrator prompt when it runs elevated) and otherwise tell the user to quit it from the system tray. Desktop does not enable scheduled tasks by default, so the scheduled-task explanations appear only once that feature is on; reminders fire only in loaded sessions, and unloaded sessions are neither counted nor resumed until they are opened.
 
 The tray renderer enlarges the brand mark by 20% around the tile center while preserving the background and aspect ratio; application and installer icons retain their original proportions.
+
+<a id="administrator-access-on-windows"></a>
+
+## Administrator access on Windows
+
+A packaged Windows build asks for administrator rights when it starts, so the agent can install software, change machine settings and operate apps that run as administrator. Before it creates any window it takes the single-instance lock, checks for elevation with `net session`, and, when not elevated, relaunches itself through `Start-Process -Verb RunAs` with the same arguments, working folder and the marker `--hackdev-elevation-attempted`, then exits. Accepting the prompt starts the elevated copy; declining it (error 1223) or any other failure keeps the unelevated run going, and the marker stops it from asking again in that run. It never bypasses the prompt.
+
+Set `HACKDEV_RUN_AS_ADMIN=0` or pass `--no-admin` to start without asking. Development runs, macOS and Linux never ask; on Linux run the command through `sudo` when a task needs root.
 
 <a id="key-technical-decisions"></a>
 
@@ -248,7 +257,7 @@ Use the dedicated guides for build and release operations. Shared Windows runner
 
 ## Windows installer interface
 
-The Windows installer uses native NSIS pages with light and dark palettes, system shadows, an editable installation directory, and a finish page whose launch checkbox is selected by default. Installation is restricted to the current user. Clicking Install or pressing Enter validates the current path; drive roots remain invalid after normalization, including repeated trailing separators. New destinations must be empty, and nonempty destinations must be registered installations. Running executables at the affected installation path produce a native prompt and remain running; same-named applications in other directories do not block installation. Silent updates wait up to ten seconds for the affected application to exit, then stop with exit code 2 if it is still running.
+The Windows installer uses native NSIS pages with light and dark palettes, system shadows, an editable installation directory, and a finish page whose launch checkbox is selected by default. Installation is restricted to the current user. Clicking Install or pressing Enter validates the current path; drive roots remain invalid after normalization, including repeated trailing separators. New destinations must be empty, and nonempty destinations must be registered installations. Running executables at the affected installation path produce a native prompt offering to close them, and remain running when declined; same-named applications in other directories do not block installation. Silent updates wait up to ten seconds for the affected application to exit, then stop with exit code 2 if it is still running.
 
 The theme follows Windows at startup; `/THEME=light`, `/THEME=dark`, and `/THEME=auto` select a palette explicitly. The window appears after its branded controls are ready. When the welcome page first appears, the installer moves above ordinary windows once and flashes its taskbar button if another window has focus; it does not remain always on top. Progress reads the pinned 7-Zip extractor’s percentage; directory promotion, registration, and cleanup retain bounded estimates. The weighted percentage does not predict remaining time. After NSIS reports success, the bar fills over 600 ms and displays 100% briefly before the finish page appears; the transition targets 750 ms. The finish page preserves the window position. Finish dismisses the installer before launching the installed executable; a launch failure restores the page for retry. Directory replacement and failure recovery follow the [installation checks](packaging/README.md#runtime-file-selection). First-launch profile preparation remains a separate Desktop operation.
 

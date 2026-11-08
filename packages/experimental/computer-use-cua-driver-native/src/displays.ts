@@ -94,6 +94,10 @@ export interface DisplayBackend {
   scroll(x: number, y: number, clicks: number, horizontal: boolean, signal?: AbortSignal): Promise<void>
   /** Press each chord in order with real keyboard input to the foreground window. */
   keys(chords: readonly Chord[], signal?: AbortSignal): Promise<void>
+  /** Press (`down`) or release (`up`) one mouse button at a point and leave it so, for drags and holds over several steps. */
+  pressButton(x: number | undefined, y: number | undefined, button: PointerButton, down: boolean, signal?: AbortSignal): Promise<void>
+  /** Press (`down`) or release (`up`) the keys of one chord and leave them so. */
+  holdKeys(chord: Chord, down: boolean, signal?: AbortSignal): Promise<void>
   /**
    * Type text with real keyboard input to the foreground window; newlines press Enter. With `paste`, put the text on
    * the clipboard, press ctrl+v and restore the earlier clipboard text, which is much faster for long text.
@@ -117,6 +121,10 @@ export interface DisplayBackend {
   elementPoint?(handle: number, index: number): Promise<{ x: number; y: number }>
   /** Recognize the text shown in one area of the screen, where the platform has text recognition. */
   ocr?(area: CaptureArea): Promise<OcrLine[]>
+  /** Recognize the text of one window as it draws itself, even behind others; undefined when it cannot draw itself so. */
+  ocrWindow?(window: WindowInfo): Promise<OcrLine[] | undefined>
+  /** Capture one window as it draws itself, even behind others; undefined when it cannot draw itself so. */
+  captureWindow?(path: string, window: WindowInfo, maxDimension: number): Promise<CaptureResult | undefined>
   /** Stop helper processes. */
   close(): void
 }
@@ -174,6 +182,18 @@ public static class Desk {
   [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
   [DllImport("user32.dll")] static extern bool IsWindow(IntPtr h);
   [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
+  /** Draw a window, even one behind others, into a device context (PW_RENDERFULLCONTENT). */
+  public static bool PrintTo(long handle, IntPtr hdc) { return IsWindow(new IntPtr(handle)) && PrintWindow(new IntPtr(handle), hdc, 2); }
+  static string ClassName(IntPtr h) { StringBuilder s = new StringBuilder(256); GetClassName(h, s, s.Capacity); return s.ToString(); }
+  /** Titles for the untitled shell windows a person uses every day. */
+  static string ShellName(string className) {
+    if (className == "Shell_TrayWnd") return "Taskbar";
+    if (className == "Shell_SecondaryTrayWnd") return "Taskbar (other display)";
+    if (className == "NotifyIconOverflowWindow" || className == "TopLevelWindowForOverflowXamlIsland") return "Hidden tray icons";
+    return "";
+  }
   [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr h, out uint pid);
   [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
   [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr h);
@@ -267,6 +287,20 @@ public static class Desk {
     POINT p = new POINT(); p.X = x; p.Y = y;
     return NeedsElevation(GetAncestor(WindowFromPoint(p), 2));
   }
+  /** Press keys and keep them down (a held modifier, a held game key) until KeysUp. */
+  public static void KeysDown(ushort[] keys) {
+    List<INPUT> list = new List<INPUT>();
+    foreach (ushort vk in keys) list.Add(Key(vk, 0, Ext(vk)));
+    Send(list.ToArray());
+  }
+  /** Release keys pressed with KeysDown, last first. */
+  public static void KeysUp(ushort[] keys) {
+    List<INPUT> list = new List<INPUT>();
+    for (int j = keys.Length - 1; j >= 0; j--) list.Add(Key(keys[j], 0, Ext(keys[j]) | 2u));
+    Send(list.ToArray());
+  }
+  /** Send one mouse button event (down or up) at the pointer. */
+  public static void Button(uint flag) { Send(new INPUT[] { Mouse(flag, 0) }); }
   public static void Click(uint down, uint up, int count) { for (int n = 0; n < count; n++) { Send(new INPUT[] { Mouse(down, 0), Mouse(up, 0) }); Thread.Sleep(60); } }
   public static void Drag(int x1, int y1, int x2, int y2, uint down, uint up) {
     Move(x1, y1); Thread.Sleep(60); Send(new INPUT[] { Mouse(down, 0) }); Thread.Sleep(60);
@@ -301,6 +335,8 @@ public static class Desk {
       // Owned windows stay listed: Run, Save As, Open and other dialogs are owned by their app.
       if (!IsWindowVisible(h) || Cloaked(h)) return true;
       string title = Title(h);
+      // The taskbar and the tray overflow have no title; name them so they can be read and operated like windows.
+      if (title.Length == 0) title = ShellName(ClassName(h));
       if (title.Length == 0) return true;
       RECT r; GetWindowRect(h, out r);
       if (r.Right - r.Left <= 0 || r.Bottom - r.Top <= 0) return true;
@@ -371,6 +407,15 @@ using System.Windows.Automation;
 namespace HackDev {
 public static class Uia {
   static readonly Dictionary<long, List<AutomationElement>> Numbered = new Dictionary<long, List<AutomationElement>>();
+  /** Windows in the order they were last read; only the most recent ones keep their numbered elements. */
+  static readonly List<long> Recent = new List<long>();
+  /** Keep a window's numbered elements, dropping those of the least recently read windows beyond sixteen. */
+  static void Remember(long handle, List<AutomationElement> numbered) {
+    Numbered[handle] = numbered;
+    Recent.Remove(handle);
+    Recent.Add(handle);
+    while (Recent.Count > 16) { Numbered.Remove(Recent[0]); Recent.RemoveAt(0); }
+  }
   static readonly HashSet<string> Controls = new HashSet<string> { "Edit", "Document", "ComboBox", "Button", "CheckBox", "RadioButton", "Slider", "Spinner", "SplitButton", "MenuItem", "TabItem", "ListItem", "TreeItem", "Hyperlink" };
   static string Clean(string text) { return (text ?? "").Replace("\r", " ").Replace("\n", " ").Trim(); }
   static string Quote(string text) { return "\"" + (text.Length > 200 ? text.Substring(0, 200) + "..." : text).Replace("\"", "'") + "\""; }
@@ -449,7 +494,7 @@ public static class Uia {
       for (int i = children.Count - 1; i >= 0; i--) stack.Push(new KeyValuePair<AutomationElement, int>(children[i], next.Value + 1));
     }
     if (stack.Count > 0) text.Append("... more elements were not read\n");
-    Numbered[handle] = numbered;
+    Remember(handle, numbered);
     return text.ToString();
   }
   /**
@@ -460,7 +505,8 @@ public static class Uia {
     AutomationElement root = AutomationElement.FromHandle(new IntPtr(handle));
     TreeWalker walker = TreeWalker.ControlViewWalker;
     List<AutomationElement> numbered;
-    if (!Numbered.TryGetValue(handle, out numbered)) { numbered = new List<AutomationElement>(); numbered.Add(null); Numbered[handle] = numbered; }
+    if (!Numbered.TryGetValue(handle, out numbered)) { numbered = new List<AutomationElement>(); numbered.Add(null); }
+    Remember(handle, numbered);
     string needle = Clean(name).ToLowerInvariant();
     string kind = (role ?? "").Trim().ToLowerInvariant();
     string id = (automationId ?? "").Trim();
@@ -588,7 +634,7 @@ const CLIPBOARD_RESTORE = '$r = $false; if ($global:hackdevClipboardSaved) { for
  * @param area - the area in virtual-desktop pixels.
  * @returns the script.
  */
-export function ocrScript(area: CaptureArea): string {
+export function ocrScript(area: CaptureArea, handle?: number): string {
   const int = (value: number): string => String(Math.round(value))
   const scale = Math.max(area.width, area.height) <= 1600 ? 2 : 1
   return String.raw`if ($null -eq $global:hackdevAsTask) { Add-Type -AssemblyName System.Runtime.WindowsRuntime; `
@@ -600,7 +646,7 @@ export function ocrScript(area: CaptureArea): string {
     + String.raw`$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages(); `
     + String.raw`if ($null -eq $engine) { throw 'Windows has no text recognition language: add a language with the Optical character recognition feature in Settings > Time & language > Language & region' }; `
     + `$s = ${String(scale)}; $bx = ${int(area.x)}; $by = ${int(area.y)}; $bw = ${int(area.width)}; $bh = ${int(area.height)}; `
-    + String.raw`$bmp = New-Object System.Drawing.Bitmap($bw, $bh); $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($bx, $by, 0, 0, $bmp.Size); $g.Dispose(); `
+    + (handle === undefined ? SCREEN_CAPTURE : windowCapture(handle))
     + String.raw`if ($s -ne 1) { $big = New-Object System.Drawing.Bitmap(($bw * $s), ($bh * $s)); $bg = [System.Drawing.Graphics]::FromImage($big); `
     + String.raw`$bg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic; $bg.DrawImage($bmp, 0, 0, $big.Width, $big.Height); $bg.Dispose(); $bmp.Dispose(); $bmp = $big }; `
     + String.raw`$path = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'hackdev-ocr-' + [Guid]::NewGuid().ToString('N') + '.png'); $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose(); `
@@ -613,6 +659,30 @@ export function ocrScript(area: CaptureArea): string {
     + String.raw`foreach ($line in $result.Lines) { $l = [double]::MaxValue; $t = [double]::MaxValue; $r = 0.0; $b = 0.0; `
     + String.raw`foreach ($word in $line.Words) { $wr = $word.BoundingRect; $l = [Math]::Min($l, $wr.X); $t = [Math]::Min($t, $wr.Y); $r = [Math]::Max($r, $wr.X + $wr.Width); $b = [Math]::Max($b, $wr.Y + $wr.Height) }; `
     + String.raw`@([int]($bx + $l / $s), [int]($by + $t / $s), [int](($r - $l) / $s), [int](($b - $t) / $s), ($line.Text -replace '\s+', ' ')) -join [char]9 }`
+}
+
+/** The last non-empty line of script output. */
+function lastLine(out: string): string {
+  return out.trim().split(/\r?\n/u).at(-1)?.trim() ?? ''
+}
+
+/** Copy the area from the screen into $bmp. */
+const SCREEN_CAPTURE = String.raw`$bmp = New-Object System.Drawing.Bitmap($bw, $bh); $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($bx, $by, 0, 0, $bmp.Size); $g.Dispose(); `
+
+/**
+ * Have one window draw itself into $bmp, so a window behind others is captured as it looks without moving it to the
+ * front. A window that cannot draw itself this way (some GPU-rendered apps come out as one flat colour) prints BLANK
+ * and ends the script.
+ * @param handle - the window.
+ * @returns the script fragment.
+ */
+export function windowCapture(handle: number): string {
+  return String.raw`$bmp = New-Object System.Drawing.Bitmap($bw, $bh); $g = [System.Drawing.Graphics]::FromImage($bmp); $hdc = $g.GetHdc(); `
+    + `$ok = [HackDev.Desk]::PrintTo(${String(Math.trunc(handle))}, $hdc); `
+    + String.raw`$g.ReleaseHdc($hdc); $g.Dispose(); $first = $bmp.GetPixel(0, 0).ToArgb(); $flat = $true; `
+    + String.raw`for ($i = 1; $i -le 12 -and $flat; $i++) { for ($j = 1; $j -le 12; $j++) { `
+    + String.raw`if ($bmp.GetPixel([int]($bw * $i / 13), [int]($bh * $j / 13)).ToArgb() -ne $first) { $flat = $false; break } } }; `
+    + String.raw`if (-not $ok -or $flat) { $bmp.Dispose(); 'BLANK'; return }; `
 }
 
 /**
@@ -687,7 +757,9 @@ const LIST_SCREENS = '@([HackDev.Desk]::Monitors()) | ConvertTo-Json -Compress'
 
 /** Quote a value for a single-quoted PowerShell string. */
 export function psQuote(value: string): string {
-  return `'${value.replace(/'/gu, "''")}'`
+  // PowerShell also ends a single-quoted string at the curly single quotes U+2018 to U+201B, so each is doubled too;
+  // otherwise text such as "don’t" from a web page would close the string and run the rest as code.
+  return `'${value.replace(/['‘’‚‛]/gu, quote => quote + quote)}'`
 }
 
 /** Parse JSON that PowerShell writes for one object or an array of them. */
@@ -895,6 +967,16 @@ export function windowsBackend(run?: ScriptRunner, options: WindowsBackendOption
     async scroll(x, y, clicks, horizontal, signal) {
       await input([{ op: 'wheel', x, y, clicks, horizontal }], { x, y }, signal)
     },
+    async pressButton(x, y, pressed, down, signal) {
+      const [downFlag, upFlag] = BUTTON_FLAGS[pressed]
+      const flag = { op: 'button' as const, flag: down ? downFlag : upFlag }
+      // Without a point the button changes where the pointer already is.
+      if (x === undefined || y === undefined) await input([flag], undefined, signal)
+      else await input([{ op: 'move', x, y }, { op: 'sleep', ms: 40 }, flag], { x, y }, signal)
+    },
+    async holdKeys(chord, down, signal) {
+      await input([{ op: down ? 'keys-down' : 'keys-up', vks: chord.vk }], undefined, signal)
+    },
     async keys(chords, signal) {
       const ops = chords.flatMap((chord, index): InputOp[] => index === 0 ? [{ op: 'chord', vks: chord.vk }] : [{ op: 'sleep', ms: 60 }, { op: 'chord', vks: chord.vk }])
       await input(ops, undefined, signal)
@@ -965,6 +1047,22 @@ export function windowsBackend(run?: ScriptRunner, options: WindowsBackendOption
     },
     async ocr(area) {
       return parseOcrLines(await ps(ocrScript(area), 30_000))
+    },
+    async ocrWindow(window) {
+      const out = await ps(ocrScript(window, window.handle), 30_000)
+      return lastLine(out) === 'BLANK' ? undefined : parseOcrLines(out)
+    },
+    async captureWindow(path, window, maxDimension) {
+      const out = await ps(`$bw = ${int(window.width)}; $bh = ${int(window.height)}; ${windowCapture(window.handle)}`
+        + `$s = [Math]::Min(1.0, ${int(maxDimension)} / [double][Math]::Max($bw, $bh)); $w = [int][Math]::Round($bw * $s); $h = [int][Math]::Round($bh * $s); `
+        + 'if ($s -lt 1.0) { $small = New-Object System.Drawing.Bitmap($w, $h); $sg = [System.Drawing.Graphics]::FromImage($small); '
+        + '$sg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic; $sg.DrawImage($bmp, 0, 0, $w, $h); $sg.Dispose(); $bmp.Dispose(); $bmp = $small }; '
+        + `$bmp.Save(${psQuote(path)}, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose(); "$w $h $s"`)
+      const last = lastLine(out)
+      if (last === 'BLANK') return undefined
+      // Only the last line is the size; drawing calls can print before it.
+      const [width, height, scale] = last.split(/\s+/u).map(Number)
+      return { width: width ?? 0, height: height ?? 0, scale: scale ?? 1 }
     },
     close() {
       elevated?.close()
@@ -1096,6 +1194,31 @@ print('\n'.join(out))
 const X11_BUTTONS: Readonly<Record<PointerButton, string>> = { left: '1', middle: '2', right: '3' }
 
 /**
+ * xdotool arguments for a drag that moves in steps like a hand, so drop targets see the pointer travel.
+ * @param fromX - start x.
+ * @param fromY - start y.
+ * @param toX - end x.
+ * @param toY - end y.
+ * @param button - X11 button number.
+ * @returns the arguments.
+ */
+export function linuxDragArgs(fromX: number, fromY: number, toX: number, toY: number, button: string): string[] {
+  const steps = Math.max(8, Math.min(40, Math.round((Math.abs(toX - fromX) + Math.abs(toY - fromY)) / 25)))
+  const path: string[] = []
+  for (let step = 1; step <= steps; step++) {
+    path.push('mousemove', String(Math.round(fromX + (toX - fromX) * step / steps)), String(Math.round(fromY + (toY - fromY) * step / steps)), 'sleep', '0.012')
+  }
+  return ['mousemove', '--sync', String(Math.round(fromX)), String(Math.round(fromY)), 'mousedown', button, 'sleep', '0.06', ...path, 'sleep', '0.08', 'mouseup', button]
+}
+
+/** Shell script that pastes $1 through the clipboard and restores the earlier clipboard text; prints PASTED. */
+export const LINUX_PASTE = 'command -v xclip >/dev/null 2>&1 || exit 3; '
+  + 'old=$(xclip -o -selection clipboard 2>/dev/null); had=$?; '
+  + 'printf %s "$1" | xclip -selection clipboard || exit 4; '
+  + 'xdotool key --clearmodifiers ctrl+v; sleep 0.6; '
+  + 'if [ "$had" = 0 ]; then printf %s "$old" | xclip -selection clipboard; fi; echo PASTED'
+
+/**
  * Linux (X11) backend through xrandr, ImageMagick, xdotool, wmctrl and xdg-open.
  * @param run - helper runner.
  * @param env - environment used to tell Wayland apart.
@@ -1149,8 +1272,7 @@ export function linuxBackend(
       await helper('xdotool', ['mousemove', '--sync', int(x), int(y), ...press], signal)
     },
     async drag(fromX, fromY, toX, toY, button, signal) {
-      await helper('xdotool', ['mousemove', '--sync', int(fromX), int(fromY), 'mousedown', X11_BUTTONS[button],
-        'sleep', '0.1', 'mousemove', '--sync', int(toX), int(toY), 'sleep', '0.1', 'mouseup', X11_BUTTONS[button]], signal)
+      await helper('xdotool', linuxDragArgs(fromX, fromY, toX, toY, X11_BUTTONS[button]), signal)
     },
     async scroll(x, y, clicks, horizontal, signal) {
       const wheel = horizontal ? (clicks > 0 ? '7' : '6') : (clicks > 0 ? '4' : '5')
@@ -1159,7 +1281,19 @@ export function linuxBackend(
     async keys(chords, signal) {
       await helper('xdotool', ['key', '--clearmodifiers', ...chords.map(chord => chord.x11)], signal)
     },
-    async type(text, _paste, signal) {
+    async pressButton(x, y, pressed, down, signal) {
+      const move = x === undefined || y === undefined ? [] : ['mousemove', '--sync', int(x), int(y)]
+      await helper('xdotool', [...move, down ? 'mousedown' : 'mouseup', X11_BUTTONS[pressed]], signal)
+    },
+    async holdKeys(chord, down, signal) {
+      await helper('xdotool', [down ? 'keydown' : 'keyup', chord.x11], signal)
+    },
+    async type(text, paste, signal) {
+      // Long text goes through the clipboard (xclip), putting the earlier clipboard text back; without xclip it is typed.
+      if (paste === true) {
+        const pasted = await run('sh', ['-c', LINUX_PASTE, 'sh', text], 30_000).then(out => out.trim() === 'PASTED', () => false)
+        if (pasted) return
+      }
       // xdotool waits 12 ms per character, so long text needs more than the default limit.
       await helper('xdotool', ['type', '--clearmodifiers', '--delay', '12', '--', text], signal, 30_000 + text.length * 15)
     },
@@ -1482,6 +1616,15 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
     window: { type: 'number', description: 'Handle of the window to bring to the front first (from desktop_window list).' },
     title: { type: 'string', description: 'Part of the title of the window to bring to the front first, when the handle is unknown.' },
   } as const
+  /** Buttons and chords left pressed by press down or hold down; released when these tools are unloaded. */
+  const heldButtons = new Set<PointerButton>()
+  const heldChords = new Map<string, Chord>()
+  ctx.effect(() => () => {
+    for (const chord of heldChords.values()) void backend.holdKeys(chord, false).catch(() => {})
+    for (const which of heldButtons) void backend.pressButton(undefined, undefined, which, false).catch(() => {})
+    heldChords.clear()
+    heldButtons.clear()
+  }, 'desktop.held-input')
   /** How points in the latest desktop_screenshot image map to the desktop, for image_x and image_y. */
   let lastCapture: { originX: number; originY: number; scale: number; width: number; height: number } | undefined
   /** A desktop point from x and y, or from image_x and image_y in the latest screenshot. */
@@ -1511,6 +1654,11 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
   /** Recognize the text of one window, bringing it to the front first so what is read is the window itself. */
   const windowOcr = async (window: WindowInfo, signal?: AbortSignal): Promise<OcrLine[]> => {
     if (backend.ocr === undefined) throw new Error('reading text from the screen is not available on this platform')
+    // A window behind others is read as it draws itself, without taking the person's focus.
+    if (!window.foreground && !window.minimized && backend.ocrWindow !== undefined) {
+      const drawn = await backend.ocrWindow(window)
+      if (drawn !== undefined) return drawn
+    }
     if (window.minimized) await backend.window(window.handle, 'restore', signal)
     if (!window.foreground || window.minimized) await backend.window(window.handle, 'focus', signal)
     const fresh = (await backend.windows()).find(candidate => candidate.handle === window.handle) ?? window
@@ -1606,6 +1754,7 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       if (!Number.isFinite(maxDimension) || maxDimension < 200 || maxDimension > 4096) throw new Error('max_dimension must be between 200 and 4096')
       const displays = await backend.list()
       let area: CaptureArea | undefined
+      let captured: WindowInfo | undefined
       let label: string
       if (args.x !== undefined || args.y !== undefined || args.width !== undefined || args.height !== undefined) {
         if (args.x === undefined || args.y === undefined || args.width === undefined || args.height === undefined) throw new Error('a region needs x, y, width and height')
@@ -1616,6 +1765,7 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
         const window = selectWindow(await backend.windows(), args.window, args.title)
         if (window.minimized) throw new Error(`"${window.title}" is minimized; restore it before capturing it`)
         area = window
+        captured = window
         label = `window ${describeWindow(window)}`
       } else if (args.display !== undefined) {
         const display = pick(displays, args.display)
@@ -1629,7 +1779,11 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       let size: CaptureResult
       let data: string
       try {
-        size = await backend.capture(path, area, maxDimension)
+        // A window behind others is captured as it draws itself; the screen copy would show what covers it.
+        const drawn = captured !== undefined && !captured.foreground && backend.captureWindow !== undefined
+          ? await backend.captureWindow(path, captured, maxDimension)
+          : undefined
+        size = drawn ?? await backend.capture(path, area, maxDimension)
         data = (await readFile(path)).toString('base64')
       } finally {
         await rm(directory, { recursive: true, force: true }).catch(() => {})
@@ -1666,9 +1820,22 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       button: { type: 'string', description: 'left (default), right, middle, or none to move only (hover).' },
       count: { type: 'number', description: 'Clicks to send: 1 (default), 2 for a double-click, 3 for a triple-click.' },
       modifiers: { type: 'string', description: 'Keys held while clicking, such as ctrl (add to a selection), shift (extend it) or ctrl+shift.' },
+      press: { type: 'string', description: 'Instead of a click: down presses the button at the point and keeps it down; up releases it there. Use for drags over several steps, drawing, or long presses.' },
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: PointArgs & { button?: string; count?: number; modifiers?: string }, execution) {
+    async execute(args: PointArgs & { button?: string; count?: number; modifiers?: string; press?: string }, execution) {
+      if (args.press !== undefined) {
+        if (args.press !== 'down' && args.press !== 'up') throw new Error('press must be down or up')
+        const which = button(args.button)
+        const at = point(args)
+        await onDisplay(at.x, at.y)
+        await backend.pressButton(at.x, at.y, which, args.press === 'down', execution.signal)
+        if (args.press === 'down') heldButtons.add(which)
+        else heldButtons.delete(which)
+        return { done: args.press === 'down'
+          ? `Pressed and holding the ${which} button at (${String(at.x)}, ${String(at.y)}); release it with press up.`
+          : `Released the ${which} button at (${String(at.x)}, ${String(at.y)}).` }
+      }
       const pressed = args.button === 'none' ? 'none' : button(args.button)
       const count = args.count ?? 1
       if (!Number.isInteger(count) || count < 1 || count > 3) throw new Error('count must be 1, 2 or 3')
@@ -1728,11 +1895,23 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
     parameters: {
       keys: { type: 'string', required: true, description: 'Chords joined with +, separated by spaces when several are pressed in turn.' },
       repeat: { type: 'number', description: 'Press the whole sequence this many times, 1 to 50 (default 1).' },
+      hold: { type: 'string', description: 'Instead of pressing and releasing: down presses one chord and keeps it down (such as shift for a series of clicks); up releases it.' },
       ...focusParameters,
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: { keys: string; repeat?: number; window?: number; title?: string }, execution) {
+    async execute(args: { keys: string; repeat?: number; hold?: string; window?: number; title?: string }, execution) {
       const chords = parseKeys(args.keys)
+      if (args.hold !== undefined) {
+        if (args.hold !== 'down' && args.hold !== 'up') throw new Error('hold must be down or up')
+        const chord = chords[0]
+        if (chords.length !== 1 || chord === undefined) throw new Error('hold takes one chord, such as shift or ctrl+alt')
+        const receiver = await target(args.window, args.title, execution.signal)
+        await backend.holdKeys(chord, args.hold === 'down', execution.signal)
+        const name = chord.names.join('+')
+        if (args.hold === 'down') heldChords.set(name, chord)
+        else heldChords.delete(name)
+        return { done: args.hold === 'down' ? `Holding ${name} down in ${receiver}; release it with hold up.` : `Released ${name}.` }
+      }
       const repeat = Math.round(args.repeat ?? 1)
       if (!Number.isFinite(repeat) || repeat < 1 || repeat > 50) throw new Error('repeat must be between 1 and 50')
       const receiver = await target(args.window, args.title, execution.signal)

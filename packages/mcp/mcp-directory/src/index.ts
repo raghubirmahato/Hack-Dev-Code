@@ -15,6 +15,11 @@ import type {} from '@hackdevcode/dsh-settings'
 import type {} from '@hackdevcode/cordis-plugin-loader'
 import { join } from 'node:path'
 import { resolveDshHome } from '@hackdevcode/dsh-home-paths'
+import { credentialRef } from '@hackdevcode/dsh-credentials'
+import { approveEscalation } from '@hackdevcode/dsh-sandbox'
+import type {} from '@hackdevcode/dsh-sandbox-policy'
+import type {} from '@hackdevcode/dsh-user-approval'
+import type { ToolRunContext } from '@hackdevcode/dsh-tools'
 import { DIRECTORY, findServer } from './catalog.ts'
 import { findSkill, installSkill, removeSkill, SKILLS, skillState } from './skills.ts'
 import type { DirectoryServer } from './catalog.ts'
@@ -34,7 +39,10 @@ export const inject = ['tools']
 export interface ServerChoice {
   /** Run the server; a choice turned off keeps its keys and folders for later. */
   enabled: boolean
-  /** Values for the keys the server requires; a key left out is read from the environment Hack Dev Code started in. */
+  /**
+   * Values typed into the profile by hand for the keys the server requires. Prefer the credential store: a key left
+   * out here is read from it, under the key's own name, and then from the environment Hack Dev Code started in.
+   */
   env?: Readonly<Record<string, string>> | undefined
   /** Folders for a server that opens folders, such as filesystem. */
   roots?: readonly string[] | undefined
@@ -107,11 +115,21 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
   const notes = new Map<string, string>()
   const choices = (): Readonly<Record<string, ServerChoice>> => config.servers.get()
 
-  const sync = (): void => {
+  /** The environment a server's keys are read from: the credential store first, then the process environment. */
+  const keyEnvironment = async (server: DirectoryServer): Promise<Record<string, string | undefined>> => {
+    const credentials = ctx.get('credentials')
+    const values: Record<string, string | undefined> = { ...process.env }
+    for (const key of server.requires) {
+      const stored = await credentials?.resolve(credentialRef(key.name)).catch(() => undefined)
+      if (stored !== undefined) values[key.name] = stored.value
+    }
+    return values
+  }
+  const syncOnce = async (): Promise<void> => {
     const chosen = choices()
     for (const server of DIRECTORY) {
       const choice = chosen[server.id]
-      const built = choice?.enabled === true ? clientConfig(server, choice, process.env, process.cwd()) : undefined
+      const built = choice?.enabled === true ? clientConfig(server, choice, await keyEnvironment(server), process.cwd()) : undefined
       const key = built !== undefined && 'config' in built ? JSON.stringify(built.config) : ''
       const current = running.get(server.id)
       if (current !== undefined && current.key !== key) {
@@ -125,8 +143,26 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       }
     }
   }
-  ctx.on('loader/volatile-update', sync)
-  sync()
+  // Changes apply one at a time, so two quick edits never start the same server twice.
+  let syncing: Promise<void> = Promise.resolve()
+  const sync = (): Promise<void> => {
+    syncing = syncing.then(syncOnce).catch((error: unknown) => { ctx.logger.warn('mcp-directory: could not apply the server choices: %s', error) })
+    return syncing
+  }
+  ctx.on('loader/volatile-update', () => { void sync() })
+  void sync()
+
+  /** Changes that start code or write outside the workspace need full access or the person's approval for this call. */
+  const approve = async (exec: ToolRunContext, what: string): Promise<void> => {
+    const policy = ctx.get('sandboxPolicy')
+    if (policy === undefined) return
+    const mode = policy.resolve(exec.agent === undefined ? {} : { session: exec.agent.session }).mode
+    await approveEscalation({
+      requestedMode: 'danger-full-access', effectiveMode: mode, subject: what,
+      justification: `${what}. It downloads and runs third-party code outside the workspace sandbox.`,
+    }, { approver: ctx.get('approval'), agent: exec.agent, callId: exec.callId, toolName: exec.name, signal: exec.signal })
+    exec.signal.throwIfAborted()
+  }
 
   const save = async (next: Record<string, ServerChoice>): Promise<void> => {
     const settings = ctx.get('settings')
@@ -155,7 +191,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       roots: { type: 'array', items: { type: 'string' }, description: 'For add: folders a folder-opening server may use.' },
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
-    async execute(args) {
+    async execute(args, exec) {
       if (args.action === 'list') return DIRECTORY.map(describe).join('\n')
       if (args.action !== 'add' && args.action !== 'remove') throw new Error('action must be list, add or remove')
       const server = args.server === undefined ? undefined : findServer(args.server)
@@ -164,17 +200,32 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       const previous = current[server.id]
       if (args.action === 'remove') {
         if (previous?.enabled !== true) return `${server.title} is already off.`
+        await approve(exec, `turn off the ${server.title} MCP server`)
         await save(Object.fromEntries(Object.entries(current).filter(([id]) => id !== server.id)))
         return `Turned off ${server.title}; its tools are gone.`
       }
-      const given = Object.fromEntries(Object.entries(args.env ?? {}).flatMap(([key, value]) => typeof value === 'string' ? [[key, value]] : []))
-      const env = Object.keys(given).length > 0 ? { ...previous?.env, ...given } : previous?.env
+      await approve(exec, `turn on the ${server.title} MCP server`)
+      // Keys go to the encrypted credential store under their own names, never into the profile file.
+      const given = Object.entries(args.env ?? {}).flatMap(([key, value]) => typeof value === 'string' && value.trim() !== '' ? [[key, value.trim()] as const] : [])
+      if (given.length > 0) {
+        const credentials = ctx.get('credentials')
+        if (credentials === undefined) throw new Error('no credential store is available to keep the key; ask the person to set it in the environment instead')
+        for (const [key, value] of given) {
+          if (!server.requires.some(required => required.name === key)) throw new Error(`${server.title} does not use a key named ${key}`)
+          await credentials.set(credentialRef(key), value)
+        }
+      }
       const roots = args.roots !== undefined && args.roots.length > 0 ? args.roots : previous?.roots
-      const choice: ServerChoice = { enabled: true, ...env === undefined ? {} : { env }, ...roots === undefined ? {} : { roots } }
-      const built = clientConfig(server, choice, process.env, process.cwd())
+      const choice: ServerChoice = {
+        enabled: true,
+        ...previous?.env === undefined ? {} : { env: previous.env },
+        ...roots === undefined ? {} : { roots },
+      }
+      const built = clientConfig(server, choice, await keyEnvironment(server), process.cwd())
       if ('missing' in built) {
         return `${server.title} needs ${built.missing.join(', ')}: ${server.requires.map(key => `${key.name}: ${key.description}`).join(' ')} `
-          + 'Ask the person for the value and call add again with env, or have them set it in the environment and restart.'
+          + 'Ask the person to add the key in Settings or the environment, or to give it to you once and call add again with env; '
+          + 'a key passed in env is kept in the encrypted credential store.'
       }
       current[server.id] = choice
       await save(current)
@@ -195,7 +246,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       skill: { type: 'string', description: 'Skill id or title for install and remove, such as webapp-testing or "Word documents".' },
     },
     output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
-    async execute(args) {
+    async execute(args, exec) {
       if (args.action === 'list') {
         const rows = await Promise.all(SKILLS.map(async (skill) => {
           const state = await skillState(skill, skillsDir)
@@ -207,6 +258,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       if (args.action !== 'install' && args.action !== 'remove') throw new Error('action must be list, install or remove')
       const skill = args.skill === undefined ? undefined : findSkill(args.skill)
       if (skill === undefined) throw new Error(`no directory skill is named "${args.skill ?? ''}"; call skill_directory with action list`)
+      await approve(exec, `${args.action} the ${skill.title} skill`)
       if (args.action === 'remove') {
         return await removeSkill(skill, skillsDir)
           ? `Removed the ${skill.title} skill.`

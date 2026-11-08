@@ -7,7 +7,8 @@ import ToolRuntime from '@hackdevcode/dsh-tools'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import { ToolCallId } from '@hackdevcode/dsh-llm'
 import {
-  findOcrLine, formatOcr, launchScript, ocrScript, parseOcrLines, parseTesseractTsv, registerDisplayTools, selectWindow, waitForText,
+  findOcrLine, formatOcr, launchScript, ocrScript, psQuote, parseOcrLines, parseTesseractTsv, registerDisplayTools, selectWindow,
+  waitForText,
 } from '../src/displays.ts'
 import type { DisplayBackend, ElementPatternAction, OcrLine, WindowInfo } from '../src/displays.ts'
 import { opCommand, opScript } from '../src/elevated.ts'
@@ -40,6 +41,8 @@ function fakeDesktop(options: { find?: string; act?: string } = {}): { backend: 
     window: async (handle, action) => { actions.push(`${action} ${String(handle)}`); if (action === 'focus') front(handle) },
     open: async () => {},
     readText: async handle => handle === 10 ? '[1] Window "Save As"\n  [2] Edit "File name" @(300,400)\n  [3] Button "Save" @(700,560)\n' : '',
+    pressButton: async (x, y, which, down) => { actions.push(`${down ? 'press' : 'release'} ${which} ${String(x)},${String(y)}`) },
+    holdKeys: async (chord, down) => { actions.push(`${down ? 'hold' : 'release'} ${chord.names.join('+')}`) },
     place: async () => {},
     launch: async app => `Started ${app}`,
     findElements: async (handle, query) => {
@@ -203,6 +206,12 @@ describe('reading the screen', () => {
       { text: 'Save file', x: 110, y: 205, width: 55, height: 12 },
       { text: 'Cancel', x: 110, y: 230, width: 40, height: 12 },
     ])
+  })
+
+  it('doubles every quote PowerShell ends a single-quoted string at, curly ones included', () => {
+    expect(psQuote("it's")).toBe("'it''s'")
+    expect(psQuote('don’t ‘x’')).toBe("'don’’t ‘‘x’’'")
+    expect(psQuote('a‚b‛')).toBe("'a‚‚b‛‛'")
   })
 
   it('builds the OCR and launch scripts', () => {

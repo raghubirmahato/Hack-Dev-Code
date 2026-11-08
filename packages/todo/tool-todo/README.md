@@ -43,11 +43,15 @@ Choose it when one agent session should own the task list and whole-list updates
 |---|---|---|
 | `allowParallelInProgress` | required | Whether several todos may be `in_progress` at once; also selects the active-status clause of the model description |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-todo) is the exhaustive source for the accepted field.
+The generated [configuration catalog](../../../docs/config-catalog.md#hackdevcodedsh-tool-todo) is the exhaustive source for the accepted field.
 
 ### What each call does
 
 The agent sends the ENTIRE list on every update; the new list replaces the previous one, so there are no partial updates or per-item edits. Each item is a short task description plus a status of `pending`, `in_progress`, or `completed`. A successful update returns the new counts — `Updated todo list: <pending> pending, <inProgress> in progress, <completed> completed.` — and the UI shows the new plan. Updates fail visibly when a task description is empty or duplicated, when an item carries fields beyond the description and status, or — when parallel work is disabled — when more than one task is marked in progress.
+
+### A finished turn never leaves a stale list
+
+When a model ends its turn while its own list still shows unfinished items, it is asked once in that turn to call `todo_write` with the list as it really stands, so the person never sees "in progress" items after the work is done. A model that stops on purpose (waiting for the person, or an item it could not do) answers once and the turn ends.
 
 ### Single owner
 
@@ -78,7 +82,7 @@ The [todo_write tool Agent Note](../../../.agents/notes/archived/feature/2026-06
 
 | File | Role |
 |---|---|
-| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, tool registration, `todos` projection unit |
+| [`src/index.ts`](src/index.ts) | Plugin entry: `Config` schema, tool registration, `todos` projection unit, the end-of-turn reminder for unfinished items |
 | [`src/types.ts`](src/types.ts) | The one home of the `todos` projection-key declaration and its payload types |
 | [`src/client.ts`](src/client.ts) | Client-namespace re-export of the types outlet |
 
@@ -105,8 +109,8 @@ Read these pages when the package-level contract is not enough. They move from t
 
 - [Todo subsystem](../../../docs/subsystems/todo.md) — the `todo/write` event payload, ownership rules, and `TodoItem`.
 - [todo group map](../README.md) — the sibling group page and its package table.
-- [Generated tool catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo) — the `todo_write` schema the model receives.
-- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-tool-todo) — every accepted config field and its source declaration.
+- [Generated tool catalog](../../../docs/tool-catalog.md#hackdevcodedsh-tool-todo) — the `todo_write` schema the model receives.
+- [Generated configuration catalog](../../../docs/config-catalog.md#hackdevcodedsh-tool-todo) — every accepted config field and its source declaration.
 - [todo_write tool Agent Note](../../../.agents/notes/archived/feature/2026-06-29-todo-write-tool.md) — the original design, alternatives, and dropped fields.
 - [parallel in-progress Agent Note](../../../.agents/notes/archived/feature/2026-07-26-todo-parallel-in-progress.md) — why the active-count cap is a deployment policy.
 
@@ -119,7 +123,7 @@ Read these pages when the package-level contract is not enough. They move from t
 
 #### What the model sees
 
-The model sees the generated [`todo_write` schema](../../../docs/tool-catalog.md#deepseek-aidsh-tool-todo): an object with one required `todos` array of `{ content, status }` items, where `status` is `pending`, `in_progress`, or `completed`. The `todos` description states that each call replaces the whole list; the tool description's active-status clause follows `allowParallelInProgress`.
+The model sees the generated [`todo_write` schema](../../../docs/tool-catalog.md#hackdevcodedsh-tool-todo): an object with one required `todos` array of `{ content, status }` items, where `status` is `pending`, `in_progress`, or `completed`. The `todos` description states that each call replaces the whole list; the tool description's active-status clause follows `allowParallelInProgress`.
 
 #### Token effect
 
@@ -142,6 +146,29 @@ Token growth scales with every full list the model submits, and those call argum
 #### KV Cache effect
 
 Append-only; newly visible content follows the reusable request prefix and does not invalidate existing KV-cache entries.
+
+### Unfinished items at the end of a turn
+
+#### What the model sees
+
+When a reply that calls no tool would end the turn while the turn's latest list still has items that are not `completed`, the next step carries one message, at most once per turn.
+
+##### Unfinished-items reminder
+
+```markdown
+Your todo list still shows <n> unfinished items:
+- <content> (in progress)
+- <content> (pending)
+Before you finish, call todo_write with the list as it really stands: mark every item you completed as completed, and for an item you did not do, either do it now or remove it and say why in your answer.
+```
+
+#### Token effect
+
+One short message and one more step, only in turns that end with a stale list.
+
+#### KV Cache effect
+
+Append-only.
 
 ## Known Limitations and Deferred Work
 

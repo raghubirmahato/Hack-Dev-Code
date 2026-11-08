@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { fitScale, linuxBackend, parseWmctrl, parseXrandr, selectWindow, waitForWindow, windowOutcome, windowsBackend } from '../src/displays.ts'
+import { LINUX_PASTE, fitScale, linuxBackend, linuxDragArgs, parseWmctrl, parseXrandr, selectWindow, waitForWindow, windowOutcome, windowsBackend } from '../src/displays.ts'
 import type { CommandRunner, WindowInfo } from '../src/displays.ts'
 import { parseKeys } from '../src/keys.ts'
 
@@ -164,10 +164,30 @@ describe('real keyboard input', () => {
       ['xdotool', 'type', '--clearmodifiers', '--delay', '12', '--', 'ls -la\n'],
       ['xdotool', 'mousemove', '--sync', '1', '2', 'click', '--repeat', '4', '4'],
       ['xdotool', 'mousemove', '--sync', '1', '2', 'click', '--repeat', '2', '6'],
-      ['xdotool', 'mousemove', '--sync', '0', '0', 'mousedown', '3', 'sleep', '0.1', 'mousemove', '--sync', '50', '60', 'sleep', '0.1', 'mouseup', '3'],
+      ['xdotool', ...linuxDragArgs(0, 0, 50, 60, '3')],
       ['wmctrl', '-ir', '0x1400007', '-b', 'add,maximized_vert,maximized_horz'],
       ['xdg-open', 'https://example.com'],
     ])
+  })
+})
+
+describe('Linux drags and paste', () => {
+  it('drags in steps so drop targets see the pointer travel', () => {
+    const args = linuxDragArgs(0, 0, 400, 0, '1')
+    expect(args.slice(0, 7)).toEqual(['mousemove', '--sync', '0', '0', 'mousedown', '1', 'sleep'])
+    expect(args.filter(arg => arg === 'mousemove')).toHaveLength(1 + 16)
+    expect(args.slice(-9)).toEqual(['mousemove', '400', '0', 'sleep', '0.012', 'sleep', '0.08', 'mouseup', '1'])
+  })
+
+  it('pastes long text through xclip and types when xclip is missing', async () => {
+    const calls: string[][] = []
+    const withXclip: CommandRunner = async (file, args) => { calls.push([file, ...args]); return file === 'sh' ? 'PASTED\n' : '' }
+    await linuxBackend(withXclip, { DISPLAY: ':0' }).type('long text', true)
+    expect(calls).toEqual([['sh', '-c', LINUX_PASTE, 'sh', 'long text']])
+    const typed: string[][] = []
+    const noXclip: CommandRunner = async (file, args) => { typed.push([file, ...args]); if (file === 'sh') throw new Error('exit 3'); return '' }
+    await linuxBackend(noXclip, { DISPLAY: ':0' }).type('long text', true)
+    expect(typed.at(-1)).toEqual(['xdotool', 'type', '--clearmodifiers', '--delay', '12', '--', 'long text'])
   })
 })
 

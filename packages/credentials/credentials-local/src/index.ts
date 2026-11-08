@@ -800,40 +800,40 @@ export class LocalCredentialProvider extends CredentialProvider {
    */
   private async loadInitial(): Promise<void> {
     await assertOwnerOnly(this.spec.filename)
-    let text: string
+    let read: { raw: string; text: string }
     try {
-      text = await this.readDocument()
+      read = await this.readDocument()
     } catch (error) {
       if (!isENOENT(error)) throw error
       return
     }
-    if (renderFlatLayoutMigration(text) !== undefined) text = await this.migrateFlatDocument()
+    let text = read.text
+    const migrated = renderFlatLayoutMigration(text) !== undefined
+    if (migrated) text = await this.migrateFlatDocument()
     const document = parseCredentialsDocument(text, this.spec.filename)
     this.warnIgnoredKeys(document)
     this.values = document.refs
     this.records = document.records
     this.text = text
+    // The on-disk form is committed with its text only after the parse succeeded (a migration already wrote its own).
+    if (!migrated) this.raw = read.raw
     if (this.spec.encryptAtRest && this.raw !== undefined && !this.raw.startsWith(SEALED_PREFIX) && text.trim().length > 0) {
       await this.sealPlainDocument()
     }
   }
 
   /**
-   * Read the document as YAML text: a sealed file is opened (once per distinct on-disk content), a plain one is
-   * returned as it is.
-   * @returns the document text.
+   * Read the document: its on-disk form and its YAML text. A sealed file is opened unless it is the form behind the
+   * cached text; a plain one is its own text. Nothing is cached here: callers commit {@link raw} with {@link text}
+   * only after the text parsed, so a document that failed to parse is read again rather than taken as current.
+   * @returns the on-disk form and the text.
    * @throws the read error, such as ENOENT for a missing file.
    */
-  private async readDocument(): Promise<string> {
+  private async readDocument(): Promise<{ raw: string; text: string }> {
     const raw = await readFile(this.spec.filename, 'utf8')
-    if (!raw.startsWith(SEALED_PREFIX)) {
-      this.raw = raw
-      return raw
-    }
-    if (raw === this.raw && this.text !== undefined) return this.text
-    const text = await this.codec.open(raw)
-    this.raw = raw
-    return text
+    if (!raw.startsWith(SEALED_PREFIX)) return { raw, text: raw }
+    if (raw === this.raw && this.text !== undefined) return { raw, text: this.text }
+    return { raw, text: await this.codec.open(raw) }
   }
 
   /**
@@ -851,8 +851,8 @@ export class LocalCredentialProvider extends CredentialProvider {
   private async sealPlainDocument(): Promise<void> {
     await withFileLock(this.spec.filename, async () => {
       const current = await this.readDocument()
-      if (this.raw?.startsWith(SEALED_PREFIX) === true || current !== this.text) return
-      await this.writeDocument(current)
+      if (current.raw.startsWith(SEALED_PREFIX) || current.text !== this.text) return
+      await this.writeDocument(current.text)
       this.ctx.logger.info('credentials-local: sealed %s for this Windows account', this.spec.filename)
     }, { waitMs: DOCUMENT_LOCK_WAIT_MS })
   }
@@ -869,7 +869,7 @@ export class LocalCredentialProvider extends CredentialProvider {
    */
   private async migrateFlatDocument(): Promise<string> {
     return withFileLock(this.spec.filename, async () => {
-      const current = await this.readDocument()
+      const current = (await this.readDocument()).text
       const migrated = renderFlatLayoutMigration(current)
       /* v8 ignore next 2 -- the losing side of the cross-process migration race:
          another boot rewrote the document between the unlocked recognize and
@@ -915,17 +915,22 @@ export class LocalCredentialProvider extends CredentialProvider {
     // Re-checked on every reload and before every write: an external editor or
     // a restored backup can loosen the mode after boot.
     await assertOwnerOnly(this.spec.filename)
-    let text: string | undefined
+    let read: { raw: string; text: string } | undefined
     try {
-      text = await this.readDocument()
+      read = await this.readDocument()
     } catch (error) {
       if (!isENOENT(error)) throw error
-      text = undefined
+      read = undefined
     }
-    if (text === this.text || this.isClosed()) return
+    const text = read?.text
+    if (text === this.text || this.isClosed()) {
+      if (!this.isClosed()) this.raw = read?.raw
+      return
+    }
     const next = text === undefined
       ? { refs: new Map<string, string>(), records: new Map<string, CredentialRecord>(), ignoredKeys: [] }
       : parseCredentialsDocument(text, this.spec.filename)
+    this.raw = read?.raw
     this.warnIgnoredKeys(next)
     const changedRefs = this.changedRefs(this.values, next.refs)
     const changedRecords = this.changedRecords(this.records, next.records)

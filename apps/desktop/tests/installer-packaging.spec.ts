@@ -112,11 +112,17 @@ describe('installer preparation preserves application dependencies', () => {
       DSH_DESKTOP_TARGET_ARCH: 'x64',
       DSH_DESKTOP_UNSIGNED: '1',
       DSH_DESKTOP_UPDATE_GITHUB: 'example-owner/example-repo',
+      DSH_DESKTOP_UPDATE_UNSIGNED: '1',
     }, 'win32', 'x64')
     // A prerelease version selects the prerelease channel and its nightly.yml feed.
     expect(config.publish).toEqual([{ provider: 'github', owner: 'example-owner', repo: 'example-repo', channel: 'nightly', releaseType: 'prerelease' }])
     expect(config.extraMetadata.dshDesktopUpdateChannel).toBe('nightly')
     expect(() => resolveGitHubUpdateRepository('not a repository')).toThrow('owner/repo')
+    // Without the explicit choice, an unsigned build refuses an update source no signature protects.
+    expect(() => createElectronBuilderConfig({
+      DSH_DESKTOP_APP_ID: 'com.example.installer', DSH_DESKTOP_TARGET_PLATFORM: 'win32', DSH_DESKTOP_TARGET_ARCH: 'x64',
+      DSH_DESKTOP_UNSIGNED: '1', DSH_DESKTOP_UPDATE_GITHUB: 'example-owner/example-repo',
+    }, 'win32', 'x64')).toThrow('DSH_DESKTOP_UPDATE_UNSIGNED=1')
     expect(resolveGitHubUpdateRepository(' ')).toBeUndefined()
   })
 

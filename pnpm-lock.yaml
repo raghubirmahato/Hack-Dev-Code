@@ -13406,6 +13406,9 @@ importers:
       '@hackdevcode/cosmokit':
         specifier: link:../../../vendor/cosmokit
         version: link:../../../vendor/cosmokit
+      '@hackdevcode/dsh-credentials':
+        specifier: workspace:*
+        version: link:../../credentials/credentials
       '@hackdevcode/dsh-home-paths':
         specifier: workspace:*
         version: link:../../util/home-paths
@@ -13415,6 +13418,12 @@ importers:
       '@hackdevcode/dsh-mcp-client':
         specifier: workspace:*
         version: link:../mcp-client
+      '@hackdevcode/dsh-sandbox':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox
+      '@hackdevcode/dsh-sandbox-policy':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-policy
       '@hackdevcode/dsh-settings':
         specifier: workspace:*
         version: link:../../settings/settings
@@ -13430,6 +13439,9 @@ importers:
       '@hackdevcode/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
+      '@hackdevcode/dsh-user-approval':
+        specifier: workspace:*
+        version: link:../../interaction/user-approval
 
   packages/mcp/mcp-resources:
     dependencies:

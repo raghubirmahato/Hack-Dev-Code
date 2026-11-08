@@ -50,7 +50,7 @@ Agents declared in config start automatically when the plugin loads. Each entry 
 | `agents[].sessionId` | — | Exact identity: first use creates, a remount resumes materialized history |
 | `agents[].resumeSessionId` | — | Load this persisted session instead of creating one; mutually exclusive with `sessionId` |
 
-The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-agent-loop) lists every accepted field. `maxParallelToolCalls` remains a volatile positive-integer Config field with default `10`; `1` selects serial execution. The loop passes its current value to each batch's `execute()` call, taking precedence over executor configuration. Live edits apply to the next batch; `agents` remains startup configuration.
+The generated [configuration catalog](../../../docs/config-catalog.md#hackdevcodedsh-agent-loop) lists every accepted field. `maxParallelToolCalls` remains a volatile positive-integer Config field with default `10`; `1` selects serial execution. The loop passes its current value to each batch's `execute()` call, taking precedence over executor configuration. Live edits apply to the next batch; `agents` remains startup configuration.
 
 `customInstructions` is a volatile text field (Settings → General → Custom instructions, at most 8000 characters in effect). Each line or list item becomes one numbered rule; a single paragraph is split into sentences. Edits apply from the next request.
 

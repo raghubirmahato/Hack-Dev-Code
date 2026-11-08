@@ -66,6 +66,7 @@ import { DesktopUpdateOverlays } from './update-overlay.ts'
 import { DesktopQuitConfirmation } from './quit-confirmation.ts'
 import { DesktopTray } from './tray.ts'
 import { DesktopBackgroundNotice } from './background-notice.ts'
+import { requestStartupElevation } from './elevation.ts'
 
 let focusPrimaryWindow = (): void => {}
 let stopForRecovery = async (): Promise<void> => { await stopOperationReports() }
@@ -1447,7 +1448,26 @@ async function main(): Promise<void> {
   publishUpdate(updateState)
 }
 
-const ownsDesktopInstance = claimDesktopSingleInstance(app, () => { focusPrimaryWindow() })
+/**
+ * Ask for administrator rights once at startup (Windows, packaged), so the agent gets full control of the machine.
+ * Only the first instance asks: a later launch, such as an opened link, hands over to the running app instead of
+ * showing another prompt. When the elevated copy starts, this one leaves before it claims the instance lock.
+ */
+function relaunchedElevated(): boolean {
+  // Only the real Electron runtime asks; under a test runner nothing may raise a UAC prompt.
+  if ((process.versions as Partial<Record<string, string>>)['electron'] === undefined) return false
+  if (!app.requestSingleInstanceLock()) return false
+  const outcome = requestStartupElevation({
+    platform: process.platform, packaged: app.isPackaged, argv: process.argv, env: process.env,
+    execPath: process.execPath, cwd: process.cwd(),
+  })
+  if (outcome !== 'relaunched') return false
+  app.releaseSingleInstanceLock()
+  app.exit(0)
+  return true
+}
+
+const ownsDesktopInstance = !relaunchedElevated() && claimDesktopSingleInstance(app, () => { focusPrimaryWindow() })
 
 if (ownsDesktopInstance) void app.whenReady().then(main).catch(async (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error)
