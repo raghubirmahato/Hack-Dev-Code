@@ -136,7 +136,7 @@ function normalConfig(
     ...policy,
     backoff: {
       initialDelayMs: 500,
-      maxDelayMs: 10_000,
+      maxDelayMs: 60_000,
       jitterRatio: 0,
       ...backoff,
     },
@@ -148,7 +148,7 @@ function alwaysConfig(backoff: BackoffConfig = {}): AlwaysRetryPolicyConfig {
     mode: 'always',
     backoff: {
       initialDelayMs: 500,
-      maxDelayMs: 10_000,
+      maxDelayMs: 60_000,
       jitterRatio: 0,
       ...backoff,
     },
@@ -228,7 +228,7 @@ describe('provider-routed retry policy', () => {
       step: 1,
       provider: 'mock',
       mode: 'normal',
-      policyKey: '["normal",2,["RATE_LIMIT","SERVER"],500,10000,0]',
+      policyKey: '["normal",2,["RATE_LIMIT","SERVER"],500,60000,0]',
       retry: 1,
       maxRetries: 2,
       delayMs: 500,
@@ -413,7 +413,7 @@ describe('provider-routed retry policy', () => {
 
     await context.fiber.dispose()
     const rejected = new ScriptedAdapter([
-      new LlmError('wait too long', 'RATE_LIMIT', { providerRetryAfterMs: 10_001 }),
+      new LlmError('wait too long', 'RATE_LIMIT', { providerRetryAfterMs: 60_001 }),
     ])
     ;({ ctx: context } = await harness(rejected))
     const rejectedAgent = await context.agentLoop.create(SessionId('retry-after-rejected'), { provider: 'mock', model: 'mock' })

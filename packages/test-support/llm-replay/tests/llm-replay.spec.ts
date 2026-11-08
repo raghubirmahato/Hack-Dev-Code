@@ -1467,7 +1467,7 @@ describe('installLlmReplay (through the real LlmRuntime)', () => {
       mode: 'normal',
       maxRetries: 5,
       initialDelayMs: 500,
-      maxDelayMs: 10_000,
+      maxDelayMs: 60_000,
       jitterRatio: 0.1,
     })
     const prepared = await ctx.llm.prepareCall({

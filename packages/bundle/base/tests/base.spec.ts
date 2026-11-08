@@ -34,7 +34,8 @@ describe('dsh-base bundle', () => {
     expect(rows.some(row => row.id === 'agent-loop')).toBe(true)
     expect(rows.find(row => row.id === 'session-telemetry-otel')?.disabled).toBeUndefined()
     expect(rows.find(row => row.id === 'session-telemetry-otel')?.config?.['mode']).toEqual({
-      __jsExpr: "process.env.DSH_TELEMETRY_MODE || 'FEEDBACK_ONLY'",
+      // No default collector: upload stays disabled until DSH_TELEMETRY_OTLP_URL names one.
+      __jsExpr: "process.env.DSH_TELEMETRY_OTLP_URL ? (process.env.DSH_TELEMETRY_MODE || 'FEEDBACK_ONLY') : 'DISABLED'",
     })
     expect(rows.find(row => row.id === 'hmr')).toMatchObject({
       config: { root: [] },

@@ -181,6 +181,18 @@ function reportFatal(error: unknown, source: CrashReportSource): void {
   })
 }
 
+// A stray exception in the main process leaves the app in an unknown state; it opens the same recovery flow as a
+// startup failure instead of Electron's bare error box. A stray rejection is recorded in a crash report without
+// interrupting the person, since the operation that owned it has already given up.
+// Installed only in the Electron runtime: under a test runner the runner owns these process-wide handlers.
+if ((process.versions as Partial<Record<string, string>>)['electron'] !== undefined) {
+  process.on('uncaughtException', (error) => { reportFatal(error, 'main') })
+  process.on('unhandledRejection', (reason) => {
+    console.error('dsh desktop: unhandled rejection in the main process', reason)
+    void persistCrashReport(reason, 'main')
+  })
+}
+
 protocol.registerSchemesAsPrivileged([{
   scheme: SCHEME,
   privileges: {

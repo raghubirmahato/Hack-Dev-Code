@@ -105,8 +105,42 @@ export interface DisplayBackend {
   open(target: string): Promise<void>
   /** The visible text of one window: control types, names and values, indented by depth and bounded in size. */
   readText(handle: number): Promise<string>
+  /** Move and resize one window in virtual-desktop pixels. */
+  place(handle: number, x: number, y: number, width: number, height: number, signal?: AbortSignal): Promise<void>
+  /** Start an installed app by its name (as in the Start menu or application menu) or by its command; returns what was started. */
+  launch(app: string): Promise<string>
+  /** Elements of one window by name, type and automation id (numbered lines), where the platform has element access. */
+  findElements?(handle: number, query: ElementQuery): Promise<string>
+  /** Operate a numbered element; returns its line afterwards, or `CLICK x y` / `TYPE x y` when real input is needed. */
+  elementAction?(handle: number, index: number, action: ElementPatternAction, value?: string): Promise<string>
+  /** The centre of a numbered element in virtual-desktop pixels. */
+  elementPoint?(handle: number, index: number): Promise<{ x: number; y: number }>
+  /** Recognize the text shown in one area of the screen, where the platform has text recognition. */
+  ocr?(area: CaptureArea): Promise<OcrLine[]>
   /** Stop helper processes. */
   close(): void
+}
+
+/** What `desktop_element` looks for in a window. */
+export interface ElementQuery {
+  /** Visible name or value, matched exactly first, then as a case-insensitive fragment. */
+  name?: string | undefined
+  /** Control type such as Button, Edit, CheckBox, MenuItem, ListItem or Hyperlink. */
+  role?: string | undefined
+  /** Automation id of the control. */
+  automationId?: string | undefined
+}
+
+/** Element operations that go through accessibility patterns rather than real input. */
+export type ElementPatternAction = 'invoke' | 'toggle' | 'expand' | 'collapse' | 'select' | 'set_value' | 'focus'
+
+/** One line of recognized screen text in virtual-desktop pixels. */
+export interface OcrLine {
+  text: string
+  x: number
+  y: number
+  width: number
+  height: number
 }
 
 /** Native helper compiled once per PowerShell session; physical pixels across mixed-DPI monitors. */
@@ -146,6 +180,8 @@ public static class Desk {
   [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr h);
   [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr h, int cmd);
   [DllImport("user32.dll")] static extern bool IsIconic(IntPtr h);
+  [DllImport("user32.dll")] static extern bool IsZoomed(IntPtr h);
+  [DllImport("user32.dll", SetLastError = true)] static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int width, int height, uint flags);
   [DllImport("user32.dll")] static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   [DllImport("user32.dll")] static extern bool GetWindowRect(IntPtr h, out RECT r);
   [DllImport("user32.dll")] static extern bool AttachThreadInput(uint a, uint b, bool attach);
@@ -303,6 +339,12 @@ public static class Desk {
     else if (action == "close") PostMessage(h, 0x0010, IntPtr.Zero, IntPtr.Zero);
     else throw new Exception("unknown window action " + action);
   }
+  /** Move and resize a window in physical desktop pixels; a minimized or maximized window is restored first. */
+  public static void Place(IntPtr h, int x, int y, int width, int height) {
+    if (!IsWindow(h)) throw new Exception("no window with handle " + h.ToInt64());
+    if (IsIconic(h) || IsZoomed(h)) { ShowWindow(h, 9); Thread.Sleep(150); }
+    if (!SetWindowPos(h, IntPtr.Zero, x, y, width, height, 0x0014)) throw new Exception("Windows refused to move the window (error " + Marshal.GetLastWin32Error() + ")");
+  }
 }
 }`
 
@@ -324,31 +366,80 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Windows;
 using System.Windows.Automation;
 namespace HackDev {
 public static class Uia {
+  static readonly Dictionary<long, List<AutomationElement>> Numbered = new Dictionary<long, List<AutomationElement>>();
+  static readonly HashSet<string> Controls = new HashSet<string> { "Edit", "Document", "ComboBox", "Button", "CheckBox", "RadioButton", "Slider", "Spinner", "SplitButton", "MenuItem", "TabItem", "ListItem", "TreeItem", "Hyperlink" };
+  static string Clean(string text) { return (text ?? "").Replace("\r", " ").Replace("\n", " ").Trim(); }
+  static string Quote(string text) { return "\"" + (text.Length > 200 ? text.Substring(0, 200) + "..." : text).Replace("\"", "'") + "\""; }
+  /** Centre of an element in physical desktop pixels, or false when it is off screen or has no size. */
+  static bool Centre(AutomationElement e, out int x, out int y) {
+    x = 0; y = 0;
+    try {
+      if (e.Current.IsOffscreen) return false;
+      Rect r = e.Current.BoundingRectangle;
+      if (r.IsEmpty || r.Width <= 0 || r.Height <= 0) return false;
+      x = (int)Math.Round(r.X + r.Width / 2); y = (int)Math.Round(r.Y + r.Height / 2);
+      return true;
+    } catch { return false; }
+  }
+  static string States(AutomationElement e) {
+    List<string> states = new List<string>();
+    try {
+      if (!e.Current.IsEnabled) states.Add("disabled");
+      if (e.Current.HasKeyboardFocus) states.Add("focused");
+      object p;
+      if (e.TryGetCurrentPattern(TogglePattern.Pattern, out p)) states.Add(((TogglePattern)p).Current.ToggleState == ToggleState.On ? "checked" : ((TogglePattern)p).Current.ToggleState == ToggleState.Off ? "unchecked" : "mixed");
+      if (e.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out p)) { ExpandCollapseState s = ((ExpandCollapsePattern)p).Current.ExpandCollapseState; if (s == ExpandCollapseState.Expanded) states.Add("expanded"); else if (s == ExpandCollapseState.Collapsed || s == ExpandCollapseState.PartiallyExpanded) states.Add("collapsed"); }
+      if (e.TryGetCurrentPattern(SelectionItemPattern.Pattern, out p) && ((SelectionItemPattern)p).Current.IsSelected) states.Add("selected");
+      if (e.TryGetCurrentPattern(ValuePattern.Pattern, out p) && ((ValuePattern)p).Current.IsReadOnly && e.Current.ControlType == ControlType.Edit) states.Add("read-only");
+    } catch { }
+    return states.Count == 0 ? "" : " (" + string.Join(", ", states.ToArray()) + ")";
+  }
+  /** One line for an element: type, name, value, centre point and states. */
+  static string Describe(AutomationElement e, out bool useful) {
+    string name = "", type = "", value = "", automationId = "";
+    useful = false;
+    try {
+      name = Clean(e.Current.Name);
+      type = e.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
+      automationId = e.Current.AutomationId ?? "";
+      object pattern;
+      if (e.TryGetCurrentPattern(ValuePattern.Pattern, out pattern)) value = Clean(((ValuePattern)pattern).Current.Value);
+    } catch { return ""; }
+    useful = name.Length > 0 || value.Length > 0 || Controls.Contains(type);
+    StringBuilder line = new StringBuilder(type);
+    if (name.Length > 0) line.Append(' ').Append(Quote(name));
+    else if (automationId.Length > 0 && Controls.Contains(type)) line.Append(" id=").Append(automationId.Length > 60 ? automationId.Substring(0, 60) : automationId);
+    if (value.Length > 0 && value != name) line.Append(" = ").Append(Quote(value));
+    int x, y;
+    if (Centre(e, out x, out y)) line.Append(" @(").Append(x).Append(',').Append(y).Append(')');
+    line.Append(States(e));
+    return line.ToString();
+  }
+  /**
+   * The text of one window as numbered lines [n] Type "name" = "value" @(x,y) (states), indented by depth. The
+   * numbers stay valid for Act and Find on this window until the next Read of it.
+   */
   public static string Read(long handle, int maxItems, int maxChars, int maxMs) {
     AutomationElement root = AutomationElement.FromHandle(new IntPtr(handle));
     TreeWalker walker = TreeWalker.ControlViewWalker;
     StringBuilder text = new StringBuilder();
+    List<AutomationElement> numbered = new List<AutomationElement>();
+    numbered.Add(null);
     HashSet<string> seen = new HashSet<string>();
     Stopwatch clock = Stopwatch.StartNew();
     Stack<KeyValuePair<AutomationElement, int>> stack = new Stack<KeyValuePair<AutomationElement, int>>();
     stack.Push(new KeyValuePair<AutomationElement, int>(root, 0));
-    int count = 0;
-    while (stack.Count > 0 && count < maxItems && text.Length < maxChars && clock.ElapsedMilliseconds < maxMs) {
+    while (stack.Count > 0 && numbered.Count <= maxItems && text.Length < maxChars && clock.ElapsedMilliseconds < maxMs) {
       KeyValuePair<AutomationElement, int> next = stack.Pop();
-      string name = "", type = "", value = "";
-      try {
-        name = next.Key.Current.Name ?? "";
-        type = next.Key.Current.ControlType.ProgrammaticName.Replace("ControlType.", "");
-        object pattern;
-        if (next.Key.TryGetCurrentPattern(ValuePattern.Pattern, out pattern)) value = ((ValuePattern)pattern).Current.Value ?? "";
-      } catch { }
-      string line = type + ": " + name + (value.Length > 0 && value != name ? " = " + value : "");
-      if ((name.Trim().Length > 0 || value.Trim().Length > 0) && seen.Add(line)) {
-        text.Append(new string(' ', Math.Min(next.Value, 8) * 2)).Append(line.Length > 300 ? line.Substring(0, 300) + "..." : line).Append('\n');
-        count++;
+      bool useful;
+      string line = Describe(next.Key, out useful);
+      if (useful && seen.Add(line)) {
+        text.Append(new string(' ', Math.Min(next.Value, 8) * 2)).Append('[').Append(numbered.Count).Append("] ").Append(line).Append('\n');
+        numbered.Add(next.Key);
       }
       List<AutomationElement> children = new List<AutomationElement>();
       try {
@@ -358,7 +449,115 @@ public static class Uia {
       for (int i = children.Count - 1; i >= 0; i--) stack.Push(new KeyValuePair<AutomationElement, int>(children[i], next.Value + 1));
     }
     if (stack.Count > 0) text.Append("... more elements were not read\n");
+    Numbered[handle] = numbered;
     return text.ToString();
+  }
+  /**
+   * Find elements of one window by name, control type and automation id, up to 2000 elements and 5 seconds. Exact
+   * name matches come first. Each match gets a number for Act. Returns lines [n] description, or "" for none.
+   */
+  public static string Find(long handle, string name, string role, string automationId, int limit) {
+    AutomationElement root = AutomationElement.FromHandle(new IntPtr(handle));
+    TreeWalker walker = TreeWalker.ControlViewWalker;
+    List<AutomationElement> numbered;
+    if (!Numbered.TryGetValue(handle, out numbered)) { numbered = new List<AutomationElement>(); numbered.Add(null); Numbered[handle] = numbered; }
+    string needle = Clean(name).ToLowerInvariant();
+    string kind = (role ?? "").Trim().ToLowerInvariant();
+    string id = (automationId ?? "").Trim();
+    List<AutomationElement> exact = new List<AutomationElement>(), partial = new List<AutomationElement>();
+    Stopwatch clock = Stopwatch.StartNew();
+    Stack<AutomationElement> stack = new Stack<AutomationElement>();
+    stack.Push(root);
+    int visited = 0;
+    while (stack.Count > 0 && visited < 2000 && clock.ElapsedMilliseconds < 5000 && exact.Count < limit) {
+      AutomationElement e = stack.Pop(); visited++;
+      try {
+        string type = e.Current.ControlType.ProgrammaticName.Replace("ControlType.", "").ToLowerInvariant();
+        bool typeOk = kind.Length == 0 || type == kind;
+        bool idOk = id.Length == 0 || e.Current.AutomationId == id;
+        if (typeOk && idOk && e != root) {
+          string n = Clean(e.Current.Name).ToLowerInvariant();
+          string v = "";
+          object pattern;
+          if (needle.Length > 0 && n != needle && e.TryGetCurrentPattern(ValuePattern.Pattern, out pattern)) v = Clean(((ValuePattern)pattern).Current.Value).ToLowerInvariant();
+          if (needle.Length == 0 || n == needle) exact.Add(e);
+          else if (n.Contains(needle) || (v.Length > 0 && v.Contains(needle))) partial.Add(e);
+        }
+      } catch { }
+      List<AutomationElement> children = new List<AutomationElement>();
+      try {
+        AutomationElement child = walker.GetFirstChild(e);
+        while (child != null && children.Count < 300) { children.Add(child); child = walker.GetNextSibling(child); }
+      } catch { }
+      for (int i = children.Count - 1; i >= 0; i--) stack.Push(children[i]);
+    }
+    exact.AddRange(partial);
+    StringBuilder text = new StringBuilder();
+    int shown = 0;
+    foreach (AutomationElement e in exact) {
+      if (shown >= limit) break;
+      bool useful;
+      string line = Describe(e, out useful);
+      if (line.Length == 0) continue;
+      int index = numbered.IndexOf(e);
+      if (index < 1) { numbered.Add(e); index = numbered.Count - 1; }
+      text.Append(shown < exact.Count - partial.Count ? "=" : "~").Append('[').Append(index).Append("] ").Append(line).Append('\n');
+      shown++;
+    }
+    return text.ToString();
+  }
+  static AutomationElement Element(long handle, int index) {
+    List<AutomationElement> numbered;
+    if (!Numbered.TryGetValue(handle, out numbered) || index < 1 || index >= numbered.Count || numbered[index] == null)
+      throw new Exception("element [" + index + "] is unknown for this window; read the window or find the element first");
+    return numbered[index];
+  }
+  /** The centre of a numbered element as x y, for a real click. */
+  public static string Point(long handle, int index) {
+    AutomationElement e = Element(handle, index);
+    int x, y;
+    if (!Centre(e, out x, out y)) throw new Exception("element [" + index + "] is off screen or hidden; scroll it into view or expand its parent first");
+    return x + " " + y;
+  }
+  /**
+   * Operate a numbered element through UI Automation: invoke, toggle, expand, collapse, select, set_value, focus.
+   * Returns the element's line afterwards, or CLICK x y when the element supports no such pattern and a real
+   * click at its centre should be used instead.
+   */
+  public static string Act(long handle, int index, string action, string value) {
+    AutomationElement e = Element(handle, index);
+    object p;
+    try {
+      if (action == "invoke") {
+        if (e.TryGetCurrentPattern(InvokePattern.Pattern, out p)) ((InvokePattern)p).Invoke();
+        else if (e.TryGetCurrentPattern(TogglePattern.Pattern, out p)) ((TogglePattern)p).Toggle();
+        else if (e.TryGetCurrentPattern(SelectionItemPattern.Pattern, out p)) ((SelectionItemPattern)p).Select();
+        else if (e.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out p)) ((ExpandCollapsePattern)p).Expand();
+        else return "CLICK " + Point(handle, index);
+      } else if (action == "toggle") {
+        if (e.TryGetCurrentPattern(TogglePattern.Pattern, out p)) ((TogglePattern)p).Toggle(); else return "CLICK " + Point(handle, index);
+      } else if (action == "expand" || action == "collapse") {
+        if (!e.TryGetCurrentPattern(ExpandCollapsePattern.Pattern, out p)) return "CLICK " + Point(handle, index);
+        if (action == "expand") ((ExpandCollapsePattern)p).Expand(); else ((ExpandCollapsePattern)p).Collapse();
+      } else if (action == "select") {
+        if (e.TryGetCurrentPattern(SelectionItemPattern.Pattern, out p)) ((SelectionItemPattern)p).Select(); else return "CLICK " + Point(handle, index);
+      } else if (action == "set_value") {
+        if (e.TryGetCurrentPattern(ValuePattern.Pattern, out p) && !((ValuePattern)p).Current.IsReadOnly) ((ValuePattern)p).SetValue(value ?? "");
+        else if (e.TryGetCurrentPattern(RangeValuePattern.Pattern, out p) && !((RangeValuePattern)p).Current.IsReadOnly) ((RangeValuePattern)p).SetValue(double.Parse(value ?? "0", System.Globalization.CultureInfo.InvariantCulture));
+        else return "TYPE " + Point(handle, index);
+      } else if (action == "focus") {
+        e.SetFocus();
+      } else throw new Exception("unknown element action " + action);
+    } catch (ElementNotAvailableException) {
+      throw new Exception("element [" + index + "] no longer exists; read the window again");
+    } catch (InvalidOperationException error) {
+      throw new Exception("the app refused " + action + " on element [" + index + "] (" + error.Message + "); try a click instead");
+    }
+    System.Threading.Thread.Sleep(150);
+    bool useful;
+    string line;
+    try { line = Describe(e, out useful); } catch { line = ""; }
+    return line.Length == 0 ? "done; the element is gone now (a dialog or menu may have closed)" : line;
   }
 }
 }
@@ -381,6 +580,107 @@ const CLIPBOARD_RESTORE = '$r = $false; if ($global:hackdevClipboardSaved) { for
   + '[System.Windows.Forms.Clipboard]::SetDataObject($global:hackdevClipboard, $true) } else { [System.Windows.Forms.Clipboard]::Clear() }; '
   + '$global:hackdevClipboard = $null; $r = $true; break } catch { Start-Sleep -Milliseconds 50 } } }; $global:hackdevClipboardSaved = $false; '
   + "if ($r) { 'RESTORED' } else { 'LOST' }"
+
+/**
+ * PowerShell that captures one area of the screen and reads its text with the OCR engine built into Windows 10 and
+ * 11, printing one tab-separated `x y width height text` line per text line in desktop pixels. Areas up to 1600
+ * pixels are enlarged twice first, which helps the engine read small interface text.
+ * @param area - the area in virtual-desktop pixels.
+ * @returns the script.
+ */
+export function ocrScript(area: CaptureArea): string {
+  const int = (value: number): string => String(Math.round(value))
+  const scale = Math.max(area.width, area.height) <= 1600 ? 2 : 1
+  return String.raw`if ($null -eq $global:hackdevAsTask) { Add-Type -AssemblyName System.Runtime.WindowsRuntime; `
+    + String.raw`$null = [Windows.Storage.StorageFile, Windows.Storage, ContentType = WindowsRuntime]; `
+    + String.raw`$null = [Windows.Media.Ocr.OcrEngine, Windows.Foundation, ContentType = WindowsRuntime]; `
+    + String.raw`$null = [Windows.Graphics.Imaging.BitmapDecoder, Windows.Graphics, ContentType = WindowsRuntime]; `
+    + String.raw`$global:hackdevAsTask = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object { $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and $_.GetParameters()[0].ParameterType.Name -like 'IAsyncOperation*' })[0] }; `
+    + String.raw`$await = { param($op, [Type]$type) $task = $global:hackdevAsTask.MakeGenericMethod($type).Invoke($null, @($op)); if (-not $task.Wait(15000)) { throw 'text recognition timed out' }; $task.Result }; `
+    + String.raw`$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromUserProfileLanguages(); `
+    + String.raw`if ($null -eq $engine) { throw 'Windows has no text recognition language: add a language with the Optical character recognition feature in Settings > Time & language > Language & region' }; `
+    + `$s = ${String(scale)}; $bx = ${int(area.x)}; $by = ${int(area.y)}; $bw = ${int(area.width)}; $bh = ${int(area.height)}; `
+    + String.raw`$bmp = New-Object System.Drawing.Bitmap($bw, $bh); $g = [System.Drawing.Graphics]::FromImage($bmp); $g.CopyFromScreen($bx, $by, 0, 0, $bmp.Size); $g.Dispose(); `
+    + String.raw`if ($s -ne 1) { $big = New-Object System.Drawing.Bitmap(($bw * $s), ($bh * $s)); $bg = [System.Drawing.Graphics]::FromImage($big); `
+    + String.raw`$bg.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic; $bg.DrawImage($bmp, 0, 0, $big.Width, $big.Height); $bg.Dispose(); $bmp.Dispose(); $bmp = $big }; `
+    + String.raw`$path = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'hackdev-ocr-' + [Guid]::NewGuid().ToString('N') + '.png'); $bmp.Save($path, [System.Drawing.Imaging.ImageFormat]::Png); $bmp.Dispose(); `
+    + String.raw`try { $file = & $await ([Windows.Storage.StorageFile]::GetFileFromPathAsync($path)) ([Windows.Storage.StorageFile]); `
+    + String.raw`$stream = & $await ($file.OpenAsync([Windows.Storage.FileAccessMode]::Read)) ([Windows.Storage.Streams.IRandomAccessStream]); `
+    + String.raw`try { $decoder = & $await ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder]); `
+    + String.raw`$soft = & $await ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap]); `
+    + String.raw`$result = & $await ($engine.RecognizeAsync($soft)) ([Windows.Media.Ocr.OcrResult]); $soft.Dispose() } finally { $stream.Dispose() } `
+    + String.raw`} finally { Remove-Item -LiteralPath $path -ErrorAction SilentlyContinue }; `
+    + String.raw`foreach ($line in $result.Lines) { $l = [double]::MaxValue; $t = [double]::MaxValue; $r = 0.0; $b = 0.0; `
+    + String.raw`foreach ($word in $line.Words) { $wr = $word.BoundingRect; $l = [Math]::Min($l, $wr.X); $t = [Math]::Min($t, $wr.Y); $r = [Math]::Max($r, $wr.X + $wr.Width); $b = [Math]::Max($b, $wr.Y + $wr.Height) }; `
+    + String.raw`@([int]($bx + $l / $s), [int]($by + $t / $s), [int](($r - $l) / $s), [int](($b - $t) / $s), ($line.Text -replace '\s+', ' ')) -join [char]9 }`
+}
+
+/**
+ * Parse tab-separated OCR lines: x, y, width, height, text.
+ * @param out - script output.
+ * @returns the lines with text.
+ */
+export function parseOcrLines(out: string): OcrLine[] {
+  const lines: OcrLine[] = []
+  for (const row of out.split(/\r?\n/u)) {
+    const [x, y, width, height, ...rest] = row.split('\t')
+    const text = rest.join(' ').trim()
+    if (text.length === 0 || x === undefined || y === undefined || width === undefined || height === undefined) continue
+    const numbers = [x, y, width, height].map(Number)
+    if (numbers.some(value => !Number.isFinite(value))) continue
+    lines.push({ text, x: numbers[0] ?? 0, y: numbers[1] ?? 0, width: numbers[2] ?? 0, height: numbers[3] ?? 0 })
+  }
+  return lines
+}
+
+/**
+ * Group `tesseract ... tsv` word rows into lines in desktop pixels.
+ * @param tsv - tesseract TSV output (level, page, block, paragraph, line, word, left, top, width, height, conf, text).
+ * @param originX - desktop x of the image's left edge.
+ * @param originY - desktop y of the image's top edge.
+ * @returns the recognized lines in reading order.
+ */
+export function parseTesseractTsv(tsv: string, originX: number, originY: number): OcrLine[] {
+  const lines = new Map<string, { words: string[]; left: number; top: number; right: number; bottom: number }>()
+  for (const row of tsv.split(/\r?\n/u).slice(1)) {
+    const cells = row.split('\t')
+    if (cells.length < 12 || cells[0] !== '5') continue
+    const text = (cells.slice(11).join(' ')).trim()
+    if (text.length === 0 || Number(cells[10]) < 0) continue
+    const [left, top, width, height] = cells.slice(6, 10).map(Number)
+    if (left === undefined || top === undefined || width === undefined || height === undefined) continue
+    const key = cells.slice(1, 5).join('.')
+    const line = lines.get(key)
+    if (line === undefined) lines.set(key, { words: [text], left, top, right: left + width, bottom: top + height })
+    else {
+      line.words.push(text)
+      line.left = Math.min(line.left, left)
+      line.top = Math.min(line.top, top)
+      line.right = Math.max(line.right, left + width)
+      line.bottom = Math.max(line.bottom, top + height)
+    }
+  }
+  return [...lines.values()].map(line => ({
+    text: line.words.join(' '), x: originX + line.left, y: originY + line.top, width: line.right - line.left, height: line.bottom - line.top,
+  }))
+}
+
+/**
+ * PowerShell that starts an installed app by its Start-menu name (exact, then prefix, then fragment, shortest name
+ * first), or else runs the name as a command such as `notepad` or `winword`, and prints what it started.
+ * @param app - app name or command.
+ * @returns the script.
+ */
+export function launchScript(app: string): string {
+  return `$q = ${psQuote(app.trim())}; $all = @(); try { $all = @(Get-StartApps) } catch { }; `
+    + '$m = @($all | Where-Object { $_.Name -eq $q }); '
+    + 'if ($m.Count -eq 0) { $m = @($all | Where-Object { $_.Name -like ($q + \'*\') } | Sort-Object { $_.Name.Length }) }; '
+    + 'if ($m.Count -eq 0) { $m = @($all | Where-Object { $_.Name -like (\'*\' + $q + \'*\') } | Sort-Object { $_.Name.Length }) }; '
+    + 'if ($m.Count -gt 0) { Start-Process -FilePath (\'shell:AppsFolder\\\' + $m[0].AppID); \'Started \' + $m[0].Name + \' from the Start menu\' } '
+    + 'else { try { Start-Process -FilePath $q -ErrorAction Stop; \'Started the command \' + $q } catch { '
+    + '$near = @($all | Where-Object { $n = $_.Name; @($q -split \'\\s+\' | Where-Object { $_.Length -gt 2 -and $n -like (\'*\' + $_ + \'*\') }).Count -gt 0 } | Select-Object -First 8 -ExpandProperty Name); '
+    + 'throw (\'no installed app is named like "\' + $q + \'" and it is not a command\' + $(if ($near.Count -gt 0) { \'; similar apps: \' + ($near -join \', \') } else { \'; check the name in the Start menu\' })) } }'
+}
 
 /** Every monitor as JSON, read fresh from Windows: device name, whether primary, and bounds in physical pixels. */
 const LIST_SCREENS = '@([HackDev.Desk]::Monitors()) | ConvertTo-Json -Compress'
@@ -644,7 +944,27 @@ export function windowsBackend(run?: ScriptRunner, options: WindowsBackendOption
       await ps(`Start-Process -FilePath ${psQuote(target)}`)
     },
     async readText(handle) {
-      return ps(`if (-not ('HackDev.Uia' -as [type])) { throw 'UI Automation is not available on this system' }; [HackDev.Uia]::Read(${String(Math.trunc(handle))}, 300, 8000, 4000)`)
+      return ps(`${UIA_CHECK}[HackDev.Uia]::Read(${int(handle)}, 300, 8000, 4000)`)
+    },
+    async place(handle, x, y, width, height, signal) {
+      await input([{ op: 'place', handle, x, y, width, height }], { handle }, signal)
+    },
+    async launch(app) {
+      return ps(launchScript(app), 20_000)
+    },
+    async findElements(handle, query) {
+      return ps(`${UIA_CHECK}[HackDev.Uia]::Find(${int(handle)}, ${psQuote(query.name ?? '')}, ${psQuote(query.role ?? '')}, ${psQuote(query.automationId ?? '')}, 15)`, 15_000)
+    },
+    async elementAction(handle, index, action, value) {
+      return ps(`${UIA_CHECK}[HackDev.Uia]::Act(${int(handle)}, ${int(index)}, '${action}', ${psQuote(value ?? '')})`, 15_000)
+    },
+    async elementPoint(handle, index) {
+      const [x, y] = (await ps(`${UIA_CHECK}[HackDev.Uia]::Point(${int(handle)}, ${int(index)})`)).trim().split(/\s+/u).map(Number)
+      if (x === undefined || y === undefined || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`element [${String(index)}] has no position on screen`)
+      return { x, y }
+    },
+    async ocr(area) {
+      return parseOcrLines(await ps(ocrScript(area), 30_000))
     },
     close() {
       elevated?.close()
@@ -652,6 +972,9 @@ export function windowsBackend(run?: ScriptRunner, options: WindowsBackendOption
     },
   }
 }
+
+/** Script prefix that fails with a readable message where UI Automation could not be loaded. */
+const UIA_CHECK = "if (-not ('HackDev.Uia' -as [type])) { throw 'UI Automation is not available on this system' }; "
 
 /**
  * Parse `xrandr --query` monitor lines such as `HDMI-1 connected primary 1920x1080+1920+0 ...`.
@@ -865,6 +1188,33 @@ export function linuxBackend(
           + 'or capture the window with desktop_screenshot.', { cause: error })
       }
     },
+    async place(handle, x, y, width, height, signal) {
+      const id = hex(handle)
+      await helper('wmctrl', ['-ir', id, '-b', 'remove,maximized_vert,maximized_horz'], signal)
+      await helper('wmctrl', ['-ir', id, '-e', `0,${int(x)},${int(y)},${int(width)},${int(height)}`], signal)
+    },
+    async launch(app) {
+      const name = app.trim()
+      // A command on PATH starts detached from this process; anything else is tried as a desktop entry id.
+      await run('sh', ['-c', 'if command -v "$1" >/dev/null 2>&1; then setsid -f "$1" >/dev/null 2>&1; else gtk-launch "$1"; fi', 'sh', name])
+        .catch((error: unknown) => {
+          throw new Error(`could not start "${name}": ${String(error instanceof Error ? error.message : error)}. Pass the command name or the .desktop id of the app`, { cause: error })
+        })
+      return `Started ${name}`
+    },
+    async ocr(area) {
+      const file = join(await mkdtemp(join(tmpdir(), 'hackdev-ocr-')), 'area.png')
+      try {
+        const offset = (value: number): string => (Math.round(value) < 0 ? '' : '+') + int(value)
+        await helper('import', ['-window', 'root', '-crop', `${int(area.width)}x${int(area.height)}${offset(area.x)}${offset(area.y)}`, file])
+        const tsv = await run('tesseract', [file, '-', 'tsv']).catch((error: unknown) => {
+          throw new Error(`${String(error instanceof Error ? error.message : error)}. Reading text from the screen uses tesseract: install it with sudo apt-get install -y tesseract-ocr`, { cause: error })
+        })
+        return parseTesseractTsv(tsv, area.x, area.y)
+      } finally {
+        await rm(join(file, '..'), { recursive: true, force: true }).catch(() => {})
+      }
+    },
     close() {},
   }
 }
@@ -920,12 +1270,20 @@ export function selectWindow(windows: readonly WindowInfo[], handle?: number, ti
   }
   if (title === undefined || title.trim().length === 0) throw new Error('pass handle or title')
   const needle = title.trim().toLowerCase()
-  const matches = windows.filter(window => window.title.toLowerCase().includes(needle))
+  let matches = windows.filter(window => window.title.toLowerCase().includes(needle))
+  // A process name such as "notepad" or "chrome" also finds the app's window when no title contains it.
+  if (matches.length === 0) matches = windows.filter(window => window.process.toLowerCase().replace(/\.exe$/u, '') === needle.replace(/\.exe$/u, ''))
   const exact = matches.filter(window => window.title.toLowerCase() === needle)
   if (exact.length === 1 && exact[0] !== undefined) return exact[0]
   if (matches.length === 1 && matches[0] !== undefined) return matches[0]
-  if (matches.length === 0) throw new Error(`no window title contains "${title}"; open windows:\n${windows.map(describeWindow).join('\n')}`)
-  throw new Error(`${String(matches.length)} windows match "${title}"; pass handle:\n${matches.map(describeWindow).join('\n')}`)
+  if (matches.length === 0) throw new Error(`no window title contains "${title}"; open windows:\n${windowList(windows)}`)
+  throw new Error(`${String(matches.length)} windows match "${title}"; pass handle:\n${windowList(matches)}`)
+}
+
+/** Window lines for an error message, at most 15 so a crowded desktop does not flood the model. */
+function windowList(windows: readonly WindowInfo[]): string {
+  const shown = windows.slice(0, 15).map(describeWindow).join('\n')
+  return windows.length > 15 ? `${shown}\n... and ${String(windows.length - 15)} more; call desktop_window with action list` : shown
 }
 
 /**
@@ -958,6 +1316,72 @@ export async function waitForWindow(
     }
     await new Promise(resolve => setTimeout(resolve, intervalMs))
   }
+}
+
+/**
+ * Poll a window's text until it contains `text`, or until it no longer does when `gone`: a page finished loading,
+ * a status reads "Done", an error message appeared or a spinner's label went away.
+ * @param read - reads the window's current text.
+ * @param text - text to look for, compared case-insensitively with runs of white space treated as one space.
+ * @param gone - wait for the text to disappear instead.
+ * @param timeoutMs - limit, 500 to 60000 milliseconds.
+ * @param signal - cancels the wait.
+ * @param intervalMs - polling interval.
+ * @returns a description of the outcome.
+ * @throws when the limit passes first.
+ */
+export async function waitForText(
+  read: () => Promise<string>, text: string | undefined, gone: boolean, timeoutMs: number, signal?: AbortSignal, intervalMs = 400,
+): Promise<string> {
+  const squash = (value: string): string => value.replace(/\s+/gu, ' ').trim().toLowerCase()
+  const needle = squash(text ?? '')
+  if (needle.length === 0) throw new Error('wait for text needs text')
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 500 || timeoutMs > 60_000) throw new Error('timeout_ms must be between 500 and 60000')
+  const started = Date.now()
+  for (;;) {
+    signal?.throwIfAborted()
+    const found = squash(await read()).includes(needle)
+    const waited = Date.now() - started
+    if (found !== gone) return `${gone ? 'The text is gone' : 'Found the text'} "${text ?? ''}" after ${String(waited)} ms.`
+    if (waited >= timeoutMs) {
+      throw new Error(gone ? `"${text ?? ''}" was still shown after ${String(timeoutMs)} ms` : `"${text ?? ''}" did not appear within ${String(timeoutMs)} ms; read the window to see what it shows instead`)
+    }
+    await new Promise(resolve => setTimeout(resolve, intervalMs))
+  }
+}
+
+/**
+ * Recognized text as numbered lines with the centre point of each, ready for a click, bounded in size.
+ * @param lines - recognized lines.
+ * @returns the text for the model.
+ */
+export function formatOcr(lines: readonly OcrLine[]): string {
+  const out: string[] = []
+  let size = 0
+  for (const [index, line] of lines.entries()) {
+    const row = `[${String(index + 1)}] "${line.text.length > 200 ? `${line.text.slice(0, 200)}...` : line.text}" @(${String(Math.round(line.x + line.width / 2))},${String(Math.round(line.y + line.height / 2))})`
+    if (out.length >= 250 || size + row.length > 9000) {
+      out.push(`... ${String(lines.length - index)} more lines; capture a smaller area to read them`)
+      break
+    }
+    out.push(row)
+    size += row.length + 1
+  }
+  return out.join('\n')
+}
+
+/**
+ * The recognized line that best matches a label: the exact text first, then the shortest line containing it.
+ * @param lines - recognized lines.
+ * @param label - the visible text to find.
+ * @returns the line, or undefined.
+ */
+export function findOcrLine(lines: readonly OcrLine[], label: string): OcrLine | undefined {
+  const squash = (value: string): string => value.replace(/\s+/gu, ' ').trim().toLowerCase()
+  const needle = squash(label)
+  if (needle.length === 0) return undefined
+  return lines.find(line => squash(line.text) === needle)
+    ?? lines.filter(line => squash(line.text).includes(needle)).toSorted((a, b) => a.text.length - b.text.length)[0]
 }
 
 /**
@@ -1016,7 +1440,11 @@ export const DISPLAY_GUIDANCE = `Whole-desktop tools use the real mouse and keyb
 - Load desktop-more only for what the desktop group cannot do (background input to one window without moving the pointer, menus, exact frames, killing a process, browser page automation).
 - Prefer the window tools (element tokens, background delivery) for precise work inside one app; switch to the real-input tools when background input is ignored or the target is part of the shell. Real input moves the person's pointer and focus.
 - Windows marks windows of apps running as administrator with [administrator]. Real input to them goes through an administrator helper that Windows asks the person to approve once per session; if they decline, ask them to do that step. UAC prompts and the lock screen are on the secure desktop, which no program can operate: ask the person to answer them.
-- Long text: desktop_type pastes through the clipboard above 500 characters (and restores the clipboard), which is far faster than typing. Hold keys during a click with modifiers, such as ctrl to add to a selection.`
+- Long text: desktop_type pastes through the clipboard above 500 characters (and restores the clipboard), which is far faster than typing. Hold keys during a click with modifiers, such as ctrl to add to a selection.
+- Work like a person who reads the screen: desktop_window read numbers every control as [n] with its centre point @(x,y) and state. desktop_element acts on a control by that number or by its visible name ("Save", "OK", "File name"): click, invoke, toggle, expand, select or set_value, without guessing coordinates. When a window exposes no controls (games, remote desktops, canvases, images), desktop_ocr reads the text on screen with the centre point of each line, and desktop_element click by name falls back to it.
+- Start apps by name with desktop_open app ("Calculator", "Word", "Visual Studio Code"); it reports the window that appeared. Wait for a result instead of sleeping: desktop_window wait with text waits until the window shows that text (a page loaded, "Done", an error).
+- If you cannot see images, never guess coordinates: use read, desktop_element and desktop_ocr, which give exact points.
+- File dialogs: focus the dialog, press alt+n (or click the "File name" box), type the full path, press enter, then wait for the dialog to close.`
 
 type Group = { name: string; description: string }
 
@@ -1054,6 +1482,87 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
     window: { type: 'number', description: 'Handle of the window to bring to the front first (from desktop_window list).' },
     title: { type: 'string', description: 'Part of the title of the window to bring to the front first, when the handle is unknown.' },
   } as const
+  /** How points in the latest desktop_screenshot image map to the desktop, for image_x and image_y. */
+  let lastCapture: { originX: number; originY: number; scale: number; width: number; height: number } | undefined
+  /** A desktop point from x and y, or from image_x and image_y in the latest screenshot. */
+  const point = (args: { x?: number; y?: number; image_x?: number; image_y?: number }): { x: number; y: number } => {
+    if (args.image_x !== undefined || args.image_y !== undefined) {
+      if (args.image_x === undefined || args.image_y === undefined) throw new Error('pass both image_x and image_y')
+      if (lastCapture === undefined) throw new Error('image_x and image_y refer to the latest desktop_screenshot, and none was taken yet')
+      if (args.image_x < 0 || args.image_y < 0 || args.image_x > lastCapture.width || args.image_y > lastCapture.height) {
+        throw new Error(`(${String(args.image_x)}, ${String(args.image_y)}) is outside the latest screenshot, which is ${String(lastCapture.width)}x${String(lastCapture.height)}`)
+      }
+      return {
+        x: Math.round(lastCapture.originX + args.image_x / lastCapture.scale),
+        y: Math.round(lastCapture.originY + args.image_y / lastCapture.scale),
+      }
+    }
+    if (args.x === undefined || args.y === undefined) throw new Error('pass x and y (desktop pixels), or image_x and image_y (a point in the latest screenshot)')
+    return { x: args.x, y: args.y }
+  }
+  /** The window chosen by handle or title, or the foreground window when neither is given. */
+  const chosenWindow = async (handle?: number, title?: string): Promise<WindowInfo> => {
+    const windows = await backend.windows()
+    if (handle !== undefined || title !== undefined) return selectWindow(windows, handle, title)
+    const front = windows.find(window => window.foreground)
+    if (front === undefined) throw new Error('no window has focus; pass window or title')
+    return front
+  }
+  /** Recognize the text of one window, bringing it to the front first so what is read is the window itself. */
+  const windowOcr = async (window: WindowInfo, signal?: AbortSignal): Promise<OcrLine[]> => {
+    if (backend.ocr === undefined) throw new Error('reading text from the screen is not available on this platform')
+    if (window.minimized) await backend.window(window.handle, 'restore', signal)
+    if (!window.foreground || window.minimized) await backend.window(window.handle, 'focus', signal)
+    const fresh = (await backend.windows()).find(candidate => candidate.handle === window.handle) ?? window
+    return backend.ocr(fresh)
+  }
+  /** A window's controls and text; when it exposes none, the text recognized on screen instead. */
+  const windowText = async (window: WindowInfo, signal?: AbortSignal): Promise<string> => {
+    const text = (await backend.readText(window.handle).catch((error: unknown) => {
+      if (backend.ocr === undefined) throw error
+      return ''
+    })).trimEnd()
+    if (text.split('\n').filter(line => line.trim().length > 0).length >= 3 || backend.ocr === undefined) return text
+    const lines = await windowOcr(window, signal).catch(() => [])
+    if (lines.length === 0) return text
+    return `${text.length > 0 ? `${text}\n` : ''}The window exposes few controls; text recognized on screen (centre points for desktop_pointer):\n${formatOcr(lines)}`
+  }
+  /** Move and resize a window, keeping its size or position where none is given, and report where it ended up. */
+  const moveWindow = async (window: WindowInfo, to: Partial<CaptureArea>, signal?: AbortSignal): Promise<string> => {
+    const width = Math.round(to.width ?? window.width)
+    const height = Math.round(to.height ?? window.height)
+    if (width < 50 || height < 30) throw new Error('width must be at least 50 and height at least 30')
+    if (to.x === undefined && to.y === undefined && to.width === undefined && to.height === undefined) throw new Error('move needs x and y, width and height, or both')
+    const x = Math.round(to.x ?? window.x)
+    const y = Math.round(to.y ?? window.y)
+    await onDisplay(x + Math.min(40, width - 1), y + Math.min(10, height - 1))
+    await backend.place(window.handle, x, y, width, height, signal)
+    const now = (await backend.windows()).find(candidate => candidate.handle === window.handle)
+    if (now === undefined) return `Moved "${window.title}", which then closed.`
+    const kept = Math.abs(now.width - width) > 24 || Math.abs(now.height - height) > 24
+      ? ` The app kept ${String(now.width)}x${String(now.height)} instead of ${String(width)}x${String(height)}; it may have a minimum or fixed size.`
+      : ''
+    return `Moved; now ${describeWindow(now)}.${kept}`
+  }
+  /** Start an app by name and report the window it opened. */
+  const launchApp = async (app: string, signal?: AbortSignal): Promise<string> => {
+    const name = app.trim()
+    if (name.length === 0) throw new Error('app is empty')
+    const before = new Set((await backend.windows()).map(window => window.handle))
+    const started = await backend.launch(name)
+    const words = name.toLowerCase().split(/\s+/u).filter(word => word.length > 2)
+    const deadline = Date.now() + 10_000
+    while (Date.now() < deadline) {
+      signal?.throwIfAborted()
+      await new Promise(resolve => setTimeout(resolve, 400))
+      const fresh = (await backend.windows()).filter(window => !before.has(window.handle))
+      const likely = fresh.find(window => words.some(word => `${window.title} ${window.process}`.toLowerCase().includes(word))) ?? fresh[0]
+      if (likely !== undefined) return `${started}. New window: ${describeWindow(likely)}`
+    }
+    const existing = (await backend.windows()).filter(window => words.some(word => `${window.title} ${window.process}`.toLowerCase().includes(word)))
+    return `${started}, but no new window appeared within 10 s; it may still be loading, or it reused an open window.`
+      + (existing.length > 0 ? ` Matching windows: ${existing.slice(0, 5).map(describeWindow).join('; ')}` : ' Wait for it with desktop_window wait.')
+  }
 
   ctx.tools.register(defineTool({
     name: 'desktop_list_displays',
@@ -1083,17 +1592,27 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
         window: { type: 'number', description: 'Handle of a window to capture (from desktop_window list).' },
         title: { type: 'string', description: 'Part of the title of a window to capture, when the handle is unknown.' },
         display: { type: 'number', description: 'Display index from desktop_list_displays; omit window, title and display to capture every display.' },
+        x: { type: 'number', description: 'Capture only this region instead: its left edge in virtual-desktop pixels (with y, width and height). Zoom into a small area this way.' },
+        y: { type: 'number', description: 'Region top edge.' },
+        width: { type: 'number', description: 'Region width.' },
+        height: { type: 'number', description: 'Region height.' },
         max_dimension: { type: 'number', description: 'Longest side of the image in pixels (default 1280, 200 to 4096).' },
+        ocr: { type: 'boolean', description: 'Also return the text recognized in the captured area with the centre point of each line.' },
       },
     },
     async call(raw) {
-      const args = raw as { window?: number; title?: string; display?: number; max_dimension?: number }
+      const args = raw as AreaArgs & { max_dimension?: number; ocr?: boolean }
       const maxDimension = Math.round(args.max_dimension ?? 1280)
       if (!Number.isFinite(maxDimension) || maxDimension < 200 || maxDimension > 4096) throw new Error('max_dimension must be between 200 and 4096')
       const displays = await backend.list()
       let area: CaptureArea | undefined
       let label: string
-      if (args.window !== undefined || args.title !== undefined) {
+      if (args.x !== undefined || args.y !== undefined || args.width !== undefined || args.height !== undefined) {
+        if (args.x === undefined || args.y === undefined || args.width === undefined || args.height === undefined) throw new Error('a region needs x, y, width and height')
+        if (args.width < 8 || args.height < 8) throw new Error('a region must be at least 8 pixels wide and high')
+        area = { x: args.x, y: args.y, width: args.width, height: args.height }
+        label = `region ${String(args.width)}x${String(args.height)} at (${String(args.x)}, ${String(args.y)})`
+      } else if (args.window !== undefined || args.title !== undefined) {
         const window = selectWindow(await backend.windows(), args.window, args.title)
         if (window.minimized) throw new Error(`"${window.title}" is minimized; restore it before capturing it`)
         area = window
@@ -1120,7 +1639,18 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       const mapping = size.scale === 1
         ? `desktop x = ${String(originX)} + image x, desktop y = ${String(originY)} + image y`
         : `desktop x = ${String(originX)} + image x / ${size.scale.toFixed(4)}, desktop y = ${String(originY)} + image y / ${size.scale.toFixed(4)}`
-      const text = `${label}, image ${String(size.width)}x${String(size.height)}. To act on a point in this image: ${mapping}.`
+      lastCapture = { originX, originY, scale: size.scale, width: size.width, height: size.height }
+      let text = `${label}, image ${String(size.width)}x${String(size.height)}. To act on a point in this image: ${mapping}, `
+        + 'or pass the image point as image_x and image_y to desktop_pointer and it is converted for you.'
+      if (args.ocr === true) {
+        const whole = area ?? displays.reduce<CaptureArea>((all, next) => ({
+          x: Math.min(all.x, next.x), y: Math.min(all.y, next.y),
+          width: Math.max(all.x + all.width, next.x + next.width) - Math.min(all.x, next.x),
+          height: Math.max(all.y + all.height, next.y + next.height) - Math.min(all.y, next.y),
+        }), displays[0] ?? { x: 0, y: 0, width: 0, height: 0 })
+        const lines = backend.ocr === undefined ? [] : await backend.ocr(whole)
+        text += `\nText on screen (desktop centre points):\n${lines.length > 0 ? formatOcr(lines) : '(none recognized)'}`
+      }
       return { content: [{ type: 'text', text }, { type: 'image', data, mimeType: 'image/png' }] }
     },
   }), options)
@@ -1129,22 +1659,25 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
     name: 'desktop_pointer',
     description: 'Move the real mouse pointer to virtual-desktop coordinates on any display and optionally click. Coordinates of a display start at its x and y from desktop_list_displays.',
     parameters: {
-      x: { type: 'number', required: true, description: 'Virtual-desktop x in pixels.' },
-      y: { type: 'number', required: true, description: 'Virtual-desktop y in pixels.' },
-      button: { type: 'string', description: 'left (default), right, middle, or none to move only.' },
+      x: { type: 'number', description: 'Virtual-desktop x in pixels (from read, desktop_element or desktop_ocr centre points).' },
+      y: { type: 'number', description: 'Virtual-desktop y in pixels.' },
+      image_x: { type: 'number', description: 'Instead of x and y: x of a point in the latest desktop_screenshot image; it is converted to the desktop.' },
+      image_y: { type: 'number', description: 'y of that point in the latest screenshot image.' },
+      button: { type: 'string', description: 'left (default), right, middle, or none to move only (hover).' },
       count: { type: 'number', description: 'Clicks to send: 1 (default), 2 for a double-click, 3 for a triple-click.' },
       modifiers: { type: 'string', description: 'Keys held while clicking, such as ctrl (add to a selection), shift (extend it) or ctrl+shift.' },
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: { x: number; y: number; button?: string; count?: number; modifiers?: string }, execution) {
+    async execute(args: PointArgs & { button?: string; count?: number; modifiers?: string }, execution) {
       const pressed = args.button === 'none' ? 'none' : button(args.button)
       const count = args.count ?? 1
       if (!Number.isInteger(count) || count < 1 || count > 3) throw new Error('count must be 1, 2 or 3')
-      const on = await onDisplay(args.x, args.y)
+      const { x, y } = point(args)
+      const on = await onDisplay(x, y)
       const held = heldKeys(args.modifiers)
-      await backend.pointer(args.x, args.y, pressed, count, held, execution.signal)
+      await backend.pointer(x, y, pressed, count, held, execution.signal)
       const how = pressed === 'none' ? 'Moved to' : `${held === undefined ? '' : `${held.names.join('+')}+`}${pressed} click x${String(count)} at`
-      return { done: `${how} (${String(args.x)}, ${String(args.y)}) on display ${describe(on)}` }
+      return { done: `${how} (${String(x)}, ${String(y)}) on display ${describe(on)}` }
     },
   }), options)
 
@@ -1229,27 +1762,46 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
 
   ctx.tools.register(defineTool({
     name: 'desktop_window',
-    description: 'List visible top-level windows and dialogs (handle, process, title, position, foreground); read the text of one (its controls, labels and values, much cheaper than a screenshot); focus, minimize, maximize, restore or close one chosen by handle or title; or wait until a window whose title contains title appears (or, with gone, closes). close asks the app to close and may leave a save prompt open.',
+    description: 'List visible top-level windows and dialogs (handle, process, title, position, foreground); read one window (every control numbered [n] with its type, name, value, centre point @(x,y) and state; far cheaper than a screenshot); '
+      + 'focus, minimize, maximize, restore, close or move (position and size) one chosen by handle, title or process name; or wait until a window whose title contains title appears (or, with gone, closes), or, with text, until a window shows that text. '
+      + 'close asks the app to close and may leave a save prompt open.',
     parameters: {
-      action: { type: 'string', required: true, description: 'list, read, focus, minimize, maximize, restore, close or wait.' },
+      action: { type: 'string', required: true, description: 'list, read, focus, minimize, maximize, restore, close, move or wait.' },
       handle: { type: 'number', description: 'Window handle from list.' },
-      title: { type: 'string', description: 'Part of the window title, used when handle is omitted; it must match one window. Required for wait.' },
-      gone: { type: 'boolean', description: 'For wait: wait until no window title contains title.' },
+      title: { type: 'string', description: 'Part of the window title (or the process name, such as notepad), used when handle is omitted. For wait without text: the title to wait for.' },
+      text: { type: 'string', description: 'For wait: wait until the window (handle or title, else the foreground window) shows this text; with gone, until it no longer does.' },
+      gone: { type: 'boolean', description: 'For wait: wait until the window (or the text) is gone.' },
       timeout_ms: { type: 'number', description: 'For wait: give up after this many milliseconds, 500 to 60000 (default 15000).' },
+      x: { type: 'number', description: 'For move: new left edge in virtual-desktop pixels.' },
+      y: { type: 'number', description: 'For move: new top edge.' },
+      width: { type: 'number', description: 'For move: new width (default: unchanged).' },
+      height: { type: 'number', description: 'For move: new height (default: unchanged).' },
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: { action: string; handle?: number; title?: string; gone?: boolean; timeout_ms?: number }, execution) {
-      if (args.action === 'wait') return { done: await waitForWindow(backend, args.title, args.gone === true, args.timeout_ms ?? 15_000, execution.signal) }
+    async execute(args: WindowArgs, execution) {
+      if (args.action === 'wait') {
+        const timeout = args.timeout_ms ?? 15_000
+        const gone = args.gone === true
+        if (args.text === undefined) return { done: await waitForWindow(backend, args.title, gone, timeout, execution.signal) }
+        const window = await chosenWindow(args.handle, args.title)
+        return { done: await waitForText(() => windowText(window, execution.signal), args.text, gone, timeout, execution.signal) }
+      }
       const windows = await backend.windows()
       if (args.action === 'list') return { done: windows.length === 0 ? 'No visible windows.' : windows.map(describeWindow).join('\n') }
       if (args.action === 'read') {
-        const window = selectWindow(windows, args.handle, args.title)
-        const text = (await backend.readText(window.handle)).trimEnd()
+        const window = args.handle === undefined && args.title === undefined
+          ? await chosenWindow()
+          : selectWindow(windows, args.handle, args.title)
+        const text = await windowText(window, execution.signal)
         return { done: `Text of ${describeWindow(window)}:\n${text.length > 0 ? text : '(no readable text; capture it with desktop_screenshot)'}` }
+      }
+      if (args.action === 'move') {
+        const window = selectWindow(windows, args.handle, args.title)
+        return { done: await moveWindow(window, args, execution.signal) }
       }
       const action = args.action
       if (action !== 'focus' && action !== 'minimize' && action !== 'maximize' && action !== 'restore' && action !== 'close') {
-        throw new Error('action must be list, read, focus, minimize, maximize, restore, close or wait')
+        throw new Error('action must be list, read, focus, minimize, maximize, restore, close, move or wait')
       }
       const window = selectWindow(windows, args.handle, args.title)
       await backend.window(window.handle, action, execution.signal)
@@ -1259,24 +1811,142 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
 
   ctx.tools.register(defineTool({
     name: 'desktop_open',
-    description: 'Open a file, folder, URL, or a system page (on Windows, settings pages such as ms-settings:display or ms-settings:network) with its default app, the way double-clicking it would.',
+    description: 'Start an installed app by name (app: "Calculator", "Microsoft Word", "Visual Studio Code", "chrome") and report the window it opened; or open a file, folder, URL, or a system page (on Windows, settings pages such as ms-settings:display or ms-settings:network) with its default app, the way double-clicking it would.',
     parameters: {
-      target: { type: 'string', required: true, description: 'Absolute path, URL, or URI such as ms-settings:bluetooth.' },
+      app: { type: 'string', description: 'Name of an installed app as shown in the Start menu or application menu, or its command.' },
+      target: { type: 'string', description: 'Instead of app: absolute path, URL, or URI such as ms-settings:bluetooth.' },
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: { target: string }) {
-      const opened = args.target.trim()
-      if (opened.length === 0) throw new Error('target is empty')
+    async execute(args: { app?: string; target?: string }, execution) {
+      if (args.app !== undefined && args.app.trim().length > 0) return { done: await launchApp(args.app, execution.signal) }
+      const opened = (args.target ?? '').trim()
+      if (opened.length === 0) throw new Error('pass app (an app name) or target (a path, URL or URI)')
       await backend.open(opened)
-      return { done: `Opened ${opened}. Use desktop_window list or list_windows to find its window.` }
+      return { done: `Opened ${opened}. Use desktop_window wait or list to find its window.` }
     },
   }), options)
 
   ctx.tools.register(defineTool({
+    name: 'desktop_element',
+    description: 'Act on one control of a window by its number [n] from desktop_window read, or by its visible name, type or automation id: find, click, double_click, right_click, invoke (press a button or menu item), toggle (a check box), expand or collapse (a tree item, combo box or menu), select (a list item, tab or radio button), set_value (fill a text box) or focus. '
+      + 'Exact points come from the app, so no coordinates are guessed. When no control matches a name, click actions fall back to text recognized on screen.',
+    parameters: {
+      action: { type: 'string', required: true, description: 'find, click, double_click, right_click, invoke, toggle, expand, collapse, select, set_value or focus.' },
+      index: { type: 'number', description: 'Element number [n] from the latest desktop_window read or find of this window.' },
+      name: { type: 'string', description: 'Visible name or text of the control, such as "Save", "OK" or "File name"; exact matches win over partial ones.' },
+      role: { type: 'string', description: 'Control type to narrow the search: Button, Edit, CheckBox, RadioButton, ComboBox, ListItem, MenuItem, TabItem, TreeItem, Hyperlink, Text.' },
+      automation_id: { type: 'string', description: 'Automation id of the control, when known.' },
+      value: { type: 'string', description: 'For set_value: the new text or number.' },
+      ...focusParameters,
+    },
+    output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
+    async execute(args: ElementArgs, execution) {
+      return { done: await elementStep(args, execution.signal) }
+    },
+  }), options)
+
+  ctx.tools.register(defineTool({
+    name: 'desktop_ocr',
+    description: 'Read the text shown on screen with text recognition: one window, one display, a region, or every display. Works for anything visible, including apps without accessible controls, games, remote desktops, images and video. '
+      + 'Each line comes with its centre point in desktop pixels, ready for desktop_pointer.',
+    parameters: {
+      ...focusParameters,
+      display: { type: 'number', description: 'Display index; omit window, title and display (and the region) to read the foreground window.' },
+      x: { type: 'number', description: 'Read only this region: its left edge in virtual-desktop pixels (with y, width and height).' },
+      y: { type: 'number', description: 'Region top edge.' },
+      width: { type: 'number', description: 'Region width.' },
+      height: { type: 'number', description: 'Region height.' },
+      all: { type: 'boolean', description: 'Read every display instead of the foreground window.' },
+    },
+    output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
+    async execute(args: AreaArgs & { all?: boolean }, execution) {
+      if (backend.ocr === undefined) throw new Error('reading text from the screen is not available on this platform')
+      let lines: OcrLine[]
+      let label: string
+      if (args.x !== undefined || args.y !== undefined || args.width !== undefined || args.height !== undefined) {
+        if (args.x === undefined || args.y === undefined || args.width === undefined || args.height === undefined) throw new Error('a region needs x, y, width and height')
+        if (args.width < 8 || args.height < 8) throw new Error('a region must be at least 8 pixels wide and high')
+        lines = await backend.ocr({ x: args.x, y: args.y, width: args.width, height: args.height })
+        label = `region ${String(args.width)}x${String(args.height)} at (${String(args.x)}, ${String(args.y)})`
+      } else if (args.display !== undefined || args.all === true) {
+        const displays = await backend.list()
+        const chosen = args.display === undefined ? displays : [pick(displays, args.display)]
+        lines = (await Promise.all(chosen.map(display => backend.ocr?.(display) ?? Promise.resolve([])))).flat()
+        label = args.display === undefined ? `all ${String(displays.length)} displays` : `display ${describe(chosen[0] as DisplayInfo)}`
+      } else {
+        const window = await chosenWindow(args.window, args.title)
+        lines = await windowOcr(window, execution.signal)
+        label = `window ${describeWindow(window)}`
+      }
+      return { done: `Text recognized in ${label}:\n${lines.length > 0 ? formatOcr(lines) : '(no text recognized)'}` }
+    },
+  }), options)
+
+  /** Find, click or operate one control of a window; shared by desktop_element and the sequence step. */
+  async function elementStep(args: ElementArgs, signal: AbortSignal): Promise<string> {
+    const action = args.action
+    if (!ELEMENT_ACTIONS.has(action)) throw new Error(`action must be one of ${[...ELEMENT_ACTIONS].join(', ')}`)
+    const window = await chosenWindow(args.window, args.title)
+    if (window.minimized) await backend.window(window.handle, 'restore', signal)
+    const clicks = CLICK_ACTIONS[action]
+    let index = args.index
+    if (index === undefined) {
+      const query = { name: args.name, role: args.role, automationId: args.automation_id }
+      if ((query.name ?? query.role ?? query.automationId ?? '').trim().length === 0) throw new Error('pass index (from desktop_window read) or name, role or automation_id')
+      const found = backend.findElements === undefined ? '' : (await backend.findElements(window.handle, query)).trim()
+      const lines = found.split('\n').map(line => line.trim()).filter(line => line.length > 0)
+      if (lines.length === 0) {
+        if (clicks !== undefined && args.name !== undefined && backend.ocr !== undefined) {
+          const seen = findOcrLine(await windowOcr(window, signal), args.name)
+          if (seen !== undefined) {
+            const x = Math.round(seen.x + seen.width / 2)
+            const y = Math.round(seen.y + seen.height / 2)
+            await backend.pointer(x, y, clicks.button, clicks.count, undefined, signal)
+            return `No control is named "${args.name}", so the text "${seen.text}" recognized on screen was clicked at (${String(x)}, ${String(y)}) in ${describeWindow(window)}. Check the result.`
+          }
+        }
+        throw new Error(backend.findElements === undefined
+          ? 'controls are not available on this platform; use desktop_ocr to find text and desktop_pointer to click it'
+          : `no control in "${window.title}" matches ${JSON.stringify(query)}${backend.ocr === undefined ? '' : ', and no such text was recognized on screen'}; read the window to see its controls`)
+      }
+      const shown = lines.map(line => line.replace(/^[=~]/u, ''))
+      if (action === 'find') return `Controls of ${describeWindow(window)} matching ${JSON.stringify(query)}:\n${shown.join('\n')}`
+      const exact = lines.filter(line => line.startsWith('='))
+      const chosen = exact.length === 1 ? exact[0] : lines.length === 1 ? lines[0] : undefined
+      if (chosen === undefined) throw new Error(`${String(lines.length)} controls match; pass index:\n${shown.join('\n')}`)
+      index = Number(/\[(\d+)\]/u.exec(chosen)?.[1])
+    } else if (action === 'find') {
+      throw new Error('find needs name, role or automation_id')
+    }
+    if (backend.elementPoint === undefined || backend.elementAction === undefined) throw new Error('controls are not available on this platform')
+    // Real input lands on whatever is on top at the point, so the window comes to the front first.
+    const front = async (): Promise<void> => { if (!window.foreground) await backend.window(window.handle, 'focus', signal) }
+    if (clicks !== undefined) {
+      const at = await backend.elementPoint(window.handle, index)
+      await onDisplay(at.x, at.y)
+      await front()
+      await backend.pointer(at.x, at.y, clicks.button, clicks.count, undefined, signal)
+      return `${action.replace('_', ' ')} on [${String(index)}] at (${String(at.x)}, ${String(at.y)}) in "${window.title}"`
+    }
+    if (action === 'set_value' && args.value === undefined) throw new Error('set_value needs value')
+    const out = (await backend.elementAction(window.handle, index, action as ElementPatternAction, args.value)).trim()
+    const fallback = /^(CLICK|TYPE) (-?\d+) (-?\d+)$/u.exec(out)
+    if (fallback === null) return `${action} [${String(index)}] done; now ${out}`
+    const x = Number(fallback[2])
+    const y = Number(fallback[3])
+    await front()
+    await backend.pointer(x, y, 'left', 1, undefined, signal)
+    if (fallback[1] === 'CLICK') return `[${String(index)}] does not support ${action}, so it was clicked at (${String(x)}, ${String(y)}) instead; check the result.`
+    await backend.keys(parseKeys('ctrl+a'), signal)
+    await backend.type(args.value ?? '', (args.value ?? '').length > PASTE_THRESHOLD, signal)
+    return `[${String(index)}] takes no direct value, so it was clicked at (${String(x)}, ${String(y)}), its text selected and "${(args.value ?? '').slice(0, 80)}" typed.`
+  }
+
+  ctx.tools.register(defineTool({
     name: 'desktop_sequence',
-    description: 'Run several whole-desktop actions in order in one call, stopping at the first failure: open, keys, type, wait, read, focus, minimize, maximize, restore, close, click, drag, scroll, sleep. '
-      + 'Use it for steps whose outcome you can predict, such as open an app, wait for its window, focus it, type, and end with read to check the result in the same call. '
-      + 'Example: [{"action":"keys","keys":"win+r"},{"action":"wait","title":"Run"},{"action":"type","text":"notepad\\n"},{"action":"wait","title":"Notepad"},{"action":"type","text":"hello"}].',
+    description: 'Run several whole-desktop actions in order in one call, stopping at the first failure: launch, open, keys, type, wait, read, ocr, element, focus, minimize, maximize, restore, close, move, click, drag, scroll, sleep. '
+      + 'Use it for steps whose outcome you can predict, such as launch an app, wait for its window, press a control by name, type, and end with read to check the result in the same call. '
+      + 'Example: [{"action":"launch","app":"Notepad"},{"action":"wait","title":"Notepad"},{"action":"type","text":"hello"},{"action":"element","element_action":"click","name":"File"},{"action":"read","title":"Notepad"}].',
     parameters: {
       steps: {
         type: 'array',
@@ -1286,16 +1956,24 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
           type: 'object',
           additionalProperties: false,
           properties: {
-            action: { type: 'string', required: true, description: 'open, keys, type, wait, read, focus, minimize, maximize, restore, close, click, drag, scroll or sleep.' },
+            action: { type: 'string', required: true, description: 'launch, open, keys, type, wait, read, ocr, element, focus, minimize, maximize, restore, close, move, click, drag, scroll or sleep.' },
+            app: { type: 'string', description: 'launch: app name, such as "Calculator".' },
             keys: { type: 'string', description: 'keys: chords such as "ctrl+s" or "alt+tab enter".' },
-            text: { type: 'string', description: 'type: text to type; a newline presses Enter.' },
+            text: { type: 'string', description: 'type: text to type, a newline presses Enter; wait: wait until the window shows this text.' },
             target: { type: 'string', description: 'open: path, URL or URI.' },
-            title: { type: 'string', description: 'wait, read, focus, minimize, maximize, restore, close: part of the window title; keys and type: window to bring forward first.' },
+            title: { type: 'string', description: 'wait, read, ocr, element, focus, minimize, maximize, restore, close, move: part of the window title or the process name; keys and type: window to bring forward first.' },
             handle: { type: 'number', description: 'Window handle, instead of title.' },
-            gone: { type: 'boolean', description: 'wait: wait for the window to close.' },
+            gone: { type: 'boolean', description: 'wait: wait for the window (or the text) to go away.' },
             timeout_ms: { type: 'number', description: 'wait: limit in milliseconds (default 15000).' },
-            x: { type: 'number', description: 'click, scroll: virtual-desktop x; drag: start x.' },
-            y: { type: 'number', description: 'click, scroll: virtual-desktop y; drag: start y.' },
+            element_action: { type: 'string', description: 'element: click, double_click, right_click, invoke, toggle, expand, collapse, select, set_value or focus.' },
+            name: { type: 'string', description: 'element: visible name of the control.' },
+            role: { type: 'string', description: 'element: control type, such as Button or Edit.' },
+            index: { type: 'number', description: 'element: number [n] from an earlier read of the window.' },
+            value: { type: 'string', description: 'element set_value: the new value.' },
+            width: { type: 'number', description: 'move: new width.' },
+            height: { type: 'number', description: 'move: new height.' },
+            x: { type: 'number', description: 'click, scroll: virtual-desktop x; drag: start x; move: new left edge.' },
+            y: { type: 'number', description: 'click, scroll: virtual-desktop y; drag: start y; move: new top edge.' },
             to_x: { type: 'number', description: 'drag: end x.' },
             to_y: { type: 'number', description: 'drag: end y.' },
             button: { type: 'string', description: 'click, drag: left (default), right or middle.' },
@@ -1332,6 +2010,18 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
   /** One `desktop_sequence` step, validated like the matching single-action tool. */
   async function runStep(step: SequenceStep, signal: AbortSignal): Promise<string> {
     switch (step.action) {
+      case 'launch':
+        return launchApp(step.app ?? '', signal)
+      case 'element':
+        return elementStep({
+          action: step.element_action ?? '', index: step.index, name: step.name, role: step.role, value: step.value, window: step.handle, title: step.title,
+        }, signal)
+      case 'ocr': {
+        const window = await chosenWindow(step.handle, step.title)
+        return `text on screen in "${window.title}":\n${formatOcr(await windowOcr(window, signal)) || '(none recognized)'}`
+      }
+      case 'move':
+        return moveWindow(selectWindow(await backend.windows(), step.handle, step.title), step, signal)
       case 'open': {
         const opened = (step.target ?? '').trim()
         if (opened.length === 0) throw new Error('open needs target')
@@ -1352,11 +2042,14 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
         await backend.type(text, paste, signal)
         return `${paste ? 'pasted' : 'typed'} ${String(text.length)} characters into ${receiver}`
       }
-      case 'wait':
-        return waitForWindow(backend, step.title, step.gone === true, step.timeout_ms ?? 15_000, signal)
+      case 'wait': {
+        if (step.text === undefined) return waitForWindow(backend, step.title, step.gone === true, step.timeout_ms ?? 15_000, signal)
+        const window = await chosenWindow(step.handle, step.title)
+        return waitForText(() => windowText(window, signal), step.text, step.gone === true, step.timeout_ms ?? 15_000, signal)
+      }
       case 'read': {
-        const window = selectWindow(await backend.windows(), step.handle, step.title)
-        const text = (await backend.readText(window.handle)).trimEnd()
+        const window = await chosenWindow(step.handle, step.title)
+        const text = await windowText(window, signal)
         return `text of "${window.title}":
 ${text.length > 0 ? text : '(no readable text)'}`
       }
@@ -1409,9 +2102,62 @@ ${text.length > 0 ? text : '(no readable text)'}`
   }
 }
 
+/** A window, display or region chosen by `desktop_screenshot` and `desktop_ocr`. */
+interface AreaArgs extends Partial<CaptureArea> {
+  window?: number
+  title?: string
+  display?: number
+}
+
+/** A point in desktop pixels, or in the latest screenshot image. */
+interface PointArgs {
+  x?: number
+  y?: number
+  image_x?: number
+  image_y?: number
+}
+
+/** Arguments of `desktop_window`. */
+interface WindowArgs extends Partial<CaptureArea> {
+  action: string
+  handle?: number
+  title?: string
+  text?: string
+  gone?: boolean
+  timeout_ms?: number
+}
+
+/** Arguments of `desktop_element` and of the sequence's element step. */
+export interface ElementArgs {
+  action: string
+  index?: number | undefined
+  name?: string | undefined
+  role?: string | undefined
+  automation_id?: string | undefined
+  value?: string | undefined
+  window?: number | undefined
+  title?: string | undefined
+}
+
+/** Every `desktop_element` action. */
+const ELEMENT_ACTIONS: ReadonlySet<string> = new Set(['find', 'click', 'double_click', 'right_click', 'invoke', 'toggle', 'expand', 'collapse', 'select', 'set_value', 'focus'])
+
+/** Element actions done with a real click at the control's centre. */
+const CLICK_ACTIONS: Readonly<Record<string, { button: PointerButton; count: number } | undefined>> = {
+  click: { button: 'left', count: 1 }, double_click: { button: 'left', count: 2 }, right_click: { button: 'right', count: 1 },
+}
+
 /** One step of `desktop_sequence`. */
 export interface SequenceStep {
   action: string
+  app?: string
+  element_action?: string
+  name?: string
+  role?: string
+  index?: number
+  value?: string
+  width?: number
+  height?: number
   keys?: string
   text?: string
   target?: string

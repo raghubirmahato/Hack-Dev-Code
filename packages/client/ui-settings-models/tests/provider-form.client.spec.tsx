@@ -1800,3 +1800,59 @@ describe('API key field', () => {
     expect(screen.queryByRole('textbox', { name: en.customRoute })).toBeNull()
   })
 })
+
+describe('local model server presets', () => {
+  function mountPresetCard(taken: readonly string[] = ['openai']) {
+    const scripted = scriptedFace({})
+    const onClose = vi.fn()
+    render(
+      <CustomProviderCard
+        taken={taken}
+        protocols={PROTOCOLS}
+        reasoningLevels={LEVELS}
+        revision={7}
+        operations={operationsWith(scripted.face)}
+        t={t}
+        readOnly={false}
+        onClose={onClose}
+      />,
+    )
+    return { ...scripted, onClose }
+  }
+
+  it('fills the address, protocol and a placeholder key of a local server', () => {
+    mountPresetCard()
+    fireEvent.click(screen.getByRole('button', { name: en.presetOllama }))
+    expect(screen.getByLabelText<HTMLInputElement>(en.customRoute).value).toBe('ollama')
+    expect(screen.getByLabelText<HTMLInputElement>(en.customDisplayName).value).toBe('Ollama')
+    expect(screen.getByLabelText<HTMLInputElement>(en.baseUrl).value).toBe('http://127.0.0.1:11434/v1')
+    expect(screen.getByLabelText<HTMLSelectElement>(en.customApi).value).toBe('openai-completions')
+    expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).value).toBe('ollama')
+    expect(screen.getByText(en.presetLocalHint)).toBeTruthy()
+  })
+
+  it('picks a free provider id when the preset one is taken', () => {
+    mountPresetCard(['lm-studio', 'lm-studio-2'])
+    fireEvent.click(screen.getByRole('button', { name: en.presetLmStudio }))
+    expect(screen.getByLabelText<HTMLInputElement>(en.customRoute).value).toBe('lm-studio-3')
+    expect(screen.getByLabelText<HTMLInputElement>(en.baseUrl).value).toBe('http://127.0.0.1:1234/v1')
+  })
+
+  it('offers no presets when the adapter cannot speak Chat Completions', () => {
+    const scripted = scriptedFace({})
+    render(
+      <CustomProviderCard
+        taken={[]}
+        protocols={['anthropic-messages']}
+        reasoningLevels={LEVELS}
+        revision={1}
+        operations={operationsWith(scripted.face)}
+        t={t}
+        readOnly={false}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: en.presetOllama })).toBeNull()
+    expect(screen.queryByText(en.presetLocalHint)).toBeNull()
+  })
+})

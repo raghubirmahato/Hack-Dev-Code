@@ -13,11 +13,14 @@ import { EMPTY_RESPONSE_CODE } from './error.ts'
 
 const DEFAULT_MAX_RETRIES = 5
 const DEFAULT_INITIAL_DELAY_MS = 500
-const DEFAULT_MAX_DELAY_MS = 10_000
+// Free tiers (Gemini, OpenRouter, Groq) often ask for 20 to 60 s after a rate limit; a shorter cap gave up at once.
+const DEFAULT_MAX_DELAY_MS = 60_000
 const DEFAULT_JITTER_RATIO = 0.1
 const DEFAULT_RETRYABLE_CODES = Object.freeze([
   EMPTY_RESPONSE_CODE,
   'RATE_LIMIT',
+  // A stream the provider dropped mid-reply is as transient as a transport failure.
+  'STREAM_CLOSED',
   'SERVER',
   'TIMEOUT',
   'TRANSPORT',
@@ -27,7 +30,7 @@ const DEFAULT_RETRYABLE_CODES = Object.freeze([
 export interface BackoffConfig {
   /** Initial local exponential-backoff delay in milliseconds (default 500). */
   initialDelayMs?: number
-  /** Maximum locally scheduled or accepted provider delay in milliseconds (default 10000). */
+  /** Maximum locally scheduled or accepted provider delay in milliseconds (default 60000). */
   maxDelayMs?: number
   /** Symmetric random multiplier range around one (default 0.1). */
   jitterRatio?: number

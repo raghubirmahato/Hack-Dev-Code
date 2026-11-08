@@ -1,4 +1,4 @@
-/** Completed provider arguments fail before a malformed call can enter successful history or dispatch. */
+/** Completed provider arguments: a malformed call reaches the tool runtime as text, which answers it with an error the model can fix. */
 
 import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
@@ -90,38 +90,33 @@ describe('completed tool-call arguments through the public runtime', () => {
     ['anthropic-messages', anthropicEvents],
     ['openai-completions', completionsEvents],
     ['openai-responses', responsesEvents],
-  ] as const)('%s rejects malformed completed arguments without successful replay', async (api, events) => {
+  ] as const)('%s keeps malformed completed arguments as a call for the tool runtime to answer', async (api, events) => {
     const raw = '{"value":"unfinished'
     const { chunks, assembler, server } = await collect(api, events(raw))
-    expect(assembler.finish).toMatchObject({ kind: 'error', failure: { code: 'MALFORMED_RESPONSE' } })
-    expect(assembler.finish).toHaveProperty('failure.message', expect.stringContaining(raw))
-    expect(assembler.replayState).toBeUndefined()
+    expect(assembler.finish).toEqual({ kind: 'tool-calls' })
+    expect(assembler.blocks()).toContainEqual(expect.objectContaining({ type: 'tool-call', name: 'count', arguments: raw }))
     expect(chunks.filter(chunk => chunk.type === 'finish')).toHaveLength(1)
-    expect(chunks.some(chunk => chunk.type === 'block-end' && chunk.block.type === 'tool-call')).toBe(false)
     expect(server.requests).toHaveLength(1)
   })
 
-  it.each(['null', '[]', '42'])('rejects non-object completed arguments %s', async (raw) => {
+  it.each(['null', '[]', '42'])('keeps non-object completed arguments %s as text', async (raw) => {
     const { assembler } = await collect('openai-completions', completionsEvents(raw))
-    expect(assembler.finish).toMatchObject({ kind: 'error', failure: { code: 'MALFORMED_RESPONSE' } })
-    expect(assembler.replayState).toBeUndefined()
+    expect(assembler.finish).toEqual({ kind: 'tool-calls' })
+    expect(assembler.blocks()).toContainEqual(expect.objectContaining({ type: 'tool-call', arguments: raw }))
   })
 
   it('uses authoritative invalid Responses arguments after a valid streamed prefix', async () => {
     const raw = '{"value":"final-invalid'
     const { chunks, assembler } = await collect('openai-responses', responsesEvents(raw, '{"value":"valid-prefix"}'))
     expect(chunks).toContainEqual(expect.objectContaining({ type: 'tool-call-delta', argumentsDelta: '{"value":"valid-prefix"}' }))
-    expect(assembler.finish).toMatchObject({ kind: 'error', failure: { code: 'MALFORMED_RESPONSE' } })
-    expect(assembler.finish).toHaveProperty('failure.message', expect.stringContaining(raw))
-    expect(assembler.replayState).toBeUndefined()
+    expect(assembler.finish).toEqual({ kind: 'tool-calls' })
+    expect(assembler.blocks()).toContainEqual(expect.objectContaining({ type: 'tool-call', arguments: raw }))
   })
 
-  it('retains the first completed-argument failure when several calls are invalid', async () => {
+  it('keeps every call when several have invalid arguments', async () => {
     const { assembler } = await collect('openai-responses', responsesEvents('[]', undefined, true, '[1]'))
-    expect(assembler.finish).toEqual({ kind: 'error', failure: {
-      code: 'MALFORMED_RESPONSE', message: 'Tool call "count": Tool arguments must be a JSON object\n\nReceived arguments:\n[1]',
-    } })
-    expect(assembler.replayState).toBeUndefined()
+    expect(assembler.finish).toEqual({ kind: 'tool-calls' })
+    expect(assembler.blocks().filter(block => block.type === 'tool-call').map(block => block.type === 'tool-call' ? block.arguments : '')).toEqual(['[1]', '[]'])
   })
 
   it('retains a native provider failure after malformed argument output', async () => {
@@ -161,9 +156,10 @@ describe('completed tool-call arguments through the public runtime', () => {
     expect(assembler.replayState?.response).toMatchObject({ stopReason: 'length' })
   })
 
-  it('does not dispatch an earlier valid parallel call when a later call is malformed', async () => {
+  it('runs the valid parallel call and answers the malformed one with an error the model can fix', async () => {
     const raw = '{"value":"unfinished'
-    const server = await mockServer([{ events: responsesEvents(raw, undefined, true) }])
+    // The second request, which carries the tool results, is refused so the turn ends after one tool round.
+    const server = await mockServer([{ events: responsesEvents(raw, undefined, true) }, { status: 400, body: '{"error":{"message":"stop here"}}' }])
     const ctx = new Context()
     onTestFinished(() => ctx.fiber.dispose())
     await mountAgentLoopTestDependencies(ctx)
@@ -184,16 +180,11 @@ describe('completed tool-call arguments through the public runtime', () => {
     agent.followup(createUserMessage({ source: { kind: 'user' }, content: [{ type: 'text', text: 'count twice' }] }))
     await idle
     const events = agent.session.snapshotEvents()
-    expect(executions).toBe(0)
-    expect(events.filter(event => event.type === 'tool/call' || event.type === 'tool/result' || event.type === 'assistant/message')).toEqual([])
-    const attempts = events.filter(event => event.type === 'assistant/attempt')
-    expect(attempts).toHaveLength(1)
-    expect(JSON.stringify(attempts)).toContain('call_valid|item_valid')
-    expect(JSON.stringify(attempts)).toContain('MALFORMED_RESPONSE')
-    expect(JSON.stringify(attempts)).not.toContain('replayState')
-    expect(events.find(event => event.type === 'turn/end')).toMatchObject({
-      data: { reason: { kind: 'error', error: { code: 'MALFORMED_RESPONSE' } } },
-    })
-    expect(server.requests).toHaveLength(1)
+    expect(executions).toBe(1)
+    const results = JSON.stringify(events.filter(event => event.type === 'tool/result'))
+    expect(results).toContain('counted')
+    expect(results).toContain('the arguments were not valid JSON')
+    expect(server.requests).toHaveLength(2)
+    expect(JSON.stringify(server.requests[1])).toContain('the arguments were not valid JSON')
   })
 })

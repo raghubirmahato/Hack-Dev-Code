@@ -111,7 +111,7 @@ export interface Config {
 
 - `inject`: `agents` · `sessions` · `llm` · `tools` · `systemPrompt` · `sessionProjections`
 - `refs`: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md) · `Volatile` (`@hackdevcode/cosmokit`)
-- `source`: [`packages/core/agent-loop/src/index.ts:256`](../packages/core/agent-loop/src/index.ts)
+- `source`: [`packages/core/agent-loop/src/index.ts:264`](../packages/core/agent-loop/src/index.ts)
 
 ```ts config-catalog
 /** Agent-loop plugin configuration. */
@@ -126,6 +126,11 @@ export interface Config {
    * request so an edit applies from the next one. Empty adds nothing.
    */
   customInstructions: Volatile<string>
+  /**
+   * How many times per turn a reply cut off at the output-token limit is answered with a request to continue (and to
+   * split large content into smaller calls) instead of ending the turn. `0` (default) ends the turn as `max-tokens`.
+   */
+  maxTokensContinuations: Volatile<number>
   /** Agents created or resumed at plugin startup; a resumed agent records its configured route as the Session's model selection. */
   agents: (AgentOptions & {
     /** Stable config label used in logs and as the fresh combined-id prefix. */
@@ -381,7 +386,7 @@ export interface Config {
 ```ts config-catalog
 /** Local attachment backend configuration. */
 export interface Config {
-  /** Explicit harness home; omitted follows `DSH_HOME`, then `~/.dsh`. */
+  /** Explicit harness home; omitted follows `DSH_HOME`, then `~/.hackdevcode`. */
   dshHome?: string
   /** Maximum encoded bytes accepted for one submitted image. Default: 50 MiB. */
   maxImageBytes?: number
@@ -829,7 +834,7 @@ export interface Config {
 export interface Config {
   /** Credentials document path; defaults to `.credentials.yaml` under the harness home. */
   path?: string
-  /** Harness home used when `path` is omitted; defaults to `$DSH_HOME` or `~/.dsh`. */
+  /** Harness home used when `path` is omitted; defaults to `$DSH_HOME` or `~/.hackdevcode`. */
   dshHome?: string
   /** Watch the document and hot-publish external edits; defaults to true. */
   watch?: boolean
@@ -1176,8 +1181,17 @@ export interface Config {
    * `all` exposes the whole catalog.
    */
   toolset?: 'essential' | 'all'
-  /** Keep the desktop tools out of every request until the agent loads the `desktop` group; defaults to true. */
+  /**
+   * Keep the desktop tools out of every request until the agent loads them: the `desktop` group holds the
+   * whole-desktop tools and the core window tools, `desktop-more` the rest of the driver catalog. Defaults to true.
+   */
   onDemand?: boolean
+  /**
+   * Windows: how real input reaches windows of apps that run as administrator. `ask` (default) starts an
+   * administrator helper the first time it is needed, which shows Windows' UAC prompt for the person to approve;
+   * `off` refuses such input with an explanation.
+   */
+  elevation?: 'ask' | 'off'
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-computer-use-cua-driver-native -->
@@ -2706,7 +2720,7 @@ export interface PlanModeConfig {
 ```ts config-catalog
 /** The pnpm executable, registries, and limits for diagnostics, lookups and connection checks. */
 export interface Config {
-  /** The pnpm executable name or path; resolved through `PATH` like the `dsh plugin` command. */
+  /** The pnpm executable name or path; resolved through `PATH` like the `hackdev plugin` command. */
   pnpmCommand?: string
   /** Maximum retained package-operation diagnostic bytes. */
   outputBytes?: number
@@ -3373,7 +3387,7 @@ export interface Config extends SessionTitleLlmConfig {
 ```ts config-catalog
 /** Plugin config (all optional — the built-in facts resolve without defaults). */
 export interface Config {
-  /** Hack Dev Code home directory exposed as `DSH_HOME`; defaults to `$DSH_HOME` or `~/.dsh`. */
+  /** Hack Dev Code home directory exposed as `DSH_HOME`; defaults to `$DSH_HOME` or `~/.hackdevcode`. */
   dshHome?: string
 }
 ```
@@ -3410,7 +3424,7 @@ export interface Config {
   providerName?: string
   /** Whether project and user roots are included around custom roots. */
   includeDefaultRoots?: boolean
-  /** Hack Dev Code config root. Defaults to `$DSH_HOME` or `~/.dsh`. */
+  /** Hack Dev Code config root. Defaults to `$DSH_HOME` or `~/.hackdevcode`. */
   dshHome?: string
   /** Shared agent config root. Defaults to `$DSH_AGENTS_HOME` or `~/.agents`. */
   agentsHome?: string
@@ -3860,7 +3874,7 @@ export interface Config {
 
 ## `@hackdevcode/dsh-system-prompt`
 
-- `source`: [`packages/core/system-prompt/src/index.ts:265`](../packages/core/system-prompt/src/index.ts)
+- `source`: [`packages/core/system-prompt/src/index.ts:275`](../packages/core/system-prompt/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the deployment-authored fragment of the system prompt (see {@link Config.personaPrefix} for its contract). */
@@ -4178,7 +4192,7 @@ export interface Config {
 ## `@hackdevcode/dsh-tool-hackdev`
 
 - `inject`: `tools` · `workflowEngine` · `subagents` · `systemPrompt`
-- `source`: [`packages/hackdev/tool-hackdev/src/index.ts:33`](../packages/hackdev/tool-hackdev/src/index.ts)
+- `source`: [`packages/hackdev/tool-hackdev/src/index.ts:34`](../packages/hackdev/tool-hackdev/src/index.ts)
 
 ```ts config-catalog
 /** Deployment policy for the fixed Hack Dev Code pipelines. */

@@ -50,7 +50,9 @@
       name: '@hackdevcode/dsh-client-product-analytics'
       disabled: !!js "ctx.get('profileContext')?.name !== 'desktop'"
       config:
-        enabled: true
+        # Off unless the distributor names its own collector: product analytics are opt-in, and no default
+        # endpoint belongs to this product.
+        enabled: !!js Boolean(process.env.DSH_PRODUCT_ANALYTICS_OTLP_URL)
         appVersion: !!js process.env.DSH_CLIENT_VERSION
 
     # Host-owned authorization sampled at Agent creation. The Plugins page

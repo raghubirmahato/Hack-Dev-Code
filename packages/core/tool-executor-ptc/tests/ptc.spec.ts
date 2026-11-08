@@ -576,8 +576,8 @@ describe('mode-aware wire contribution', () => {
       const rejected = await executeCall(ctx, {
         signal: testToolSignal, callId: ToolCallId('argument-order'), name: RUN_CODE_NAME, arguments: {},
       })
-      expect(rejected).toHaveProperty('error.message',
-        'invalid arguments: missing required property "code"; missing required property "description"')
+      expect(rejected).toHaveProperty('error.message', expect.stringContaining(
+        'invalid arguments: missing required property "code"; missing required property "description". Expected arguments: {code: string, description: string,'))
     } finally {
       await ctx.fiber.dispose()
     }
@@ -2480,7 +2480,8 @@ describe('per-program execution controls', () => {
     } finally { await python.ctx.fiber.dispose() }
   })
 
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, '1000', null])('rejects invalid timeout %s before runtime execution', async (timeoutMs) => {
+  // A numeric string is converted to its number; JSON carries no NaN or Infinity, which arrive as null.
+  it.each([0, -1, 'soon', true, null])('rejects invalid timeout %s before runtime execution', async (timeoutMs) => {
     const { ctx, runtime, execute } = await controlledSetup()
     try {
       expect((await execute({ timeoutMs })).isError).toBe(true)

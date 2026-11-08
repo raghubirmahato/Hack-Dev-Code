@@ -19,6 +19,7 @@ import type { SessionSeq, UserMessage } from '@hackdevcode/dsh-session'
 import type { ToolExecutionInput, ToolExecutionMode, ToolExecutionResult, ToolRunContext } from './contracts.ts'
 import type { ScheduledToolDispatch, ToolExecutionPipeline } from './pipeline.ts'
 import { assertNever } from '@hackdevcode/dsh-util-values'
+import { parseToolArguments } from './repair.ts'
 
 /** One tool call after argument parsing, ready to schedule. */
 interface PlannedCall {
@@ -95,14 +96,13 @@ export async function executeToolBatch(
   }
 }
 
-/** Parse model arguments, preserving invalid JSON as text and mapping empty input to `{}`. */
+/**
+ * Parse model arguments, mapping empty input to `{}` and repairing common damage (code fences, trailing commas,
+ * JSON encoded twice, a forgotten final brace); text that still is not JSON is preserved for tool-owned diagnostics.
+ */
 function parseArguments(raw: string): unknown {
-  try {
-    return raw ? JSON.parse(raw) : {}
-  } catch (_error: unknown) {
-    // Preserve malformed model input for tool-owned argument diagnostics.
-    return raw
-  }
+  const parsed = parseToolArguments(raw)
+  return parsed.ok ? parsed.value : raw
 }
 
 /**

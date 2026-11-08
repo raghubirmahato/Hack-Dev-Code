@@ -183,7 +183,7 @@ describe('Schedule model tools', () => {
   })
 
   it.each([
-    ['non-integer weekday', [1.5]], ['string weekday', ['1']], ['null weekday', [null]],
+    ['non-integer weekday', [1.5]], ['word weekday', ['monday']], ['null weekday', [null]],
   ])('rejects a %s at the tool parameter schema', async (_label, weekdays) => {
     const test = await setup()
     const result = await execute(test, 'schedule_create', {

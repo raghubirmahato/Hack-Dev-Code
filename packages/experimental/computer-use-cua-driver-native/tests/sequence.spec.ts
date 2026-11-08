@@ -41,6 +41,12 @@ function fakeDesktop(): { backend: DisplayBackend; actions: string[] } {
     window: async (handle, action) => { actions.push(`${action} ${String(handle)}`); if (action === 'focus') front(handle) },
     open: async (target) => { actions.push(`open ${target}`) },
     readText: async handle => handle === 3 ? 'Document: Text editor = hello\n' : '',
+    place: async (handle, x, y, width, height) => { actions.push(`place ${String(handle)} ${String(x)},${String(y)} ${String(width)}x${String(height)}`) },
+    launch: async (app) => {
+      actions.push(`launch ${app}`)
+      setTimeout(() => { windows.push({ handle: 4, pid: 4, process: 'CalculatorApp', title: 'Calculator', x: 0, y: 0, width: 400, height: 600, minimized: false, foreground: false }); front(4) }, 30)
+      return `Started ${app} from the Start menu`
+    },
     close: () => {},
   }
   return { backend, actions }
@@ -103,6 +109,23 @@ describe('desktop_sequence', () => {
     expect(text(result)).toContain('step 2 (keys) failed: unknown key \\"hyper\\"')
     expect(text(result)).toContain('1. opened ms-settings:display')
     expect(actions).toEqual(['open ms-settings:display'])
+  })
+
+  it('launches an app by name, moves its window and waits for text in one call', async () => {
+    const { backend, actions } = fakeDesktop()
+    backend.readText = async handle => handle === 4 ? 'Text: Display is 12\n' : ''
+    await ctx.plugin({ inject: ['tools'], apply: (inner: Context) => { registerDisplayTools(inner, backend) } })
+    const result = await run([
+      { action: 'launch', app: 'Calculator' },
+      { action: 'move', title: 'Calculator', x: 10, y: 20 },
+      { action: 'wait', title: 'Calculator', text: 'display is 12', timeout_ms: 1000 },
+      { action: 'element', element_action: 'click', name: 'Seven' },
+    ])
+    expect(actions.slice(0, 2)).toEqual(['launch Calculator', 'place 4 10,20 400x600'])
+    expect(text(result)).toContain('1. Started Calculator from the Start menu. New window: handle 4')
+    expect(text(result)).toContain('3. Found the text')
+    // This desktop has no control access, so the element step explains what to use instead.
+    expect(text(result)).toContain('step 4 (element) failed: controls are not available on this platform')
   })
 
   it('rejects empty, oversized and unknown sequences', async () => {

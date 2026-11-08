@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import {
   CRASH_REPORTS_RETAINED, crashReportFileName, ERROR_SECTION_MAX_CHARS, pruneCrashReports, renderCrashReport, RendererConsoleTail,
-  writeCrashReport,
+  redactSecrets, writeCrashReport,
   type CrashReportInput,
 } from '../src/crash-report.ts'
 
@@ -114,4 +114,24 @@ it('keeps the newest renderer console lines within the byte cap, never cutting a
   expect(tail.snapshot()).toEqual(['b'.repeat(8), 'c'.repeat(8)])
   tail.push('d'.repeat(40))
   expect(tail.snapshot()).toEqual(['d'.repeat(40)])
+})
+
+it('hides API keys, bearer tokens and credential fields before a report is written', () => {
+  // Made-up values in each provider's key format.
+  const fake = 'sk-' + 'a1b2c3d4'.repeat(4)
+  const google = 'AIza' + 'Q'.repeat(35)
+  const text = [
+    `Error: 401 for key ${fake}`,
+    `headers: { authorization: 'Bearer ${'t0ken'.repeat(6)}', 'x-api-key': '${'k'.repeat(24)}' }`,
+    `url: https://example.com/v1?key=${google}`,
+    '{"apiKey":"' + 'z9'.repeat(10) + '","model":"deepseek-chat"}',
+  ].join('\n')
+  const redacted = redactSecrets(text)
+  expect(redacted).not.toContain(fake)
+  expect(redacted).not.toContain(google)
+  expect(redacted).not.toContain('t0ken'.repeat(6))
+  expect(redacted).not.toContain('k'.repeat(24))
+  expect(redacted).not.toContain('z9'.repeat(10))
+  expect(redacted).toContain('deepseek-chat')
+  expect(redacted).toContain('Error: 401 for key [redacted]')
 })

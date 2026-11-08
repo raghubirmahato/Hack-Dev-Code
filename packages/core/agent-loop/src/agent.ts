@@ -92,6 +92,38 @@ export const EMPTY_REPLY_FOLLOW_UP = 'Your last reply was empty. Continue the ta
   + 'finish the remaining steps, then give your final answer.'
 
 /**
+ * Sent after a reply that hit the output-token limit, when the agent loop is configured to continue: the reply's
+ * tool calls were dropped because they were incomplete.
+ */
+export const MAX_TOKENS_FOLLOW_UP = 'Your last reply was cut off at the output limit, and any tool call in it was dropped because it was incomplete. '
+  + 'Continue from where it stopped. Keep each reply and each tool call smaller: split large file content into several smaller write or edit calls.'
+
+/**
+ * Sent once per turn when a reply writes a tool call as text instead of calling the tool, which some models do;
+ * nothing ran, and without it the turn would end with the work not done.
+ */
+export const TEXT_TOOL_CALL_FOLLOW_UP = 'Your last reply wrote a tool call as text, so nothing ran. Call tools through the tool-calling interface, '
+  + 'not as text, tags or JSON in your reply. Make the call now if it is still needed.'
+
+/** Markup some models emit when they write a tool call into their text instead of calling the tool. */
+const TEXT_TOOL_CALL = new RegExp([
+  String.raw`<\/?tool_call>`,
+  String.raw`<function=[\w.-]+>`,
+  String.raw`<\|?tool[▁_]calls?[▁_]begin\|?>`,
+  '<｜tool▁calls?▁begin｜>',
+  String.raw`^\s*\{\s*"(name|tool|function)"\s*:\s*"[\w.-]+"\s*,\s*"(arguments|parameters|args|input)"\s*:`,
+].join('|'), 'mu')
+
+/**
+ * Whether a reply that called no tools wrote one as text.
+ * @param content - the message blocks.
+ * @returns true when a text block holds tool-call markup.
+ */
+export function writesToolCallAsText(content: readonly { type: string; text?: string }[]): boolean {
+  return content.some(block => block.type === 'text' && typeof block.text === 'string' && TEXT_TOOL_CALL.test(block.text))
+}
+
+/**
  * Whether an assistant message says anything to the person.
  * @param content - the message blocks.
  * @returns true when a text block has visible characters.
@@ -142,6 +174,12 @@ export class ReactLoopAgent implements Agent {
   private activityDone: Promise<void> = Promise.resolve()
   /** The last turn that already received {@link EMPTY_REPLY_FOLLOW_UP}. */
   private emptyReplyTurn = -1
+  /** The last turn that already received {@link TEXT_TOOL_CALL_FOLLOW_UP}. */
+  private textToolCallTurn = -1
+  /** Continuations after the output-token limit, counted for {@link maxTokensTurn}. */
+  private maxTokensContinued = 0
+  /** The turn {@link maxTokensContinued} counts. */
+  private maxTokensTurn = -1
 
   /** The agent-scoped registration boundary; the lifecycle owner unwinds it after the driver exits. */
   readonly scope: Scope
@@ -460,6 +498,13 @@ export class ReactLoopAgent implements Agent {
     return true
   }
 
+  /** Queue the loop's own message for the next step of this turn. */
+  private followUp(text: string): void {
+    this.inbox.splice('next-step', this.inbox.nextStep.length, 0, [
+      createUserMessage({ content: [{ type: 'text', text }], source: AGENT_LOOP_SOURCE }),
+    ])
+  }
+
   private async step(decision: Extract<PreparedStep, { kind: 'enter' }>): Promise<StepEndReason | null> {
     /* v8 ignore next -- private callers establish the running phase before executing a step */
     if (this.phase.kind !== 'running') throw new Error(`agent "${this.id}": step outside running phase`)
@@ -609,16 +654,32 @@ export class ReactLoopAgent implements Agent {
             stream: live.stream,
           }, { surfaceOp: 'append' }).seq,
         )
-        if (finish.kind === 'max-tokens') return { kind: 'max-tokens' }
+        if (finish.kind === 'max-tokens') {
+          if (this.maxTokensTurn !== turn) {
+            this.maxTokensTurn = turn
+            this.maxTokensContinued = 0
+          }
+          // A model with a small output limit gets cut off writing a large file; ask it to go on in smaller pieces.
+          if (this.maxTokensContinued < (this.loopCtx.agentLoop.config.maxTokensContinuations.get())) {
+            this.maxTokensContinued++
+            this.followUp(MAX_TOKENS_FOLLOW_UP)
+            return null
+          }
+          return { kind: 'max-tokens' }
+        }
 
         const toolCalls = message.content.filter(block => block.type === 'tool-call')
         if (toolCalls.length === 0) {
           // An empty reply after tool work is a provider hiccup, not an answer: ask once to carry on.
           if (step > 1 && this.emptyReplyTurn !== turn && !hasVisibleText(message.content)) {
             this.emptyReplyTurn = turn
-            this.inbox.splice('next-step', this.inbox.nextStep.length, 0, [
-              createUserMessage({ content: [{ type: 'text', text: EMPTY_REPLY_FOLLOW_UP }], source: AGENT_LOOP_SOURCE }),
-            ])
+            this.followUp(EMPTY_REPLY_FOLLOW_UP)
+            return null
+          }
+          // A tool call written as text ran nothing; ask once for a real call.
+          if (this.textToolCallTurn !== turn && writesToolCallAsText(message.content)) {
+            this.textToolCallTurn = turn
+            this.followUp(TEXT_TOOL_CALL_FOLLOW_UP)
             return null
           }
           return { kind: 'completed' }

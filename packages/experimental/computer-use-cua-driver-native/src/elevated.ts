@@ -20,6 +20,7 @@ export type InputOp =
   | { op: 'drag'; x1: number; y1: number; x2: number; y2: number; down: number; up: number }
   | { op: 'wheel'; x: number; y: number; clicks: number; horizontal: boolean }
   | { op: 'act'; handle: number; action: 'focus' | 'minimize' | 'maximize' | 'restore' | 'close' }
+  | { op: 'place'; handle: number; x: number; y: number; width: number; height: number }
   | { op: 'sleep'; ms: number }
 
 const int = (value: number): string => String(Math.trunc(Math.round(value)))
@@ -41,6 +42,7 @@ export function opScript(op: InputOp): string {
     case 'drag': return `[HackDev.Desk]::Drag(${int(op.x1)}, ${int(op.y1)}, ${int(op.x2)}, ${int(op.y2)}, ${int(op.down)}, ${int(op.up)})`
     case 'wheel': return `[HackDev.Desk]::Wheel(${int(op.x)}, ${int(op.y)}, ${int(op.clicks)}, $${String(op.horizontal)})`
     case 'act': return `[HackDev.Desk]::Act([IntPtr]${int(op.handle)}, '${op.action}')`
+    case 'place': return `[HackDev.Desk]::Place([IntPtr]${int(op.handle)}, ${int(op.x)}, ${int(op.y)}, ${int(op.width)}, ${int(op.height)})`
     case 'sleep': return `Start-Sleep -Milliseconds ${int(op.ms)}`
   }
 }
@@ -59,6 +61,7 @@ export function opCommand(op: InputOp): string {
     case 'drag': return `drag ${int(op.x1)} ${int(op.y1)} ${int(op.x2)} ${int(op.y2)} ${int(op.down)} ${int(op.up)}`
     case 'wheel': return `wheel ${int(op.x)} ${int(op.y)} ${int(op.clicks)} ${op.horizontal ? '1' : '0'}`
     case 'act': return `act ${int(op.handle)} ${op.action}`
+    case 'place': return `place ${int(op.handle)} ${int(op.x)} ${int(op.y)} ${int(op.width)} ${int(op.height)}`
     case 'sleep': return `sleep ${int(op.ms)}`
   }
 }
@@ -122,6 +125,7 @@ try {
           if (@('focus', 'minimize', 'maximize', 'restore', 'close') -cnotcontains $part[3]) { throw "unknown window action $($part[3])" }
           [HackDev.Desk]::Act([IntPtr][long]$part[2], $part[3])
         }
+        'place' { [HackDev.Desk]::Place([IntPtr][long]$part[2], [int]$part[3], [int]$part[4], [int]$part[5], [int]$part[6]) }
         'sleep' { Start-Sleep -Milliseconds ([Math]::Min(10000, [int]$part[2])) }
         default { throw "unknown command $($part[1])" }
       }

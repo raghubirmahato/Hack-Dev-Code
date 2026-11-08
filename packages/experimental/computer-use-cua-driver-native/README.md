@@ -49,12 +49,16 @@ On Windows and Linux (X11) the provider adds tools that act on the whole desktop
 | Tool | Does |
 |---|---|
 | `desktop_list_displays` | Lists every monitor with its position on the virtual desktop. |
-| `desktop_screenshot` | Captures one window, one display or all of them, scaled to `max_dimension` (default 1280), and returns the image itself (through the MCP result adapter's durable attachments) with how image points map to desktop coordinates. |
-| `desktop_pointer`, `desktop_drag`, `desktop_scroll` | Move, click (optionally holding ctrl, shift or alt), drag and turn the wheel at virtual-desktop coordinates on any display. |
+| `desktop_screenshot` | Captures one window, one display, a region or all of them, scaled to `max_dimension` (default 1280), and returns the image itself (through the MCP result adapter's durable attachments) with how image points map to desktop coordinates; with `ocr`, also the text recognized in it. |
+| `desktop_pointer`, `desktop_drag`, `desktop_scroll` | Move, click (optionally holding ctrl, shift or alt), drag and turn the wheel at virtual-desktop coordinates on any display. `desktop_pointer` also takes `image_x`/`image_y`, a point in the latest screenshot, and converts it. |
 | `desktop_keys`, `desktop_type` | Press key chords (`win+r`, `ctrl+shift+esc`, `alt+tab enter`) and type any text into the foreground window, optionally focusing a window first; the result names the window that received the input. Text over 500 characters is pasted through the clipboard, whose every format is saved and restored. |
-| `desktop_window` | Lists top-level windows and dialogs; reads a window's text through UI Automation on Windows or AT-SPI on Linux (bounded to 300 elements, 8000 characters and 4 seconds); focuses, minimizes, maximizes, restores or closes one by handle or title; waits for a window to appear or close. |
-| `desktop_open` | Opens a file, folder, URL or settings URI (`ms-settings:display`) with its default handler. |
-| `desktop_sequence` | Runs up to 30 of these actions (open, keys, type, wait, read, window actions, click, drag, scroll, sleep) in order in one call, stopping at the first failure. |
+| `desktop_window` | Lists top-level windows and dialogs; reads a window through UI Automation on Windows or AT-SPI on Linux (bounded to 300 elements, 8000 characters and 4 seconds), numbering each control `[n]` with its centre point and state, and adding OCR text when the window exposes few controls; focuses, minimizes, maximizes, restores, closes or moves and resizes one by handle, title or process name; waits for a window to appear or close, or until a window shows a text. |
+| `desktop_element` | Acts on one control by its `[n]` number or by its visible name, type or automation id: find, click, double or right click at the point the app reports, or invoke, toggle, expand, collapse, select, set_value and focus through UI Automation patterns (falling back to a real click, or click, select all and type). A name no control has is looked for in the OCR text for click actions. Windows only; elsewhere it explains what to use instead. |
+| `desktop_ocr` | Reads the text on screen in one window, one display, a region or every display with the OCR engine built into Windows 10 and 11 (or tesseract on Linux), each line with its centre point. |
+| `desktop_open` | Starts an installed app by name (`app`: the Start-menu entry, else a command) and reports the window it opened; or opens a file, folder, URL or settings URI (`ms-settings:display`) with its default handler. |
+| `desktop_sequence` | Runs up to 30 of these actions (launch, open, keys, type, wait, read, ocr, element, window actions, move, click, drag, scroll, sleep) in order in one call, stopping at the first failure. |
+
+Numbered controls and OCR give exact points, so a model that cannot see images (DeepSeek, most local models) never has to guess coordinates.
 
 Windows of apps running as administrator are marked `[administrator]`. Windows drops input that a normal process sends to them, so that input goes through an administrator helper: it starts on first need through Windows' "Run as administrator" prompt, accepts only a fixed table of input and window commands (never scripts) over a named pipe that only this user may open, checks the connecting process id and a one-time secret, and exits when the connection closes or when nobody connects within a minute. The desktop session sends nothing until it has confirmed the pipe is served by exactly the process the UAC prompt started. Its script is written to a temporary file and run by a bootstrap that verifies the file's SHA-256 before running the bytes it checked; for the elevated start the bootstrap first limits module loading to the system folder and compiles in a folder only administrators and SYSTEM can write to. UAC prompts and the lock screen stay out of reach by design: they run on the secure desktop.
 
@@ -139,11 +143,11 @@ The unchanged guidance preserves its repeated prompt prefix. Mounting, removing,
 
 #### What the model sees
 
-On Windows and Linux a second guidance section explains when to use real input instead of background delivery, how display coordinates work, that results name the window receiving input, and that apps running as administrator, UAC prompts and the lock screen refuse input from a normal process. The `desktop_*` tools return one line of text each; `desktop_screenshot` returns a file path the model opens with `read`.
+On Windows and Linux a second guidance section explains when to use real input instead of background delivery, how display coordinates work, that results name the window receiving input, that apps running as administrator, UAC prompts and the lock screen refuse input from a normal process, how to act on numbered controls and OCR text instead of guessing coordinates, how to start apps by name and wait for text, and how to fill a file dialog. The `desktop_*` tools return text; `desktop_screenshot` returns the image with its coordinate mapping.
 
 #### Token effect
 
-The section and ten tool definitions add request tokens while the `desktop` group is loaded; with `onDemand` they cost nothing until then. The driver's full essential catalog is about 21K tokens per request, so only the core window tools join `desktop` and the rest wait in `desktop-more`. `desktop_sequence` replaces several model round trips with one call. Window lists grow with the number of open windows.
+The section and twelve tool definitions add request tokens while the `desktop` group is loaded; with `onDemand` they cost nothing until then. A window read now carries an index, a centre point and states per control, which makes it somewhat longer than before but replaces screenshots for most checks. The driver's full essential catalog is about 21K tokens per request, so only the core window tools join `desktop` and the rest wait in `desktop-more`. `desktop_sequence` replaces several model round trips with one call. Window lists grow with the number of open windows.
 
 #### KV Cache effect
 
@@ -179,6 +183,9 @@ The package preserves the upstream driver's platform and application limits.
 - **Wayland** — the Linux whole-desktop tools need X11 or XWayland; a pure Wayland session is reported as unsupported.
 - **Linux window text** — needs the AT-SPI accessibility bus (`python3-gi gir1.2-atspi-2.0 at-spi2-core`) and apps that expose accessibility; the error names the packages.
 - **macOS** — the whole-desktop tools are not registered; the driver's own tools cover macOS.
+- **Linux controls** — `desktop_element` needs UI Automation and is Windows-only; on Linux use the read text, `desktop_ocr` (tesseract, `sudo apt-get install -y tesseract-ocr`) and `desktop_pointer`. Linux typing does not paste through the clipboard.
+- **OCR languages** — Windows OCR uses the languages installed for the person's profile; one without the optical character recognition feature reports how to add it.
+- **Elevated windows** — controls of an app running as administrator are read from the normal session, where Windows may hide some of them; clicks still go through the administrator helper.
 
 <a id="dev-note"></a>
 ### Dev Note

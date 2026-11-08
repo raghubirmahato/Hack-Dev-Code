@@ -1727,18 +1727,24 @@ describe('model-switch pressure', () => {
     expect(ctx.tokenMeter.measure(session).totalTokens).toBeLessThan(300)
   })
 
-  it.each([false, true])('requires a valid small-window policy even for short history (override: %s)', async (override) => {
+  it.each([false, true])('scales the default headroom for a small window, with or without an override (override: %s)', async (override) => {
     const { ctx, adapter } = harness({
       headroomTokens: 65_536, maxTokens: 65_536,
       modelPolicies: override ? [{ provider: '64k', model: '64k', headroomTokens: 4_096, maxTokens: 4_096 }] : [],
     })
     ctx.llm.registerAdapter(['64k'], new ContextAdapter(65_536))
     const session = conversation(1, 'short')
-    const previous = session.requestHeader()
     const selected = { provider: '64k', model: '64k', maxTokens: 4_096 }
-    const switching = request(ctx, session, selected)
-    if (override) await expect(switching).resolves.toEqual(selected)
-    else await expect(switching).rejects.toMatchObject({ code: 'MODEL_SWITCH_COMPACTION_FAILED' })
+    await expect(request(ctx, session, selected)).resolves.toEqual(selected)
+    expect(adapter.lastOptions).toBeUndefined()
+  })
+
+  it('requires a valid small-window policy when the headroom is set explicitly', async () => {
+    const { ctx, adapter } = harness({ headroomTokens: 62_000, maxTokens: 4_096 })
+    ctx.llm.registerAdapter(['64k'], new ContextAdapter(65_536))
+    const session = conversation(1, 'short')
+    const previous = session.requestHeader()
+    await expect(request(ctx, session, { provider: '64k', model: '64k', maxTokens: 4_096 })).rejects.toMatchObject({ code: 'MODEL_SWITCH_COMPACTION_FAILED' })
     expect(session.requestHeader()).toEqual(previous)
     expect(adapter.lastOptions).toBeUndefined()
   })

@@ -129,6 +129,18 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
 }
 
 /**
+ * Remove reasoning that a model wrote into its answer as a leading `<think>...</think>` section, which R1-style and
+ * Qwen3 models do when served through Ollama, LM Studio, vLLM or Together without a separate reasoning field. Left
+ * in, it is shown as the answer and sent back on every later request.
+ * @param text - the completed text block.
+ * @returns the text after the reasoning section, or the text unchanged when it has none.
+ */
+export function withoutInlineThinking(text: string): string {
+  const match = /^\s*<think>[\s\S]*?<\/think>\s*/u.exec(text)
+  return match === null ? text : text.slice(match[0].length)
+}
+
+/**
  * Translate the pi-ai event stream into StreamChunks. pi-ai never throws
  * mid-stream — failures arrive as `error` events, which become error/aborted
  * `finish` chunks (the harness protocol's other error-delivery style).
@@ -138,9 +150,10 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
  *   in-band terminal error an aborted finish.
  * @param requestedModel - request model identity recorded for durable replay.
  * @returns the harness chunks, ending with `usage` then `finish`; throws
- *   `LlmError` (`STREAM_CLOSED`) if the source ends without a terminal event, or
- *   `MALFORMED_RESPONSE` when completed tool arguments are invalid. Length-limited
- *   output retains its terminal reason so the assembler can discard incomplete calls.
+ *   `LlmError` (`STREAM_CLOSED`) if the source ends without a terminal event. A
+ *   tool call whose completed arguments are invalid keeps the text the model sent,
+ *   for the tool runtime to repair or answer. Length-limited output retains its
+ *   terminal reason so the assembler can discard incomplete calls.
  */
 export async function* toStreamChunks(
   events: AsyncIterable<AssistantMessageEvent>,
@@ -151,7 +164,8 @@ export async function* toStreamChunks(
   // pi-ai contentIndex ↔ our block index map 1:1 (both count blocks from 0
   // in stream order), but we track ids per index for tool calls.
   const toolIds = new Map<number, { id: string; name: string }>()
-  let argumentsError: string | undefined
+  // Argument text as streamed, kept for a call whose JSON pi-ai could not parse.
+  const rawArguments = new Map<number, string>()
 
   for await (const event of events) {
     switch (event.type) {
@@ -164,7 +178,7 @@ export async function* toStreamChunks(
         yield { type: 'text-delta', index: event.contentIndex, text: event.delta }
         break
       case 'text_end':
-        yield { type: 'block-end', index: event.contentIndex, block: { type: 'text', text: event.content } }
+        yield { type: 'block-end', index: event.contentIndex, block: { type: 'text', text: withoutInlineThinking(event.content) } }
         break
       case 'thinking_start':
         yield { type: 'block-start', index: event.contentIndex, blockType: 'reasoning' }
@@ -185,6 +199,7 @@ export async function* toStreamChunks(
         break
       }
       case 'toolcall_delta': {
+        rawArguments.set(event.contentIndex, (rawArguments.get(event.contentIndex) ?? '') + event.delta)
         const known = toolIds.get(event.contentIndex)
         yield {
           type: 'tool-call-delta',
@@ -197,7 +212,19 @@ export async function* toStreamChunks(
       }
       case 'toolcall_end':
         if (event.toolCall.argumentsError !== undefined) {
-          argumentsError ??= `Tool call "${event.toolCall.name}": ${event.toolCall.argumentsError}`
+          // The call keeps the text the model sent: the tool runtime repairs common damage or answers with an error
+          // the model can act on, instead of the whole step failing over one malformed call.
+          yield {
+            type: 'block-end',
+            index: event.contentIndex,
+            block: {
+              type: 'tool-call',
+              id: brandString<ToolCallId>(event.toolCall.id),
+              name: event.toolCall.name,
+              // pi-ai appends the authoritative text it received, which can differ from the streamed deltas.
+              arguments: /\n\nReceived arguments:\n([\s\S]*)$/u.exec(event.toolCall.argumentsError)?.[1] ?? rawArguments.get(event.contentIndex) ?? '',
+            },
+          }
           break
         }
         yield {
@@ -215,9 +242,6 @@ export async function* toStreamChunks(
         break
       case 'done':
         yield { type: 'usage', usage: mapUsage(event.message.usage) }
-        if (argumentsError !== undefined && event.message.stopReason !== 'length') {
-          throw new LlmError(argumentsError, 'MALFORMED_RESPONSE')
-        }
         yield {
           type: 'finish',
           reason: mapStopReason(event.message, contextWindow),

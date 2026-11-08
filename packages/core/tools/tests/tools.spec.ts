@@ -741,10 +741,10 @@ describe('ToolRuntime', () => {
 
     const unknown = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('c1'), name: 'nope', arguments: {} })
     expect(unknown.isError).toBe(true)
-    expect(unknown.content[0]).toMatchObject({ text: 'Error: unknown tool "nope"' })
+    expect(unknown.content[0]).toMatchObject({ text: 'Error: unknown tool "nope": callable tools are: boom' })
     // An unknown tool is a routable failure class, same as a tool-thrown one.
     expect(unknown.error).toEqual({
-      message: 'unknown tool "nope"',
+      message: 'unknown tool "nope": callable tools are: boom',
       info: { name: 'ToolNotFoundError', code: 'UNKNOWN_TOOL' },
     })
 
@@ -2753,7 +2753,7 @@ describe('defineTool validation (the runtime-validation Agent Note, part 1)', ()
     const result = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('c1'), name: 'reader', arguments: {} })
     expect(result.isError).toBe(true)
     expect(result.content[0]).toMatchObject({
-      text: 'Error: invalid arguments: missing required property "path"',
+      text: 'Error: invalid arguments: missing required property "path". Expected arguments: {path: string}',
     })
   })
 
@@ -2797,7 +2797,7 @@ describe('defineTool validation (the runtime-validation Agent Note, part 1)', ()
     const result = await executeToolFixture(ctx, { signal: testToolSignal, callId: ToolCallId('c1'), name: 'reader', arguments: {} })
     expect(result.isError).toBe(true)
     expect(result.error).toEqual({
-      message: 'invalid arguments: missing required property "path"',
+      message: 'invalid arguments: missing required property "path". Expected arguments: {path: string}',
       info: { name: 'ToolArgsError', code: 'INVALID_ARGS' },
     })
   })

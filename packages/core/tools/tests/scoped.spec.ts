@@ -83,8 +83,8 @@ describe('scoped tool registration', () => {
 
     expect(await run(ctx, 'mine', key)).toBe('ran:mine')
     // Out-of-view execution is indistinguishable from a nonexistent tool.
-    expect(await run(ctx, 'mine', other)).toBe('Error: unknown tool "mine"')
-    expect(await run(ctx, 'mine')).toBe('Error: unknown tool "mine"')
+    expect(await run(ctx, 'mine', other)).toMatch(/^Error: unknown tool "mine"(: callable tools are: .+)?$/u)
+    expect(await run(ctx, 'mine')).toMatch(/^Error: unknown tool "mine"(: callable tools are: .+)?$/u)
   })
 
   it('scoped shadows global on a name conflict, in either registration order', async () => {
@@ -131,7 +131,7 @@ describe('restrict()', () => {
 
     // The scope-local registration survives the allow-list; the unlisted global is gone.
     expect(ctx.tools.schemas(key).map(t => t.name).sort()).toEqual(['capture', 'read'])
-    expect(await run(ctx, 'bash', key)).toBe('Error: unknown tool "bash"')
+    expect(await run(ctx, 'bash', key)).toMatch(/^Error: unknown tool "bash"(: callable tools are: .+)?$/u)
     expect(await run(ctx, 'read', key)).toBe('ran:read')
     expect(await run(ctx, 'capture', key)).toBe('ran:capture')
     // Other scopes and the global view are untouched.
@@ -156,7 +156,7 @@ describe('restrict()', () => {
     expect(ctx.tools.schemas(allowed.key).map(t => t.name).sort())
       .toEqual(['allowed-local', 'read'])
     expect(await run(ctx, 'web', denied.key)).toBe('ran:web')
-    expect(await run(ctx, 'web', allowed.key)).toBe('Error: unknown tool "web"')
+    expect(await run(ctx, 'web', allowed.key)).toMatch(/^Error: unknown tool "web"(: callable tools are: .+)?$/u)
     expect(await run(ctx, 'denied-local', denied.key)).toBe('ran:denied-local')
     expect(await run(ctx, 'allowed-local', allowed.key)).toBe('ran:allowed-local')
   })
@@ -230,7 +230,7 @@ describe('restrict() over an inherited scope layer', () => {
     // Reading the exempt set as "the global layer" left this unfiltered, and
     // the name unrestrictable in the first place.
     expect(ctx.tools.schemas(child.key).map(t => t.name)).toEqual(['read'])
-    expect(await run(ctx, 'bash', child.key)).toBe('Error: unknown tool "bash"')
+    expect(await run(ctx, 'bash', child.key)).toMatch(/^Error: unknown tool "bash"(: callable tools are: .+)?$/u)
     // The ancestor keeps its whole surface: a child's filter is its own.
     expect(ctx.tools.schemas(parent.key).map(t => t.name).sort()).toEqual(['bash', 'read'])
   })

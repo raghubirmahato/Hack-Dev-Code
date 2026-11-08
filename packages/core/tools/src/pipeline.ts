@@ -9,6 +9,7 @@ import type {} from '@hackdevcode/dsh-user-approval'
 import { assertNever, deepFreeze, snapshotJsonValue, type JsonValue } from '@hackdevcode/dsh-util-values'
 import { TOOL_ABORTED, TOOL_ABORTED_BEFORE_DISPATCH, ToolNotFoundError, ToolOutputError } from './contracts.ts'
 import { validateJsonSchemaValue } from './json-schema.ts'
+import { similarToolNames } from './repair.ts'
 import type { ToolsService } from './index.ts'
 import type { ResolvedToolSet, ToolDefinition, ToolExecutionInput, ToolExecutionMode, ToolExecution, ToolRunContext, ToolExecutionResult, ToolExecutionSuccess, ToolErrorInfo, ToolExecutionToken, PreToolDecision, PostToolDecision } from './contracts.ts'
 
@@ -78,6 +79,22 @@ export class ToolExecutionPipeline {
   ): ToolDefinition | undefined {
     const tool = this.get(name, scope, toolSet)
     return tool !== undefined && this.source.reject?.(name, nested) === undefined ? tool : undefined
+  }
+
+  /**
+   * Point a model that called a name it does not have at the names it does: lookalikes first (other case,
+   * separators or namespace), otherwise the callable names. Executors with their own lookup give no hint.
+   */
+  private unknownToolHint(exec: ToolExecutionInput): string | undefined {
+    if (this.source.get !== undefined) return undefined
+    const names = this.tools.definitions(exec.agent, exec.toolSet).map(definition => definition.name)
+      .filter(name => this.source.reject?.(name, exec.parent !== undefined) === undefined)
+    // A tool registered under this very name but not callable here (another scope, a nested-only tool) gets no hint.
+    if (names.length === 0 || names.includes(exec.name)) return undefined
+    const similar = similarToolNames(exec.name, names)
+    if (similar.length > 0) return `did you mean ${similar.map(name => `"${name}"`).join(' or ')}? Call it with that exact name`
+    const listed = names.slice(0, 40).join(', ')
+    return `callable tools are: ${listed}${names.length > 40 ? ', ...' : ''}`
   }
 
   /** Context deferred by a running tool body, keyed by its scheduler-owned execution. */
@@ -270,7 +287,7 @@ export class ToolExecutionPipeline {
     exec.signal = signal
     try {
       const tool = this.resolveExecution(exec.name, exec.agent, exec.parent !== undefined, exec.toolSet)
-      if (!tool) throw new ToolNotFoundError(exec.name)
+      if (!tool) throw new ToolNotFoundError(exec.name, this.unknownToolHint(exec))
       state.bodyInvoked = true
       const returned = await tool.execute(exec.arguments, exec)
       const result = this.createSuccessResult(exec, tool, returned)

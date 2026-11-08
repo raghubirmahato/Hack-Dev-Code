@@ -8,6 +8,7 @@ import type { ToolDefinition, ToolExecution, ToolExecutionResult, ToolRunContext
 import { assertSupportedJsonSchema, isJsonSchemaRecord, isPlainJsonArray, JsonSchemaError, validateJsonSchemaValue } from './json-schema.ts'
 import type { JsonSchemaNode, JsonSchemaScalar, ObjectJsonSchema } from './json-schema.ts'
 import type { ToolCallView, ToolResultView } from './presentation.ts'
+import { argumentSignature, coerceToSchema, parseToolArguments } from './repair.ts'
 
 /** Annotation keywords shared by every author-facing schema node. */
 export interface ValueSchemaAnnotations {
@@ -463,8 +464,14 @@ export class ToolArgsError extends HarnessError {
   /** Individual violations in schema-walk order. */
   readonly violations: string[]
 
-  constructor(violations: string[]) {
-    super(`invalid arguments: ${violations.join('; ')}`, 'INVALID_ARGS')
+  /**
+   * @param violations - every violation found.
+   * @param expected - the expected arguments as a short signature, appended so the model can resend them correctly.
+   */
+  constructor(violations: string[], expected?: string) {
+    const shown = violations.slice(0, 5).join('; ')
+    const more = violations.length > 5 ? `; and ${String(violations.length - 5)} more` : ''
+    super(`invalid arguments: ${shown}${more}${expected === undefined ? '' : `. Expected arguments: ${expected}`}`, 'INVALID_ARGS')
     this.name = 'ToolArgsError'
     this.violations = violations
   }
@@ -577,7 +584,9 @@ export function defineTool<const S extends ParameterSchemaSpec, const O extends 
   }
   const parameters = parameterSchemaSpecToJsonSchema(options.parameters)
   const outputSchema = valueSchemaSpecToJsonSchema(options.output.schema)
-  const validate = (args: unknown): string[] => validateJsonSchemaValue(parameters, args, '')
+  // Weaker models send "5" for 5, "true" for true and null for an omitted field; convert those before checking.
+  const coerce = (args: unknown): unknown => coerceToSchema(parameters, args)
+  const validate = (args: unknown): string[] => validateJsonSchemaValue(parameters, coerce(args), '')
   const tool: ToolDefinition = {
     name: options.name,
     description: options.description,
@@ -596,9 +605,17 @@ export function defineTool<const S extends ParameterSchemaSpec, const O extends 
     ...(options.deferLoading === true ? { deferLoading: options.deferLoading } : {}),
     ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
     async execute(args: unknown, exec: ToolRunContext): Promise<JsonValue> {
-      const violations = validate(args)
-      if (violations.length > 0) throw new ToolArgsError(violations)
-      return userExecute(args as InferArgs<S>, exec) as Promise<JsonValue>
+      if (typeof args === 'string') {
+        const parsed = parseToolArguments(args)
+        throw new ToolArgsError(
+          [`the arguments were not valid JSON (${parsed.ok ? 'not an object' : parsed.error}); resend them as one JSON object`],
+          argumentSignature(parameters),
+        )
+      }
+      const coerced = coerce(args)
+      const violations = validateJsonSchemaValue(parameters, coerced, '')
+      if (violations.length > 0) throw new ToolArgsError(violations, argumentSignature(parameters))
+      return userExecute(coerced as InferArgs<S>, exec) as Promise<JsonValue>
     },
   }
   if (userProjectContent) {
@@ -614,19 +631,19 @@ export function defineTool<const S extends ParameterSchemaSpec, const O extends 
   if (userPresentCall) {
     tool.presentCall = (args: unknown): ToolCallView | undefined => {
       if (validate(args).length > 0) return undefined
-      return userPresentCall(args as InferArgs<S>)
+      return userPresentCall(coerce(args) as InferArgs<S>)
     }
   }
   if (userPresentResult) {
     tool.presentResult = (args: unknown, result: ToolResult): ToolResultView | undefined => {
       if (validate(args).length > 0) return undefined
-      return userPresentResult(args as InferArgs<S>, result)
+      return userPresentResult(coerce(args) as InferArgs<S>, result)
     }
   }
   if (userIsConcurrencySafe) {
     tool.isConcurrencySafe = (args: unknown): boolean => {
       if (validate(args).length > 0) return false
-      return userIsConcurrencySafe(args as InferArgs<S>)
+      return userIsConcurrencySafe(coerce(args) as InferArgs<S>)
     }
   }
   return tool

@@ -78,11 +78,12 @@ describe('Messages stream', () => {
     await expect(chunks(translate(events(values as Record<string, unknown>[]), MODEL))).rejects.toMatchObject({ code: 'MALFORMED_RESPONSE' })
   })
 
-  it.each(['{', '[]'])('refuses completed non-object tool JSON %s without repairing it', async (partial_json) => {
-    await expect(chunks(translate(events([start,
+  it.each(['{', '[]'])('keeps completed non-object tool JSON %s as text for the tool runtime to answer', async (partial_json) => {
+    const out = await chunks(translate(events([start,
       { type: 'content_block_start', index: 0, content_block: { type: 'tool_use', id: 'a', name: 'read', input: {} } },
       { type: 'content_block_delta', index: 0, delta: { type: 'input_json_delta', partial_json } },
-      { type: 'content_block_stop', index: 0 }, ...end('tool_use')]), MODEL))).rejects.toMatchObject({ code: 'MALFORMED_RESPONSE' })
+      { type: 'content_block_stop', index: 0 }, ...end('tool_use')]), MODEL))
+    expect(out.find(chunk => chunk.type === 'block-end')).toMatchObject({ block: { type: 'tool-call', arguments: partial_json } })
   })
 
   it('refuses unsupported response content, empty responses and premature EOF', async () => {

@@ -54,6 +54,16 @@ const NS = 'llm-pi-ai'
  */
 const ROUTE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/
 
+/**
+ * Local model servers that speak OpenAI Chat Completions on a well-known port. Each preset fills the form; the
+ * person then lists the server's models. The servers ignore the key, but the client refuses to send a request
+ * without one, so the preset fills a placeholder.
+ */
+const LOCAL_PRESETS = [
+  { id: 'ollama', label: 'presetOllama', displayName: 'Ollama', baseURL: 'http://127.0.0.1:11434/v1', key: 'ollama' },
+  { id: 'lm-studio', label: 'presetLmStudio', displayName: 'LM Studio', baseURL: 'http://127.0.0.1:1234/v1', key: 'lm-studio' },
+] as const
+
 function isHttpUrl(value: string): boolean {
   try {
     const protocol = new URL(value).protocol
@@ -213,8 +223,40 @@ export function CustomProviderCard(props: CustomProviderCardProps): ReactNode {
     }
   }
 
+  /** Fill the form for a local server, choosing a free route id. */
+  const applyPreset = (preset: typeof LOCAL_PRESETS[number]): void => {
+    let id: string = preset.id
+    for (let n = 2; taken.includes(id); n++) id = `${preset.id}-${String(n)}`
+    setRoute(id)
+    setDisplayName(preset.displayName)
+    setBaseURL(preset.baseURL)
+    if (protocols.includes('openai-completions')) setProtocol('openai-completions')
+    setKeyDraft(preset.key)
+  }
+
   return (
     <div className={styles['editor']}>
+      {protocols.includes('openai-completions')
+        ? (
+          <div className={styles['field']}>
+            <span className={styles['fieldLabel']}>{t('presetLocal')}</span>
+            <div className={styles['presetRow']}>
+              {LOCAL_PRESETS.map(preset => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  className={styles['presetButton']}
+                  disabled={profileDisabled}
+                  onClick={() => { applyPreset(preset) }}
+                >
+                  {t(preset.label)}
+                </button>
+              ))}
+            </div>
+          </div>
+        )
+        : null}
+      {protocols.includes('openai-completions') ? <p className={styles['advancedHint']}>{t('presetLocalHint')}</p> : null}
       <div className={styles['field']}>
         <span className={styles['fieldLabel']}>{t('customRoute')}</span>
         <input

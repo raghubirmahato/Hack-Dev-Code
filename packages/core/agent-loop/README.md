@@ -54,6 +54,8 @@ The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-a
 
 `customInstructions` is a volatile text field (Settings → General → Custom instructions, at most 8000 characters in effect). Each line or list item becomes one numbered rule; a single paragraph is split into sentences. Edits apply from the next request.
 
+`maxTokensContinuations` (volatile, 0 to 10, default `0`) is how many times per turn a reply cut off at the output-token limit is answered with a request to continue in smaller pieces instead of ending the turn as `max-tokens`. The product base bundle sets `2`, for models with small output limits.
+
 A configured resume records the declared route as the Session selection before publication. Programmatic resume preserves the Session choice unless its setup explicitly records another route; initial `agentOptions` alone do not override saved history.
 
 ### Create or resume agents programmatically
@@ -186,6 +188,34 @@ When a model answers tool results with neither text nor a tool call, the loop ad
 #### Token effect
 
 One short message, only in the rare turns that end empty.
+
+#### KV Cache effect
+
+Append-only.
+
+### Tool call written as text
+
+#### What the model sees
+
+When a reply calls no tool but writes one into its text (`<tool_call>`, `<function=...>`, DeepSeek's tool-call tokens, or a bare `{"name": ..., "arguments": ...}` object), the loop adds one message, `Your last reply wrote a tool call as text, so nothing ran. Call tools through the tool-calling interface, not as text, tags or JSON in your reply. Make the call now if it is still needed.`, and takes another step. This happens at most once per turn.
+
+#### Token effect
+
+One short message, only for models that slip into text-form calls.
+
+#### KV Cache effect
+
+Append-only.
+
+### Reply cut off at the output limit
+
+#### What the model sees
+
+With `maxTokensContinuations` above zero, a reply that hits the output-token limit (whose incomplete tool calls are dropped) is followed by `Your last reply was cut off at the output limit, and any tool call in it was dropped because it was incomplete. Continue from where it stopped. Keep each reply and each tool call smaller: split large file content into several smaller write or edit calls.`, up to that many times per turn; after that the turn ends as `max-tokens`.
+
+#### Token effect
+
+One short message per continuation, plus the continued output.
 
 #### KV Cache effect
 

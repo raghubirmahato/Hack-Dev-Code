@@ -120,10 +120,13 @@ The registry holds typed `ToolDefinition`s in scoped layers and projects them on
 - [`src/schema.ts`](src/schema.ts) — Typed tool definitions and model-facing schema projection.
 - [`src/json-schema.ts`](src/json-schema.ts) — Supported JSON Schema validation.
 - [`src/presentation.ts`](src/presentation.ts) — Tool-card render intents.
+- [`src/repair.ts`](src/repair.ts) — Tolerance for weaker models: argument JSON repair, schema-driven type coercion, argument signatures and lookalike tool names.
 
 ### Execution and cancellation
 
 Each typed invocation materializes and freezes parsed arguments, assigns an opaque correlation token, and runs policy and dispatch. A pre-execute denial may attach `ToolErrorInfo` beside its model-facing reason; the native and PTC durable projections preserve the structured name, code, and optional user-facing reason without adding that detail to model content. Cancellation is cooperative and quiescent: every tool body receives the caller-owned `exec.signal` and must observe it; cancellation before body invocation is `ABORTED_BEFORE_DISPATCH`, after invocation it replaces only a successful outcome with `ABORTED`. Denials, wrapper failures, tool failures, post-policy failures, and timeout-owned `TOOL_TIMEOUT` remain more specific. Unknown and throwing tools become structured errors (`UNKNOWN_TOOL`), so a call fails without ending the turn.
+
+Argument text is parsed with conservative repair: code fences, trailing commas, JSON encoded twice and a forgotten final brace are fixed, while text cut off inside a string is never completed. A typed tool converts unambiguous types before validation (`"5"` for a number, `"true"` for a boolean, a JSON string for an array or object, one item for an array) and drops `null` for an optional field. Validation errors list at most five violations followed by the expected arguments, and an unparseable call says so; an unknown name lists lookalike names or the callable ones. These help models such as DeepSeek, Qwen and Llama recover in one step. Policies still see the arguments as the model sent them.
 
 ### PTC mode
 
@@ -174,7 +177,7 @@ Prefix-stable while visible definitions and their order are unchanged. Registrat
 
 #### What the model sees
 
-The loop retains model-emitted arguments and the registry's final content. Any thrown or denied call becomes exactly `Error: <message>`; structured user-facing failure detail is not added to that message. PTC mode renders the outer program's printed lines and return value, `(run_code completed with no output)` when both are empty, or `Error: code run failed (<kind>): <message>` followed conditionally by `Captured output:` and the captured lines. Inner dispatch events stay log-only, while a successful image-bearing sub-result is appended after the outer result as source-attributed context.
+The loop retains model-emitted arguments and the registry's final content. Any thrown or denied call becomes exactly `Error: <message>`; structured user-facing failure detail is not added to that message. Invalid arguments read `Error: invalid arguments: <up to five violations>. Expected arguments: {name: type, optional?: type}`, and an unknown tool reads `Error: unknown tool "<name>": did you mean "<name>"? Call it with that exact name` or lists the callable tools. PTC mode renders the outer program's printed lines and return value, `(run_code completed with no output)` when both are empty, or `Error: code run failed (<kind>): <message>` followed conditionally by `Captured output:` and the captured lines. Inner dispatch events stay log-only, while a successful image-bearing sub-result is appended after the outer result as source-attributed context.
 
 #### Token effect
 

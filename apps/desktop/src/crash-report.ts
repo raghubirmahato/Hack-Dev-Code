@@ -104,6 +104,25 @@ export function crashReportFileName(time: Date, source: CrashReportSource): stri
  * @returns the complete file content.
  */
 export function renderCrashReport(input: CrashReportInput): string {
+  return redactSecrets(renderUnredacted(input))
+}
+
+/**
+ * Hide credentials a report can pick up from an inspected HTTP error or a console line: API keys (sk-..., AIza...,
+ * gsk_..., xai-..., hf_...), bearer tokens, and the values of authorization and api-key headers or fields.
+ * Reports are meant to be shared, so they must never carry a key.
+ * @param text - the report text.
+ * @returns the text with each credential replaced by [redacted].
+ */
+export function redactSecrets(text: string): string {
+  return text
+    .replaceAll(/((?:authorization|x-api-key|api[-_]?key|apikey|x-goog-api-key|access[-_]?token|secret)['"]?\s*[:=]\s*['"]?)(?:bearer\s+)?[^\s'",;}]{8,}/giu, '$1[redacted]')
+    .replaceAll(/\bbearer\s+[\w.~+/=-]{12,}/giu, 'Bearer [redacted]')
+    .replaceAll(/\b(?:sk|pk|rk)-[A-Za-z0-9_-]{16,}/gu, '[redacted]')
+    .replaceAll(/\b(?:AIza[A-Za-z0-9_-]{30,}|gsk_[A-Za-z0-9]{20,}|xai-[A-Za-z0-9]{20,}|hf_[A-Za-z0-9]{20,}|ghp_[A-Za-z0-9]{20,})/gu, '[redacted]')
+}
+
+function renderUnredacted(input: CrashReportInput): string {
   const header = [
     `time: ${input.time.toISOString()}`,
     `source: ${input.source}`,

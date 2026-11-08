@@ -60,6 +60,9 @@ export class TargetPressureConfigError extends Error {
   }
 }
 
+/** Headroom kept free below the window by default; scaled down for windows too small for it. */
+export const DEFAULT_HEADROOM_TOKENS = 65_536
+
 /**
  * Resolve and validate service defaults plus exact-target partial overrides.
  * @param config - untrusted plugin configuration after Loader normalization.
@@ -72,7 +75,7 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
     throw new Error('BasicCompactionConfig: auto must be a boolean')
   }
 
-  const headroomTokens = config.headroomTokens ?? 65_536
+  const headroomTokens = config.headroomTokens ?? DEFAULT_HEADROOM_TOKENS
   const maxTokens = config.maxTokens ?? headroomTokens
   assertPositiveInteger('BasicCompactionConfig.maxTokens (explicit or from headroomTokens)', maxTokens)
   const thresholdRatio = config.thresholdRatio ?? DEFAULT_THRESHOLD_RATIO
@@ -178,7 +181,13 @@ export function resolveCompactSpec(
       + "the adapter model's contextWindow above the effective request maxTokens",
     )
   }
-  const pressureBudgetTokens = messageBudgetTokens - policy.headroomTokens
+  // The default headroom suits large windows. On a small one (a 32K or 64K local or free model) it would leave no
+  // pressure budget, which used to turn compaction off; keep at least three quarters of the message budget instead.
+  // An explicitly configured headroom is used as given.
+  const headroomTokens = policy.headroomTokens === DEFAULT_HEADROOM_TOKENS && policy.headroomTokens > messageBudgetTokens / 2
+    ? Math.floor(messageBudgetTokens / 4)
+    : policy.headroomTokens
+  const pressureBudgetTokens = messageBudgetTokens - headroomTokens
   if (pressureBudgetTokens <= 0) {
     throw new TargetPressureConfigError(
       targetKey,
@@ -210,7 +219,9 @@ export function resolveCompactSpec(
     retainTokens,
     summarizationProvider: policy.summarizationProvider,
     summarizationModel: policy.summarizationModel,
-    maxTokens: policy.maxTokens,
+    // A summary never needs more output than the routed request may produce, and asking a model with a small
+    // output limit (8K) for 64K tokens is refused by its provider.
+    maxTokens: reservedCompletionTokens > 0 ? Math.min(policy.maxTokens, Math.max(reservedCompletionTokens, 4096)) : policy.maxTokens,
     compactionRetries: policy.compactionRetries,
     maxOverflowRetries: policy.maxOverflowRetries,
   })
