@@ -15,7 +15,7 @@ describe('Turn tail slot spacing', () => {
   it('combines the flow and footer offsets around turn-tail content', () => {
     expect(read('ChatView.module.css')).toMatch(/margin-top:\s*var\(--dsh-chat-flow-gap, 4px\)/)
     const tail = read('TurnTailNodeView.module.css')
-    expect(tail).toMatch(/\.root\s*\{[^}]*gap:\s*16px/s)
+    expect(tail).toMatch(/\.root\s*\{[^}]*gap:\s*10px/s)
     expect(tail).toMatch(/\.actions\s*\{[^}]*margin-top:\s*4px/s)
   })
 
@@ -28,14 +28,14 @@ describe('Turn tail slot spacing', () => {
   it('keeps the tail slot above a marked steering batch start and out of neighbour gaps', () => {
     const view = read('ChatView.module.css')
     const marked = String.raw`:has\(> \[data-slot="conversation\.chat\.node"\] > \[data-chat-steering-batch`
-    expect(view).toMatch(new RegExp(String.raw`\.flowItem${marked}="start"\]\)\s*\{\s*--dsh-chat-flow-gap:\s*calc\(44px \+ var\(--dsh-content-font-delta, 0px\)\);`))
-    expect(view).toMatch(new RegExp(String.raw`:not\(\.running\):not\(${marked}\]\)\)\s*\{\s*--dsh-chat-flow-gap:\s*12px;`))
-    expect(view).toMatch(new RegExp(String.raw`:not\(\.running\):not\(\[data-submission-echo\], \[data-pending-steering\]\):not\(${marked}\]\)\)\s*\{\s*--dsh-chat-flow-gap:\s*16px;`))
+    expect(view).toMatch(new RegExp(String.raw`\.flowItem${marked}="start"\]\)\s*\{\s*--dsh-chat-flow-gap:\s*calc\(36px \+ var\(--dsh-content-font-delta, 0px\)\);`))
+    expect(view).toMatch(new RegExp(String.raw`:not\(\.running\):not\(${marked}\]\)\)\s*\{\s*--dsh-chat-flow-gap:\s*8px;`))
+    expect(view).toMatch(new RegExp(String.raw`:not\(\.running\):not\(\[data-submission-echo\], \[data-pending-steering\]\):not\(${marked}\]\)\)\s*\{\s*--dsh-chat-flow-gap:\s*10px;`))
   })
 
   it('keeps echoes after a running Turn\'s empty control at the input gap', () => {
     const view = read('ChatView.module.css')
-    const header = view.slice(view.indexOf('/* The Turn header has 16px clearance'))
+    const header = view.slice(view.indexOf('/* The Turn header has 10px clearance'))
     const rule = header.slice(0, header.indexOf('}') + 1)
     const empty = String.raw`:empty, :has(> [data-slot="conversation.chat.node"]:empty)`
     // A visible control keeps its 16px clearance for every following row, echoes included.
@@ -55,7 +55,7 @@ describe('Running status entrance after admitted steering', () => {
     expect(view).toMatch(new RegExp(String.raw`@media \(prefers-reduced-motion: no-preference\) \{\s*:where\(\.column > [^{]*\[data-chat-flow-kind="steering"\]\) \+ \.running \{\s*`
       + String.raw`animation: running-enters-slot 140ms cubic-bezier\(0\.2, 0\.8, 0\.2, 1\);`))
     expect(view).toMatch(new RegExp(String.raw`@keyframes running-enters-slot \{\s*from \{\s*opacity: 0;\s*`
-      + String.raw`translate: 0 calc\(-44px - var\(--dsh-content-font-delta, 0px\)\);\s*\}\s*40% \{\s*opacity: 1;`))
+      + String.raw`translate: 0 calc\(-36px - var\(--dsh-content-font-delta, 0px\)\);\s*\}\s*40% \{\s*opacity: 1;`))
   })
 
   it('is the only status move, and an input fold changes only its duration', () => {

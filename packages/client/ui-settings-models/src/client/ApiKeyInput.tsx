@@ -1,4 +1,4 @@
-/** Write-only credential input with the same reveal behavior as masked conversation text. */
+/** Write-only credential inputs, one row per key, with the same reveal behavior as masked conversation text. */
 import { useState } from 'react'
 import type { ChangeEvent, InputHTMLAttributes, ReactNode } from 'react'
 import type { en } from './locales.ts'
@@ -10,60 +10,109 @@ const EYE_OFF_PATH = `${EYE_CONTOUR}M2.5 2.5L13.5 13.5`
 
 /** Input attributes and section copy for the current credential draft. */
 interface ApiKeyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'type' | 'className' | 'autoComplete'> {
-  /** Unsaved input; stored credentials are never read into this field. */
+  /** Unsaved input, keys separated by commas; stored credentials are never read into this field. */
   readonly value: string
   /** Section copy, including the same reveal labels as SecretText. */
   readonly t: (key: keyof typeof en) => string
 }
 
+/** Split the draft into rows, keeping empty rows the person added and has not filled yet. */
+function rowsOf(value: string): string[] {
+  return value.length === 0 ? [''] : value.split(/[,;]/)
+}
+
+/** Report a new draft through the input's change handler. */
+function changed(props: ApiKeyInputProps, next: string): void {
+  props.onChange?.({ target: { value: next } } as ChangeEvent<HTMLInputElement>)
+}
+
 /**
- * Reveal only a nonempty draft; a different value starts masked, as in SecretText.
- * @param props - current draft, input attributes, and translated control labels.
- * @returns a password input with an optional reveal button.
+ * One row per key: requests rotate through every key, and a key the provider refuses is skipped. A nonempty row can
+ * be revealed; a changed value starts masked, as in SecretText.
+ * @param props - current draft, input attributes for the first row, and translated control labels.
+ * @returns the key rows, an add button and the pool summary.
  */
-export function ApiKeyInput({ value, t, ...props }: ApiKeyInputProps): ReactNode {
-  const [revealedValue, setRevealedValue] = useState<string | undefined>()
-  const revealed = value.length > 0 && revealedValue === value
-  const keyCount = value.split(/[,;]+/).filter(part => part.trim().length > 0).length
+export function ApiKeyInput(props: ApiKeyInputProps): ReactNode {
+  const { value, t, ...inputProps } = props
+  const [revealed, setRevealed] = useState<{ row: number; value: string } | undefined>()
+  const rows = rowsOf(value)
+  const keyCount = rows.filter(row => row.trim().length > 0).length
+  const write = (next: string[]): void => {
+    setRevealed(undefined)
+    changed(props, next.join(','))
+  }
   return (
     <>
-      <div className={styles['keyInput']}>
-        <input
-          {...props}
-          className={`${styles['input']} ${value.length > 0 ? styles['keyInputFilled'] : ''}`}
-          type={revealed ? 'text' : 'password'}
-          autoComplete="new-password"
-          value={value}
-          onPaste={(event) => {
-            // A single-line field flattens pasted lines into one run; keep them apart as separate keys.
-            const text = event.clipboardData.getData('text')
-            if (!/[\r\n]/.test(text)) return
-            event.preventDefault()
-            const joined = text.trim().split(/\s*[\r\n]+\s*/).join(',')
-            const input = event.currentTarget
-            const next = `${value.slice(0, input.selectionStart ?? value.length)}${joined}${value.slice(input.selectionEnd ?? value.length)}`
-            setRevealedValue(undefined)
-            props.onChange?.({ target: { value: next } } as ChangeEvent<HTMLInputElement>)
-          }}
-          onChange={(event) => {
-            setRevealedValue(undefined)
-            props.onChange?.(event)
-          }}
-        />
-        {value.length === 0 ? null : <button
-          type="button"
-          className={styles['keyToggle']}
-          aria-label={t(revealed ? 'keyHide' : 'keyReveal')}
-          aria-pressed={revealed}
-          disabled={props.disabled}
-          onClick={() => { setRevealedValue(revealed ? undefined : value) }}
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" aria-hidden="true">
-            <path d={revealed ? EYE_OFF_PATH : EYE_PATH} />
-          </svg>
-        </button>}
+      <div className={styles['keyRows']}>
+        {rows.map((row, index) => {
+          const shown = row.length > 0 && revealed?.row === index && revealed.value === row
+          return (
+            <div key={index} className={styles['keyRow']}>
+              <div className={styles['keyInput']}>
+                <input
+                  {...index === 0 ? inputProps : { disabled: inputProps.disabled, 'aria-label': t('keyRowLabel').replace('{n}', String(index + 1)) }}
+                  className={`${styles['input']} ${row.length > 0 ? styles['keyInputFilled'] : ''}`}
+                  type={shown ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  value={row}
+                  onPaste={(event) => {
+                    // Pasted lines are separate keys: each becomes its own row.
+                    const text = event.clipboardData.getData('text')
+                    if (!/[\r\n,;]/.test(text)) return
+                    event.preventDefault()
+                    const pasted = text.trim().split(/\s*[\r\n,;]+\s*/).filter(part => part.length > 0)
+                    const input = event.currentTarget
+                    /* v8 ignore start -- text and password inputs always report a selection; the fallback appends */
+                    const before = row.slice(0, input.selectionStart ?? row.length)
+                    const after = row.slice(input.selectionEnd ?? row.length)
+                    /* v8 ignore stop */
+                    // Keys hold no line breaks, so a line break joins and splits the pieces safely.
+                    const merged = `${before}${pasted.join('\n')}${after}`.split('\n')
+                    write([...rows.slice(0, index), ...merged, ...rows.slice(index + 1)])
+                  }}
+                  onChange={(event) => {
+                    write(rows.map((existing, at) => at === index ? event.target.value.replace(/[,;]/g, '') : existing))
+                  }}
+                />
+                {row.length === 0 ? null : <button
+                  type="button"
+                  className={styles['keyToggle']}
+                  aria-label={t(shown ? 'keyHide' : 'keyReveal')}
+                  aria-pressed={shown}
+                  disabled={inputProps.disabled}
+                  onClick={() => { setRevealed(shown ? undefined : { row: index, value: row }) }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" aria-hidden="true">
+                    <path d={shown ? EYE_OFF_PATH : EYE_PATH} />
+                  </svg>
+                </button>}
+              </div>
+              {rows.length === 1 ? null : <button
+                type="button"
+                className={styles['keyRemove']}
+                aria-label={t('keyRemove').replace('{n}', String(index + 1))}
+                disabled={inputProps.disabled}
+                onClick={() => { write(rows.filter((_, at) => at !== index)) }}
+              >
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+                  <path d="M4 4L12 12M12 4L4 12" />
+                </svg>
+              </button>}
+            </div>
+          )
+        })}
       </div>
-      {keyCount > 1 && <p className={styles['keyCount']} role="status">{t('keyPoolCount').replace('{count}', String(keyCount))}</p>}
+      <div className={styles['keyFooter']}>
+        <button
+          type="button"
+          className={styles['keyAdd']}
+          disabled={inputProps.disabled === true || /(?:^|[,;])\s*$/u.test(value)}
+          onClick={() => { write([...rows, '']) }}
+        >
+          {t('keyAdd')}
+        </button>
+        {keyCount > 1 && <p className={styles['keyCount']} role="status">{t('keyPoolCount').replace('{count}', String(keyCount))}</p>}
+      </div>
     </>
   )
 }

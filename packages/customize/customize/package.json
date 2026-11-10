@@ -1,0 +1,64 @@
+{
+  "name": "@hackdevcode/dsh-customize",
+  "description": "Remote gateway of the Customize settings area: MCP servers, OAuth connectors and skills",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/customize/customize"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "peerDependencies": {
+    "@hackdevcode/dsh-mcp-directory": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "peerDependenciesMeta": {
+    "@hackdevcode/dsh-mcp-directory": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-mcp-directory": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~"
+  }
+}

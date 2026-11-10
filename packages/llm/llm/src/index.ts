@@ -1020,7 +1020,14 @@ export class LlmRuntime extends TypertRemoteService {
 
   private registration(provider: string): AdapterRegistration {
     const registration = this.adapters.get(provider)
-    if (!registration) throw new LlmError(`no adapter registered for provider "${provider}"`, 'NO_ADAPTER')
+    if (!registration) {
+      // No model was ever chosen (a fresh install with no provider set up yet): say how to set one up.
+      if (provider === '') {
+        throw new LlmError('no model is set up yet; open Settings → Models to add a local Ollama model or a provider API key,'
+          + ' then pick it in the model menu', 'NO_ADAPTER')
+      }
+      throw new LlmError(`no adapter registered for provider "${provider}"`, 'NO_ADAPTER')
+    }
     return registration
   }
 

@@ -940,7 +940,7 @@ export interface Config {
 
 - `inject`: `browserUse` · `agents` · `tools` · `systemPrompt` · `workingDirectory`
 - `refs`: `BrowserMcpAttachConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`) · `BrowserMcpLaunchConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`)
-- `source`: [`packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts:65`](../packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts)
+- `source`: [`packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts:67`](../packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts)
 
 ```ts config-catalog
 /** Fixed Chromium launch, debugging-endpoint attachment, or connection to the running Chrome. */
@@ -991,7 +991,7 @@ export interface ChromeCapabilities {
   onDemand?: boolean
 }
 
-/** Chrome release channel whose installation and profile are used. */
+/** Chrome release channels chrome-devtools-mcp accepts. */
 export type ChromeChannel = 'stable' | 'beta' | 'dev' | 'canary'
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp -->
@@ -2056,7 +2056,7 @@ export interface Config extends ProtocolConfig, ModelListingConfig {
 
 - `inject`: `llm`
 - `refs`: `Api` (`@earendil-works/pi-ai`) · `CacheRetention` (`@earendil-works/pi-ai`) · `Model` (`@earendil-works/pi-ai`) · `ModelThinkingLevel` (`@earendil-works/pi-ai`) · `OpenAICompletionsCompat` (`@earendil-works/pi-ai`) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts) · `ThinkingBudgets` (`@earendil-works/pi-ai`) · `Transport` (`@earendil-works/pi-ai`) · `Volatile` (`@hackdevcode/cordis`)
-- `source`: [`packages/llm/llm-pi-ai/src/config.ts:227`](../packages/llm/llm-pi-ai/src/config.ts)
+- `source`: [`packages/llm/llm-pi-ai/src/config.ts:228`](../packages/llm/llm-pi-ai/src/config.ts)
 
 ```ts config-catalog
 /** Plugin configuration: the provider routes this instance owns. */
@@ -2475,12 +2475,13 @@ export interface LspLocalServerConfig {
 ## `@hackdevcode/dsh-mcp-client`
 
 - `inject`: `tools`
-- `source`: [`packages/mcp/mcp-client/src/index.ts:122`](../packages/mcp/mcp-client/src/index.ts)
+- `source`: [`packages/mcp/mcp-client/src/index.ts:144`](../packages/mcp/mcp-client/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for one stdio or Streamable HTTP MCP server. */
 export type Config = StdioConfig | StreamableHttpConfig
 
+/** Config for connecting to an MCP server over a child-process stdio transport. */
 export interface StdioConfig {
   /** Selects child-process stdio transport. */
   transport: 'stdio'
@@ -2564,14 +2565,20 @@ export interface ReconnectConfig {
 ## `@hackdevcode/dsh-mcp-directory`
 
 - `inject`: `tools`
-- `refs`: `Volatile` (`@hackdevcode/cosmokit`)
-- `source`: [`packages/mcp/mcp-directory/src/index.ts:52`](../packages/mcp/mcp-directory/src/index.ts)
+- `refs`: `OAuthClientProvider` (`@modelcontextprotocol/client`) · `Volatile` (`@hackdevcode/cosmokit`)
+- `source`: [`packages/mcp/mcp-directory/src/index.ts:95`](../packages/mcp/mcp-directory/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config. */
 export interface Config {
   /** Chosen servers by directory id; edited live by Settings and `mcp_directory`. */
   servers: Volatile<Record<string, ServerChoice>>
+  /** The person's own MCP servers by id. */
+  custom: Volatile<Record<string, CustomServer>>
+  /** Connectors the person added, by id. */
+  connectors: Volatile<Record<string, ConnectorEntry>>
+  /** Test seam: the OAuth flow; the MCP SDK's when unset. */
+  authRunner?: AuthRunner | undefined
 }
 
 /** One server the person turned on. */
@@ -2585,6 +2592,47 @@ export interface ServerChoice {
   env?: Readonly<Record<string, string>> | undefined
   /** Folders for a server that opens folders, such as filesystem. */
   roots?: readonly string[] | undefined
+}
+
+/** One of the person's own MCP servers: a command to start, or an address to reach. */
+export interface CustomServer {
+  /** Run the server. */
+  enabled: boolean
+  /** The name shown for it; its id when unset. */
+  title?: string | undefined
+  /** The program a local server starts with. */
+  command?: string | undefined
+  /** Arguments for the command. */
+  args?: readonly string[] | undefined
+  /** Environment values for the command. */
+  env?: Readonly<Record<string, string>> | undefined
+  /** The address of a remote server; when set, the command is not used. */
+  url?: string | undefined
+  /** HTTP headers sent to a remote server. */
+  headers?: Readonly<Record<string, string>> | undefined
+}
+
+/** One connector the person added. */
+export interface ConnectorEntry {
+  /** Use the connector; a choice turned off keeps its sign-in for later. */
+  enabled: boolean
+  /** Name shown for a connector that is not in the directory. */
+  title?: string | undefined
+  /** The connector's MCP address. */
+  url: string
+}
+
+/** Runs one step of the authorization flow; the MCP SDK's `auth` in production. */
+export type AuthRunner = (
+  provider: OAuthClientProvider, options: AuthStep,
+) => Promise<'AUTHORIZED' | 'REDIRECT'>
+
+/** What one step of the authorization flow needs. */
+export interface AuthStep {
+  /** The connector's MCP address. */
+  serverUrl: string
+  /** The code the browser returned; absent when the flow is only starting. */
+  authorizationCode?: string
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-mcp-directory -->
@@ -4225,51 +4273,6 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-tool-goal -->
 
-<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-tool-hackdev -->
-<a id="hackdevcodedsh-tool-hackdev"></a>
-
-## `@hackdevcode/dsh-tool-hackdev`
-
-- `inject`: `tools` · `workflowEngine` · `subagents` · `systemPrompt`
-- `source`: [`packages/hackdev/tool-hackdev/src/index.ts:34`](../packages/hackdev/tool-hackdev/src/index.ts)
-
-```ts config-catalog
-/** Deployment policy for the fixed Hack Dev Code pipelines. */
-export interface Config {
-  /** Fresh structured-output provider used for every pipeline agent (default `spawn`). */
-  subagentProvider?: string
-  /** Deployment ceiling for planned tasks per wave (default 24). */
-  maxTasks?: number
-  /** Builder agents that may run at the same time (default 6). */
-  maxParallel?: number
-  /** Deployment ceiling for build waves per mission (default 3). */
-  maxWaves?: number
-  /** Optional image-capable model for the quality/UX gate; empty inherits the default route (default ''). */
-  visionModel?: string
-  /** Deployment ceiling for review-fix rounds after the first review of each gate (default 2). */
-  maxFixRounds?: number
-  /** Maximum characters of shared memory placed in any one agent prompt (default 6000). */
-  maxMemoryChars?: number
-  /** Maximum characters in the parent-facing report (default 16384). */
-  maxResultChars?: number
-  /** Commands the fact-checker may re-run per wave (default 8). */
-  maxFactChecks?: number
-  /**
-   * Where parallel builders work: `shared` (one workspace, disjoint owned paths) or `worktree` (each task in its
-   * own git worktree, merged back one at a time; falls back to shared outside a git repository). Default `shared`.
-   */
-  builderIsolation?: 'shared' | 'worktree'
-  /**
-   * `full` lets the lead agent and every pipeline agent act without asking for approval; `bounded` keeps them
-   * from destructive or irreversible actions and defers large additions to a person. Default `full`.
-   */
-  autonomy?: 'full' | 'bounded'
-  /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
-  customInstructions?: string
-}
-```
-<!-- END GENERATED config-catalog:@hackdevcode/dsh-tool-hackdev -->
-
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-tool-jobs -->
 <a id="hackdevcodedsh-tool-jobs"></a>
 
@@ -5025,13 +5028,13 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@hackdevcode/dsh-client-ui-conversation` | — | [`packages/client/ui-conversation/src/index.ts`](../packages/client/ui-conversation/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-cordis` | — | [`packages/extensions/ui-cordis/src/index.ts`](../packages/extensions/ui-cordis/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-creation-recommendations` | — | [`packages/experimental/client-ui-creation-recommendations/src/index.ts`](../packages/experimental/client-ui-creation-recommendations/src/index.ts) |
+| `@hackdevcode/dsh-client-ui-customize` | — | [`packages/customize/client-ui-customize/src/index.ts`](../packages/customize/client-ui-customize/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-deliverables` | `connection` · `sessionQuery` · `sessionController` · `workspaceFiles` · `fs` · `sandboxPolicy` · `workspaceChanges` | [`packages/client/ui-deliverables/src/index.ts`](../packages/client/ui-deliverables/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-directory-picker-browse` | — | [`packages/client/ui-directory-picker-browse/src/index.ts`](../packages/client/ui-directory-picker-browse/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-directory-picker-native` | — | [`packages/client/ui-directory-picker-native/src/index.ts`](../packages/client/ui-directory-picker-native/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-entry-customization` | — | [`packages/client/ui-entry-customization/src/index.ts`](../packages/client/ui-entry-customization/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-file-drag` | — | [`packages/client/ui-file-drag/src/index.ts`](../packages/client/ui-file-drag/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-goal` | — | [`packages/client/ui-goal/src/index.ts`](../packages/client/ui-goal/src/index.ts) |
-| `@hackdevcode/dsh-client-ui-hackdev` | — | [`packages/hackdev/client-ui-hackdev/src/index.ts`](../packages/hackdev/client-ui-hackdev/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-input-trigger` | — | [`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-jobs` | — | [`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-layout` | — | [`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts) |
@@ -5078,6 +5081,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@hackdevcode/dsh-cordis-client-runner` | — | [`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts) |
 | `@hackdevcode/dsh-creation-recommendations` | `tools` · `pluginManager` · `agents` · `subagents` · `profileContext` · `skills` · `actionCards` | [`packages/experimental/creation-recommendations/src/index.ts`](../packages/experimental/creation-recommendations/src/index.ts) |
 | `@hackdevcode/dsh-cua` | — | [`packages/experimental/cua/src/index.ts`](../packages/experimental/cua/src/index.ts) |
+| `@hackdevcode/dsh-customize` | — | [`packages/customize/customize/src/index.ts`](../packages/customize/customize/src/index.ts) |
 | `@hackdevcode/dsh-deepseek-llm-api-extensions` | — | [`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../packages/llm/deepseek-llm-api-extensions/src/index.ts) |
 | `@hackdevcode/dsh-deliverable-file-references` | `systemPrompt` | [`packages/deliverables/deliverable-file-references/src/index.ts`](../packages/deliverables/deliverable-file-references/src/index.ts) |
 | `@hackdevcode/dsh-experimental-auto-review` | `approval` · `llm` · `permissionPresets` · `sessions` · `tools` · `workingDirectory` | [`packages/experimental/auto-review/src/index.ts`](../packages/experimental/auto-review/src/index.ts) |

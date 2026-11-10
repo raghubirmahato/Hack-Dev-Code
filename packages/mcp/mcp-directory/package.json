@@ -1,6 +1,6 @@
 {
   "name": "@hackdevcode/dsh-mcp-directory",
-  "description": "Curated directory of well-known MCP servers and skills: servers mount live as mcp-client instances, skills install into the user skill folder",
+  "description": "Directory of MCP servers, OAuth connectors and skills: servers and connectors mount live as mcp-client instances, skills install into the user skill folder",
   "version": "0.2.2-alpha.2",
   "publishConfig": {
     "access": "public"
@@ -27,7 +27,8 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "@hackdevcode/schemastery": "workspace:~"
+    "@hackdevcode/schemastery": "workspace:~",
+    "@modelcontextprotocol/client": "2.2.0"
   },
   "peerDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -39,7 +40,7 @@
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
-    "@hackdevcode/cordis-plugin-loader": "workspace:*",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
     "@hackdevcode/cosmokit": "workspace:~",
     "@hackdevcode/dsh-llm": "workspace:*",
     "@hackdevcode/dsh-mcp-client": "workspace:*",
@@ -52,6 +53,7 @@
     "@hackdevcode/dsh-credentials": "workspace:*",
     "@hackdevcode/dsh-sandbox": "workspace:*",
     "@hackdevcode/dsh-sandbox-policy": "workspace:*",
-    "@hackdevcode/dsh-user-approval": "workspace:*"
+    "@hackdevcode/dsh-user-approval": "workspace:*",
+    "@hackdevcode/dsh-host-webserver": "workspace:*"
   }
 }

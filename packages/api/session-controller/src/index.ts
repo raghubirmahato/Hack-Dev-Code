@@ -6,7 +6,7 @@ import type { Agent } from '@hackdevcode/dsh-agent'
 import type {} from '@hackdevcode/dsh-fs'
 import { Context, Service } from '@hackdevcode/cordis'
 import z from '@hackdevcode/schemastery'
-import { errorChain, ReasoningEffortId, type MessageSource } from '@hackdevcode/dsh-llm'
+import { errorChain, type MessageSource } from '@hackdevcode/dsh-llm'
 import type {} from '@hackdevcode/dsh-client-file-upload'
 import { canOpenNativePath, nativeFileManager, nativeFileApplications, openNativeFileApplication, openNativeAssociatedPath, revealNativePath } from '@hackdevcode/dsh-native-command'
 import type { SessionId } from '@hackdevcode/dsh-session'
@@ -27,7 +27,7 @@ import { StateController } from './state/controller.ts'
 import { WebController } from './web/controller.ts'
 import { SessionFileReferences } from './file-references.ts'
 import { ApiSessionList } from './list.ts'
-import { buildModelCatalog, hasProviderApiKey } from './catalog.ts'
+import { ensureUsableDefault } from './catalog.ts'
 import { SessionSkillCatalog } from './skill-catalog.ts'
 import { SessionMediaReferences } from './media-references.ts'
 import { ArchivedSessionGate } from './archived-session-gate.ts'
@@ -316,21 +316,12 @@ export class SessionController extends TypertRemoteService {
   }
 
   /**
-   * Select the first available account model after login when no provider API key is configured.
+   * Make the default model one that works, saving the first available model when no usable default is set.
    * @returns after saving the first available model or retaining the existing default.
    */
   @Remote
   async initializeDefaultModel(): Promise<void> {
-    const provider = 'deepseek-account'
-    if (await hasProviderApiKey(this.ctx)) return
-    const catalog = await buildModelCatalog(this.ctx)
-    const model = catalog.groups.find(group => group.id === provider)?.models[0]
-    if (model === undefined) throw new RemoteError('session/provider-models-unavailable',
-      `provider "${provider}" has no available models`, { provider })
-    const selection = { provider, model: model.id,
-      ...model.reasoning?.defaultEffort === undefined ? {} : { reasoningEffort: ReasoningEffortId(model.reasoning.defaultEffort) },
-    }
-    await this.ctx.agentDefaultModel.saveSelection(selection)
+    await ensureUsableDefault(this.ctx)
   }
 
   /**
@@ -339,7 +330,8 @@ export class SessionController extends TypertRemoteService {
    */
   @Remote('modelCatalog')
   modelCatalog(): Promise<ModelCatalog> {
-    return buildModelCatalog(this.ctx)
+    // Reading the model list also settles the default on a model that works, so a new install needs no preset.
+    return ensureUsableDefault(this.ctx)
   }
 
   /**

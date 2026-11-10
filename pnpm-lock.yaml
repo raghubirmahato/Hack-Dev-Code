@@ -1408,6 +1408,9 @@ importers:
       '@hackdevcode/dsh-credentials':
         specifier: workspace:*
         version: link:../../credentials/credentials
+      '@hackdevcode/dsh-customize':
+        specifier: workspace:*
+        version: link:../../customize/customize
       '@hackdevcode/dsh-deepseek-account':
         specifier: workspace:*
         version: link:../../credentials/deepseek-account
@@ -2497,9 +2500,6 @@ importers:
       '@hackdevcode/dsh-tool-goal':
         specifier: workspace:*
         version: link:../../goal/tool-goal
-      '@hackdevcode/dsh-tool-hackdev':
-        specifier: workspace:*
-        version: link:../../hackdev/tool-hackdev
       '@hackdevcode/dsh-tool-jobs':
         specifier: workspace:*
         version: link:../../jobs/tool-jobs
@@ -2888,6 +2888,9 @@ importers:
       '@hackdevcode/dsh-client-ui-cordis':
         specifier: workspace:*
         version: link:../../extensions/ui-cordis
+      '@hackdevcode/dsh-client-ui-customize':
+        specifier: workspace:*
+        version: link:../../customize/client-ui-customize
       '@hackdevcode/dsh-client-ui-deliverables':
         specifier: workspace:*
         version: link:../../client/ui-deliverables
@@ -2906,9 +2909,6 @@ importers:
       '@hackdevcode/dsh-client-ui-goal':
         specifier: workspace:*
         version: link:../../client/ui-goal
-      '@hackdevcode/dsh-client-ui-hackdev':
-        specifier: workspace:*
-        version: link:../../hackdev/client-ui-hackdev
       '@hackdevcode/dsh-client-ui-input-trigger':
         specifier: workspace:*
         version: link:../../client/ui-input-trigger
@@ -3050,6 +3050,9 @@ importers:
       '@hackdevcode/dsh-cordis-host-runner':
         specifier: workspace:*
         version: link:../../extensions/cordis-host-runner
+      '@hackdevcode/dsh-customize':
+        specifier: workspace:*
+        version: link:../../customize/customize
       '@hackdevcode/dsh-deliverable-file-references':
         specifier: workspace:*
         version: link:../../deliverables/deliverable-file-references
@@ -7802,6 +7805,61 @@ importers:
         specifier: workspace:*
         version: link:../../host/webserver
 
+  packages/customize/client-ui-customize:
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/dsh-api-remotes':
+        specifier: workspace:*
+        version: link:../../api/remotes
+      '@hackdevcode/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../../client/locale
+      '@hackdevcode/dsh-client-store':
+        specifier: workspace:*
+        version: link:../../client/store
+      '@hackdevcode/dsh-client-test-runtime':
+        specifier: workspace:*
+        version: link:../../test-support/client-runtime
+      '@hackdevcode/dsh-client-ui-primitives':
+        specifier: workspace:*
+        version: link:../../client/ui-primitives
+      '@hackdevcode/dsh-client-ui-renderer':
+        specifier: workspace:*
+        version: link:../../client/ui-renderer
+      '@hackdevcode/dsh-client-ui-settings':
+        specifier: workspace:*
+        version: link:../../client/ui-settings
+      '@hackdevcode/dsh-client-ui-slots':
+        specifier: workspace:*
+        version: link:../../client/ui-slots
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+
+  packages/customize/customize:
+    dependencies:
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/dsh-mcp-directory':
+        specifier: workspace:*
+        version: link:../../mcp/mcp-directory
+      '@hackdevcode/dsh-typert-protocol':
+        specifier: workspace:*
+        version: link:../../typert/protocol
+
   packages/deliverables/deliverable-file-references:
     devDependencies:
       '@hackdevcode/cordis':
@@ -8227,6 +8285,9 @@ importers:
       chrome-devtools-mcp:
         specifier: 1.9.0
         version: 1.9.0
+      ws:
+        specifier: ^8.21.3
+        version: 8.21.3
     devDependencies:
       '@hackdevcode/cordis':
         specifier: workspace:~
@@ -8264,6 +8325,9 @@ importers:
       '@hackdevcode/dsh-working-directory':
         specifier: workspace:*
         version: link:../../session/working-directory
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
 
   packages/experimental/browser-use-playwright-mcp:
     dependencies:
@@ -12224,70 +12288,6 @@ importers:
         specifier: workspace:*
         version: link:../../core/tools
 
-  packages/hackdev/client-ui-hackdev:
-    devDependencies:
-      '@hackdevcode/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@hackdevcode/dsh-client-locale':
-        specifier: workspace:*
-        version: link:../../client/locale
-      '@hackdevcode/dsh-client-ui-primitives':
-        specifier: workspace:*
-        version: link:../../client/ui-primitives
-      '@hackdevcode/dsh-client-ui-renderer':
-        specifier: workspace:*
-        version: link:../../client/ui-renderer
-      '@hackdevcode/dsh-client-ui-slots':
-        specifier: workspace:*
-        version: link:../../client/ui-slots
-      '@hackdevcode/dsh-client-ui-tool':
-        specifier: workspace:*
-        version: link:../../client/ui-tool
-      '@hackdevcode/dsh-tool-hackdev':
-        specifier: workspace:*
-        version: link:../tool-hackdev
-      '@testing-library/react':
-        specifier: ^16.3.3
-        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      react:
-        specifier: ^18.2.0
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.2.0
-        version: 18.3.1(react@18.3.1)
-
-  packages/hackdev/tool-hackdev:
-    dependencies:
-      '@hackdevcode/schemastery':
-        specifier: link:../../../vendor/schemastery
-        version: link:../../../vendor/schemastery
-    devDependencies:
-      '@hackdevcode/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@hackdevcode/dsh-agent':
-        specifier: workspace:*
-        version: link:../../core/agent
-      '@hackdevcode/dsh-llm':
-        specifier: workspace:*
-        version: link:../../llm/llm
-      '@hackdevcode/dsh-subagent':
-        specifier: workspace:*
-        version: link:../../subagent/subagent
-      '@hackdevcode/dsh-system-prompt':
-        specifier: workspace:*
-        version: link:../../core/system-prompt
-      '@hackdevcode/dsh-tool-workflow':
-        specifier: workspace:*
-        version: link:../../workflow/tool-workflow
-      '@hackdevcode/dsh-tools':
-        specifier: workspace:*
-        version: link:../../core/tools
-      '@hackdevcode/dsh-workflow':
-        specifier: workspace:*
-        version: link:../../workflow/workflow
-
   packages/host/directory-picker:
     devDependencies:
       '@hackdevcode/cordis':
@@ -13396,12 +13396,15 @@ importers:
       '@hackdevcode/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
+      '@modelcontextprotocol/client':
+        specifier: 2.2.0
+        version: 2.2.0
     devDependencies:
       '@hackdevcode/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
       '@hackdevcode/cordis-plugin-loader':
-        specifier: workspace:*
+        specifier: workspace:~
         version: link:../../../vendor/loader
       '@hackdevcode/cosmokit':
         specifier: link:../../../vendor/cosmokit
@@ -13412,6 +13415,9 @@ importers:
       '@hackdevcode/dsh-home-paths':
         specifier: workspace:*
         version: link:../../util/home-paths
+      '@hackdevcode/dsh-host-webserver':
+        specifier: workspace:*
+        version: link:../../host/webserver
       '@hackdevcode/dsh-llm':
         specifier: workspace:*
         version: link:../../llm/llm

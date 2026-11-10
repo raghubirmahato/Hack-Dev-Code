@@ -117,3 +117,68 @@ export function findServer(query: string): DirectoryServer | undefined {
   const key = query.toLowerCase().replace(/[^a-z0-9]/gu, '')
   return DIRECTORY.find(server => server.id.replace(/-/gu, '') === key || server.title.toLowerCase().replace(/[^a-z0-9]/gu, '') === key)
 }
+
+/** One connector the directory offers: a remote MCP server the person signs in to in the browser. */
+export interface DirectoryConnector {
+  /** Stable id; also the MCP server name, so its tools are `mcp__<id>__<tool>`. */
+  id: string
+  title: string
+  /** What the connector lets an agent do, for the person and the model. */
+  description: string
+  /** Where the connector is documented. */
+  homepage: string
+  /** The Streamable HTTP address of the MCP server. */
+  url: string
+}
+
+/** The connectors, in display order. Each one authorizes with OAuth and registers this app on first sign-in. */
+export const CONNECTORS: readonly DirectoryConnector[] = [
+  {
+    id: 'notion', title: 'Notion', description: 'Search, read, create and update Notion pages and databases.',
+    homepage: 'https://developers.notion.com/docs/mcp', url: 'https://mcp.notion.com/mcp',
+  },
+  {
+    id: 'linear', title: 'Linear', description: 'Find, create and update Linear issues, projects and comments.',
+    homepage: 'https://linear.app/docs/mcp', url: 'https://mcp.linear.app/mcp',
+  },
+  {
+    id: 'sentry', title: 'Sentry', description: 'Look up Sentry issues, events, traces and releases to debug errors.',
+    homepage: 'https://docs.sentry.io/product/sentry-mcp/', url: 'https://mcp.sentry.dev/mcp',
+  },
+  {
+    id: 'atlassian', title: 'Atlassian', description: 'Work with Jira issues and Confluence pages.',
+    homepage: 'https://www.atlassian.com/platform/remote-mcp-server', url: 'https://mcp.atlassian.com/v1/mcp',
+  },
+  {
+    id: 'stripe', title: 'Stripe', description: 'Read and manage Stripe customers, payments, products and invoices, and search the Stripe docs.',
+    homepage: 'https://docs.stripe.com/mcp', url: 'https://mcp.stripe.com',
+  },
+  {
+    id: 'vercel', title: 'Vercel', description: 'Inspect Vercel projects, deployments and logs, and search the Vercel docs.',
+    homepage: 'https://vercel.com/docs/mcp/vercel-mcp', url: 'https://mcp.vercel.com',
+  },
+  {
+    id: 'huggingface', title: 'Hugging Face', description: 'Search Hugging Face models, datasets, Spaces and papers.',
+    homepage: 'https://huggingface.co/docs/hub/hf-mcp-server', url: 'https://huggingface.co/mcp',
+  },
+  {
+    id: 'canva', title: 'Canva', description: 'Search, create and export Canva designs.',
+    homepage: 'https://www.canva.dev/docs/connect/canva-mcp-server-setup/', url: 'https://mcp.canva.com/mcp',
+  },
+  {
+    id: 'supabase', title: 'Supabase', description: 'Manage Supabase projects, run SQL and read logs.',
+    homepage: 'https://supabase.com/docs/guides/getting-started/mcp', url: 'https://mcp.supabase.com/mcp',
+  },
+  {
+    id: 'neon', title: 'Neon', description: 'Manage Neon Postgres projects and branches, and run SQL.',
+    homepage: 'https://neon.com/docs/ai/neon-mcp-server', url: 'https://mcp.neon.tech/mcp',
+  },
+  {
+    id: 'intercom', title: 'Intercom', description: 'Search Intercom conversations and contacts.',
+    homepage: 'https://developers.intercom.com/docs/guides/mcp', url: 'https://mcp.intercom.com/mcp',
+  },
+  {
+    id: 'monday', title: 'monday.com', description: 'Read and update monday.com boards, items and updates.',
+    homepage: 'https://developer.monday.com/apps/docs/mcp', url: 'https://mcp.monday.com/mcp',
+  },
+]

@@ -21,6 +21,10 @@ import { PowerShellHost } from './powershell.ts'
 import type { ScriptRunner } from './powershell.ts'
 import { ElevatedInput, opScript } from './elevated.ts'
 import type { HelperLauncher, InputOp } from './elevated.ts'
+import {
+  WAYLAND_HELPERS, WAYLAND_PASTE, WAYLAND_SCREENSHOT, isWaylandSession, parseHyprClients, parseSwayTree, parseWlrRandr,
+  ydotoolClickCode, ydotoolHoldArgs, ydotoolKeyArgs, ydotoolMoveArgs,
+} from './wayland.ts'
 
 /** One monitor in virtual-desktop pixels; a display left of or above the primary has negative coordinates. */
 export interface DisplayInfo {
@@ -219,9 +223,33 @@ public static class Desk {
   [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attribute, out int value, int size);
   static readonly HashSet<ushort> Extended = new HashSet<ushort> { 0x21, 0x22, 0x23, 0x24, 0x25, 0x26, 0x27, 0x28, 0x2C, 0x2D, 0x2E, 0x5B, 0x5C, 0x5D, 0x6F, 0x90 };
   public static void Init() { SetProcessDpiAwarenessContext(new IntPtr(-4)); }
+  [DllImport("user32.dll", SetLastError = true)] static extern IntPtr OpenInputDesktop(uint flags, bool inherit, uint access);
+  [DllImport("user32.dll")] static extern bool CloseDesktop(IntPtr h);
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool GetUserObjectInformation(IntPtr h, int index, StringBuilder info, int length, out int needed);
+  [DllImport("kernel32.dll")] static extern uint SetThreadExecutionState(uint flags);
+  /** Whether the lock screen or a UAC prompt holds the input desktop (the secure desktop), which no program may drive. */
+  public static bool SecureDesktop() {
+    IntPtr desk = OpenInputDesktop(0, false, 0x0001);
+    if (desk == IntPtr.Zero) return true;
+    try {
+      StringBuilder s = new StringBuilder(256); int needed;
+      GetUserObjectInformation(desk, 2, s, s.Capacity * 2, out needed);
+      return !s.ToString().Equals("Default", StringComparison.OrdinalIgnoreCase);
+    } finally { CloseDesktop(desk); }
+  }
+  static string Blocked() {
+    return SecureDesktop()
+      ? "The lock screen or a UAC prompt is showing. Windows keeps them on the secure desktop, which no program can operate: ask the person to unlock the computer or answer the prompt, then try again."
+      : "The foreground window may belong to an app running as administrator.";
+  }
+  /** Keep the display awake and reset the idle timer with a zero-distance pointer move, so an idle lock does not interrupt work; false lets it sleep again. */
+  public static void KeepAwake(bool on) {
+    SetThreadExecutionState(on ? 0x80000003u : 0x80000000u);
+    if (on && !SecureDesktop()) SendInput(1, new INPUT[] { Mouse(1, 0) }, Marshal.SizeOf(typeof(INPUT)));
+  }
   static void Send(INPUT[] inputs) {
     if (SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT))) != inputs.Length)
-      throw new Exception("Windows blocked the input (error " + Marshal.GetLastWin32Error() + "). The foreground window may belong to an app running as administrator, or a UAC prompt or the lock screen is showing.");
+      throw new Exception("Windows blocked the input (error " + Marshal.GetLastWin32Error() + "). " + Blocked());
   }
   static INPUT Key(ushort vk, ushort scan, uint flags) { INPUT i = new INPUT(); i.type = 1; i.u.ki.wVk = vk; i.u.ki.wScan = scan; i.u.ki.dwFlags = flags; return i; }
   static INPUT Mouse(uint flags, uint data) { INPUT i = new INPUT(); i.type = 0; i.u.mi.dwFlags = flags; i.u.mi.mouseData = data; return i; }
@@ -243,7 +271,7 @@ public static class Desk {
     if (list.Count > 0) Send(list.ToArray());
   }
   public static void Move(int x, int y) {
-    if (!SetCursorPos(x, y)) throw new Exception("Windows refused to move the pointer to " + x + ", " + y + ". A window of an app running as administrator may be in front, or a UAC prompt or the lock screen is showing.");
+    if (!SetCursorPos(x, y)) throw new Exception("Windows refused to move the pointer to " + x + ", " + y + ". " + Blocked());
   }
   /** Press modifier keys, click, then release the modifiers in reverse order (ctrl+click, shift+click). */
   public static void ClickWith(ushort[] modifiers, uint down, uint up, int count) {
@@ -789,6 +817,11 @@ export interface WindowsBackendOptions {
   launchHelper?: HelperLauncher
   /** Helper connection settings. */
   helper?: { connectTimeoutMs?: number }
+  /**
+   * How long after the last input the display is kept awake and the idle lock held off, in milliseconds. Defaults to
+   * 10 minutes with the built-in PowerShell session and 0 (off) with a replaced script runner.
+   */
+  keepAwakeMs?: number
 }
 
 /** Model-facing message for a declined UAC prompt. */
@@ -912,6 +945,27 @@ export function windowsBackend(run?: ScriptRunner, options: WindowsBackendOption
   const int = (value: number): string => String(Math.round(value))
   let elevated: ElevatedInput | undefined
   let pasting: Promise<void> = Promise.resolve()
+  // While the agent operates the desktop the screen must not lock under it: every 50 seconds, until keepAwakeMs after
+  // the last input, the session asks Windows to keep the display on and resets the idle timer.
+  const keepAwakeMs = options.keepAwakeMs ?? (run === undefined ? 10 * 60_000 : 0)
+  let awakeUntil = 0
+  let awakeTimer: NodeJS.Timeout | undefined
+  const stayAwake = (): void => {
+    if (keepAwakeMs <= 0) return
+    awakeUntil = Date.now() + keepAwakeMs
+    if (awakeTimer !== undefined) return
+    const tick = (): void => {
+      const on = Date.now() < awakeUntil
+      void ps(`[HackDev.Desk]::KeepAwake(${String(on)})`).catch(() => {})
+      if (!on) {
+        clearInterval(awakeTimer)
+        awakeTimer = undefined
+      }
+    }
+    awakeTimer = setInterval(tick, 50_000)
+    awakeTimer.unref()
+    tick()
+  }
   /**
    * Perform input in the normal session, or through the administrator helper when the window that receives it
    * (the foreground window, or the one under `at`) belongs to an app running as administrator.
@@ -928,6 +982,7 @@ export function windowsBackend(run?: ScriptRunner, options: WindowsBackendOption
       : 'handle' in at
         ? `[HackDev.Desk]::WindowNeedsElevation(${int(at.handle)})`
         : `[HackDev.Desk]::PointNeedsElevation(${int(at.x)}, ${int(at.y)})`
+    stayAwake()
     const out = await ps(`if (${check}) { '${NEEDS_ELEVATION}' } else { ${ops.map(opScript).join('; ')} }`, 30_000 + typed * 2, signal)
     if (out.trim() !== NEEDS_ELEVATION) return
     await helper().run(ops, signal)
@@ -1065,6 +1120,8 @@ export function windowsBackend(run?: ScriptRunner, options: WindowsBackendOption
       return { width: width ?? 0, height: height ?? 0, scale: scale ?? 1 }
     },
     close() {
+      if (awakeTimer !== undefined) clearInterval(awakeTimer)
+      awakeTimer = undefined
       elevated?.close()
       host?.close()
     },
@@ -1219,7 +1276,8 @@ export const LINUX_PASTE = 'command -v xclip >/dev/null 2>&1 || exit 3; '
   + 'if [ "$had" = 0 ]; then printf %s "$old" | xclip -selection clipboard; fi; echo PASTED'
 
 /**
- * Linux (X11) backend through xrandr, ImageMagick, xdotool, wmctrl and xdg-open.
+ * Linux backend: on X11 through xrandr, ImageMagick, xdotool, wmctrl and xdg-open; on Wayland through ydotool,
+ * the compositor's screenshot tool, wl-clipboard, and Sway or Hyprland (or XWayland) for windows.
  * @param run - helper runner.
  * @param env - environment used to tell Wayland apart.
  * @returns the backend.
@@ -1228,21 +1286,107 @@ export function linuxBackend(
   run: CommandRunner = runCommand,
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): DisplayBackend {
+  const wayland = isWaylandSession(env)
   const helper = async (file: string, args: readonly string[], signal?: AbortSignal, timeoutMs?: number): Promise<string> => {
-    // A cancelled caller stops waiting at once, but xdotool is never killed midway: that could leave a key or mouse
-    // button held down.
+    // A cancelled caller stops waiting at once, but xdotool and ydotool are never killed midway: that could leave a
+    // key or mouse button held down.
     signal?.throwIfAborted()
     try { return await untilCancelled(run(file, args, timeoutMs), signal) } catch (error) {
       if (signal?.aborted === true) throw error
-      const wayland = (env['WAYLAND_DISPLAY'] ?? '').length > 0 && (env['DISPLAY'] ?? '').length === 0
-      throw new Error(`${String(error instanceof Error ? error.message : error)}. ${wayland
-        ? 'This is a Wayland session without XWayland; log in to an Xorg session for full desktop control.'
-        : `Install the helpers with: ${LINUX_HELPERS}`}`, { cause: error })
+      throw new Error(`${String(error instanceof Error ? error.message : error)}. Install the helpers with: ${wayland ? WAYLAND_HELPERS : LINUX_HELPERS}`,
+        { cause: error })
     }
   }
   const int = (value: number): string => String(Math.round(value))
   const hex = (handle: number): string => `0x${Math.trunc(handle).toString(16)}`
-  const list = async (): Promise<DisplayInfo[]> => parseXrandr(await helper('xrandr', ['--query']))
+  const offset = (value: number): string => (Math.round(value) < 0 ? '' : '+') + int(value)
+  const has = (command: string): Promise<boolean> =>
+    run('sh', ['-c', 'command -v "$1" >/dev/null 2>&1 && echo yes', 'sh', command]).then(out => out.trim() === 'yes', () => false)
+  /** The Wayland compositor whose own commands list and move windows, if any. */
+  let compositor: Promise<'sway' | 'hyprland' | 'xwayland'> | undefined
+  const whichCompositor = (): Promise<'sway' | 'hyprland' | 'xwayland'> => {
+    compositor ??= (async () => {
+      if ((env['SWAYSOCK'] ?? '').length > 0 && await has('swaymsg')) return 'sway'
+      if ((env['HYPRLAND_INSTANCE_SIGNATURE'] ?? '').length > 0 && await has('hyprctl')) return 'hyprland'
+      return 'xwayland'
+    })()
+    return compositor
+  }
+  const list = async (): Promise<DisplayInfo[]> => {
+    if (wayland) {
+      const outputs = await run('wlr-randr', ['--json']).then(parseWlrRandr, () => undefined)
+      if (outputs !== undefined && outputs.length > 0) return outputs.map((display, index) => ({ index, ...display }))
+      // GNOME and KDE report their monitors to XWayland apps.
+      if ((env['DISPLAY'] ?? '').length === 0) {
+        throw new Error(`the displays of this Wayland session could not be listed; install wlr-randr or enable XWayland. ${WAYLAND_HELPERS}`)
+      }
+    }
+    return parseXrandr(await helper('xrandr', ['--query']))
+  }
+  /** Save the whole desktop, or one area of it, to `path`, scaled to fit `maxDimension` when given. */
+  const shoot = async (path: string, area: CaptureArea | undefined, maxDimension?: number): Promise<void> => {
+    const crop = area === undefined ? [] : ['-crop', `${int(area.width)}x${int(area.height)}${offset(area.x)}${offset(area.y)}`]
+    const resize = maxDimension === undefined ? [] : ['-resize', `${int(maxDimension)}x${int(maxDimension)}>`]
+    if (!wayland) {
+      await helper('import', ['-window', 'root', ...crop, ...resize, path])
+      return
+    }
+    // Wayland compositors do not let a client read the screen through X11; their own screenshot tool does.
+    const whole = join(await mkdtemp(join(tmpdir(), 'hackdev-shot-')), 'desktop.png')
+    try {
+      await run('sh', ['-c', WAYLAND_SCREENSHOT, 'sh', whole]).catch((error: unknown) => {
+        throw new Error(`no screenshot tool worked in this Wayland session (${String(error instanceof Error ? error.message : error)}); `
+          + 'install grim (Sway, Hyprland and other wlroots compositors), gnome-screenshot (GNOME) or spectacle (KDE)', { cause: error })
+      })
+      // Screenshot tools capture physical pixels, while display positions are logical (scaled) pixels: bring the
+      // capture to the logical desktop size first, then crop relative to the desktop's top-left corner.
+      const displays = await list()
+      const left = Math.min(...displays.map(display => display.x))
+      const top = Math.min(...displays.map(display => display.y))
+      const right = Math.max(...displays.map(display => display.x + display.width))
+      const bottom = Math.max(...displays.map(display => display.y + display.height))
+      const logical = displays.length === 0 ? [] : ['-resize', `${int(right - left)}x${int(bottom - top)}!`]
+      const relative = area === undefined || displays.length === 0
+        ? crop
+        : ['-crop', `${int(area.width)}x${int(area.height)}${offset(area.x - left)}${offset(area.y - top)}`]
+      // +repage drops the crop offset, so the saved image starts at 0,0 like import's.
+      await helper('convert', [whole, ...logical, ...relative, ...relative.length > 0 ? ['+repage'] : [], ...resize, path])
+    } finally {
+      await rm(join(whole, '..'), { recursive: true, force: true }).catch(() => {})
+    }
+  }
+  /** Run ydotool (Wayland) with the arguments, or xdotool (X11) with the other set. */
+  const tool = (ydotool: readonly string[], xdotool: readonly string[], signal?: AbortSignal, timeoutMs?: number): Promise<string> =>
+    wayland ? helper('ydotool', ydotool, signal, timeoutMs) : helper('xdotool', xdotool, signal, timeoutMs)
+  const ydoMove = async (x: number, y: number, signal?: AbortSignal): Promise<void> => { await helper('ydotool', ydotoolMoveArgs(x, y), signal) }
+  const windows = async (): Promise<WindowInfo[]> => {
+    if (wayland) {
+      const kind = await whichCompositor()
+      if (kind === 'sway') return parseSwayTree(await helper('swaymsg', ['-t', 'get_tree', '--raw']))
+      if (kind === 'hyprland') {
+        const active = await run('hyprctl', ['activewindow', '-j']).catch(() => '')
+        return parseHyprClients(await helper('hyprctl', ['clients', '-j']), active)
+      }
+      // Other compositors keep native windows private; XWayland windows are still listed through wmctrl.
+      if ((env['DISPLAY'] ?? '').length === 0) {
+        throw new Error('this Wayland compositor does not let programs list its windows; Sway and Hyprland do, and on GNOME or KDE '
+          + 'windows of X11 apps are listed when XWayland runs. Use desktop_screenshot and desktop_ocr to see the screen, and '
+          + 'desktop_pointer and desktop_keys to act')
+      }
+    }
+    const active = await run('xdotool', ['getactivewindow']).then(out => Number(out.trim()), () => undefined)
+    return parseWmctrl(await helper('wmctrl', ['-lpG']), active)
+  }
+  /** Run a window command through the compositor (Sway, Hyprland) or wmctrl. */
+  const manage = async (
+    handle: number, sway: string, hypr: readonly string[], x11: () => Promise<void>, signal?: AbortSignal,
+  ): Promise<void> => {
+    const kind = wayland ? await whichCompositor() : 'xwayland'
+    if (kind === 'sway') await helper('swaymsg', [`[con_id=${String(Math.trunc(handle))}] ${sway}`], signal)
+    else if (kind === 'hyprland') {
+      for (const command of hypr) await helper('hyprctl', ['dispatch', ...command.replaceAll('$W', `address:${hex(handle)}`).split(' ')], signal)
+    } else await x11()
+  }
   return {
     list,
     async capture(path, display, maxDimension) {
@@ -1252,17 +1396,23 @@ export function linuxBackend(
         width: Math.max(all.x + all.width, next.x + next.width) - Math.min(all.x, next.x),
         height: Math.max(all.y + all.height, next.y + next.height) - Math.min(all.y, next.y),
       }, undefined)
-      const offset = (value: number): string => {
-        const rounded = Math.round(value)
-        return rounded < 0 ? String(rounded) : `+${String(rounded)}`
-      }
-      const crop = display === undefined ? [] : ['-crop', `${int(display.width)}x${int(display.height)}${offset(display.x)}${offset(display.y)}`]
       const scale = area === undefined ? 1 : fitScale(area.width, area.height, maxDimension)
-      const resize = scale < 1 ? ['-resize', `${int(maxDimension)}x${int(maxDimension)}>`] : []
-      await helper('import', ['-window', 'root', ...crop, ...resize, path])
+      await shoot(path, display, scale < 1 ? maxDimension : undefined)
       return { width: Math.round((area?.width ?? 0) * scale), height: Math.round((area?.height ?? 0) * scale), scale }
     },
     async pointer(x, y, button, count, modifiers, signal) {
+      if (wayland) {
+        if (button !== 'none' && modifiers !== undefined) await helper('ydotool', ydotoolHoldArgs(modifiers.x11, true), signal)
+        try {
+          await ydoMove(x, y, signal)
+          if (button !== 'none') {
+            await helper('ydotool', ['click', '--repeat', String(count), '--next-delay', '60', ydotoolClickCode(button, 'click')], signal)
+          }
+        } finally {
+          if (button !== 'none' && modifiers !== undefined) await helper('ydotool', ydotoolHoldArgs(modifiers.x11, false))
+        }
+        return
+      }
       const held = button === 'none' || modifiers === undefined ? [] : modifiers.x11.split('+')
       const press = button === 'none' ? [] : [
         ...held.flatMap(key => ['keydown', key]),
@@ -1272,47 +1422,77 @@ export function linuxBackend(
       await helper('xdotool', ['mousemove', '--sync', int(x), int(y), ...press], signal)
     },
     async drag(fromX, fromY, toX, toY, button, signal) {
-      await helper('xdotool', linuxDragArgs(fromX, fromY, toX, toY, X11_BUTTONS[button]), signal)
+      if (!wayland) {
+        await helper('xdotool', linuxDragArgs(fromX, fromY, toX, toY, X11_BUTTONS[button]), signal)
+        return
+      }
+      await ydoMove(fromX, fromY, signal)
+      await helper('ydotool', ['click', ydotoolClickCode(button, 'down')], signal)
+      try {
+        const steps = Math.max(8, Math.min(40, Math.round((Math.abs(toX - fromX) + Math.abs(toY - fromY)) / 25)))
+        for (let step = 1; step <= steps; step++) {
+          await helper('ydotool', ydotoolMoveArgs(fromX + (toX - fromX) * step / steps, fromY + (toY - fromY) * step / steps))
+        }
+      } finally {
+        await helper('ydotool', ['click', ydotoolClickCode(button, 'up')])
+      }
     },
     async scroll(x, y, clicks, horizontal, signal) {
-      const wheel = horizontal ? (clicks > 0 ? '7' : '6') : (clicks > 0 ? '4' : '5')
-      await helper('xdotool', ['mousemove', '--sync', int(x), int(y), 'click', '--repeat', String(Math.abs(Math.round(clicks))), wheel], signal)
+      if (!wayland) {
+        const wheel = horizontal ? (clicks > 0 ? '7' : '6') : (clicks > 0 ? '4' : '5')
+        await helper('xdotool', ['mousemove', '--sync', int(x), int(y), 'click', '--repeat', String(Math.abs(Math.round(clicks))), wheel], signal)
+        return
+      }
+      await ydoMove(x, y, signal)
+      // ydotool wheel steps: positive y scrolls up, so a downward scroll (positive clicks) is negative.
+      const amount = String(-Math.round(clicks))
+      await helper('ydotool', ['mousemove', '--wheel', '-x', horizontal ? String(Math.round(clicks)) : '0', '-y', horizontal ? '0' : amount], signal)
     },
     async keys(chords, signal) {
-      await helper('xdotool', ['key', '--clearmodifiers', ...chords.map(chord => chord.x11)], signal)
+      await tool(ydotoolKeyArgs(chords.map(chord => chord.x11)), ['key', '--clearmodifiers', ...chords.map(chord => chord.x11)], signal)
     },
     async pressButton(x, y, pressed, down, signal) {
+      if (wayland) {
+        if (x !== undefined && y !== undefined) await ydoMove(x, y, signal)
+        await helper('ydotool', ['click', ydotoolClickCode(pressed, down ? 'down' : 'up')], signal)
+        return
+      }
       const move = x === undefined || y === undefined ? [] : ['mousemove', '--sync', int(x), int(y)]
       await helper('xdotool', [...move, down ? 'mousedown' : 'mouseup', X11_BUTTONS[pressed]], signal)
     },
     async holdKeys(chord, down, signal) {
-      await helper('xdotool', [down ? 'keydown' : 'keyup', chord.x11], signal)
+      await tool(ydotoolHoldArgs(chord.x11, down), [down ? 'keydown' : 'keyup', chord.x11], signal)
     },
     async type(text, paste, signal) {
-      // Long text goes through the clipboard (xclip), putting the earlier clipboard text back; without xclip it is typed.
+      // Long text goes through the clipboard (wl-clipboard on Wayland, xclip on X11), putting the earlier clipboard
+      // text back; without the clipboard tool it is typed.
       if (paste === true) {
-        const pasted = await run('sh', ['-c', LINUX_PASTE, 'sh', text], 30_000).then(out => out.trim() === 'PASTED', () => false)
+        const pasted = await run('sh', ['-c', wayland ? WAYLAND_PASTE : LINUX_PASTE, 'sh', text], 30_000).then(out => out.trim() === 'PASTED', () => false)
         if (pasted) return
       }
-      // xdotool waits 12 ms per character, so long text needs more than the default limit.
-      await helper('xdotool', ['type', '--clearmodifiers', '--delay', '12', '--', text], signal, 30_000 + text.length * 15)
+      // Both tools wait 12 ms per character, so long text needs more than the default limit.
+      await tool(['type', '--key-delay', '12', '--', text], ['type', '--clearmodifiers', '--delay', '12', '--', text], signal, 30_000 + text.length * 15)
     },
-    async windows() {
-      const active = await helper('xdotool', ['getactivewindow']).then(out => Number(out.trim()), () => undefined)
-      return parseWmctrl(await helper('wmctrl', ['-lpG']), active)
-    },
+    windows,
     async window(handle, action, signal) {
       const id = hex(handle)
-      if (action === 'focus' || action === 'restore') await helper('wmctrl', ['-ia', id], signal)
-      else if (action === 'minimize') await helper('xdotool', ['windowminimize', String(Math.trunc(handle))], signal)
-      else if (action === 'maximize') await helper('wmctrl', ['-ir', id, '-b', 'add,maximized_vert,maximized_horz'], signal)
-      else await helper('wmctrl', ['-ic', id], signal)
+      if (action === 'focus' || action === 'restore') {
+        await manage(handle, action === 'restore' ? 'scratchpad show, focus' : 'focus', ['focuswindow $W'], () => helper('wmctrl', ['-ia', id], signal).then(() => {}), signal)
+      } else if (action === 'minimize') {
+        await manage(handle, 'move scratchpad', ['movetoworkspacesilent special,$W'],
+          () => helper('xdotool', ['windowminimize', String(Math.trunc(handle))], signal).then(() => {}), signal)
+      } else if (action === 'maximize') {
+        await manage(handle, 'fullscreen enable', ['focuswindow $W', 'fullscreen 1'],
+          () => helper('wmctrl', ['-ir', id, '-b', 'add,maximized_vert,maximized_horz'], signal).then(() => {}), signal)
+      } else {
+        await manage(handle, 'kill', ['closewindow $W'], () => helper('wmctrl', ['-ic', id], signal).then(() => {}), signal)
+      }
     },
     async open(target) {
       await helper('xdg-open', [target])
     },
     async readText(handle) {
-      const window = parseWmctrl(await helper('wmctrl', ['-lpG'])).find(candidate => candidate.handle === handle)
+      const window = (await windows()).find(candidate => candidate.handle === handle)
       if (window === undefined) throw new Error(`no window with handle ${String(handle)}`)
       try {
         return await run('python3', ['-c', ATSPI_READER, String(window.pid), window.title])
@@ -1324,8 +1504,12 @@ export function linuxBackend(
     },
     async place(handle, x, y, width, height, signal) {
       const id = hex(handle)
-      await helper('wmctrl', ['-ir', id, '-b', 'remove,maximized_vert,maximized_horz'], signal)
-      await helper('wmctrl', ['-ir', id, '-e', `0,${int(x)},${int(y)},${int(width)},${int(height)}`], signal)
+      await manage(handle, `floating enable, move absolute position ${int(x)} ${int(y)}, resize set ${int(width)} ${int(height)}`,
+        ['setfloating $W', `movewindowpixel exact ${int(x)} ${int(y)},$W`, `resizewindowpixel exact ${int(width)} ${int(height)},$W`],
+        async () => {
+          await helper('wmctrl', ['-ir', id, '-b', 'remove,maximized_vert,maximized_horz'], signal)
+          await helper('wmctrl', ['-ir', id, '-e', `0,${int(x)},${int(y)},${int(width)},${int(height)}`], signal)
+        }, signal)
     },
     async launch(app) {
       const name = app.trim()
@@ -1339,8 +1523,7 @@ export function linuxBackend(
     async ocr(area) {
       const file = join(await mkdtemp(join(tmpdir(), 'hackdev-ocr-')), 'area.png')
       try {
-        const offset = (value: number): string => (Math.round(value) < 0 ? '' : '+') + int(value)
-        await helper('import', ['-window', 'root', '-crop', `${int(area.width)}x${int(area.height)}${offset(area.x)}${offset(area.y)}`, file])
+        await shoot(file, area)
         const tsv = await run('tesseract', [file, '-', 'tsv']).catch((error: unknown) => {
           throw new Error(`${String(error instanceof Error ? error.message : error)}. Reading text from the screen uses tesseract: install it with sudo apt-get install -y tesseract-ocr`, { cause: error })
         })

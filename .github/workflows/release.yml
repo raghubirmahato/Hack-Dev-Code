@@ -57,9 +57,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # The checkout is a git repository, so the build stamps the commit itself.
       - name: Build
-        shell: bash
-        run: DSH_CLIENT_COMMIT_HASH="${GITHUB_SHA::7}" pnpm run build:artifacts
+        run: pnpm run build:artifacts
 
       - name: Package the installer
         run: pnpm run package:desktop:win:x64:unsigned

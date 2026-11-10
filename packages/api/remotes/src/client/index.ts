@@ -18,6 +18,7 @@ import toolResultsRemote from '@hackdevcode/dsh-client-ui-trajectory/remote'
 import pluginRegistryProbeRemote from '@hackdevcode/dsh-client-ui-plugin-manager/remote'
 import pluginMarketRemote from '@hackdevcode/dsh-plugin-market/remote'
 import pluginInventoryRemote from '@hackdevcode/dsh-host-plugin-inventory/remote'
+import customizeRemote from '@hackdevcode/dsh-customize/remote'
 import messageFeedbackRemote from '@hackdevcode/dsh-message-feedback/remote'
 import permissionPresetsRemote from '@hackdevcode/dsh-permission-presets/remote'
 import sessionFeedbackRemote from '@hackdevcode/dsh-command-feedback/remote'
@@ -49,6 +50,7 @@ export type {
   MarketQuery, MarketSearchResult, MarketSort, PluginDetail, PluginDetailDocumentId, PluginDetailOrigin,
 } from '@hackdevcode/dsh-plugin-market/types'
 export type { PluginInventorySnapshot } from '@hackdevcode/dsh-host-plugin-inventory/types'
+export type { CustomizeSnapshot } from '@hackdevcode/dsh-customize/types'
 export type {} from '@hackdevcode/dsh-agent-preset-registry/remote'
 export type {} from '@hackdevcode/dsh-user-questions/remote'
 export type {} from '@hackdevcode/dsh-commands/remote'
@@ -59,6 +61,7 @@ export type {} from '@hackdevcode/dsh-schedule/remote'
 export type {} from '@hackdevcode/dsh-office-to-pdf/remote'
 export type {} from '@hackdevcode/dsh-llm/remote'
 export type {} from '@hackdevcode/dsh-host-plugin-inventory/remote'
+export type {} from '@hackdevcode/dsh-customize/remote'
 export type {} from '@hackdevcode/dsh-message-feedback/remote'
 export type {} from '@hackdevcode/dsh-permission-presets/remote'
 export type {} from '@hackdevcode/dsh-command-feedback/remote'
@@ -191,7 +194,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
     for (const contribution of [
       productAnalyticsRemote, agentPresetsRemote, commandsRemote, settingsControllerRemote, accountRemote,
       goalsRemote, llmRemote, dynamicRemote, scheduleRemote,
-      pluginInventoryRemote, pluginManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote, toolResultsRemote,
+      customizeRemote, pluginInventoryRemote, pluginManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote, toolResultsRemote,
       messageFeedbackRemote, sessionFeedbackRemote,
       fileUploadsRemote, sessionReferencesRemote,
       permissionPresetsRemote, subagentsRemote, sessionRemote, jobRemote, workspaceRemote, workspaceFilesRemote, terminalRemote,

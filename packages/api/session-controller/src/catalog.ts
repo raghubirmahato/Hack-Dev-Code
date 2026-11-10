@@ -3,6 +3,7 @@
 import { RemoteError } from '@hackdevcode/dsh-typert-protocol'
 import { credentialRef } from '@hackdevcode/dsh-credentials'
 import type {} from '@hackdevcode/dsh-settings'
+import { ReasoningEffortId } from '@hackdevcode/dsh-llm'
 import type { LlmModelInfo } from '@hackdevcode/dsh-llm'
 import type { Context } from '@hackdevcode/cordis'
 import type {
@@ -114,4 +115,30 @@ export async function hasProviderApiKey(ctx: Context): Promise<boolean> {
       && (await credentials.describe(credentialRef(ref))).configured) return true
   }
   return false
+}
+
+/**
+ * Make the default model one that works. When no default was ever chosen, or the default's provider is not
+ * registered or offers no models without failing (a provider with no key), save the first available model. A
+ * provider that failed to list (Ollama not running yet) keeps its default, so a passing outage never replaces it.
+ * DeepSeek is chosen only when no other provider offers a model.
+ * @param ctx - Host LLM registry and default-model service.
+ * @param catalog - an already built catalog, to avoid listing twice.
+ * @returns the catalog with the default it now holds.
+ */
+export async function ensureUsableDefault(ctx: Context, catalog?: ModelCatalog): Promise<ModelCatalog> {
+  const current = catalog ?? await buildModelCatalog(ctx)
+  const chosen = current.default
+  const usable = current.groups.some(group => group.id === chosen.provider && group.models.some(model => model.id === chosen.model))
+  const failing = current.failures.some(failure => failure.id === chosen.provider)
+  // DeepSeek is not the preferred default: another working provider (a local model, or one the person added) comes first.
+  const first = current.groups.find(group => !group.id.startsWith('deepseek')) ?? current.groups[0]
+  const model = first?.models[0]
+  if (usable || (failing && chosen.provider !== '') || first === undefined || model === undefined) return current
+  const effort = model.reasoning?.defaultEffort
+  await ctx.agentDefaultModel.saveSelection({
+    provider: first.id, model: model.id, ...effort === undefined ? {} : { reasoningEffort: ReasoningEffortId(effort) },
+  })
+  const selection: ModelSelection = { provider: first.id, model: model.id, ...effort === undefined ? {} : { reasoningEffort: effort } }
+  return { ...current, default: selection }
 }

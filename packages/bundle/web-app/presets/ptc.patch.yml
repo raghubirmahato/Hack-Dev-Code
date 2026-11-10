@@ -108,11 +108,6 @@
               - id: tool-workflow
                 name: '@hackdevcode/dsh-tool-workflow'
                 disabled: true
-              - id: tool-hackdev
-                name: '@hackdevcode/dsh-tool-hackdev'
-                disabled: true
-                config:
-                  subagentProvider: spawn
           - id: tool-ask-user
             name: '@hackdevcode/dsh-tool-ask-user'
           - id: tool-todo

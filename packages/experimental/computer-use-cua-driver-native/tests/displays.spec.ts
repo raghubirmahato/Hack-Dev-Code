@@ -36,10 +36,11 @@ describe('Linux displays', () => {
     ])
   })
 
-  it('tells how to install a missing helper, or that Wayland needs an Xorg session', async () => {
+  it('tells how to install a missing helper on X11 and on Wayland', async () => {
     const missing: CommandRunner = async () => { throw new Error('spawn xrandr ENOENT') }
     await expect(linuxBackend(missing, { DISPLAY: ':0' }).list()).rejects.toThrow('sudo apt-get install -y x11-xserver-utils xdotool imagemagick')
-    await expect(linuxBackend(missing, { WAYLAND_DISPLAY: 'wayland-0' }).list()).rejects.toThrow('Xorg session')
+    // A Wayland session without XWayland lists its displays through wlr-randr.
+    await expect(linuxBackend(missing, { WAYLAND_DISPLAY: 'wayland-0' }).list()).rejects.toThrow('install wlr-randr or enable XWayland')
   })
 })
 
@@ -279,7 +280,7 @@ describe('Linux window text and modifier clicks', () => {
     }
     const backend = linuxBackend(run, { DISPLAY: ':0' })
     await expect(backend.readText(0x1400007)).resolves.toBe('Frame: Calculator\n  Label: 56\n')
-    expect(calls).toEqual([['wmctrl', '-lpG'], ['python3', '4321', 'Calculator']])
+    expect(calls).toEqual([['xdotool', 'getactivewindow'], ['wmctrl', '-lpG'], ['python3', '4321', 'Calculator']])
     await expect(backend.readText(5)).rejects.toThrow('no window with handle 5')
   })
 

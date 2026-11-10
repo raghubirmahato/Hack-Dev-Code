@@ -87,11 +87,13 @@
 
     # The transport-independent default for Agents created by entry points.
     # Settings may supply a saved selection; consumers read it at creation time.
+    # No preset model: the Session controller saves the first model that works (a local Ollama model or a provider
+    # with a key) the first time the model list is read or a Session is created.
     - id: agent-default-model
       name: '@hackdevcode/dsh-agent-default-model'
       config:
-        provider: deepseek-official
-        model: deepseek-flash
+        provider: ''
+        model: ''
 
     - id: jobs
       name: '@hackdevcode/dsh-jobs-local'
@@ -420,22 +422,6 @@
     - id: tool-workflow
       name: '@hackdevcode/dsh-tool-workflow'
 
-    # Hack Dev Code mission pipeline: a planning council that sizes a specialist
-    # team, waves of parallel builders over a shared blackboard, fact-checking,
-    # verifier / quality+UX (screenshots) / security gates and an integrator that
-    # starts follow-up waves for unmet acceptance criteria. Reuses the workflow
-    # engine and the fresh `spawn` subagent provider above. `visionModel` may name
-    # an image-capable model for the quality/UX gate (empty inherits the route).
-    - id: tool-hackdev
-      name: '@hackdevcode/dsh-tool-hackdev'
-      config:
-        subagentProvider: spawn
-        maxTasks: 24
-        maxParallel: 6
-        maxWaves: 6
-        maxFixRounds: 4
-        builderIsolation: worktree
-
     - id: timeout-policy
       name: '@hackdevcode/dsh-tool-call-timeout-policy'
 
@@ -565,5 +551,7 @@
     - id: llm-deepseek
       name: '@hackdevcode/dsh-llm-deepseek-api-key'
 
+    # DeepSeek account sign-in is not offered; DeepSeek is used through an API key like any other provider.
     - id: llm-deepseek-account
       name: '@hackdevcode/dsh-llm-deepseek-account'
+      disabled: true

@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { X509Certificate } from 'node:crypto'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -6,6 +6,9 @@ import { join, resolve } from 'node:path'
 import { rootCertificates } from 'node:tls'
 import { expect, it, vi } from 'vitest'
 import { inspectWindowsTokenIdentity, windowsTokenIdentityFailure } from '../scripts/windows-token-identity.ts'
+
+/** The release tooling these tests drive runs on PowerShell 7 (pwsh); without it they are skipped, not failed. */
+const hasPwsh = process.platform === 'win32' && spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', '$true'], { encoding: 'utf8' }).status === 0
 
 const launch = vi.hoisted(() => vi.fn(async (_file: string, _args: string[], _options: { env: NodeJS.ProcessEnv; timeout: number }) => ({ stdout: '', stderr: '' })))
 vi.mock('node:child_process', async (importOriginal) => {
@@ -90,7 +93,7 @@ it('reports a missing query launcher without exposing process diagnostics or ret
   expect(message).toContain('no signing was attempted')
 })
 
-it.skipIf(process.platform !== 'win32')('exercises native control flow with a fake CSP and never constructs the native adapter', () => {
+it.skipIf(!hasPwsh)('exercises native control flow with a fake CSP and never constructs the native adapter', () => {
   const root = mkdtempSync(join(tmpdir(), 'token-public-test-'))
   try {
     const source = resolve(import.meta.dirname, '../scripts/windows-token-public-key.cs')

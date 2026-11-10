@@ -34,7 +34,7 @@ describe('the Ollama card', () => {
     await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true) })
     expect(writeSettings).toHaveBeenCalledWith('llm-pi-ai', [{
       op: 'set', path: ['providers', 'ollama-2'],
-      value: { displayName: 'Ollama (ollama-2)', apiKeyEnv: 'OLLAMA_2_API_KEY', api: 'openai-completions', baseURL: OLLAMA_BASE_URL, models: [{ id: 'qwen2.5-coder:7b' }] },
+      value: { displayName: 'Ollama (ollama-2)', apiKeyEnv: 'OLLAMA_2_API_KEY', api: 'openai-completions', baseURL: OLLAMA_BASE_URL, models: [{ id: 'qwen2.5-coder:7b', contextWindow: 32768 }] },
     }], 4)
     expect(storeCredential).toHaveBeenCalledWith('OLLAMA_2_API_KEY', 'ollama')
   })

@@ -24,6 +24,12 @@ export const OLLAMA_BASE_URL = 'http://127.0.0.1:11434/v1'
 /** Placeholder key: Ollama accepts any. */
 const OLLAMA_KEY = 'ollama'
 
+/**
+ * Context recorded for a model Ollama does not report one for. Hack Dev Code serves Ollama models through a variant
+ * with this context (see dsh-llm-pi-ai's ollama-context), so compaction keeps conversations within it.
+ */
+const OLLAMA_CONTEXT_WINDOW = 32_768
+
 /** Props of {@link OllamaProviderCard}. */
 export interface OllamaProviderCardProps {
   /** Route ids already declared, so the card picks a free one. */
@@ -117,7 +123,7 @@ export function OllamaProviderCard(props: OllamaProviderCardProps): ReactNode {
           models: chosen.map(model => ({
             id: model.id,
             ...model.name === undefined ? {} : { name: model.name },
-            ...model.contextWindow === undefined ? {} : { contextWindow: model.contextWindow },
+            contextWindow: model.contextWindow ?? OLLAMA_CONTEXT_WINDOW,
             ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
           })),
         } as JsonValue,

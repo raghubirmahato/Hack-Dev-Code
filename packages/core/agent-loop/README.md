@@ -169,7 +169,7 @@ Prefix reuse requires earlier messages and declarations to stay byte-identical u
 
 #### What the model sees
 
-With custom instructions set, the system prompt carries a `policy:custom-instructions` section after the tool documentation (order `CUSTOM_INSTRUCTIONS`): the person's standing orders, to be applied directly and completely without asking, debating or weakening them, overriding the model's own defaults and yielding only to an explicit contradicting request in the current conversation, followed by the numbered rules in a `<custom_instructions>` block. On the first step of each turn a context message beside the newest message reads `Apply the person's N custom instructions directly in this turn.`
+With custom instructions set, the system prompt carries a `policy:custom-instructions` section after the tool documentation (order `CUSTOM_INSTRUCTIONS`): the person's standing orders, to be applied directly and completely without asking, debating or weakening them, overriding the model's own defaults and yielding only to an explicit contradicting request in the current conversation, followed by the numbered rules in a `<custom_instructions>` block. On the first step of each turn a context message placed just before the person's newest message reads `(Note from Hack Dev Code, not a request from the person: keep following the person's N custom instructions from the system prompt. Reply to the person's message that follows.)`; it comes before the message so a model answers the person rather than the note.
 
 #### Token effect
 

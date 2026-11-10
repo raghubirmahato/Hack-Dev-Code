@@ -29,6 +29,7 @@ const EXTERNAL_KIT_PACKAGES = new Set(['@deepseek-ai/libreoffice-kit'])
  */
 export const DEFAULT_ON_EXPERIMENTAL: ReadonlySet<string> = new Set([
   '@hackdevcode/dsh-cua-bundle',
+  '@hackdevcode/dsh-experimental-plugin-market-bundle',
   '@hackdevcode/dsh-cua',
   '@hackdevcode/dsh-experimental-cua-macos',
   '@hackdevcode/dsh-experimental-computer-use-cua-driver-native',

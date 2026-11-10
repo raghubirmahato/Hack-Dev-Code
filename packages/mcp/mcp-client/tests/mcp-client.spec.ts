@@ -1088,6 +1088,20 @@ describe('tool execution', () => {
 })
 
 describe('createTransport', () => {
+  it('hands an HTTP transport the sign-in it was given, and ignores it for stdio', () => {
+    const http: Config = {
+      transport: 'streamable-http', serverName: 'srv', url: 'http://localhost:3000/mcp', headers: {},
+      toolCallTimeoutMs: 60_000, failOnStartupError: false,
+    }
+    const provider = { tokens: () => undefined } as unknown as Parameters<typeof createTransport>[1]
+    expect(createTransport(http, provider)).toHaveProperty('_authProvider', provider)
+    expect(createTransport(http)).not.toHaveProperty('_authProvider', provider)
+    const stdio: Config = {
+      transport: 'stdio', serverName: 'srv', command: 'node', args: [], env: {}, cwd: '.', toolCallTimeoutMs: 60_000, failOnStartupError: false,
+    }
+    expect(createTransport(stdio, provider)).not.toHaveProperty('_authProvider')
+  })
+
   it('creates StdioClientTransport for stdio config', () => {
     const config: Config = {
       transport: 'stdio',

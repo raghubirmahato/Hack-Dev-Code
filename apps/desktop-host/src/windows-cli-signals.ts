@@ -20,4 +20,8 @@ export async function installWindowsCliSignals(): Promise<void> {
     koffi.unregister(handler)
     throw new Error('desktop CLI: cannot register the Windows console handler')
   }
+  // A process inherits "ignore Ctrl+C" from a parent that set it (some IDEs and launchers do), and Windows then never
+  // delivers CTRL_C_EVENT to any handler. Restore normal Ctrl+C processing so Ctrl+C always reaches SIGINT.
+  const restore = kernel.func('int __stdcall SetConsoleCtrlHandler(void *handler, int add)')
+  restore(null, 0)
 }

@@ -215,7 +215,11 @@ describe.skipIf(!windowsNative)('Windows Job native containment', () => {
     copyFileSync(process.execPath, join(scratch, relativeExecutable))
     const relative = spec([relativeExecutable, '-e', 'process.exit(17)'])
     const relativeHandle = bindManagedProcess(relative, launchWindowsJob(relative, targetEnvironment(relative)))
-    await expect(relativeHandle.done).resolves.toEqual({ exitCode: 17, signal: null })
+    // With NoDefaultCurrentDirectoryInExePath set, Windows does not look in the working directory, so the
+    // relative name is not found there; the runner must report that the same way Windows does.
+    const skipsWorkingDirectory = Object.keys(process.env).some(name => name.toUpperCase() === 'NODEFAULTCURRENTDIRECTORYINEXEPATH')
+    if (skipsWorkingDirectory) await expect(relativeHandle.done).rejects.toMatchObject({ code: 'ENOENT' })
+    else await expect(relativeHandle.done).resolves.toEqual({ exitCode: 17, signal: null })
     await expect(relativeHandle.waitForExit()).resolves.toBe(true)
 
     const missing = spec([`missing-native-target-${Date.now()}.exe`])

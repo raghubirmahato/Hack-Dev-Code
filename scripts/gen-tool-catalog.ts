@@ -85,7 +85,6 @@ import * as ToolWeb from '@hackdevcode/dsh-tool-web'
 import WorkflowEngine from '@hackdevcode/dsh-workflow'
 import type { WorkflowRun, WorkflowStartRequest } from '@hackdevcode/dsh-workflow'
 import * as ToolRalph from '@hackdevcode/dsh-tool-ralph'
-import * as ToolHackdev from '@hackdevcode/dsh-tool-hackdev'
 import * as ToolWorkflow from '@hackdevcode/dsh-tool-workflow'
 import * as ToolWorkspaceDependencies from '@hackdevcode/dsh-tool-workspace-dependencies'
 import { githubSlug } from './github-slug.ts'
@@ -505,21 +504,6 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap.',
-  },
-  {
-    pkg: '@hackdevcode/dsh-tool-hackdev',
-    dir: 'tool-hackdev',
-    source: 'packages/hackdev/tool-hackdev/src/index.ts',
-    requires: ['ctx.tools', 'ctx.workflowEngine', 'ctx.subagents', 'ctx.systemPrompt', 'a calling Agent (exec.agent parents every pipeline child)'],
-    writes: ['tool/call', 'tool/result', 'workflow and child session events during execution'],
-    async mount(ctx) {
-      await ctx.plugin(SubagentRuntime)
-      registerCatalogSubagentProvider(ctx, 'mock')
-      await ctx.plugin(CatalogWorkflowEngine)
-      await ctx.plugin(ToolHackdev, { subagentProvider: 'mock' })
-    },
-    note:
-      'Two fixed pipelines (hackdev and hackdev_review) run a planning council, parallel builders with shared memory and three review gates over the workflow seam; the model selects only the mission text and optional caps within deployment ceilings.',
   },
   {
     pkg: '@hackdevcode/dsh-tool-skill',

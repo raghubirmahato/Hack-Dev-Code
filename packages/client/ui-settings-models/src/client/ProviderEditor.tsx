@@ -30,7 +30,7 @@ import {
   DeepSeekModelsEditor, modelDrafts, validateDeepSeekModels,
 } from './DeepSeekModelsEditor.tsx'
 import type { DeepSeekModelsValidationFailure } from './DeepSeekModelsEditor.tsx'
-import { apiKeyFailure } from './apiKey.ts'
+import { apiKeyFailure, storedKeys } from './apiKey.ts'
 import { EditorFooter } from './EditorFooter.tsx'
 import { ModelListEditor } from './ModelListEditor.tsx'
 import { validateReasoningEfforts } from './ModelReasoningEfforts.tsx'
@@ -240,7 +240,7 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
   // removed. A blank field yields an empty string, which both call sites read
   // as "no key supplied" rather than as a key — that is how a card whose
   // provider already has a stored key is edited without re-entering it.
-  const keyValue = keyDraft.trim()
+  const keyValue = storedKeys(keyDraft)
   const credentialRequiredFailure = props.credentialRequired === true
     && keyDraft.length > 0 && keyValue.length === 0
     ? 'keyRequired' as const

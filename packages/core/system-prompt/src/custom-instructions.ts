@@ -78,10 +78,12 @@ export function renderCustomInstructions(text: string, options: CustomInstructio
 }
 
 /**
- * A one-line reminder placed next to the newest message, where models weigh instructions most.
+ * A one-line note placed just before the newest message, where models weigh instructions most. It says plainly that
+ * it is not the person's request, so a small model answers the message that follows instead of the note.
  * @param count - number of rules in effect.
  * @returns the reminder.
  */
 export function customInstructionsReminder(count: number): string {
-  return `Apply the person's ${String(count)} custom instruction${count === 1 ? '' : 's'} directly in this turn.`
+  return `(Note from Hack Dev Code, not a request from the person: keep following the person's ${String(count)} custom instruction${count === 1 ? '' : 's'} `
+    + 'from the system prompt. Reply to the person\'s message that follows.)'
 }

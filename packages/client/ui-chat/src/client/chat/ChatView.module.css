@@ -82,14 +82,14 @@
 }
 
 /* Process rows sit 4px apart; an Assistant response is separated from its
-   neighbours by 12px. */
+   neighbours by 8px. */
 .flowItem[data-chat-group-part="response"] {
-  --dsh-chat-flow-gap: 12px;
+  --dsh-chat-flow-gap: 8px;
 }
 
 :is(.column, :global([data-slot="conversation.chat.flow"])) > [data-chat-group-part="response"]:not([hidden]):not(:empty)
   + :not([hidden]):not(.flowItem:is(:empty, :has(> [data-slot="conversation.chat.node"]:empty))):not(.running):not(:has(> [data-slot="conversation.chat.node"] > [data-chat-steering-batch])) {
-  --dsh-chat-flow-gap: 12px;
+  --dsh-chat-flow-gap: 8px;
 }
 
 /* Settled-flow identity boundary. It is neutral until it becomes the natural
@@ -129,17 +129,17 @@
   }
 }
 
-/* The Turn header has 16px clearance from its input and following content. A
+/* The Turn header has 10px clearance from its input and following content. A
    running Turn's control renders empty until the Turn closes; an echo after it
    is still an opening input of that Turn, so it keeps the input gap. */
 .flowItem[data-chat-flow-kind="turn-process"],
 :is(.column, :global([data-slot="conversation.chat.flow"])) > [data-chat-flow-kind="turn-process"]:not(:empty, :has(> [data-slot="conversation.chat.node"]:empty)) + :not([hidden]):not(.flowItem:is(:empty, :has(> [data-slot="conversation.chat.node"]:empty))):not(.running):not(:has(> [data-slot="conversation.chat.node"] > [data-chat-steering-batch])),
 :is(.column, :global([data-slot="conversation.chat.flow"])) > [data-chat-flow-kind="turn-process"] + :not([hidden]):not(.flowItem:is(:empty, :has(> [data-slot="conversation.chat.node"]:empty))):not(.running):not([data-submission-echo], [data-pending-steering]):not(:has(> [data-slot="conversation.chat.node"] > [data-chat-steering-batch])) {
-  --dsh-chat-flow-gap: 16px;
+  --dsh-chat-flow-gap: 10px;
 }
 
 /* Tail slot: the running status and a completed Turn's actions row both take
-   a 16px offset plus a 28px row. The steering renderer marks the first
+   an 8px offset plus a 28px row. The steering renderer marks the first
    steering row of each claim that Chat orders after the Turn's process
    control; that row keeps the slot above it, the way a completed Turn's
    actions row precedes the next user message, while rows claimed together
@@ -148,7 +148,7 @@
    without moving any bubble. Neighbour gap rules exclude the batch start so
    this slot always applies. */
 :is(.column, :global([data-slot="conversation.chat.flow"])) > .flowItem:has(> [data-slot="conversation.chat.node"] > [data-chat-steering-batch="start"]) {
-  --dsh-chat-flow-gap: calc(44px + var(--dsh-content-font-delta, 0px));
+  --dsh-chat-flow-gap: calc(36px + var(--dsh-content-font-delta, 0px));
 }
 
 .running + [data-pending-steering] {
@@ -184,7 +184,7 @@
 @keyframes running-enters-slot {
   from {
     opacity: 0;
-    translate: 0 calc(-44px - var(--dsh-content-font-delta, 0px));
+    translate: 0 calc(-36px - var(--dsh-content-font-delta, 0px));
   }
   40% {
     opacity: 1;
@@ -215,7 +215,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  --dsh-chat-flow-gap: 12px;
+  --dsh-chat-flow-gap: 8px;
   --dsw-alias-label-shimmer: var(--dsw-alias-label-deep-diving-shimmer);
   color: var(--dsw-alias-label-deep-diving);
   font-size: calc(var(--dsh-content-font-size, 14px) - 2px);

@@ -1,16 +1,15 @@
 # Hack Dev Code: conventions for coding agents and contributors
 
-Hack Dev Code is a TypeScript monorepo (pnpm workspaces, Node 24.9+). The agent runtime lives in `packages/` and `apps/`; its mission pipeline (the guild) lives in `packages/hackdev`. Read [README.md](README.md) first and [docs/hack-dev-code.md](docs/hack-dev-code.md) for the design.
+Hack Dev Code is a TypeScript monorepo (pnpm workspaces, Node 24.9+). The agent runtime (agent loop, subagents, workflow engine) lives in `packages/` and `apps/` and is the upstream DeepSeek Harness one; do not add a separate orchestration layer on top of it. Read [README.md](README.md) first.
 
 ## Layout
 
 - `packages/<group>/<package>`: one plugin or library per package. Everything is a Cordis plugin; services are declared by a `Context` and consumed through `inject`.
-- `packages/hackdev/tool-hackdev`: the mission pipeline (`src/script.ts` holds the fixed orchestration scripts).
-- `packages/hackdev/client-ui-hackdev`: the Web card for mission and gate-review results.
+- `packages/customize/*`: the Customize area (skills, plugin marketplaces, MCP servers and OAuth connectors) and its settings UI.
 - `packages/bundle/*`: product bundles. A tool or UI plugin is mounted by a row in a bundle's `cordis.patch.yml`; the Web app also needs rows in `packages/bundle/web-app/presets/*.patch.yml`.
 - `apps/cli`, `apps/web`, `apps/desktop`: command line, Web UI and desktop shell.
 - `vendor/`: vendored Cordis framework libraries. `native/`: the native sandbox helper.
-- `docs/`: the design doc plus generated `tool-catalog.md` and `config-catalog.md` (regenerate with `pnpm run gen-tool-catalog` and `pnpm run gen-config-catalog`).
+- `docs/`: generated `tool-catalog.md` and `config-catalog.md` (regenerate with `pnpm run gen-tool-catalog` and `pnpm run gen-config-catalog`).
 
 ## Commands
 

@@ -32,6 +32,12 @@
     workspaceRoot: !!js process.cwd()
     additionalWritableRoots: !!js ctx.headlessStartup.additionalWritableRoots
 
+# One-shot runs read DEEPSEEK_API_KEY (the GitHub review action and CI), so DeepSeek stays their default model.
+- id: agent-default-model
+  config:
+    provider: deepseek-official
+    model: deepseek-flash
+
 - id: hmr
   disabled: true
 

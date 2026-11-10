@@ -42,6 +42,7 @@ import type {
   RouteCatalog,
 } from './catalog.ts'
 import { buildProvider, supportedProtocols } from './provider.ts'
+import { OLLAMA_DEFAULT_NUM_CTX, isOllamaPort } from './ollama-context.ts'
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
@@ -477,7 +478,9 @@ export function resolveProfiles(
         ...source.modelOverrides === undefined ? {} : { modelOverrides: source.modelOverrides },
         ...source.compat === undefined ? {} : { compat: source.compat },
         defaultInput,
-        defaultContextWindow: source.defaultContextWindow ?? DEFAULT_CONTEXT_WINDOW,
+        // An Ollama route serves its models through a 32K-context variant (ollama-context.ts); compaction keeps to it.
+        defaultContextWindow: source.defaultContextWindow
+          ?? (isOllamaPort(source.baseURL) ? OLLAMA_DEFAULT_NUM_CTX : DEFAULT_CONTEXT_WINDOW),
         defaultMaxTokens: source.defaultMaxTokens ?? DEFAULT_MAX_TOKENS,
       }, validation)
       catalogError = catalog.modelErrors.values().next().value

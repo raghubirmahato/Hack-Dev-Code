@@ -17,8 +17,9 @@ export interface ProductPackagePolicy {
  */
 export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolicy>> = {
   'packages/core/agent-tool-presentation': { category: 'optional', reason: 'Deprecated selector retained for existing executor configurations.' },
-  'packages/browser-use/browser-use': { category: 'optional', reason: 'Service definition used by explicitly selected browser providers.' },
-  'packages/computer-use/computer-use': { category: 'optional', reason: 'Service definition used by explicitly selected computer providers.' },
+  'packages/client/ui-settings-account': { category: 'optional', reason: 'DeepSeek account pages, shipped switched off; models are configured with API keys.' },
+  'packages/fs/fs-observation-policy': { category: 'optional', reason: 'Read-before-write guard, shipped switched off; a deployment may enable its row.' },
+  'packages/llm/llm-deepseek-account': { category: 'optional', reason: 'DeepSeek account sign-in, shipped switched off; a deployment may enable its row.' },
   'packages/lsp/lsp': { category: 'optional', reason: 'Service definition for deployment-configured language servers.' },
   'packages/lsp/lsp-stdio': { category: 'optional', reason: 'Requires an explicit server list and language-server executables.' },
   'packages/lsp/tool-lsp': { category: 'optional', reason: 'Model tools selected together with a configured LSP provider.' },

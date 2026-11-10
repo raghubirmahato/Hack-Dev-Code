@@ -31,7 +31,8 @@
   "dependencies": {
     "@hackdevcode/dsh-experimental-browser-use-runtime": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~",
-    "chrome-devtools-mcp": "1.9.0"
+    "chrome-devtools-mcp": "1.9.0",
+    "ws": "^8.21.3"
   },
   "peerDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -43,16 +44,17 @@
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
-    "@hackdevcode/cordis-plugin-loader": "workspace:~",
     "@hackdevcode/cordis-plugin-include": "workspace:~",
-    "@hackdevcode/dsh-browser-use": "workspace:*",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
     "@hackdevcode/dsh-agent": "workspace:*",
     "@hackdevcode/dsh-agent-loop": "workspace:*",
+    "@hackdevcode/dsh-browser-use": "workspace:*",
     "@hackdevcode/dsh-llm": "workspace:*",
     "@hackdevcode/dsh-session": "workspace:*",
-    "@hackdevcode/dsh-tools": "workspace:*",
-    "@hackdevcode/dsh-system-prompt": "workspace:*",
     "@hackdevcode/dsh-session-projection": "workspace:*",
-    "@hackdevcode/dsh-working-directory": "workspace:*"
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@hackdevcode/dsh-working-directory": "workspace:*",
+    "@types/ws": "^8.18.1"
   }
 }

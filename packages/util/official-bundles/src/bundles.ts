@@ -12,7 +12,10 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
     bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-acp-app'],
   },
   web: {
-    bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app', '@hackdevcode/dsh-cua-bundle'],
+    bundles: [
+      '@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app', '@hackdevcode/dsh-cua-bundle',
+      '@hackdevcode/dsh-experimental-plugin-market-bundle',
+    ],
   },
   headless: {
     bundles: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-headless'],
@@ -26,13 +29,17 @@ export const PROFILE_TEMPLATES: Record<string, ProfileTemplate> = {
 }
 
 /**
- * Installation-owned bundle tuples that an earlier release wrote into a shipped profile; app-boot replaces an exact
- * match with the {@link PROFILE_TEMPLATES} entry of the same name and leaves every other list untouched.
+ * Installation-owned bundle tuples that earlier releases wrote into a shipped profile; app-boot replaces an exact
+ * match of any one with the {@link PROFILE_TEMPLATES} entry of the same name and leaves every other list untouched.
  */
-export const INSTALLATION_OWNED_PROFILE_TUPLES: Readonly<Record<string, readonly string[]>> = {
-  headless: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app', '@hackdevcode/dsh-headless'],
-  // Web profiles from before desktop and Chrome control was on by default.
-  web: ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app'],
+export const INSTALLATION_OWNED_PROFILE_TUPLES: Readonly<Record<string, readonly (readonly string[])[]>> = {
+  headless: [['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app', '@hackdevcode/dsh-headless']],
+  web: [
+    // Web profiles from before desktop and Chrome control was on by default.
+    ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app'],
+    // Web profiles from before the plugin marketplace was on by default.
+    ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app', '@hackdevcode/dsh-cua-bundle'],
+  ],
 }
 
 /** Bundles an earlier release shipped and the installation no longer carries; app-boot removes them from profiles. */
@@ -67,7 +74,6 @@ export const OPTIONAL_BUNDLES: readonly string[] = [
   '@hackdevcode/dsh-experimental-auto-review',
   '@hackdevcode/dsh-experimental-inspector-profile',
   '@hackdevcode/dsh-experimental-liveshare',
-  '@hackdevcode/dsh-experimental-plugin-market-bundle',
   '@hackdevcode/dsh-experimental-tool-worktree',
   '@hackdevcode/dsh-experimental-forge-bundle',
 ]

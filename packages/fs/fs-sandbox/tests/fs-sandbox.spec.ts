@@ -9,6 +9,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { realpathSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -41,7 +42,9 @@ beforeEach(async ({ onTestFinished }) => {
   // Both siblings must be outside automatic temp grants for containment denials to be meaningful.
   const directory = await mkdtemp(join(outsideTempWorkspaceParent(), '.dsh-fssbx-'))
   onTestFinished(async () => { await rm(directory, { recursive: true, force: true }) })
-  base = directory
+  // The physical path: Windows can redirect a packaged app's AppData writes (MSIX), and containment compares
+  // physical paths, so the fixture must start from the path the sandbox resolves to.
+  base = realpathSync.native(directory)
   assertWorkspaceOutsideTemp(base)
   workspace = join(base, 'ws')
   outside = join(base, 'out')

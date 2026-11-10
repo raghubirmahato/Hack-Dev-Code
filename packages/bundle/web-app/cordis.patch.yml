@@ -110,6 +110,8 @@
     # Read-only projection of current Loader entries for trusted client RPCs.
     - id: plugin-inventory
       name: '@hackdevcode/dsh-host-plugin-inventory'
+    - id: customize
+      name: '@hackdevcode/dsh-customize'
 
     # Session commands, cold reads, and live control over Typert Remote.
     - id: session-controller
@@ -320,6 +322,11 @@
     - id: ui-settings-plugin-inventory
       name: '@hackdevcode/dsh-client-ui-settings-plugin-inventory'
 
+    # Customize section in Settings: skills, connectors and MCP servers, over
+    # the `customize` Remote.
+    - id: ui-customize
+      name: '@hackdevcode/dsh-client-ui-customize'
+
     - id: ui-conversation
       name: '@hackdevcode/dsh-client-ui-conversation'
 
@@ -371,11 +378,6 @@
     # existing generic workflow tool row.
     - id: ui-workflow-run
       name: '@hackdevcode/dsh-client-ui-workflow-run'
-
-    # Hack Dev Code mission and gate-review card: tasks, gate verdicts, issues
-    # and human-approval items from the durable tool-result presentation meta.
-    - id: ui-hackdev
-      name: '@hackdevcode/dsh-client-ui-hackdev'
 
     # Input triggers: the '/' | '@' pipeline (ui-input-trigger), the command surface over
     # it (ui-commands), and the reference sources (ui-skill / ui-reference).
@@ -578,9 +580,6 @@
   disabled: true
 
 - id: tool-workflow
-  disabled: true
-
-- id: tool-hackdev
   disabled: true
 
 - id: agent-instructions

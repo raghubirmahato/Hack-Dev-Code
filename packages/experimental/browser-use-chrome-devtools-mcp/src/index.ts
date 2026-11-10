@@ -6,6 +6,7 @@ import Schema from '@hackdevcode/schemastery'
 import { mountSessionMcp, validateBrowserMcpConfig } from '@hackdevcode/dsh-experimental-browser-use-runtime/mcp'
 import type { BrowserMcpAttachConfig, BrowserMcpLaunchConfig } from '@hackdevcode/dsh-experimental-browser-use-runtime/mcp'
 import type {} from '@hackdevcode/dsh-working-directory'
+import { CdpRelay, chromeUserDataDir, readChromeEndpoint } from './relay.ts'
 
 /** Cordis identity for the Chrome DevTools MCP browser provider. */
 export const name = 'experimental-browser-use-chrome-devtools-mcp'
@@ -14,7 +15,8 @@ export const name = 'experimental-browser-use-chrome-devtools-mcp'
 export const inject = ['browserUse', 'agents', 'tools', 'systemPrompt', 'workingDirectory']
 
 /** Chrome release channel whose installation and profile are used. */
-export type ChromeChannel = 'stable' | 'beta' | 'dev' | 'canary'
+export type { ChromeChannel } from './relay.ts'
+import type { ChromeChannel } from './relay.ts'
 
 /** Capabilities shared by every Chrome connection mode. */
 export interface ChromeCapabilities {
@@ -117,15 +119,19 @@ export const Config: Schema<ConfigInput, Config> = Schema.union([
 /**
  * Upstream server arguments for one configuration.
  * @param config - validated browser choice.
+ * @param relay - for `connect`, the local relay endpoint that holds the one Chrome connection.
  * @returns arguments after the server entry point.
  */
-export function chromeArgs(config: Config): string[] {
+export function chromeArgs(config: Config, relay?: string): string[] {
   const args = ['--no-usage-statistics']
   if (config.mode === 'attach') {
     args.push(/^wss?:/u.test(config.endpoint) ? '--ws-endpoint' : '--browser-url', config.endpoint)
   } else if (config.mode === 'connect') {
-    args.push('--auto-connect')
-    if (config.channel !== undefined) args.push('--channel', config.channel)
+    if (relay !== undefined) args.push('--ws-endpoint', relay)
+    else {
+      args.push('--auto-connect')
+      if (config.channel !== undefined) args.push('--channel', config.channel)
+    }
   } else {
     if (config.isolated !== false) args.push('--isolated')
     args.push(`--headless=${String(config.headless)}`)
@@ -143,19 +149,35 @@ export function chromeArgs(config: Config): string[] {
 
 /**
  * Expose Chrome DevTools' upstream catalog through one MCP process per live Session.
- * Attached and connected browsers remain externally owned; the server disables usage statistics.
+ * Attached and connected browsers remain externally owned; the server disables usage statistics. A connected Chrome
+ * is reached through one relay connection shared by every Session, so Chrome asks for permission once.
  * @param ctx - provider context supplying browser use, Agents, and tools.
  * @param config - validated browser choice and optional tool timeout.
  */
-export function apply(ctx: Context, config: Config): void {
+export function apply(ctx: Context, config: Config): void | Promise<void> {
   if (config.mode === 'attach') validateBrowserMcpConfig(config)
+  if (config.mode !== 'connect') {
+    mount(ctx, config)
+    return
+  }
+  // Chrome asks the person to allow every new remote-debugging connection, so all Sessions share one through a
+  // local relay that connects on first use and stays connected while this provider is loaded.
+  const directory = chromeUserDataDir(config.channel)
+  const relay = new CdpRelay(() => readChromeEndpoint(directory))
+  // Registered before listening, so a provider unloaded while the relay starts still closes it.
+  ctx.effect(() => () => { void relay.close() }, 'chrome.relay')
+  return relay.start().then((endpoint) => { mount(ctx, config, endpoint) })
+}
+
+/** Mount one MCP server per live Session with the arguments for this configuration. */
+function mount(ctx: Context, config: Config, relay?: string): void {
   const cli = fileURLToPath(import.meta.resolve('chrome-devtools-mcp/build/src/bin/chrome-devtools-mcp.js'))
   mountSessionMcp(ctx, {
     name: 'chrome-devtools-mcp',
     // One Session at a time may drive a browser the person already owns.
     exclusive: config.mode !== 'launch',
     command: process.execPath,
-    args: [cli, ...chromeArgs(config)],
+    args: [cli, ...chromeArgs(config, relay)],
     ...config.onDemand === false ? {} : { toolGroup: CHROME_GROUP },
     ...config.toolCallTimeoutMs === undefined ? {} : { toolCallTimeoutMs: config.toolCallTimeoutMs },
   })

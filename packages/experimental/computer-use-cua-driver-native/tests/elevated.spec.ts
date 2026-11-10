@@ -263,16 +263,18 @@ describe.runIf(process.platform === 'win32')('administrator helper robustness', 
     const session = new PowerShellHost(WINDOWS_PRELUDE)
     const runner = (script: string, timeoutMs?: number, signal?: AbortSignal): Promise<string> => session.run(script, timeoutMs, signal)
     const controller = new AbortController()
+    let abortedAt = 0
     // The start-up is shared and goes on, but this caller stops waiting as soon as its turn is cancelled.
     const input = new ElevatedInput(DESK_CSHARP, async () => {
+      abortedAt = Date.now()
       controller.abort()
       await new Promise(resolve => setTimeout(resolve, 2000))
       return 4
     }, runner, { connectTimeoutMs: 500 })
     try {
-      const started = Date.now()
       await expect(input.run([{ op: 'text', text: 'never' }], controller.signal)).rejects.toThrow()
-      expect(Date.now() - started).toBeLessThan(1500)
+      // Timed from the cancel, not from the call: compiling the helper first can take seconds on a busy machine.
+      expect(Date.now() - abortedAt).toBeLessThan(1500)
     } finally {
       input.close()
       session.close()

@@ -52,6 +52,9 @@
       "path": "../../host/plugin-inventory"
     },
     {
+      "path": "../../customize/customize"
+    },
+    {
       "path": "../../interaction/commands"
     },
     {

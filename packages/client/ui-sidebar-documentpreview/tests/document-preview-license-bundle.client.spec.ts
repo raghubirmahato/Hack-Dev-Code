@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
@@ -34,9 +34,12 @@ function run(command: string, args: string[], cwd: string, timeout: number): str
 
 function runPnpm(args: string[], cwd: string, timeout: number): string {
   const entrypoint = process.env.npm_execpath
-  if (entrypoint === undefined || entrypoint === '') {
-    if (process.platform === 'win32') throw new Error('npm_execpath is required to run pnpm on Windows')
-    return run('pnpm', args, cwd, timeout)
+  // npm_execpath names npm when the tests run through npx; pnpm is then started by name. On Windows that is a
+  // pnpm.cmd shim, which only cmd.exe can run.
+  if (entrypoint === undefined || entrypoint === '' || !/pnpm/iu.test(entrypoint)) {
+    return process.platform === 'win32'
+      ? run(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', 'pnpm', ...args], cwd, timeout)
+      : run('pnpm', args, cwd, timeout)
   }
   return /\.[cm]?js$/iu.test(entrypoint)
     ? run(process.execPath, [entrypoint, ...args], cwd, timeout)
@@ -55,9 +58,13 @@ describe('published document preview licenses', () => {
       expect(packed.files.map(file => file.path)).toContain('lib/client.pdf.js')
       expect(packed.files.map(file => file.path)).toContain('lib/client.frontmatter-fields.js')
       expect(packed.files.some(file => file.path.endsWith('pdfjs-NOTICES.txt'))).toBe(false)
+      // The archive is read from its own folder by name: GNU tar (Git for Windows) takes the drive colon of an
+      // absolute path for a remote host.
+      const archive = resolve(packageRoot, packed.filename)
+      const extract = (member: string): string => run('tar', ['-xOf', basename(archive), member], dirname(archive), task.timeout)
 
-      const client = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.js'], packageRoot, task.timeout)
-      const pdf = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.pdf.js'], packageRoot, task.timeout)
+      const client = extract('package/lib/client.js')
+      const pdf = extract('package/lib/client.pdf.js')
       expect([...client.matchAll(/require\.async\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]))
         .toEqual(['./client.frontmatter-fields.js', './client.pdf.js', './client.excel.js'])
       expect(client).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
@@ -66,7 +73,7 @@ describe('published document preview licenses', () => {
       expect(client).not.toContain('//! Bundled PDF.js license notices')
       expect(client).not.toContain('/pdfjs-dist/')
       expect(pdf).toContain('//! Bundled PDF.js license notices')
-      const excel = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.excel.js'], packageRoot, task.timeout)
+      const excel = extract('package/lib/client.excel.js')
       expect(excel).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
       expect(client).not.toContain('FortuneSheet')
       expect(excel).toContain('//! Bundled spreadsheet license notices')
@@ -77,7 +84,7 @@ describe('published document preview licenses', () => {
         const license = readFileSync(join(root, 'LICENSE'), 'utf8').trimEnd()
         expect(excel).toContain(license.split('\n').map(line => `// ${line}`).join('\n'))
       }
-      const frontmatter = run('tar', ['-xOf', resolve(packageRoot, packed.filename), 'package/lib/client.frontmatter-fields.js'], packageRoot, task.timeout)
+      const frontmatter = extract('package/lib/client.frontmatter-fields.js')
       expect(frontmatter).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
       let frontmatterInitialized = false
       runInNewContext(frontmatter, { window: { __ModuleLoader__: { load: (registration: {

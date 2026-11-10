@@ -1,6 +1,6 @@
 /** Session commands whose activation policy is explicit at each Remote method. */
 
-import { modelAvailable } from './catalog.ts'
+import { modelAvailable, ensureUsableDefault } from './catalog.ts'
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@hackdevcode/cordis'
 import { brandString } from '@hackdevcode/dsh-brand'
@@ -100,7 +100,25 @@ export class SessionCommandController {
    * @param request - optional blank Session to reuse, location, and Agent preset.
    * @returns the created or reused Session identity and its preset when configured.
    */
+  /**
+   * Start new Sessions on a model that works: when no default was chosen yet, or its provider is not registered,
+   * save the first available model. A default that is set is never re-listed here, and a slow provider cannot hold
+   * Session creation for more than ten seconds; a failed check keeps the current default.
+   */
+  private async settleDefaultModel(): Promise<void> {
+    const llm = this.ctx.get('llm')
+    const defaults = this.ctx.get('agentDefaultModel')
+    if (llm === undefined || defaults === undefined) return
+    const { provider } = defaults.currentSelection()
+    if (provider !== '' && llm.listProviders().some(entry => entry.id === provider)) return
+    await Promise.race([
+      ensureUsableDefault(this.ctx).catch(() => undefined),
+      new Promise<void>((resolve) => { setTimeout(resolve, 10_000).unref() }),
+    ])
+  }
+
   async create(request: SessionCreateRequest): Promise<SessionCreateValue> {
+    await this.settleDefaultModel()
     if (request.workspaceId !== undefined && request.cwd !== undefined) {
       throw new RemoteError('gateway/bad-request', 'session.create accepts workspaceId or cwd, not both', {})
     }
@@ -257,6 +275,7 @@ export class SessionCommandController {
     }
     const childId = brandString<SessionId>(`session-${randomUUID()}`)
     const composition = await this.agents.composeAgent(this.agents.presetForObservation(source))
+    await this.settleDefaultModel()
     try {
       const { provider, model } = this.ctx.agentDefaultModel.currentSelection()
       await this.ctx.agents.create({

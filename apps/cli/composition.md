@@ -156,7 +156,6 @@ flowchart LR
   cfg --> plugin_dsh_base_workflow_ptc
   plugin_dsh_base_tool_workflow["tool-workflow<br/>@hackdevcode/dsh-tool-workflow"]
   cfg --> plugin_dsh_base_tool_workflow
-  plugin_dsh_base_tool_hackdev["tool-hackdev<br/>@hackdevcode/dsh-tool-hackdev"]
   cfg --> plugin_dsh_base_tool_hackdev
   plugin_dsh_base_timeout_policy["timeout-policy<br/>@hackdevcode/dsh-tool-call-timeout-policy"]
   cfg --> plugin_dsh_base_timeout_policy
@@ -282,7 +281,6 @@ flowchart LR
 | `ptc-runtime` | `@hackdevcode/dsh-ptc-runtime-node` |
 | `workflow-ptc` | `@hackdevcode/dsh-workflow-ptc` |
 | `tool-workflow` | `@hackdevcode/dsh-tool-workflow` |
-| `tool-hackdev` | `@hackdevcode/dsh-tool-hackdev` |
 | `timeout-policy` | `@hackdevcode/dsh-tool-call-timeout-policy` |
 | `spill-local` | `@hackdevcode/dsh-spill-local` |
 | `spill-policy` | `@hackdevcode/dsh-spill-policy` |

@@ -75,6 +75,7 @@
     "@hackdevcode/dsh-credentials": "workspace:*",
     "@hackdevcode/dsh-file-reference": "workspace:*",
     "@hackdevcode/dsh-goal": "workspace:*",
+    "@hackdevcode/dsh-customize": "workspace:*",
     "@hackdevcode/dsh-host-plugin-inventory": "workspace:*",
     "@hackdevcode/dsh-llm": "workspace:*",
     "@hackdevcode/dsh-message-feedback": "workspace:*",

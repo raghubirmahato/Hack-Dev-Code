@@ -53,12 +53,23 @@ function isQuoted(value: string): boolean {
  */
 export function apiKeyFailure(draft: string): ApiKeyFailureKey | undefined {
   if (draft.length === 0) return undefined
-  const value = draft.trim()
-  if (value.length === 0) return 'keyBlank'
+  const keys = draft.split(KEY_SEPARATOR).map(part => part.trim()).filter(part => part.length > 0)
+  // Only blank rows (an added row left empty) are no key at all.
+  if (keys.length === 0) return 'keyBlank'
   // Several keys for one platform may be entered together; each must be a legal key on its own.
-  for (const key of value.split(KEY_SEPARATOR).map(part => part.trim()).filter(part => part.length > 0)) {
+  for (const key of keys) {
     if (ENV_LINE.test(key) || isQuoted(key)) return 'keyIllegalCharacters'
     if (!LEGAL_API_KEY.test(key)) return 'keyIllegalCharacters'
   }
   return undefined
+}
+
+/**
+ * The keys to store: every nonblank key, trimmed and joined with commas, so an added row left empty or a stray
+ * separator never reaches the credential store.
+ * @param draft - the key input's current value.
+ * @returns the joined keys, or an empty string when there are none.
+ */
+export function storedKeys(draft: string): string {
+  return draft.split(KEY_SEPARATOR).map(part => part.trim()).filter(part => part.length > 0).join(',')
 }

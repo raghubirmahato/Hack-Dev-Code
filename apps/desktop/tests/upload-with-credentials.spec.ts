@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { execFile, spawnSync } from 'node:child_process'
 import { copyFile, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, delimiter, join } from 'node:path'
@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { afterEach, describe, expect, it } from 'vitest'
 import { resolveCredentialUploadEnvironment } from '../scripts/upload-target.ts'
+
+/** The release tooling these tests drive runs on PowerShell 7 (pwsh); without it they are skipped, not failed. */
+const hasPwsh = process.platform === 'win32' && spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', '$true'], { encoding: 'utf8' }).status === 0
 
 const execute = promisify(execFile)
 const launcher = fileURLToPath(new URL('../scripts/upload-with-credentials.ps1', import.meta.url))
@@ -114,7 +117,7 @@ describe('credential launcher destination', () => {
 })
 
 // DPAPI's user-and-machine encryption is Windows-only.
-describe.skipIf(process.platform !== 'win32')('Windows upload credentials', () => {
+describe.skipIf(!hasPwsh)('Windows upload credentials', () => {
   it.each(['production', 'test'])('checks %s credentials without uploading or changing the parent', async (deployment) => {
     const result = await check('valid', deployment)
     expect(result.code, result.output).toBe(0)

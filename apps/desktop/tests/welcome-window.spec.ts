@@ -180,9 +180,9 @@ describe('desktop welcome window', () => {
     expect(electron.handlers.size).toBe(0)
   })
 
-  it('shows the entry after logout only without a separately configured API key', () => {
+  it('never requires the welcome entry: there is no account sign-in, and models are set up in Settings', () => {
     expect(needsWelcome({ loggedIn: true, hasApiKey: false })).toBe(false)
-    expect(needsWelcome({ loggedIn: false, hasApiKey: false })).toBe(true)
+    expect(needsWelcome({ loggedIn: false, hasApiKey: false })).toBe(false)
     expect(needsWelcome({ loggedIn: false, hasApiKey: true })).toBe(false)
     expect(needsWelcome({ loggedIn: true, hasApiKey: true })).toBe(false)
   })

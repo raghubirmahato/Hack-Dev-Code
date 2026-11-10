@@ -21,7 +21,7 @@ import { hasTypertRemoteNavigation, isForbiddenPublicationFile } from './publica
 import type { DshBundleManifest } from '../packages/util/package-manifest/src/types.ts'
 import { detailPath } from '../packages/util/plugin-detail/src/document.ts'
 import { bundlePatchFiles } from '../packages/boot/app-boot/src/profile.ts'
-import { OPTIONAL_BUNDLES } from '../packages/util/official-bundles/src/bundles.ts'
+import { OPTIONAL_BUNDLES, PROFILE_TEMPLATES } from '../packages/util/official-bundles/src/bundles.ts'
 import {
   PACKAGE_ASSET_EXPORT,
   PACKAGE_ASSET_EXPORT_TARGET,
@@ -191,7 +191,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@hackdevcode/dsh-experimental-subagent-oar': ['LICENSE-OAR'],
   // CUA publishes its client API and attributed native source for local macOS builds.
   '@hackdevcode/dsh-cua': ['lib/remote-types.js', 'lib/api.js', 'lib/bridge.js', 'lib/native-client.js', 'lib/protocol.js'],
-  '@hackdevcode/dsh-experimental-cua-macos': ['native/bin', 'native/Package.swift', 'native/Sources', 'native/tests/swift', 'native/tests/test_swift.py', 'native/LICENSE.cua-driver', 'native/upstream.json', 'native/README.md', 'native/README.zh.md', 'native/protocol.schema.json'],
+  '@hackdevcode/dsh-experimental-cua-macos': ['native/bin', 'native/Package.swift', 'native/Sources', 'native/tests/swift', 'native/tests/test_swift.py', 'native/LICENSE.cua-driver', 'native/upstream.json', 'native/README.md', 'native/protocol.schema.json'],
   '@hackdevcode/dsh-webhook-github': ['examples/github-review/cordis.yml', 'examples/github-review/github-ready-review-rule.mjs'],
   // Liveshare publishes its built Relay gateway entry and the shared runtime
   // chunk that entry imports, plus the declaration-plane entry and its chunk.
@@ -650,11 +650,13 @@ const runtimeDependencySections = ['dependencies', 'optionalDependencies', 'peer
  * may hold the bundles the launcher's `OPTIONAL_BUNDLES` names: shipped switched off, they are not a requirement
  * ([rationale](../.agents/notes/implemented/process/2026-09-15-shipped-optional-bundles.md)).
  * @param manifests - release, private experimental, and deployment-root manifests.
- * @param optionalBundles - the bundles the installation ships switched off; the launcher's list by default.
+ * @param optionalBundles - the bundles the installation ships switched off or selects in the Web template; the
+ * launcher's lists by default.
  * @returns One error for each forbidden runtime dependency.
  */
 export function checkExperimentalDependencyIsolation(
-  manifests: readonly WorkspaceManifest[], optionalBundles: readonly string[] = OPTIONAL_BUNDLES,
+  manifests: readonly WorkspaceManifest[],
+  optionalBundles: readonly string[] = [...OPTIONAL_BUNDLES, ...PROFILE_TEMPLATES.web?.bundles ?? []],
 ): string[] {
   const experimentalNames = new Set(manifests
     .filter(entry => experimentalPackageDirectory.test(entry.dir))

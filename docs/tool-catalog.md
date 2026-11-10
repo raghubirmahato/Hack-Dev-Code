@@ -37,7 +37,6 @@ This table connects model-visible tool names to the plugin package and service s
 | `@hackdevcode/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@hackdevcode/dsh-tool-lsp` | `lsp` | `ctx.workingDirectory`, `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@hackdevcode/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@hackdevcode/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
-| `@hackdevcode/dsh-tool-hackdev` | `hackdev`, `hackdev_review` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every pipeline child)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | Two fixed pipelines (hackdev and hackdev_review) run a planning council, parallel builders with shared memory and three review gates over the workflow seam; the model selects only the mission text and optional caps within deployment ceilings. |
 | `@hackdevcode/dsh-tool-skill` | `skill` | `ctx.workingDirectory`, `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
 | `@hackdevcode/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `ctx.agents`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
 | `@hackdevcode/dsh-experimental-tool-subagent-oar` | `subagent_oar` | `ctx.tools`, `ctx.subagents` | `tool/call`, `tool/result`, `parent subagent catalog and completion notices` | - | The subagent_oar tool selects among configured aliases for external providers. This catalog shows Codex and Claude Code aliases; each deployment chooses its providers. Native model and permission settings belong to the selected provider configuration. |
@@ -1876,74 +1875,6 @@ Run a foreground fresh-agent Ralph loop toward one immutable objective. Use only
 Source: [`packages/experimental/tool-ralph/src/index.ts`](../packages/experimental/tool-ralph/src/index.ts)
 
 A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap.
-
-<a id="hackdevcodedsh-tool-hackdev"></a>
-
-## `@hackdevcode/dsh-tool-hackdev`
-
-### `hackdev`
-
-Run the full Hack Dev Code pipeline for one mission: a planning council maps the project and decomposes the mission into a team of specialist tasks sized to its complexity; parallel builder agents execute the dependency graph with a shared blackboard, unfinished tasks are re-split, and a fact-checker re-verifies claimed files and evidence; three gate agents then verify (syntax, logic and runtime errors), review quality and UI/UX visually with screenshots, and audit and harden security, fixing what they find; an integrator checks every acceptance criterion and starts follow-up waves for unmet ones. Writes .hackdev/RUN_REPORT.md, .hackdev/PROGRESS.md, .hackdev/PROJECT_MAP.md and long-term .hackdev/MEMORY.md. Use for any substantial build, feature or multi-file fix. The call blocks until the whole pipeline settles and returns an evidence-based report.
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "mission": {
-      "type": "string",
-      "description": "The complete mission: what to build or change, constraints, stack preferences and acceptance expectations."
-    },
-    "maxTasks": {
-      "type": "number",
-      "description": "Optional cap on planned tasks per wave, bounded by the deployment ceiling."
-    },
-    "maxWaves": {
-      "type": "number",
-      "description": "Optional cap on build waves (follow-up waves close unmet acceptance criteria), bounded by the deployment ceiling."
-    },
-    "maxFixRounds": {
-      "type": "number",
-      "description": "Optional cap on extra review-fix rounds per gate, bounded by the deployment ceiling."
-    }
-  },
-  "required": [
-    "mission"
-  ]
-}
-```
-
-Source: [`packages/hackdev/tool-hackdev/src/index.ts`](../packages/hackdev/tool-hackdev/src/index.ts)
-
-### `hackdev_review`
-
-Run only the three Hack Dev Code gates on the current workspace: a verifier for syntax, logic and runtime errors, a quality and UI/UX reviewer that captures and views screenshots of the interface, and a security reviewer that hardens weaknesses (quality and security audit in parallel, then fix one after the other). Each gate fixes what it finds and re-verifies. Use after small edits you made yourself, before declaring the work complete.
-
-```json
-{
-  "type": "object",
-  "properties": {
-    "mission": {
-      "type": "string",
-      "description": "One or two sentences on what the software is meant to do, so the gates know what to verify."
-    },
-    "focus": {
-      "type": "string",
-      "description": "Optional: the files or changes the gates should concentrate on."
-    },
-    "maxFixRounds": {
-      "type": "number",
-      "description": "Optional cap on extra review-fix rounds per gate, bounded by the deployment ceiling."
-    }
-  },
-  "required": [
-    "mission"
-  ]
-}
-```
-
-Source: [`packages/hackdev/tool-hackdev/src/index.ts`](../packages/hackdev/tool-hackdev/src/index.ts)
-
-Two fixed pipelines (hackdev and hackdev_review) run a planning council, parallel builders with shared memory and three review gates over the workflow seam; the model selects only the mission text and optional caps within deployment ceilings.
 
 <a id="hackdevcodedsh-tool-skill"></a>
 

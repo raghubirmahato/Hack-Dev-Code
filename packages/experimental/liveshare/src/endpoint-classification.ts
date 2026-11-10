@@ -93,6 +93,14 @@ export const VIEWER_ENDPOINT_CLASSES = {
   'account/startSignIn': 'owner-only', // owner account and sign-in; the served page never reads it
   'account/watch': 'owner-only', // owner account and sign-in; the served page never reads it
   'account/watchExpiry': 'owner-only', // owner account and sign-in; the served page never reads it
+  'customize/connect': 'owner-only', // owner Customize settings: servers, keys, connectors and skills
+  'customize/disconnect': 'owner-only', // owner Customize settings: servers, keys, connectors and skills
+  'customize/installSkill': 'owner-only', // owner Customize settings: servers, keys, connectors and skills
+  'customize/read': 'owner-only', // owner Customize settings: servers, keys, connectors and skills
+  'customize/removeCustom': 'owner-only', // owner Customize settings: servers, keys, connectors and skills
+  'customize/removeSkill': 'owner-only', // owner Customize settings: servers, keys, connectors and skills
+  'customize/saveCustom': 'owner-only', // owner Customize settings: servers, keys, connectors and skills
+  'customize/setServer': 'owner-only', // owner Customize settings: servers, keys, connectors and skills
   'job/follow': 'owner-only', // owner background jobs
   'job/kill': 'owner-only', // owner background jobs
   'job/list': 'owner-only', // owner background jobs

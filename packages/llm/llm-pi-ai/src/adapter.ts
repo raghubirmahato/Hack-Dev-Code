@@ -63,10 +63,12 @@ import type {
 } from '@hackdevcode/dsh-llm'
 import type { AttachmentStore, ImageAttachmentRef } from '@hackdevcode/dsh-attachment'
 import { idleWatchdog, timeoutOf } from '@hackdevcode/dsh-timeout'
+import { DEFAULT_CONTEXT_WINDOW } from './config.ts'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { requestImageTarget, toPiContext } from './context.ts'
 import { adoptForeignGeminiHistory } from './gemini-history.ts'
 import { conversationUpdates, createModels, getSupportedThinkingLevels } from './models.ts'
+import { OllamaContext } from './ollama-context.ts'
 import { toStreamChunks } from './stream.ts'
 
 /**
@@ -275,6 +277,8 @@ export class PiAiAdapter extends LlmAdapter {
    * with one model, and no request is spent on a model known to be out of quota or overloaded.
    */
   private readonly fallenBack = new Map<string, { readonly model: string; readonly until: number }>()
+  /** Larger-context variants of Ollama models, so an agent prompt is not cut from the front. */
+  private readonly ollama = new OllamaContext()
 
   constructor(private readonly config: PiAiAdapterOptions) {
     super()
@@ -483,7 +487,14 @@ export class PiAiAdapter extends LlmAdapter {
           await waitForKey(restMs, watchdog.signal)
           watchdog.signal.throwIfAborted()
         }
-        const events = snapshot.models.streamSimple(model, adoptForeignGeminiHistory(context, model), {
+        // An Ollama server answers with a variant of the model that holds the whole prompt.
+        const wireId = model.api === 'openai-completions'
+          ? await this.ollama.modelFor(
+            model.baseUrl, model.id, model.contextWindow === DEFAULT_CONTEXT_WINDOW ? undefined : model.contextWindow,
+          )
+          : model.id
+        const wire = wireId === model.id ? model : { ...model, id: wireId }
+        const events = snapshot.models.streamSimple(wire, adoptForeignGeminiHistory(context, model), {
           ...profileOptions(profile, reasoning, apiKey),
           ...options.temperature === undefined ? {} : { temperature: options.temperature },
           ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },

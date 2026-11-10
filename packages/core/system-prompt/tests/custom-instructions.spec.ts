@@ -36,7 +36,7 @@ describe('custom instruction prompt text', () => {
   })
 
   it('reminds in one short line with the rule count', () => {
-    expect(customInstructionsReminder(1)).toBe("Apply the person's 1 custom instruction directly in this turn.")
-    expect(customInstructionsReminder(3)).toBe("Apply the person's 3 custom instructions directly in this turn.")
+    expect(customInstructionsReminder(1)).toBe("(Note from Hack Dev Code, not a request from the person: keep following the person's 1 custom instruction from the system prompt. Reply to the person's message that follows.)")
+    expect(customInstructionsReminder(3)).toBe("(Note from Hack Dev Code, not a request from the person: keep following the person's 3 custom instructions from the system prompt. Reply to the person's message that follows.)")
   })
 })

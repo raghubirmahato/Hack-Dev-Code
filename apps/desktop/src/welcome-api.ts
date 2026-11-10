@@ -66,10 +66,11 @@ export interface WelcomeAuthentication {
 }
 
 /**
- * Decide whether a startup or sign-out requires the welcome entry.
- * @param authentication - current account and independently stored API-key facts.
- * @returns true only when neither authentication route is configured.
+ * Decide whether a startup or sign-out requires the welcome entry. Hack Dev Code offers no account sign-in: the
+ * workspace opens directly, and models (local Ollama models or any provider's API key) are set up in Settings → Models.
+ * @param _authentication - current account and stored API-key facts, kept for the call sites.
+ * @returns always false.
  */
-export function needsWelcome(authentication: WelcomeAuthentication): boolean {
-  return !authentication.loggedIn && !authentication.hasApiKey
+export function needsWelcome(_authentication: WelcomeAuthentication): boolean {
+  return false
 }

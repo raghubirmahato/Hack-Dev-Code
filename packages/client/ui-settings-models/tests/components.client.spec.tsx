@@ -2466,14 +2466,72 @@ describe('apiKeyFailure with several keys', () => {
   })
 })
 
-describe('ApiKeyInput key count', () => {
-  it('announces how many keys are entered only when there are several', async () => {
+describe('ApiKeyInput key rows', () => {
+  const t = (key: keyof typeof en): string => en[key]
+
+  it('announces how many keys are entered only when there are several, one row each', async () => {
     const { ApiKeyInput } = await import('../src/client/ApiKeyInput.tsx')
-    const t = (key: keyof typeof en): string => en[key]
     const one = render(<ApiKeyInput value="sk-one" t={t} onChange={() => {}} />)
     expect(one.queryByRole('status')).toBeNull()
+    expect(one.queryByRole('button', { name: 'Remove key 1' })).toBeNull()
     one.unmount()
     render(<ApiKeyInput value="sk-one, sk-two;sk-three" t={t} onChange={() => {}} />)
-    expect(screen.getByRole('status').textContent).toContain('3 keys entered')
+    expect(screen.getByRole('status').textContent).toContain('3 keys')
+    expect(screen.getByLabelText('API key 2')).toHaveProperty('value', ' sk-two')
+    expect(screen.getAllByRole('button', { name: /Remove key/u })).toHaveLength(3)
+  })
+
+  it('adds an empty row only after the last key is filled, and removes a row', async () => {
+    const { ApiKeyInput } = await import('../src/client/ApiKeyInput.tsx')
+    const onChange = vi.fn()
+    const empty = render(<ApiKeyInput value="" t={t} onChange={onChange} />)
+    expect(screen.getByRole('button', { name: '+ Add another key' })).toHaveProperty('disabled', true)
+    empty.unmount()
+    const filled = render(<ApiKeyInput value="sk-one" t={t} onChange={onChange} />)
+    fireEvent.click(screen.getByRole('button', { name: '+ Add another key' }))
+    expect(onChange).toHaveBeenLastCalledWith({ target: { value: 'sk-one,' } })
+    filled.unmount()
+    render(<ApiKeyInput value="sk-one,sk-two" t={t} onChange={onChange} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Remove key 1' }))
+    expect(onChange).toHaveBeenLastCalledWith({ target: { value: 'sk-two' } })
+    // Typing a separator does not split a key in place; each key keeps its own row.
+    fireEvent.change(screen.getByLabelText('API key 2'), { target: { value: 'sk-t,wo' } })
+    expect(onChange).toHaveBeenLastCalledWith({ target: { value: 'sk-one,sk-two' } })
+  })
+
+  it('splits pasted lines into rows and keeps a plain paste in its row', async () => {
+    const { ApiKeyInput } = await import('../src/client/ApiKeyInput.tsx')
+    const onChange = vi.fn()
+    render(<ApiKeyInput value="sk-first" t={t} onChange={onChange} placeholder="key" />)
+    const input = screen.getByPlaceholderText('key') as HTMLInputElement
+    input.setSelectionRange(8, 8)
+    fireEvent.paste(input, { clipboardData: { getData: () => '-a\nsk-b, sk-c' } })
+    expect(onChange).toHaveBeenLastCalledWith({ target: { value: 'sk-first-a,sk-b,sk-c' } })
+    const calls = onChange.mock.calls.length
+    fireEvent.paste(input, { clipboardData: { getData: () => 'plain' } })
+    expect(onChange.mock.calls.length).toBe(calls)
+  })
+
+  it('reveals one row at a time and masks it again when its value changes', async () => {
+    const { ApiKeyInput } = await import('../src/client/ApiKeyInput.tsx')
+    const view = render(<ApiKeyInput value="sk-one,sk-two" t={t} onChange={() => {}} placeholder="key" />)
+    const [first] = screen.getAllByRole('button', { name: en.keyReveal })
+    fireEvent.click(first!)
+    expect(screen.getByPlaceholderText('key')).toHaveProperty('type', 'text')
+    expect(screen.getByLabelText('API key 2')).toHaveProperty('type', 'password')
+    fireEvent.click(screen.getByRole('button', { name: en.keyHide }))
+    expect(screen.getByPlaceholderText('key')).toHaveProperty('type', 'password')
+    fireEvent.click(screen.getAllByRole('button', { name: en.keyReveal })[0]!)
+    view.rerender(<ApiKeyInput value="sk-changed,sk-two" t={t} onChange={() => {}} placeholder="key" />)
+    expect(screen.getByPlaceholderText('key')).toHaveProperty('type', 'password')
+  })
+})
+
+describe('stored keys', () => {
+  it('stores only nonblank keys and treats rows that are all blank as no key', async () => {
+    const { storedKeys } = await import('../src/client/apiKey.ts')
+    expect(storedKeys(' sk-one , ,sk-two,')).toBe('sk-one,sk-two')
+    expect(storedKeys(',')).toBe('')
+    expect(apiKeyFailure(',')).toBe('keyBlank')
   })
 })

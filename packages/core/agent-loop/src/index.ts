@@ -368,8 +368,9 @@ export class AgentLoop extends Service implements AgentFactory {
       interpolate: false,
       text: () => renderCustomInstructions(this.config.customInstructions.get()),
     })
-    // A one-line reminder beside the newest message at the start of each turn keeps the rules in view in long
-    // conversations; it names how many rules apply, not their text, so it costs a few tokens.
+    // A one-line note just before the newest message at the start of each turn keeps the rules in view in long
+    // conversations; it names how many rules apply, not their text, so it costs a few tokens. It goes before the
+    // person's message, never after: a model answers the last message, and must answer the person, not the note.
     ctx.on('agent/pre-step', async ({ step, signal }, next): Promise<PreStepDecision> => {
       const decision = await next()
       if (decision.kind === 'reject' || step !== 1 || signal.aborted) return decision
@@ -380,11 +381,11 @@ export class AgentLoop extends Service implements AgentFactory {
       return {
         ...decision,
         messages: [
-          ...decision.messages,
           createUserMessage({
             content: [{ type: 'text', text: reminder }],
             source: { kind: CUSTOM_INSTRUCTIONS_SOURCE, form: 'snapshot', sections: [{ name: CUSTOM_INSTRUCTIONS_SOURCE, text: reminder }] },
           }),
+          ...decision.messages,
         ],
       }
     })

@@ -49,7 +49,7 @@ function runTurn(ctx: Context, agent: Agent, text = 'go'): Promise<void> {
   return idle
 }
 
-const REMINDER = "Apply the person's 2 custom instructions directly in this turn."
+const REMINDER = "(Note from Hack Dev Code, not a request from the person: keep following the person's 2 custom instructions from the system prompt. Reply to the person's message that follows.)"
 
 describe('custom instructions in requests', () => {
   it('sends numbered standing orders and reminds once per turn', async () => {
@@ -61,6 +61,10 @@ describe('custom instructions in requests', () => {
     const [first, second] = adapter.requests.map(request => JSON.stringify(request))
     expect(first).toContain('<custom_instructions>\\n1. Answer in British English.\\n2. Use tabs.\\n</custom_instructions>')
     expect(first).toContain(REMINDER)
+    // The note comes before the person's message, so the model answers the person and not the note.
+    const messages = JSON.stringify(adapter.requests[0]?.messages ?? [])
+    expect(messages.indexOf(REMINDER)).toBeGreaterThan(-1)
+    expect(messages.indexOf(REMINDER)).toBeLessThan(messages.lastIndexOf('"go"'))
     // Occurrences per request; one reminder message serializes its text more than once.
     const count = (request: unknown): number => JSON.stringify(request).split(REMINDER).length - 1
     const once = count(adapter.requests[0])

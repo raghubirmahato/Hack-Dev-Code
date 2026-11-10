@@ -13,7 +13,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, posix, resolve } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Win32Error } from '@hackdevcode/dsh-win32-process'
 import type {
   CurrentTokenProcessBindings,
@@ -388,14 +388,21 @@ describe('runner launch inputs', () => {
   })
 
   it('resolves Windows executables with target-cwd and PATH search semantics', () => {
+    // The shell running the tests may set NoDefaultCurrentDirectoryInExePath; these cases describe the default search,
+    // and the case that sets the variable passes it explicitly.
+    const inherited = Object.keys(process.env).filter(name => name.toUpperCase() === 'NODEFAULTCURRENTDIRECTORYINEXEPATH')
+    const saved = inherited.map(name => [name, process.env[name]] as const)
+    for (const name of inherited) Reflect.deleteProperty(process.env, name)
+    onTestFinished(() => { for (const [name, value] of saved) process.env[name] = value })
     const probed: string[] = []
     const exists = (candidate: string): boolean => {
       probed.push(candidate)
       return candidate === 'C:\\tools\\git\\bin\\bash.exe'
     }
+    // An explicit, empty current environment: the shell running the tests may set NoDefaultCurrentDirectoryInExePath.
     expect(resolveWindowsExecutable('bash', 'C:\\target', {
       Path: 'relative;"C:\\semi;colon";"C:\\tools\\git\\bin";C:\\later',
-    }, exists)).toBe('C:\\tools\\git\\bin\\bash.exe')
+    }, exists, {})).toBe('C:\\tools\\git\\bin\\bash.exe')
     expect(probed).toEqual([
       'C:\\target\\bash.com',
       'C:\\target\\bash.exe',

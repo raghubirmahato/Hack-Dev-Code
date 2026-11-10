@@ -170,6 +170,13 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@hackdevcode/dsh-credentials-local` | yes | File-backed credentials provider ($DSH_HOME/.env under the live process environment) for the Hack Dev Code |
 | `@hackdevcode/dsh-deepseek-account-platform` | yes | Authorize DeepSeek accounts through browser PKCE |
 
+## customize
+
+| Package | Config | Description |
+|---|---|---|
+| `@hackdevcode/dsh-client-ui-customize` | no | Customize section in Web settings: skills, connectors and MCP servers |
+| `@hackdevcode/dsh-customize` | no | Remote gateway of the Customize settings area: MCP servers, OAuth connectors and skills |
+
 ## deliverables
 
 | Package | Config | Description |
@@ -208,7 +215,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@hackdevcode/dsh-experimental-client-ui-stats` | no | Per-turn and per-step context, timing, cache, and tool-cost table contributed as an experimental conversation View |
 | `@hackdevcode/dsh-experimental-client-ui-voice-input` | no | Record speech and insert editable text into the conversation draft |
 | `@hackdevcode/dsh-experimental-computer-use-cua-driver-mcp` | yes | Experimental computer use through an installed Cua Driver MCP executable |
-| `@hackdevcode/dsh-experimental-computer-use-cua-driver-native` | no | Experimental computer-use provider embedding the Cua Driver native npm SDK |
+| `@hackdevcode/dsh-experimental-computer-use-cua-driver-native` | yes | Experimental computer-use provider embedding the Cua Driver native npm SDK |
 | `@hackdevcode/dsh-experimental-cua-macos` | yes | macOS native provider for shared Computer Use application and window objects |
 | `@hackdevcode/dsh-experimental-forge` | yes | Provider-neutral change request registry with shared status polling |
 | `@hackdevcode/dsh-experimental-forge-github` | yes | GitHub provider for the experimental forge registry, read through the GitHub CLI on the host |
@@ -278,13 +285,6 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@hackdevcode/dsh-repeat-tool-reminder` | yes | Repeat-tool-call guard plugin: advisory reminders when an agent loops on identical tool calls |
 | `@hackdevcode/dsh-tool-call-timeout-policy` | no | Tool-call timeout policy: a tools/execute wrapper that arms a per-tool deadline on exec.signal and returns TOOL_TIMEOUT when it wins |
 
-## hackdev
-
-| Package | Config | Description |
-|---|---|---|
-| `@hackdevcode/dsh-client-ui-hackdev` | no | Web card for Hack Dev Code missions and gate reviews: tasks, gate verdicts, issues and items needing human approval |
-| `@hackdevcode/dsh-tool-hackdev` | yes | Hack Dev Code mission tools: planning council, parallel builders with shared memory, and verifier, quality/UX and security gates |
-
 ## host
 
 | Package | Config | Description |
@@ -341,6 +341,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@hackdevcode/dsh-mcp-client` | yes | MCP client bridge: connects to MCP servers and registers their tools on ctx.tools |
+| `@hackdevcode/dsh-mcp-directory` | yes | Directory of MCP servers, OAuth connectors and skills: servers and connectors mount live as mcp-client instances, skills install into the user skill folder |
 | `@hackdevcode/dsh-mcp-resources` | no | Scoped MCP resource discovery and reading through shared model tools |
 
 ## plan

@@ -8,6 +8,7 @@
 
 import type {} from '@hackdevcode/dsh-api-session-controller/remote-events'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
+import type {} from '@hackdevcode/dsh-customize/types'
 import type {} from '@hackdevcode/dsh-deepseek-account/types'
 import type {} from '@hackdevcode/dsh-permission-presets/types'
 import type {} from '@hackdevcode/dsh-plugin-manager/types'
@@ -34,6 +35,7 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   { event: 'commands/change', mode: 'emit' },
   { event: 'deepseek-account/session-expired', mode: 'emit' },
   { event: 'deepseek-account/model-sign-in-required', mode: 'emit' },
+  { event: 'customize/changed', mode: 'emit' },
   { event: 'credentials/record-updated', mode: 'emit' },
   { event: 'credentials/reference-updated', mode: 'emit' },
   { event: 'goal/activation-changed', mode: 'emit' },

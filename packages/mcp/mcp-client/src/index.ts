@@ -14,6 +14,7 @@
  */
 
 import type { Context } from '@hackdevcode/cordis'
+import type { OAuthClientProvider } from '@modelcontextprotocol/client'
 import z from '@hackdevcode/schemastery'
 import { scopeOf } from '@hackdevcode/dsh-scope'
 import { MAX_TIMER_DELAY_MS } from '@hackdevcode/dsh-timeout'
@@ -26,6 +27,26 @@ import type {} from '@hackdevcode/dsh-tools'
 export { createMcpToolDefinition } from './tools.ts'
 export type { McpResult, McpToolDefinitionOptions } from './tools.ts'
 export type { ReconnectConfig, ResolvedReconnectPolicy } from './connection.ts'
+
+/**
+ * The optional `mcpAuth` service: whoever keeps OAuth sign-ins for remote MCP servers publishes it, and a
+ * Streamable HTTP connection asks it for the server's sign-in before it connects.
+ */
+export interface McpAuth {
+  /**
+   * The stored sign-in for one server.
+   * @param serverName - the connection's `serverName`.
+   * @returns the provider the transport authenticates with, or `undefined` when the server has no sign-in.
+   */
+  provider(serverName: string): OAuthClientProvider | undefined
+}
+
+declare module '@hackdevcode/cordis' {
+  interface Context {
+    /** OAuth sign-ins for remote MCP servers; absent when nothing keeps any. */
+    mcpAuth: McpAuth
+  }
+}
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'mcp-client'
@@ -63,6 +84,7 @@ const McpToolGroupSchema: z<McpToolGroup | undefined> = z.union([
   z.const(undefined),
 ])
 
+/** Config for connecting to an MCP server over a child-process stdio transport. */
 export interface StdioConfig {
   /** Selects child-process stdio transport. */
   transport: 'stdio'

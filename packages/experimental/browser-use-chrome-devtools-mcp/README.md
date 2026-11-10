@@ -102,6 +102,7 @@ The integration retains the pinned server's browser and tool restrictions.
 - Cancellation does not undo navigation, clicks, or other actions already delivered to the browser.
 - Tool schemas follow the pinned experimental dependency and carry no DSH stability promise.
 - Usage statistics are disabled. Other features, including performance tools, retain their upstream behavior.
+- `connect` mode reaches the running Chrome through a loopback relay ([`src/relay.ts`](src/relay.ts)) that opens one Chrome connection on first use and keeps it while the provider is loaded. Chrome 144 and later ask the person to allow each new remote-debugging connection, so Chrome asks once per run instead of once per Session or subagent. The relay serves one Session at a time; when a Session leaves, it detaches that Session's targets and turns automatic attachment off. If Chrome quits or the person revokes the connection, the next Session connects, and Chrome asks, again.
 
 <a id="dev-note"></a>
 ### Dev Note
