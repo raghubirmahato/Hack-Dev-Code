@@ -422,6 +422,22 @@
     - id: tool-workflow
       name: '@hackdevcode/dsh-tool-workflow'
 
+    # Hack Dev Code mission pipeline: a planning council that sizes a specialist
+    # team, waves of parallel builders over a shared blackboard, fact-checking,
+    # verifier / quality+UX (screenshots) / security gates and an integrator that
+    # starts follow-up waves for unmet acceptance criteria. Reuses the workflow
+    # engine and the fresh `spawn` subagent provider above. `visionModel` may name
+    # an image-capable model for the quality/UX gate (empty inherits the route).
+    - id: tool-hackdev
+      name: '@hackdevcode/dsh-tool-hackdev'
+      config:
+        subagentProvider: spawn
+        maxTasks: 24
+        maxParallel: 6
+        maxWaves: 6
+        maxFixRounds: 4
+        builderIsolation: worktree
+
     - id: timeout-policy
       name: '@hackdevcode/dsh-tool-call-timeout-policy'
 

@@ -105,6 +105,15 @@
                   provider: spawn
               - id: tool-workflow
                 name: '@hackdevcode/dsh-tool-workflow'
+              - id: tool-hackdev
+                name: '@hackdevcode/dsh-tool-hackdev'
+                config:
+                  subagentProvider: spawn
+                  maxTasks: 24
+                  maxParallel: 6
+                  maxWaves: 6
+                  maxFixRounds: 4
+                  builderIsolation: worktree
           - id: tool-ask-user
             name: '@hackdevcode/dsh-tool-ask-user'
           - id: tool-todo

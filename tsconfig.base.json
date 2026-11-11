@@ -30,6 +30,9 @@
     "paths": {
       "@hackdevcode/dsh-client-ui-entry-customization": ["./packages/client/ui-entry-customization/src/index.ts"],
       "@hackdevcode/dsh-client-ui-customize/client": ["./packages/customize/client-ui-customize/src/client/index.ts"],
+      "@hackdevcode/dsh-client-ui-hackdev/client": ["./packages/hackdev/client-ui-hackdev/src/client/index.ts"],
+      "@hackdevcode/dsh-client-ui-hackdev": ["./packages/hackdev/client-ui-hackdev/src"],
+      "@hackdevcode/dsh-tool-hackdev": ["./packages/hackdev/tool-hackdev/src"],
       "@hackdevcode/dsh-client-ui-entry-customization/client": ["./packages/client/ui-entry-customization/src/client/index.ts"],
       "@hackdevcode/dsh-client-ui-entry-customization/src/*": ["./packages/client/ui-entry-customization/src/*"],
       "@hackdevcode/dsh-experimental-session-search": ["./packages/experimental/session-search/src/index.ts"],

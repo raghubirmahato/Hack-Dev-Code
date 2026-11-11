@@ -4273,6 +4273,51 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-tool-goal -->
 
+<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-tool-hackdev -->
+<a id="hackdevcodedsh-tool-hackdev"></a>
+
+## `@hackdevcode/dsh-tool-hackdev`
+
+- `inject`: `tools` · `workflowEngine` · `subagents` · `systemPrompt`
+- `source`: [`packages/hackdev/tool-hackdev/src/index.ts:34`](../packages/hackdev/tool-hackdev/src/index.ts)
+
+```ts config-catalog
+/** Deployment policy for the fixed Hack Dev Code pipelines. */
+export interface Config {
+  /** Fresh structured-output provider used for every pipeline agent (default `spawn`). */
+  subagentProvider?: string
+  /** Deployment ceiling for planned tasks per wave (default 24). */
+  maxTasks?: number
+  /** Builder agents that may run at the same time (default 6). */
+  maxParallel?: number
+  /** Deployment ceiling for build waves per mission (default 3). */
+  maxWaves?: number
+  /** Optional image-capable model for the quality/UX gate; empty inherits the default route (default ''). */
+  visionModel?: string
+  /** Deployment ceiling for review-fix rounds after the first review of each gate (default 2). */
+  maxFixRounds?: number
+  /** Maximum characters of shared memory placed in any one agent prompt (default 6000). */
+  maxMemoryChars?: number
+  /** Maximum characters in the parent-facing report (default 16384). */
+  maxResultChars?: number
+  /** Commands the fact-checker may re-run per wave (default 8). */
+  maxFactChecks?: number
+  /**
+   * Where parallel builders work: `shared` (one workspace, disjoint owned paths) or `worktree` (each task in its
+   * own git worktree, merged back one at a time; falls back to shared outside a git repository). Default `shared`.
+   */
+  builderIsolation?: 'shared' | 'worktree'
+  /**
+   * `full` lets the lead agent and every pipeline agent act without asking for approval; `bounded` keeps them
+   * from destructive or irreversible actions and defers large additions to a person. Default `full`.
+   */
+  autonomy?: 'full' | 'bounded'
+  /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
+  customInstructions?: string
+}
+```
+<!-- END GENERATED config-catalog:@hackdevcode/dsh-tool-hackdev -->
+
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-tool-jobs -->
 <a id="hackdevcodedsh-tool-jobs"></a>
 
@@ -5035,6 +5080,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@hackdevcode/dsh-client-ui-entry-customization` | — | [`packages/client/ui-entry-customization/src/index.ts`](../packages/client/ui-entry-customization/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-file-drag` | — | [`packages/client/ui-file-drag/src/index.ts`](../packages/client/ui-file-drag/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-goal` | — | [`packages/client/ui-goal/src/index.ts`](../packages/client/ui-goal/src/index.ts) |
+| `@hackdevcode/dsh-client-ui-hackdev` | — | [`packages/hackdev/client-ui-hackdev/src/index.ts`](../packages/hackdev/client-ui-hackdev/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-input-trigger` | — | [`packages/client/ui-input-trigger/src/index.ts`](../packages/client/ui-input-trigger/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-jobs` | — | [`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts) |
 | `@hackdevcode/dsh-client-ui-layout` | — | [`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts) |

@@ -4,7 +4,7 @@ import type { WorkspaceId } from '@hackdevcode/dsh-workspace/types'
 import { workspaceDisplayTitle } from '@hackdevcode/dsh-api-workspace-controller/default-workspace'
 import type { ConversationContentProps, ConversationViewsProps, InputZone } from '../contract/slots.ts'
 import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
-import { StarterTemplates } from './StarterHome.tsx'
+import { MissionTemplates } from './MissionHome.tsx'
 import css from './ConversationRoot.module.css'
 
 function ConversationSessionView({ renderSlot }: ConversationViewsProps) {
@@ -169,7 +169,7 @@ export function ConversationContent(props: ConversationContentProps) {
       {zone !== undefined && renderSlot('conversation.input.dock', zone)}
       {inputBar}
       {hero && !inert && !blocked && inputActions !== undefined && (
-        <StarterTemplates t={t} onPick={(prompt) => { inputActions.setDraft(prompt) }} />
+        <MissionTemplates t={t} onPick={(prompt) => { inputActions.setDraft(prompt) }} />
       )}
     </div>
   )

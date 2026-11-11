@@ -112,6 +112,7 @@
     "@hackdevcode/dsh-tool-jobs": "workspace:*",
     "@hackdevcode/dsh-tool-todo": "workspace:*",
     "@hackdevcode/dsh-tool-web": "workspace:*",
+    "@hackdevcode/dsh-tool-hackdev": "workspace:*",
     "@hackdevcode/dsh-tool-workflow": "workspace:*",
     "@hackdevcode/dsh-tools": "workspace:*",
     "@hackdevcode/dsh-typert-loader": "workspace:*",

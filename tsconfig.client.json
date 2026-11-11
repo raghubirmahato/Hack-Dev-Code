@@ -118,6 +118,7 @@
     { "path": "./packages/client/ui-tool" },
     { "path": "./packages/client/ui-deliverables/tsconfig.client.json" },
     { "path": "./packages/client/ui-workflow-run" },
+    { "path": "./packages/hackdev/client-ui-hackdev" },
     { "path": "./packages/client/ui-workspace" },
     { "path": "./packages/client/ui-input-trigger" },
     { "path": "./packages/client/ui-commands" },

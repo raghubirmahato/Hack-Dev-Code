@@ -13,14 +13,15 @@ Hack Dev Code ships as a desktop app for Windows and macOS, a Web UI, a command 
 3. [Quick start](#quick-start)
 4. [Models and keys](#models-and-keys)
 5. [Desktop and browser control](#desktop-and-browser-control)
-6. [Permissions and safety](#permissions-and-safety)
-7. [Customize: skills, connectors, MCP and plugins](#customize-skills-connectors-mcp-and-plugins)
-8. [Integrations](#integrations)
-9. [Configuration](#configuration)
-10. [Architecture](#architecture)
-11. [Build from source](#build-from-source)
-12. [Known limitations](#known-limitations)
-13. [Contributing, license and acknowledgements](#contributing-license-and-acknowledgements)
+6. [Multi-agent missions](#multi-agent-missions)
+7. [Permissions and safety](#permissions-and-safety)
+8. [Customize: skills, connectors, MCP and plugins](#customize-skills-connectors-mcp-and-plugins)
+9. [Integrations](#integrations)
+10. [Configuration](#configuration)
+11. [Architecture](#architecture)
+12. [Build from source](#build-from-source)
+13. [Known limitations](#known-limitations)
+14. [Contributing, license and acknowledgements](#contributing-license-and-acknowledgements)
 
 ---
 
@@ -29,6 +30,8 @@ Hack Dev Code ships as a desktop app for Windows and macOS, a Web UI, a command 
 | Area | Capability |
 |---|---|
 | **Coding** | Reads, writes and edits files, runs shell commands (PowerShell or Bash), searches with `glob`, `grep` and a ranked `code_search` over definitions, and keeps a to-do list that it finishes before it reports back. |
+| **Missions** | The `hackdev` tool turns one request into a planned project: an analyst, a scout and a planner size a team, specialist builders work in parallel, and three independent gates verify, review (including real screenshots of the UI) and secure the result. |
+undefined
 | **Desktop control** | Launches apps by name, lists and reads windows through UI Automation (Windows) or AT-SPI (Linux), acts on numbered controls, reads text with OCR, clicks, drags, scrolls, types and presses shortcuts with real input, across every monitor. |
 | **Browser** | A built-in browser pane in the desktop app, plus agent control of Chrome through Chrome DevTools, with a persistent profile so sign-ins stay. |
 | **Models** | Local models through Ollama, listed straight from your Ollama install; DeepSeek and any OpenAI-compatible provider through an API key. No account or sign-in. Add several keys per provider and requests rotate through them. |
@@ -77,6 +80,8 @@ sudo systemctl enable --now ydotoold
    - *"Add a health check endpoint and a test for it."*
    - *"Open Calculator and work out 12 × 7."*
    - *"Install the code-review skill and review my last commit."*
+   - *"Use hackdev to build a single-page expense tracker with tests."*
+   - *"Use hackdev to build a single-page expense tracker with tests."*
 
 From a terminal:
 
@@ -120,6 +125,39 @@ Anything left pressed is released when the tools unload. While the agent is work
 
 ---
 
+## Multi-agent missions
+
+Ask the agent to "use hackdev" for work that deserves a team. The pipeline is fixed in code; the model only supplies the mission text and caps within your limits, so the checks always run.
+
+```mermaid
+flowchart TB
+    M(["Mission"]) --> C["Council<br/>analyst, scout, planner"]
+    C -->|"validated task graph"| F["Forge<br/>parallel specialist builders"]
+    F --> FC["Fact-check<br/>re-run claimed evidence"]
+    FC --> G1["Gate 1: Verifier<br/>build, run, test, fix"]
+    G1 --> G2["Gate 2: Quality and UX<br/>code review, real screenshots"]
+    G1 --> G3["Gate 3: Security<br/>validation, authz, secrets, dependencies"]
+    G2 --> I{"Integrator<br/>every acceptance criterion met?"}
+    G3 --> I
+    I -->|"no, waves remain"| F
+    I -->|"yes"| R(["Report<br/>results, evidence, needs attention"])
+```
+
+| Agent | Responsibility |
+|---|---|
+| Requirements analyst | Turns the mission into requirements and testable acceptance criteria. |
+| Codebase scout | Maps the stack, commands, conventions and risks into `.hackdev/PROJECT_MAP.md`. |
+| Planner | Sizes the team and returns small tasks with dependencies, owned paths and specialist roles. |
+| Specialist builders | One per task (frontend, backend, data, test, docs, security, ...), each in its own git worktree, merged back one at a time. |
+| Splitter | Breaks a task a builder could not finish into ordered subtasks. |
+| Fact-checker | Confirms listed files exist and re-runs the cheapest decisive evidence. |
+| Verifier, Quality + UX, Security | Independent gates with bounded review-fix loops and a regression pass. |
+| Integrator | Opens follow-up tasks for unmet criteria. |
+| Chronicler | Writes `RUN_REPORT.md` and compacts long-term memory. |
+
+Agents communicate through a typed blackboard (contracts, decisions, facts, risks, warnings, handoffs, questions) rather than free-form chat. Memory persists in `.hackdev/MEMORY.md`, and `.hackdev/PROGRESS.md` lets a rerun plan only the remaining work. Use `hackdev_review` to run only the three gates on work done elsewhere. The full design is in [docs/hack-dev-code.md](docs/hack-dev-code.md).
+
+---
 ## Permissions and safety
 
 Hack Dev Code starts with **Full access**: agents install, edit, delete and run commands without asking. That suits a personal machine. To add limits back:
@@ -179,6 +217,8 @@ packages/experimental                desktop control (computer use) and browser 
 packages/llm                         model adapters, key pools and fallbacks
 packages/mcp, packages/skill         MCP client and directory, skills
 packages/customize                   Customize settings area (skills, connectors, MCP servers)
+packages/hackdev                     multi-agent mission pipeline and its result card
+undefined
 packages/bundle                      product bundles (base, web-app, headless)
 packages/*                           sessions, sandbox, credentials, file tools, UI and more
 extensions/vscode                    VS Code extension

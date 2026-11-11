@@ -2500,6 +2500,9 @@ importers:
       '@hackdevcode/dsh-tool-goal':
         specifier: workspace:*
         version: link:../../goal/tool-goal
+      '@hackdevcode/dsh-tool-hackdev':
+        specifier: workspace:*
+        version: link:../../hackdev/tool-hackdev
       '@hackdevcode/dsh-tool-jobs':
         specifier: workspace:*
         version: link:../../jobs/tool-jobs
@@ -2909,6 +2912,9 @@ importers:
       '@hackdevcode/dsh-client-ui-goal':
         specifier: workspace:*
         version: link:../../client/ui-goal
+      '@hackdevcode/dsh-client-ui-hackdev':
+        specifier: workspace:*
+        version: link:../../hackdev/client-ui-hackdev
       '@hackdevcode/dsh-client-ui-input-trigger':
         specifier: workspace:*
         version: link:../../client/ui-input-trigger
@@ -12287,6 +12293,70 @@ importers:
       '@hackdevcode/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
+
+  packages/hackdev/client-ui-hackdev:
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../../client/locale
+      '@hackdevcode/dsh-client-ui-primitives':
+        specifier: workspace:*
+        version: link:../../client/ui-primitives
+      '@hackdevcode/dsh-client-ui-renderer':
+        specifier: workspace:*
+        version: link:../../client/ui-renderer
+      '@hackdevcode/dsh-client-ui-slots':
+        specifier: workspace:*
+        version: link:../../client/ui-slots
+      '@hackdevcode/dsh-client-ui-tool':
+        specifier: workspace:*
+        version: link:../../client/ui-tool
+      '@hackdevcode/dsh-tool-hackdev':
+        specifier: workspace:*
+        version: link:../tool-hackdev
+      '@testing-library/react':
+        specifier: ^16.3.3
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+
+  packages/hackdev/tool-hackdev:
+    dependencies:
+      '@hackdevcode/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@hackdevcode/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@hackdevcode/dsh-subagent':
+        specifier: workspace:*
+        version: link:../../subagent/subagent
+      '@hackdevcode/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@hackdevcode/dsh-tool-workflow':
+        specifier: workspace:*
+        version: link:../../workflow/tool-workflow
+      '@hackdevcode/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+      '@hackdevcode/dsh-workflow':
+        specifier: workspace:*
+        version: link:../../workflow/workflow
 
   packages/host/directory-picker:
     devDependencies:

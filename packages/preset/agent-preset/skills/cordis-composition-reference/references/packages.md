@@ -285,6 +285,13 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@hackdevcode/dsh-repeat-tool-reminder` | yes | Repeat-tool-call guard plugin: advisory reminders when an agent loops on identical tool calls |
 | `@hackdevcode/dsh-tool-call-timeout-policy` | no | Tool-call timeout policy: a tools/execute wrapper that arms a per-tool deadline on exec.signal and returns TOOL_TIMEOUT when it wins |
 
+## hackdev
+
+| Package | Config | Description |
+|---|---|---|
+| `@hackdevcode/dsh-client-ui-hackdev` | no | Web card for Hack Dev Code missions and gate reviews: tasks, gate verdicts, issues and items needing human approval |
+| `@hackdevcode/dsh-tool-hackdev` | yes | Hack Dev Code mission tools: planning council, parallel builders with shared memory, and verifier, quality/UX and security gates |
+
 ## host
 
 | Package | Config | Description |

@@ -1,6 +1,6 @@
 # Hack Dev Code: conventions for coding agents and contributors
 
-Hack Dev Code is a TypeScript monorepo (pnpm workspaces, Node 24.9+). The agent runtime (agent loop, subagents, workflow engine) lives in `packages/` and `apps/` and is the upstream DeepSeek Harness one; do not add a separate orchestration layer on top of it. Read [README.md](README.md) first.
+Hack Dev Code is a TypeScript monorepo (pnpm workspaces, Node 24.9+). The agent runtime (agent loop, subagents, workflow engine) lives in `packages/` and `apps/` and is the upstream DeepSeek Harness one; the hackdev mission pipeline (`packages/hackdev`) sits on top of its workflow engine and subagents. Read [README.md](README.md) first.
 
 ## Layout
 
