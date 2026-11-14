@@ -4,7 +4,7 @@ import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import type { Agent, AgentHandle, CreateAgentOptions } from '@hackdevcode/dsh-agent'
 import type {} from '@hackdevcode/dsh-agent-preset-registry'
 import { createUserMessage } from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { SessionId, type SessionEvent } from '@hackdevcode/dsh-session'
 import { RemoteError } from '@hackdevcode/dsh-typert-protocol'
 import TypertRegistry from '@hackdevcode/dsh-typert-registry'
 import type { Workspace, WorkspaceId } from '@hackdevcode/dsh-workspace'
@@ -15,7 +15,7 @@ import {
   type ApiSessionCreated,
   type ApiSessionCreateRequest,
 } from '../src/agent.ts'
-import { SessionCommandController } from '../src/commands.ts'
+import { SessionCommandController, undoCut } from '../src/commands.ts'
 import { installSessionReadTestServices, testSessionPersistence } from './test-remote.ts'
 
 async function expectFailure(operation: Promise<unknown>, code: string): Promise<void> {
@@ -296,35 +296,81 @@ describe('Session fork failures', () => {
   })
 })
 
-describe('Session rewind', () => {
-  it('restores the files after the forked turn before creating the branch, and reports the counts', async () => {
+describe('Session undo', () => {
+  /** Two turns, each opened by the person's prompt; the second also has an assistant reply. */
+  function twoTurnSession(ctx: Context, id: string) {
+    const session = completedSession(ctx, id, '/workspace')
+    const prompt = createUserMessage({ content: [{ type: 'text', text: 'second prompt' }], source: { kind: 'user' } })
+    // The prompt is queued before its turn starts, as the Agent records it.
+    session.append('agent/inbox/spliced', { target: 'next-turn', start: 0, inserted: [prompt] })
+    session.append('turn/start', { turn: 2 })
+    session.append('agent/inbox/spliced', { target: 'next-turn', start: 0, removedCount: 1, inserted: [] })
+    session.append('user/message', prompt, { surfaceOp: 'append' })
+    session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
+    return session
+  }
+
+  it('cuts before the turn the newest prompt opened, puts its files back, and returns the prompt', async () => {
     const ctx = await baseContext()
     ctx.provide('workspaceRegistry', { list: () => [] } as never)
-    const source = completedSession(ctx, 'rewind-source', '/workspace')
+    const source = twoTurnSession(ctx, 'undo-source')
     const restore = vi.fn((_sessionId: SessionId, _cwd: string, _afterTurn: number, _signal: AbortSignal) =>
       Promise.resolve({ restored: ['a.txt', 'b.txt'], removed: ['new.txt'] }))
-    ctx.provide('workspaceChanges', { restore } as never)
-    vi.spyOn(ctx.agents, 'create').mockImplementation((options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)))
+    const inherit = vi.fn(() => Promise.resolve())
+    ctx.provide('workspaceChanges', { restore, inherit } as never)
+    const create = vi.spyOn(ctx.agents, 'create').mockImplementation((options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)))
     const controller = new SessionCommandController(ctx, controllerAgents(ctx), '/default')
 
-    const end = source.snapshotEvents().findLast(event => event.type === 'turn/end')!
-    const forked = await controller.fork({ sessionId: source.id, atSeq: end.seq, restoreFiles: true })
-    expect(forked.restoredFiles).toEqual({ restored: 2, removed: 1 })
+    const forked = await controller.fork({ sessionId: source.id, undoLastPrompt: true })
+    expect(forked.undone).toEqual({ prompt: 'second prompt', restored: 2, removed: 1 })
     expect(restore.mock.calls[0]?.slice(0, 3)).toEqual([source.id, '/workspace', 1])
-    // A plain branch leaves the files alone.
-    await controller.fork({ sessionId: source.id, atSeq: end.seq })
-    expect(restore).toHaveBeenCalledTimes(1)
+    expect(inherit).toHaveBeenCalledWith(source.id, forked.sessionId, '/workspace', 1)
+    // The child keeps turn 1 and the queueing of the prompt, and nothing of turn 2.
+    const turnOneEnd = source.snapshotEvents().find(event => event.type === 'turn/end')!
+    expect(create.mock.calls[0]?.[0].inheritedEventCount).toBe(turnOneEnd.seq + 2)
+    // The kept history ends with the prompt queued; the child cancels it so it does not wait to run again.
+    expect(create.mock.calls[0]?.[0].seed?.at(-1)).toMatchObject({
+      type: 'agent/inbox/spliced', data: { target: 'next-turn', start: 0, removedCount: 1, inserted: [], outcome: 'canceled' },
+    })
     await ctx.fiber.dispose()
   })
 
-  it('refuses a rewind when the Host does not record workspace changes, and maps a failed restore', async () => {
+  it('undoes the only prompt into a blank Session and keeps files on a Host without change records', async () => {
     const ctx = await baseContext()
     ctx.provide('workspaceRegistry', { list: () => [] } as never)
-    const source = completedSession(ctx, 'rewind-refused', '/workspace')
-    const controller = new SessionCommandController(ctx, controllerAgents(ctx), '/default')
-    await expectFailure(controller.fork({ sessionId: source.id, restoreFiles: true }), 'session/rewind-failed')
-    ctx.provide('workspaceChanges', { restore: () => Promise.reject(new Error('not a repository')) } as never)
-    await expectFailure(controller.fork({ sessionId: source.id, restoreFiles: true }), 'session/rewind-failed')
+    const source = completedSession(ctx, 'undo-only', '/workspace')
+    const createSession = vi.fn(publishedSession(ctx, SessionId('undo-blank')))
+    const controller = new SessionCommandController(ctx, controllerAgents(ctx, { createSession }), '/default')
+
+    const forked = await controller.fork({ sessionId: source.id, undoLastPrompt: true })
+    expect(forked).toEqual({ sessionId: 'undo-blank', undone: { prompt: 'work', restored: 0, removed: 0 } })
+    expect(createSession.mock.calls[0]?.[0].cwd).toBe('/workspace')
     await ctx.fiber.dispose()
+  })
+
+  it('refuses a Session without a prompt, and fails rather than undoing without the files', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const empty = ctx.sessions.create(SessionId('undo-empty'), { meta: { cwd: '/workspace' } })
+    empty.append('turn/start', { turn: 1 })
+    empty.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    const controller = new SessionCommandController(ctx, controllerAgents(ctx), '/default')
+    await expectFailure(controller.fork({ sessionId: empty.id, undoLastPrompt: true }), 'session/fork-unavailable')
+    const source = twoTurnSession(ctx, 'undo-refused')
+    ctx.provide('workspaceChanges', { restore: () => Promise.reject(new Error('not a repository')) } as never)
+    await expectFailure(controller.fork({ sessionId: source.id, undoLastPrompt: true }), 'session/undo-failed')
+    await ctx.fiber.dispose()
+  })
+
+  it('cuts a prompt sent into a running turn on its own, keeping that turn', () => {
+    const events = [
+      { type: 'turn/start', seq: 0, data: { turn: 1 } },
+      { type: 'user/message', seq: 1, surfaceOp: 'append', data: createUserMessage({ content: [{ type: 'text', text: 'first' }], source: { kind: 'user' } }) },
+      { type: 'assistant/message', seq: 2, data: {} },
+      { type: 'user/message', seq: 3, surfaceOp: 'append', data: createUserMessage({ content: [{ type: 'text', text: 'also this' }], source: { kind: 'user' } }) },
+    ] as unknown as SessionEvent[]
+    expect(undoCut(events)).toEqual({ boundary: 2, afterTurn: 1, prompt: 'also this' })
+    expect(undoCut(events.slice(0, 2))).toEqual({ boundary: -1, afterTurn: 0, prompt: 'first' })
+    expect(undoCut(events.slice(0, 1))).toBeUndefined()
   })
 })

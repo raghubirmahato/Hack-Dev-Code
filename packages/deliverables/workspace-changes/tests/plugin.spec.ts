@@ -535,7 +535,7 @@ describe('workspace-changes without git', () => {
   })
 })
 
-describe('rewinding the workspace', () => {
+describe('putting the workspace files back', () => {
   it('puts files back to how they were after a turn, from durable checkpoints, even after the Session ends', async () => {
     const cwd = await repository()
     const { ctx } = await boot()
@@ -565,7 +565,12 @@ describe('rewinding the workspace', () => {
     expect(await readText(join(cwd, 'b.txt'))).toBe('x\n')
     await expect(stat(join(cwd, 'new.txt'))).rejects.toThrow()
 
-    // Rewinding to before every turn restores the committed content; nothing after the last turn is a no-op.
+    // A Session that continues this conversation inherits the kept turn and can undo it too.
+    await ctx.workspaceChanges.inherit(session.id, SessionId('rewind-child'), cwd, 1)
+    await ctx.workspaceChanges.restore(SessionId('rewind-child'), cwd, 0, signal)
+    expect(await readText(join(cwd, 'a.txt'))).toBe('l1\nl2\nl3\n')
+
+    // Going back to before every turn restores the committed content; nothing after the last turn is a no-op.
     await ctx.workspaceChanges.restore(session.id, cwd, 0, signal)
     expect(await readText(join(cwd, 'a.txt'))).toBe('l1\nl2\nl3\n')
     expect(await ctx.workspaceChanges.restore(session.id, cwd, 2, signal)).toEqual({ restored: [], removed: [] })

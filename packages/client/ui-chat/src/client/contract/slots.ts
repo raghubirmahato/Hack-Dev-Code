@@ -230,10 +230,15 @@ export interface ChatNodeOwnerProps {
   cwd?: string | undefined
   openFile: (path: string, options?: OpenFileOptions) => void
   inspectCall: ((callId: ToolCallId) => void) | undefined
-  /** Fork the conversation at an event; `restoreFiles` also rewinds the workspace's files to that point. */
-  forkAt: (seq: number, options?: { restoreFiles?: boolean }) => void
+  /** Fork the conversation at an event. */
+  forkAt: (seq: number) => void
   /** Ask the agent to pick a stopped task back up where it left off; absent where the view cannot send. */
   continueTask?: (() => void) | undefined
+  /**
+   * Undo the person's newest prompt: the conversation and the files go back to before it, and the prompt waits in
+   * the composer to be edited and sent again; absent where the view cannot undo.
+   */
+  undoLastPrompt?: (() => void) | undefined
   /** Session-authorized image loader supplied by the Chat view. */
   loadImage: MessageImageLoader
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
@@ -346,10 +351,12 @@ export interface ChatViewInjected {
     save: (position: ChatScrollPosition | null) => void
     read: () => ChatScrollPosition | null
   }
-  /** Fork the conversation at an event; `restoreFiles` also rewinds the workspace's files to that point. */
-  forkAt: (seq: number, options?: { restoreFiles?: boolean }) => void
+  /** Fork the conversation at an event. */
+  forkAt: (seq: number) => void
   /** Ask the agent to pick a stopped task back up where it left off. */
   continueTask?: (() => void) | undefined
+  /** Undo the person's newest prompt and put it back in the composer for editing. */
+  undoLastPrompt?: (() => void) | undefined
   fileMentions: (owner: TurnTailOwnerProps) => MarkdownFileMentions | undefined
 }
 
@@ -363,7 +370,7 @@ export type ChatFlowDataInjected = Pick<ChatViewInjected, 'keyedHooks'> & {
 
 /** Ordered rows and reconciled local echoes rendered inside one Chat viewport. */
 export interface ChatFlowOwnerProps extends Pick<ChatNodeOwnerProps,
-  'cwd' | 'openFile' | 'inspectCall' | 'forkAt' | 'continueTask' | 'loadImage' | 'fileMentions'> {
+  'cwd' | 'openFile' | 'inspectCall' | 'forkAt' | 'continueTask' | 'undoLastPrompt' | 'loadImage' | 'fileMentions'> {
   readonly entries: readonly RenderEntry[]
   readonly pendingInputs: readonly (PendingSubmission | InboxState['next-step'][number])[]
   readonly lastInputTurn: number | undefined

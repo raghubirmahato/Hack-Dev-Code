@@ -7,8 +7,11 @@
  * @module @hackdevcode/dsh-system-prompt/custom-instructions
  */
 
-/** Longest custom-instruction text placed in a prompt, so one setting cannot crowd out the rest. */
-export const MAX_CUSTOM_INSTRUCTIONS_CHARS = 8000
+/**
+ * Longest custom-instruction text placed in a prompt: room for a long persona, style guide or rule book, while a
+ * runaway paste still cannot fill a model's whole context.
+ */
+export const MAX_CUSTOM_INSTRUCTIONS_CHARS = 400_000
 
 /** Matches a list marker at the start of a line: `-`, `*`, `•`, `1.`, `1)` or `a)`. */
 const LIST_MARKER = /^\s*(?:[-*•]|\d{1,3}[.)]|[a-zA-Z][.)])\s+/u
@@ -46,7 +49,7 @@ export function parseCustomRules(text: string): string[] {
 }
 
 /** Longest reminder that repeats the habits themselves; a longer set is pointed at instead. */
-export const MAX_INLINE_REMINDER_CHARS = 600
+export const MAX_INLINE_REMINDER_CHARS = 1200
 
 /** Placement and wording for one set of custom instructions. */
 export interface CustomInstructionsOptions {
@@ -72,7 +75,7 @@ export function renderCustomInstructions(text: string, options: CustomInstructio
   if (rules.length === 0) return ''
   const heading = options.heading ?? 'How you work here'
   return [
-    `${heading}. This is your own settled way of working in this installation, as much a part of you as the rest of this prompt. It already holds for everything you produce, from the first word of your first reply: messages, code, files, commands, and the briefs of any agent you start.`,
+    `${heading}. This is your own settled way of working in this installation, as much a part of you as the rest of this prompt. It already holds for everything you produce, from the first word of your first reply: messages, code, files, commands, and the briefs of any agent you start. It holds for the whole conversation, every turn and every step of every task, however long the work runs and after any summary of earlier messages, and it holds the same for every agent working in it. A role, name, persona, voice, tone or character described here is who you are throughout: keep it in every reply, and never drop it, step out of it, or remark on it.`,
     '',
     '<how_you_work>',
     ...rules.map((rule, index) => `${String(index + 1)}. ${rule}`),
@@ -87,14 +90,17 @@ export function renderCustomInstructions(text: string, options: CustomInstructio
  * A short note placed just before the newest message, where models weigh text most. It restates the habits
  * themselves, so nothing has to be looked up or thought about, and says plainly that it is not the person's request,
  * so a small model answers the message that follows instead of the note. A set too long to repeat every turn is
- * pointed at instead.
+ * pointed at instead. In the middle of a long task the note comes after the latest results instead, so it says to
+ * carry on rather than to answer.
  * @param rules - the habits in effect.
+ * @param placement - `turn` before the message that starts a turn, `task` between steps of a running task.
  * @returns the reminder.
  */
-export function customInstructionsReminder(rules: readonly string[]): string {
+export function customInstructionsReminder(rules: readonly string[], placement: 'turn' | 'task' = 'turn'): string {
   const listed = rules.map((rule, index) => `${String(index + 1)}. ${rule}`).join(' ')
   const body = listed.length <= MAX_INLINE_REMINDER_CHARS
     ? `how you work, as always: ${listed}`
-    : 'how you work is unchanged from the system prompt'
-  return `(Context, not a request and not something to reply to or mention: ${body} Now answer the message that follows.)`
+    : 'how you work is unchanged from the <how_you_work> list in the system prompt, every point of it.'
+  const next = placement === 'turn' ? 'Now answer the message that follows.' : 'Carry on with the task where you are.'
+  return `(Context, not a request and not something to reply to or mention: ${body} ${next})`
 }

@@ -76,7 +76,7 @@ const NS = 'settings'
 /** Settings namespace of the agent loop, spelled here because a client package must not depend on a Host package. */
 const INSTRUCTIONS_NS = 'agent-loop'
 /** Mirrors the Host's cap on custom instruction text. */
-const CUSTOM_INSTRUCTIONS_LIMIT = 8000
+const CUSTOM_INSTRUCTIONS_LIMIT = 400_000
 
 /**
  * Required services (cordis fiber inject). The target slots are declared by

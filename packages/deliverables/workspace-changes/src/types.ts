@@ -106,15 +106,24 @@ export interface WorkspaceChanges {
    * @throws when git is unavailable, the directory is no longer a repository, or a git command fails.
    */
   restore(sessionId: SessionId, cwd: string, afterTurn: number, signal: AbortSignal): Promise<WorkspaceRestore>
+  /**
+   * Give a Session that continues another one's conversation, such as the one an undo creates, that Session's file
+   * checkpoints up to a turn, so {@link WorkspaceChanges.restore} can later undo those turns from the new Session too.
+   * @param fromSessionId - the Session whose turns are kept.
+   * @param toSessionId - the new Session.
+   * @param cwd - the shared working directory.
+   * @param throughTurn - the last kept turn.
+   */
+  inherit(fromSessionId: SessionId, toSessionId: SessionId, cwd: string, throughTurn: number): Promise<void>
 }
 
-/** What a rewind changed in the workspace. */
+/** What putting files back changed in the workspace. */
 export interface WorkspaceRestore {
   /** Paths written back, relative to the repository root. */
   restored: string[]
   /** Paths removed because they did not exist at that point. */
   removed: string[]
-  /** Snapshot tree of the files just before the rewind, when it changed anything. */
+  /** Snapshot tree of the files just before the restore, when it changed anything. */
   backup?: string
 }
 

@@ -139,9 +139,16 @@ export interface ISessions {
     onCreated?: (childId: SessionId) => void
     /** False refuses source migration; omission preserves the Host default. */
     allowMigration?: boolean
-    /** Rewind: also put the workspace's files back to how they were at `atSeq`. */
-    restoreFiles?: boolean
   }): Promise<SessionId>
+  /**
+   * Undo the person's newest prompt: a new Session holds the conversation up to just before it, the workspace's files
+   * are back to how they were before it, and the undone text is returned so it can be edited and sent again. The
+   * source Session is left as it is; the caller decides whether to archive it.
+   * @param sessionId - the Session whose newest prompt is undone.
+   * @returns the new Session, the undone prompt text, and how many files were written back or removed.
+   * @throws when the Session has no prompt to undo or its files cannot be put back.
+   */
+  undo(sessionId: SessionId): Promise<{ sessionId: SessionId; prompt: string; restored: number; removed: number }>
   /**
    * Borrow an already-retained Agent-scoped Context without extending its lifetime.
    * @param id - session id.

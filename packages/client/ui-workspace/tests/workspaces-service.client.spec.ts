@@ -139,6 +139,7 @@ class FakeSessions implements ISessions {
   readonly list: MutableSource<SessionListState>
   readonly create: ReturnType<typeof vi.fn<ISessions['create']>>
   readonly fork = vi.fn<ISessions['fork']>(async () => sid('forked'))
+  readonly undo = vi.fn<ISessions['undo']>(async () => ({ sessionId: sid('undone'), prompt: '', restored: 0, removed: 0 }))
   readonly retained: RetainedSession[] = []
   readonly refreshProjections = vi.fn<ISessions['refreshProjections']>(() => Promise.resolve())
   readonly retain = vi.fn<ISessions['retain']>((target) => {

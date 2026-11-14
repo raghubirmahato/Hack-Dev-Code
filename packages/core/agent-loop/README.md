@@ -52,7 +52,7 @@ Agents declared in config start automatically when the plugin loads. Each entry 
 
 The generated [configuration catalog](../../../docs/config-catalog.md#hackdevcodedsh-agent-loop) lists every accepted field. `maxParallelToolCalls` remains a volatile positive-integer Config field with default `10`; `1` selects serial execution. The loop passes its current value to each batch's `execute()` call, taking precedence over executor configuration. Live edits apply to the next batch; `agents` remains startup configuration.
 
-`customInstructions` is a volatile text field (Settings → General → Custom instructions, at most 8000 characters in effect). Each line or list item becomes one numbered rule; a single paragraph is split into sentences. Edits apply from the next request.
+`customInstructions` is a volatile text field (Settings → General → Custom instructions, at most 400,000 characters in effect). Each line or list item becomes one numbered rule; a single paragraph is split into sentences. Edits apply from the next request.
 
 `maxTokensContinuations` (volatile, 0 to 10, default `0`) is how many times per turn a reply cut off at the output-token limit is answered with a request to continue in smaller pieces instead of ending the turn as `max-tokens`. The product base bundle sets `2`, for models with small output limits.
 
@@ -169,11 +169,11 @@ Prefix reuse requires earlier messages and declarations to stay byte-identical u
 
 #### What the model sees
 
-With custom instructions set, the system prompt carries a `policy:custom-instructions` section after the tool documentation (order `CUSTOM_INSTRUCTIONS`): the person's standing orders, to be applied directly and completely without asking, debating or weakening them, overriding the model's own defaults and yielding only to an explicit contradicting request in the current conversation, followed by the numbered rules in a `<custom_instructions>` block. On the first step of each turn a context message placed just before the person's newest message reads `(Note from Hack Dev Code, not a request from the person: keep following the person's N custom instructions from the system prompt. Reply to the person's message that follows.)`; it comes before the message so a model answers the person rather than the note.
+With custom instructions set, the system prompt of every agent, subagents and mission members included, carries a `policy:custom-instructions` section after the tool documentation (order `CUSTOM_INSTRUCTIONS`). It states the numbered rules, in a `<how_you_work>` block, as the model's own settled way of working for the whole conversation, every turn and step and after any summary, with a described role, persona or character kept in every reply and never dropped or remarked on; only an explicit contradicting request in the current conversation comes first, and only for that request. On the first step of each turn a context message placed just before the person's newest message restates the rules when they fit in 1200 characters (`(Context, not a request and not something to reply to or mention: how you work, as always: 1. … Now answer the message that follows.)`) and otherwise points at the system prompt list; it comes before the message so a model answers the person rather than the note. Inside a long task the same note, ending `Carry on with the task where you are.`, follows the latest results on steps 11, 21, 31 and so on.
 
 #### Token effect
 
-The section costs its rules plus about 120 tokens of framing on every request; the reminder adds about 15 tokens per turn. Empty instructions add nothing.
+The section costs its rules plus about 170 tokens of framing on every request, up to roughly 100,000 tokens at the 400,000-character limit, so a very long text needs a model with a large context window. The reminder adds about 30 tokens, or its restated rules, at each turn and every ten steps. Empty instructions add nothing.
 
 #### KV Cache effect
 

@@ -22,7 +22,7 @@ import type { Agent } from '@hackdevcode/dsh-agent'
 import { createWorkflowRecorder } from '@hackdevcode/dsh-tool-workflow'
 import { createUserMessage } from '@hackdevcode/dsh-llm'
 import type { ContextFormed } from '@hackdevcode/dsh-llm'
-import { parseCustomRules, renderCustomInstructions } from '@hackdevcode/dsh-system-prompt'
+import { MAX_CUSTOM_INSTRUCTIONS_CHARS, parseCustomRules, renderCustomInstructions } from '@hackdevcode/dsh-system-prompt'
 import { HACKDEV_META, HACKDEV_REVIEW_META, HACKDEV_REVIEW_SCRIPT, HACKDEV_SCRIPT } from './script.ts'
 import { HACKDEV_SWARM_META, HACKDEV_SWARM_SCRIPT } from './swarm.ts'
 import { compactReport, renderReport } from './render.ts'
@@ -191,8 +191,14 @@ export const Config: z<Config> = z.object({
   maxSwarmRounds: z.number().step(1).min(1).max(6).default(3),
 })
 
-/** Longest custom instruction text accepted, so one setting cannot crowd out every agent prompt. */
-const MAX_CUSTOM_INSTRUCTIONS = 8000
+/** Longest custom instruction text accepted, the same cap as the person's global instructions. */
+const MAX_CUSTOM_INSTRUCTIONS = MAX_CUSTOM_INSTRUCTIONS_CHARS
+
+/** Longest numbered list repeated inside each mission agent's task prompt. */
+const MAX_INLINE_MISSION_INSTRUCTIONS = 6000
+
+/** What a mission prompt says instead of a list too long to repeat in every task. */
+const LONG_INSTRUCTIONS_POINTER = 'Every point of the <how_you_work> list in your system prompt holds on this mission, for every message, file, command and report you produce.'
 
 interface ResolvedConfig {
   readonly subagentProvider: string
@@ -493,14 +499,16 @@ export function apply(ctx: Context, config: Config): void {
 
   /**
    * This tool's own instructions plus the person's global ones from Settings, read afresh for each mission, as the
-   * numbered rules every mission prompt repeats so builders and gates can check their work against each one.
+   * numbered rules every mission prompt repeats so builders and gates can check their work against each one. A list
+   * too long to repeat in every task is pointed at in the system prompt, which every mission agent carries.
    */
   const missionInstructions = (): string => {
     const loop = (ctx as unknown as { get(name: string): unknown }).get('agentLoop') as
       { config?: { customInstructions?: { get(): string } } } | undefined
     const global = (loop?.config?.customInstructions?.get() ?? '').trim()
     const text = [resolved.customInstructions, global].filter(part => part.length > 0).join('\n').slice(0, MAX_CUSTOM_INSTRUCTIONS)
-    return parseCustomRules(text).map((rule, index) => `${String(index + 1)}. ${rule}`).join('\n')
+    const numbered = parseCustomRules(text).map((rule, index) => `${String(index + 1)}. ${rule}`).join('\n')
+    return numbered.length <= MAX_INLINE_MISSION_INSTRUCTIONS ? numbered : LONG_INSTRUCTIONS_POINTER
   }
 
   // A message from the person that names a mission tool gets a note before it, at the first step of its turn only.

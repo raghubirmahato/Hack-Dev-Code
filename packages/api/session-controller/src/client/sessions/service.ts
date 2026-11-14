@@ -466,7 +466,6 @@ export class ClientSessions implements ISessions {
     increaseTitle?: boolean
     onCreated?: (childId: SessionId) => void
     allowMigration?: boolean
-    restoreFiles?: boolean
   }): Promise<SessionId> {
     const sourceTitle = opts.increaseTitle
       ? this.list.getSnapshot().byId[opts.sessionId]?.title
@@ -475,7 +474,6 @@ export class ClientSessions implements ISessions {
       sessionId: opts.sessionId,
       ...(opts.atSeq === undefined ? {} : { atSeq: SessionSeq(opts.atSeq) }),
       ...(opts.allowMigration === undefined ? {} : { allowMigration: opts.allowMigration }),
-      ...(opts.restoreFiles === true ? { restoreFiles: true } : {}),
     })
     if (!result.ok) throw new SessionForkError(result.error, opts.sessionId)
     this.projectList()
@@ -486,6 +484,20 @@ export class ClientSessions implements ISessions {
       if (!renamed.ok) throw new Error(`fork child rename failed: ${renamed.error.code}: ${renamed.error.message}`)
     }
     return childId
+  }
+
+  /**
+   * Undo the person's newest prompt into a new Session (see {@link ClientSessions.undo}); the source is left as is.
+   * @param sessionId - the Session whose newest prompt is undone.
+   * @returns the new Session, the undone prompt text, and the file counts.
+   * @throws {SessionForkError} with the source id.
+   */
+  async undo(sessionId: SessionId): Promise<{ sessionId: SessionId; prompt: string; restored: number; removed: number }> {
+    const result = await this.manager.fork({ sessionId, undoLastPrompt: true })
+    if (!result.ok) throw new SessionForkError(result.error, sessionId)
+    this.projectList()
+    const undone = result.value.undone ?? { prompt: '', restored: 0, removed: 0 }
+    return { sessionId: result.value.sessionId, ...undone }
   }
 
   /**

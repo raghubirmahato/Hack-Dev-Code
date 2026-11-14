@@ -111,7 +111,7 @@ export interface Config {
 
 - `inject`: `agents` · `sessions` · `llm` · `tools` · `systemPrompt` · `sessionProjections`
 - `refs`: [`AgentOptions`](subsystems/core.md) · [`SessionId`](subsystems/core.md) · `Volatile` (`@hackdevcode/cosmokit`)
-- `source`: [`packages/core/agent-loop/src/index.ts:264`](../packages/core/agent-loop/src/index.ts)
+- `source`: [`packages/core/agent-loop/src/index.ts:266`](../packages/core/agent-loop/src/index.ts)
 
 ```ts config-catalog
 /** Agent-loop plugin configuration. */
@@ -5108,8 +5108,8 @@ export interface Config {
   /** Milliseconds a line comparison may run before it degrades to whole-file replacement. */
   diffTimeoutMs: number
   /**
-   * Directory for durable checkpoints, so a workspace can be rewound after its Session ends: snapshot objects and a
-   * per-Session index of each turn's snapshots. Empty uses `checkpoints` in the Hack Dev Code home.
+   * Directory for durable checkpoints, so a turn's file changes can be undone after its Session ends: snapshot
+   * objects and a per-Session index of each turn's snapshots. Empty uses `checkpoints` in the Hack Dev Code home.
    */
   checkpointDir: string
 }

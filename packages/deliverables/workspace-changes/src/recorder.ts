@@ -28,8 +28,8 @@ export interface RecorderEnvironment {
   warn: (message: string) => void
   /**
    * Directory for durable checkpoints: when set, snapshot objects and each Session's checkpoint index are kept there,
-   * one directory per working directory, so a workspace can be rewound after the Session ends. Without it they live
-   * in the Session's temporary directory.
+   * one directory per working directory, so a turn's file changes can be undone after the Session ends. Without it
+   * they live in the Session's temporary directory.
    */
   storeRoot?: string
 }

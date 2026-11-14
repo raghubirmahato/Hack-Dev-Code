@@ -60,7 +60,8 @@ const MOTION_TAIL_MS = 800
  */
 export function ChatView({
   useSession, useChat, useConversation, useSessions, renderSlot,
-  sessionId, openFile, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, forkAt, continueTask, fileMentions,
+  sessionId, openFile, openExternalLink, loadOlder, loadThrough, loadImage, inspectCall, chatScroll, forkAt, continueTask, undoLastPrompt,
+  fileMentions,
   usePresentation, useProjection, useInteractionIds, dispatchInteraction, t, fileDrag,
 }: ChatViewSlotProps) {
   const order = useChat(s => s.order)
@@ -233,7 +234,7 @@ export function ChatView({
             <MarkdownDelegateProvider openFile={requestOpenFile} openExternalLink={openExternalLink} fileImages={fileImages}>
               {renderSlot('conversation.chat.flow', {
                 entries, pendingInputs, lastInputTurn, deferCollapse,
-                cwd, openFile: requestOpenFile, inspectCall, forkAt, continueTask, loadImage, fileMentions,
+                cwd, openFile: requestOpenFile, inspectCall, forkAt, continueTask, undoLastPrompt, loadImage, fileMentions,
               }, { hookContext: flowContext })}
             </MarkdownDelegateProvider>
             <div ref={interactionSurfaceRef} className={css.textInteraction} data-text-interaction-surface=""

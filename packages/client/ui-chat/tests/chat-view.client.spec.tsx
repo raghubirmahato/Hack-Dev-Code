@@ -2577,6 +2577,23 @@ describe('ChatView', () => {
     expect(continueTask).toHaveBeenCalledTimes(1)
   })
 
+  it('offers undo on the newest prompt only', () => {
+    const h = makeHarness({ nodes: [
+      userInTurn(1, 'first', 1), assistant(2, 'reply', 1), userInTurn(3, 'second', 2), assistant(4, 'again', 2),
+    ] })
+    const undoLastPrompt = vi.fn()
+    const view = render(<h.ChatView {...h.props} undoLastPrompt={undoLastPrompt} />)
+    const undo = view.getAllByRole('button', { name: 'Undo this prompt to edit and resend it' })
+    expect(undo).toHaveLength(1)
+    // It sits in the newest prompt's row: after that prompt and before the reply to it.
+    expect(view.getByText('second').compareDocumentPosition(undo[0]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(undo[0]!.compareDocumentPosition(view.getByText('again')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(undo[0]!)
+    expect(undoLastPrompt).toHaveBeenCalledTimes(1)
+    view.rerender(<h.ChatView {...h.props} />)
+    expect(view.queryByRole('button', { name: 'Undo this prompt to edit and resend it' })).toBeNull()
+  })
+
   it('shows no continue action without a sender', () => {
     const h = makeHarness({ nodes: [user(1, 'try'), turnError(2, 'TRANSPORT')] })
     const view = render(<h.ChatView {...h.props} />)

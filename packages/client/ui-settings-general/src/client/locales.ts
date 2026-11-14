@@ -38,7 +38,7 @@ export const en = {
   'tools.more.empty': 'No other tools are installed.',
   'general.currentVersion': 'Current version: {version}',
   'customInstructions.title': 'Custom instructions',
-  'customInstructions.description': 'Standing instructions every agent follows in every mission: coding style, languages, frameworks, things to avoid. They apply from the next request.',
+  'customInstructions.description': 'Standing instructions every agent keeps to for the whole conversation and in every mission: a role or persona to stay in, coding style, languages, frameworks, things to avoid. They apply from the next request.',
   'customInstructions.placeholder': 'For example: Use TypeScript and tabs. Never add new dependencies without asking. Explain trade-offs briefly.',
   'customInstructions.hint': 'Write one rule per line. Agents receive them as their own way of working, so they act on them at once instead of stopping to consider them, and short lists are repeated every turn. For rules that apply to one project only, use that project\'s AGENTS.md.',
   'customInstructions.ruleCount': '{count} rules',

@@ -36,7 +36,7 @@ Hack Dev Code ships as a desktop app for Windows and macOS, a Web UI, a command 
 | **Browser** | A built-in browser pane in the desktop app, plus agent control of Chrome through Chrome DevTools, with a persistent profile so sign-ins stay. |
 | **Models** | Local models through Ollama, listed straight from your Ollama install; DeepSeek and any OpenAI-compatible provider through an API key. No account or sign-in. Add several keys per provider and requests rotate through them. |
 | **Extensibility** | **Settings → Customize** with built-in and installable skills, OAuth connectors, sign-in to any website, and MCP servers; a plugin marketplace on the Plugins page; custom instructions and `AGENTS.md` files. The agent can delegate to subagents and run workflows. |
-| **Rewind and resume** | **Rewind** on any finished turn puts the project's files back to how they were at that point and continues the conversation from there in a new branch; your current files stay in a checkpoint. A dropped connection is waited out (about half an hour by default) and the task carries on at the same step, and a stopped or cut-off turn has a **Continue** button. |
+| **Undo and resume** | **Undo** on your newest message takes that prompt back: the conversation returns to just before it, the files the agent changed since are put back, and the prompt waits in the message box so you can edit it and send it again. Undo again to go back further; the undone conversation is archived, not deleted. A dropped connection is waited out (about half an hour by default) and the task carries on at the same step, and a stopped or cut-off turn has a **Continue** button. |
 | **Everywhere you work** | Desktop app, Web UI, CLI, VS Code extension and a GitHub Action. |
 
 The agent runtime is the upstream DeepSeek Harness: the same agent loop, subagents and workflow engine, with desktop control, local models and the Customize area added on top.
@@ -230,7 +230,7 @@ The **plugin marketplace** is the **Discover** tab of the Plugins page and is on
   ```
 - **MCP servers.** Turn on GitHub, Playwright, filesystem, Context7 docs, fetch, Git, memory, sequential thinking, time or Brave Search from the built-in directory, or add your own.
 - **Skills.** Install skills from a Git repository; they load into every session.
-- **Custom instructions.** **Settings → General → Custom instructions**, or `AGENTS.md` files. They are given to the model as its own way of working rather than as a list of rules to consider, so it acts on them at once without weighing, announcing or quoting them; a short list is repeated before each message. Where they apply: `~/.hackdevcode/AGENTS.md` for all projects, `AGENTS.md` in a project, `AGENTS.local.md` for private notes.
+- **Custom instructions.** **Settings → General → Custom instructions**, or `AGENTS.md` files. They are given to the model as its own way of working rather than as a list of rules to consider, so it acts on them at once without weighing, announcing or quoting them. They hold for the whole conversation and for every agent in it, subagents and mission members included; a described role or persona is kept in every reply. Up to 400,000 characters; a short list is repeated before each message and every ten steps of a long task. Where they apply: `~/.hackdevcode/AGENTS.md` for all projects, `AGENTS.md` in a project, `AGENTS.local.md` for private notes.
 
 ---
 
@@ -300,7 +300,7 @@ npx vitest run <path>
 - On GNOME and KDE Wayland, only the windows of X11 apps can be listed and moved; Sway and Hyprland expose every window.
 - A website session needs Chrome, Edge or Chromium installed. Some websites ask to sign in again after a while or show a verification challenge; the agent then asks you to finish it in the sign-in window. A website's own terms decide whether automated use of your account is allowed.
 - In the shared workspace a swarm worker keeps its conversation across rounds. A worker in its own git worktree gets a new folder each round, so it starts afresh there and reads its earlier report and the board instead.
-- Rewinding files needs the project to be a git repository; outside one, turns can be branched but their file changes are not undone. Rewind checkpoints are kept in `~/.hackdevcode/checkpoints` and are not pruned.
+- Undo puts files back only in a git repository; outside one, the conversation is undone but file changes stay. Undo checkpoints are kept in `~/.hackdevcode/checkpoints` and are not pruned. Images and files attached to an undone prompt are not put back in the message box; only its text is.
 - Very small local models (around 4B parameters) can run a whole mission, but their plans and code are weak; the pipeline keeps going when one of them fails a step, and the gates catch some mistakes, not all.
 - The Windows installer is not code-signed yet.
 - Tests of the release tooling that needs PowerShell 7 are skipped, with that reason, on machines without `pwsh`.

@@ -8,9 +8,10 @@ import type {
   ChatNodeOwnerProps, ChatNodeViewProps, ChatViewSlotProps, UserContentAttachment, UserContentData, UserContentInput,
 } from '../contract/slots.ts'
 import type { ModelRetryNode, TurnErrorNode, UserMessageNode } from '../contract/snapshot.ts'
+import type { ChatNode } from '../contract/chat-nodes.ts'
 import { CompactionItem } from './CompactionItem.tsx'
 import { ContextInjectionRow } from './ContextInjectionRow.tsx'
-import { MessageIconActions } from './MessageIconActions.tsx'
+import { MessageIconActions, UndoPromptAction } from './MessageIconActions.tsx'
 import css from './MessageItem.module.css'
 
 const EMPTY_TEXT_FACTS: Readonly<Partial<UserTextFacts>> = {}
@@ -334,7 +335,7 @@ export function PendingSubmissionBubble({ submission, loadImage, renderFactorySl
  * bubble without asking for it.
  */
 export const UserMessageNodeView = memo(function UserMessageNodeView({
-  node, renderFactorySlot, loadImage, renderSlotChain, t,
+  node, renderFactorySlot, loadImage, renderSlotChain, t, undoLastPrompt, useAccess, useChat,
 }: ChatNodeViewProps<'user' | 'steering'> & {
   /** Bound by the `user` keyed registration, the only entry that declares the seat. */
   renderSlotChain: PropsRenderSlots<'conversation.chat.user.before'>['renderSlotChain']
@@ -356,6 +357,10 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
           text={text}
           time={data.time}
           clock="start"
+          // Only the newest prompt can be undone: undo goes back one prompt at a time.
+          extraActions={undoLastPrompt === undefined
+            ? undefined
+            : <NewestPromptUndo node={node} onUndo={undoLastPrompt} useAccess={useAccess} useChat={useChat} t={t} />}
           className={css.actions}
           t={t}
         />
@@ -363,6 +368,30 @@ export const UserMessageNodeView = memo(function UserMessageNodeView({
     />
   )
 })
+
+/**
+ * The undo action on the person's newest message, the one an undo takes back; nothing on older ones or without
+ * the fork permission.
+ * @param props - the message, the undo callback, the view's chat and access seats, and its locale seat.
+ * @returns the action, or null.
+ */
+function NewestPromptUndo({ node, onUndo, useAccess, useChat, t }: {
+  node: ChatNodeViewProps<'user' | 'steering'>['node']
+  onUndo: () => void
+} & Pick<ChatNodeViewProps<'user' | 'steering'>, 'useAccess' | 'useChat' | 't'>): ReactNode {
+  const turn = node.location.kind === 'turn' || node.location.kind === 'step' ? node.location.turn.turn : undefined
+  const allowed = useAccess('session/fork')
+  const newest = useChat((snapshot) => {
+    if (turn === undefined || snapshot.timeline.turnOrder.at(-1) !== turn) return false
+    const keys = snapshot.locations.getTurn(turn)
+    for (let index = keys.length - 1; index >= 0; index--) {
+      const candidate = snapshot.nodes.get(keys[index] as string) as ChatNode | undefined
+      if (candidate?.kind === 'user' || candidate?.kind === 'steering') return candidate.anchorSeq === node.anchorSeq
+    }
+    return false
+  })
+  return newest && allowed ? <UndoPromptAction onUndo={onUndo} t={t} /> : null
+}
 
 /** Injected-context keyed Chat renderer. */
 export const ContextMessageNodeView = memo(function ContextMessageNodeView({ node, t }: ChatNodeViewProps<'context'>) {

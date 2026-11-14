@@ -167,7 +167,7 @@ Web presets mount tools per agent, so `tool-hackdev` is declared in `packages/bu
 | `visionModel` | empty | Optional image-capable model for the quality/UX gate; empty inherits the default route |
 | `maxFactChecks` | 8 | Commands the fact-checker may re-run per wave |
 | `autonomy` | `full` | `full` acts without approval; `bounded` forbids destructive actions and defers large additions |
-| `customInstructions` | empty | The user's standing instructions (up to 8000 characters) for the lead agent and every pipeline agent |
+| `customInstructions` | empty | The user's standing instructions (up to 400,000 characters) for the lead agent and every pipeline agent, kept for the whole conversation and mission |
 
 The `hackdev` tool also accepts per-call `maxTasks`, `maxWaves` and `maxFixRounds`, bounded by these ceilings.
 

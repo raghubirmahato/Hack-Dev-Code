@@ -298,20 +298,34 @@ export function apply(ctx: Context): void {
           },
           // Failures land in the session's prompt error, which the composer already shows.
           continueTask: () => { void session.prompt([{ type: 'text', text: t('message.continuePrompt') }], 'queue') },
-          forkAt: (seq, options) => {
-            const restoreFiles = options?.restoreFiles === true
-            // A rewind changes files on disk, so it asks first; a plain branch does not.
-            if (restoreFiles && !globalThis.confirm(t('message.rewindConfirm'))) return
+          // Undo changes files on disk, so it asks first. The conversation continues in a new Session cut just
+          // before the prompt, which keeps the inherited title, with the prompt back in its composer. The old Session
+          // is archived, so the undo reads as happening in place and stays recoverable.
+          undoLastPrompt: () => {
+            if (!globalThis.confirm(t('message.undoConfirm'))) return
+            // A running turn stops first, so it cannot write files after they are put back.
+            const running = ctx.sessions.list.getSnapshot().byId[sessionId]?.running === true
+            void (running ? session.cancel() : Promise.resolve())
+              .then(() => ctx.sessions.undo(sessionId))
+              .then(async ({ sessionId: childId, prompt }) => {
+                ctx.uiWorkspace.openSession(childId)
+                const target = ctx.sessions.binding(childId)
+                if (target !== undefined) ctx.get('conversation')?.input.requestDraftInitialization(target, { prompt, whenDraftExists: 'replace' })
+                await ctx.uiWorkspace.archiveSession(sessionId, { stopActivity: true })
+              })
+              .catch((error: unknown) => {
+                globalThis.alert(t('message.undoFailed', { reason: error instanceof Error ? error.message : String(error) }))
+              })
+          },
+          forkAt: (seq) => {
             const turn = [...chat.getSnapshot().timeline.turns.values()].find(turn => turn.end?.seq === seq)
             const messageId = turn?.data.get('turn-tail')?.closing?.finalNode.messageId
-            const rewind = restoreFiles ? { restoreFiles } : {}
-            ctx.sessions.fork({ sessionId, atSeq: seq, increaseTitle: true, ...rewind, onCreated: (childId) => {
+            ctx.sessions.fork({ sessionId, atSeq: seq, increaseTitle: true, onCreated: (childId) => {
               ctx.get('productAnalytics')?.track('branch_session_click', { session_id: childId, parent_session_id: sessionId, ...messageId === undefined ? {} : { parent_message_id: messageId }, click_position: 'footer' })
             } })
               .then((childId) => { ctx.uiWorkspace.openSession(childId) })
-              .catch((error: unknown) => {
-                // Fork or child-title failure leaves the source view unchanged; a failed rewind says why.
-                if (restoreFiles) globalThis.alert(t('message.rewindFailed', { reason: error instanceof Error ? error.message : String(error) }))
+              .catch(() => {
+                // Fork or child-title failure leaves the source view unchanged.
               })
           },
         }

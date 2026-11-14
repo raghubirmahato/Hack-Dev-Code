@@ -311,7 +311,7 @@ export class TestSessions implements ISessions {
 
   /** Calls observed on the service-level face, newest last. */
   readonly calls: {
-    method: 'create' | 'refreshProjections' | 'refresh' | 'search' | 'fork'
+    method: 'create' | 'refreshProjections' | 'refresh' | 'search' | 'fork' | 'undo'
     args: unknown[]
   }[] = []
 
@@ -680,6 +680,16 @@ export class TestSessions implements ISessions {
   fork(opts: Parameters<ISessions['fork']>[0]): Promise<SessionId> {
     this.calls.push({ method: 'fork', args: [opts] })
     return Promise.resolve(opts.sessionId)
+  }
+
+  /**
+   * Record an undo call.
+   * @param sessionId - source Session.
+   * @returns the source id with an empty undone prompt (no child record is created).
+   */
+  undo(sessionId: SessionId): ReturnType<ISessions['undo']> {
+    this.calls.push({ method: 'undo', args: [sessionId] })
+    return Promise.resolve({ sessionId, prompt: '', restored: 0, removed: 0 })
   }
 
   /**

@@ -3,7 +3,7 @@
 
 import { useId, type ReactNode } from 'react'
 import {
-  IconBranchOutlineRegular, IconCheckOutlineRegular, IconCopyOutlineRegular, IconRefreshOutlineRegular, Tooltip, useClipboardCopy,
+  IconBranchOutlineRegular, IconCheckOutlineRegular, IconCopyOutlineRegular, IconUndoOutlineRegular, Tooltip, useClipboardCopy,
 } from '@hackdevcode/dsh-client-ui-primitives'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { formatMessageClock } from './message-chrome.ts'
@@ -21,8 +21,6 @@ export interface MessageIconActionsProps {
   onBranch?: (() => void) | undefined
   /** The message is not a completed transcript tail, so branch stays visible but unavailable. */
   branchUnavailable?: boolean | undefined
-  /** Rewind files and conversation to this message; omission hides the action. Unavailable whenever branch is. */
-  onRewind?: (() => void) | undefined
   /** Parent layout class composed onto the actions row. */
   className?: string | undefined
   /**
@@ -45,7 +43,7 @@ export interface MessageIconActionsProps {
  * @returns The actions row element.
  */
 export function MessageIconActions({
-  text, time, clock, onBranch, branchUnavailable = false, onRewind, className,
+  text, time, clock, onBranch, branchUnavailable = false, className,
   extraActions, usageAction, t,
 }: MessageIconActionsProps) {
   const day = useCalendarDay()
@@ -81,13 +79,6 @@ export function MessageIconActions({
           </button>
         </Tooltip>
       )}
-      {onRewind !== undefined && !branchUnavailable && (
-        <Tooltip label={t('message.rewind')} side="bottom">
-          <button type="button" className={css.action} aria-label={t('message.rewind')} onClick={onRewind}>
-            <IconRefreshOutlineRegular />
-          </button>
-        </Tooltip>
-      )}
       {onBranch !== undefined && branchUnavailable && (
         <span id={reasonId} className={css.visuallyHidden}>{t('message.branchUnavailable')}</span>
       )}
@@ -95,5 +86,20 @@ export function MessageIconActions({
         ? <span className={css.endInfo}>{usageAction}{clockEl}</span>
         : usageAction}
     </div>
+  )
+}
+
+/**
+ * The undo action of a prompt, in the same chrome as the other message actions.
+ * @param props - the undo callback and the view's locale seat.
+ * @returns the action button.
+ */
+export function UndoPromptAction({ onUndo, t }: { onUndo: () => void; t: ChatViewSlotProps['t'] }) {
+  return (
+    <Tooltip label={t('message.undo')} side="bottom">
+      <button type="button" className={css.action} aria-label={t('message.undo')} onClick={onUndo}>
+        <IconUndoOutlineRegular />
+      </button>
+    </Tooltip>
   )
 }

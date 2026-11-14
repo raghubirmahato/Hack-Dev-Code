@@ -7,6 +7,7 @@ import type { WorkspaceId } from '@hackdevcode/dsh-workspace/types'
 import type {
   SessionControlBaseline,
   SessionControlFrame,
+  SessionForkValue,
   SessionProjectionHints,
   SessionRenameValue,
   SessionSummary,
@@ -559,14 +560,14 @@ export class SessionManager {
    * @returns the fork result (the child session id).
    */
   async fork(
-    opts: { sessionId: SessionId; atSeq?: SessionSeq; allowMigration?: boolean; restoreFiles?: boolean },
-  ): Promise<RemoteResult<{ sessionId: SessionId }>> {
+    opts: { sessionId: SessionId; atSeq?: SessionSeq; allowMigration?: boolean; undoLastPrompt?: boolean },
+  ): Promise<RemoteResult<SessionForkValue>> {
     const source = this.summaries.find(s => s.sessionId === opts.sessionId)
     const result = await this.remote.session.fork({
       sessionId: opts.sessionId,
       ...opts.atSeq === undefined ? {} : { atSeq: opts.atSeq },
       ...opts.allowMigration === undefined ? {} : { allowMigration: opts.allowMigration },
-      ...opts.restoreFiles === true ? { restoreFiles: true } : {},
+      ...opts.undoLastPrompt === true ? { undoLastPrompt: true } : {},
     })
     const childId = result.ok
       ? result.value.sessionId

@@ -1,10 +1,10 @@
 /**
- * Durable checkpoints for rewinding a workspace: the snapshot object store and a per-Session index of each recorded
- * turn's turn-start and turn-end tree ids, kept under one directory per working directory so they outlive the
- * Session's process.
+ * Durable checkpoints for undoing a prompt's file changes: the snapshot object store and a per-Session index of each
+ * recorded turn's turn-start and turn-end tree ids, kept under one directory per working directory so they outlive
+ * the Session's process.
  */
 import { createHash } from 'node:crypto'
-import { appendFile, mkdir, readFile } from 'node:fs/promises'
+import { appendFile, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
 /** One recorded turn: the `workspace/changes` event's sequence, its turn, and its snapshot tree ids. */
@@ -71,6 +71,19 @@ export async function readCheckpoints(directory: string, sessionId: string): Pro
     }
   }
   return out
+}
+
+/**
+ * Give a Session the checkpoints of another one's turns up to a point, for a Session that continues that one's
+ * conversation; the new index replaces any the Session had.
+ * @param directory - from {@link checkpointDir}.
+ * @param from - the Session whose turns are copied.
+ * @param to - the Session that receives them.
+ * @param throughTurn - the last turn copied.
+ */
+export async function copyCheckpoints(directory: string, from: string, to: string, throughTurn: number): Promise<void> {
+  const kept = (await readCheckpoints(directory, from)).filter(checkpoint => checkpoint.turn <= throughTurn)
+  await writeFile(indexFile(directory, to), kept.map(checkpoint => `${JSON.stringify(checkpoint)}\n`).join(''), 'utf8')
 }
 
 /**

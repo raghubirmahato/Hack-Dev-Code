@@ -4498,6 +4498,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'what changed, empty when no recorded turn changed files after that point.',
         throws: ['when git is unavailable, the directory is no longer a repository, or a git command fails.'],
       },
+      {
+        signature: 'inherit(fromSessionId: SessionId, toSessionId: SessionId, cwd: string, throughTurn: number): Promise<void>',
+        description: 'Give a Session that continues another one\'s conversation, such as the one an undo creates, that Session\'s file checkpoints up to a turn, so WorkspaceChanges.restore can later undo those turns from the new Session too.',
+        parameters: [{ name: 'fromSessionId', description: 'the Session whose turns are kept.' }, { name: 'toSessionId', description: 'the new Session.' }, { name: 'cwd', description: 'the shared working directory.' }, { name: 'throughTurn', description: 'the last kept turn.' }],
+      },
     ],
   },
   {
@@ -8353,7 +8358,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionForkRequest',
-    declaration: 'export interface SessionForkRequest {\n    readonly sessionId: SessionId;\n    readonly atSeq?: number;\n    readonly allowMigration?: boolean;\n    readonly restoreFiles?: boolean;\n}',
+    declaration: 'export interface SessionForkRequest {\n    readonly sessionId: SessionId;\n    readonly atSeq?: number;\n    readonly allowMigration?: boolean;\n    readonly undoLastPrompt?: boolean;\n}',
   },
   {
     name: 'SessionForkSource',
@@ -8361,7 +8366,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionForkValue',
-    declaration: 'export interface SessionForkValue {\n    readonly sessionId: SessionId;\n    readonly restoredFiles?: {\n        readonly restored: number;\n        readonly removed: number;\n    };\n}',
+    declaration: 'export interface SessionForkValue {\n    readonly sessionId: SessionId;\n    readonly undone?: {\n        readonly prompt: string;\n        readonly restored: number;\n        readonly removed: number;\n    };\n}',
   },
   {
     name: 'SessionHandle',

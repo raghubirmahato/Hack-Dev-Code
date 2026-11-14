@@ -76,6 +76,19 @@ describe('custom instructions in requests', () => {
     expect(count(adapter.requests[2])).toBe(once * 2)
   })
 
+  it('reminds a long task every ten steps, after the latest results', async () => {
+    const calls = Array.from({ length: 10 }, (_, index) => toolCallResponse(`c${String(index)}`, 'look', {}))
+    const { ctx, adapter, agent } = await harness([...calls, textResponse('done')], 'Answer in British English.\nUse tabs.')
+    await runTurn(ctx, agent)
+    const task = REMINDER.replace('Now answer the message that follows.', 'Carry on with the task where you are.')
+    expect(adapter.requests).toHaveLength(11)
+    expect(JSON.stringify(adapter.requests[9])).not.toContain(task)
+    const messages = JSON.stringify(adapter.requests[10]?.messages ?? [])
+    expect(messages).toContain(task)
+    // It comes after the last tool result, so it reads as a note between steps.
+    expect(messages.lastIndexOf(task)).toBeGreaterThan(messages.lastIndexOf('"c9"'))
+  })
+
   it('adds nothing when there are no custom instructions', async () => {
     const { ctx, adapter, agent } = await harness([textResponse('done')], '  ')
     await runTurn(ctx, agent)

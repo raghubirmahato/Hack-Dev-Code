@@ -18,7 +18,7 @@ import type {} from '@hackdevcode/dsh-tools'
 import type { FsTarget } from '@hackdevcode/dsh-fs'
 import { join } from 'node:path'
 import { resolveDshHome } from '@hackdevcode/dsh-home-paths'
-import { checkpointDir, readCheckpoints, rewindTarget } from './checkpoints.ts'
+import { checkpointDir, copyCheckpoints, readCheckpoints, rewindTarget } from './checkpoints.ts'
 import { GitRunner, locateGitWorkspace, restoreTree } from './git.ts'
 import { TurnRecorder } from './recorder.ts'
 import type { WorkspaceChanges } from './types.ts'
@@ -49,8 +49,8 @@ export interface Config {
   /** Milliseconds a line comparison may run before it degrades to whole-file replacement. */
   diffTimeoutMs: number
   /**
-   * Directory for durable checkpoints, so a workspace can be rewound after its Session ends: snapshot objects and a
-   * per-Session index of each turn's snapshots. Empty uses `checkpoints` in the Hack Dev Code home.
+   * Directory for durable checkpoints, so a turn's file changes can be undone after its Session ends: snapshot
+   * objects and a per-Session index of each turn's snapshots. Empty uses `checkpoints` in the Hack Dev Code home.
    */
   checkpointDir: string
 }
@@ -131,11 +131,14 @@ export function apply(ctx: Context, config: Config): void {
       const target = rewindTarget(await readCheckpoints(directory, sessionId), afterTurn)
       if (target === undefined) return { restored: [], removed: [] }
       const git = await gitRunner()
-      if (git === null) throw new Error('rewinding files needs git, which is not available on this Host')
+      if (git === null) throw new Error('putting files back needs git, which is not available on this Host')
       const workspace = await locateGitWorkspace(git, cwd, () => Promise.resolve(directory), signal)
       if (workspace === null) throw new Error(`${cwd} is no longer inside a git repository`)
       const outcome = await restoreTree(git, workspace, target, signal)
       return { restored: outcome.restored, removed: outcome.removed, backup: outcome.backup }
+    },
+    inherit: async (fromSessionId, toSessionId, cwd, throughTurn) => {
+      await copyCheckpoints(await checkpointDir(storeRoot, cwd), fromSessionId, toSessionId, throughTurn)
     },
   }
   ctx.provide('workspaceChanges', service)

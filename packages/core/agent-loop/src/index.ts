@@ -253,6 +253,8 @@ function applyLauncherIdentities(
 
 /** Message source of the per-turn custom-instructions reminder. */
 const CUSTOM_INSTRUCTIONS_SOURCE = 'custom-instructions'
+/** Steps of one turn between custom-instruction reminders inside a long task (steps 1, 11, 21, ...). */
+const CUSTOM_INSTRUCTIONS_STEP_INTERVAL = 10
 
 declare module '@hackdevcode/dsh-llm' {
   interface MessageSourceMap {
@@ -371,24 +373,22 @@ export class AgentLoop extends Service implements AgentFactory {
     })
     // A short note just before the newest message at the start of each turn keeps the habits in view in long
     // conversations; it repeats them when they are short, so the model has nothing to look up or deliberate. It goes
-    // before the person's message, never after: a model answers the last message, and must answer the person.
+    // before the person's message, never after: a model answers the last message, and must answer the person. Every
+    // agent gets it, subagents and mission members included, and a long task gets it again every few steps, after
+    // the latest results, so a persona or style holds through hours of tool calls as well as across turns.
     ctx.on('agent/pre-step', async ({ step, signal }, next): Promise<PreStepDecision> => {
       const decision = await next()
-      if (decision.kind === 'reject' || step !== 1 || signal.aborted) return decision
+      const midTask = step > 1 && step % CUSTOM_INSTRUCTIONS_STEP_INTERVAL === 1
+      if (decision.kind === 'reject' || (step !== 1 && !midTask) || signal.aborted) return decision
       const text = this.config.customInstructions.get().trim()
       const rules = text.length === 0 ? [] : parseCustomRules(text.slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS))
       if (rules.length === 0) return decision
-      const reminder = customInstructionsReminder(rules)
-      return {
-        ...decision,
-        messages: [
-          createUserMessage({
-            content: [{ type: 'text', text: reminder }],
-            source: { kind: CUSTOM_INSTRUCTIONS_SOURCE, form: 'snapshot', sections: [{ name: CUSTOM_INSTRUCTIONS_SOURCE, text: reminder }] },
-          }),
-          ...decision.messages,
-        ],
-      }
+      const reminder = customInstructionsReminder(rules, midTask ? 'task' : 'turn')
+      const note = createUserMessage({
+        content: [{ type: 'text', text: reminder }],
+        source: { kind: CUSTOM_INSTRUCTIONS_SOURCE, form: 'snapshot', sections: [{ name: CUSTOM_INSTRUCTIONS_SOURCE, text: reminder }] },
+      })
+      return { ...decision, messages: midTask ? [...decision.messages, note] : [note, ...decision.messages] }
     })
 
     for (const { id, sessionId, cwd, resumeSessionId, ...options } of this.config.agents) {

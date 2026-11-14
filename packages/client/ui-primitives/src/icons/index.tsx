@@ -138,6 +138,12 @@ export const IconRefreshOutlineRegular = productIcon('refresh-outline', 'regular
 /** Medium IconRefreshOutline artwork with a 1.3px stroke. */
 export const IconRefreshOutlineMedium = productIcon('refresh-outline', 'medium')
 
+/** Regular one-pixel IconUndoOutline artwork. */
+export const IconUndoOutlineRegular = productIcon('undo-outline', 'regular')
+
+/** Medium IconUndoOutline artwork with a 1.3px stroke. */
+export const IconUndoOutlineMedium = productIcon('undo-outline', 'medium')
+
 /** Regular one-pixel IconLikeOutline artwork. */
 export const IconLikeOutlineRegular = productIcon('like-outline', 'regular')
 

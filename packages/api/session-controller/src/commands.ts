@@ -81,15 +81,80 @@ function latestCompletedPrefixBoundary(events: readonly SessionEvent[]): Session
   return boundary
 }
 
-/** The part of the workspace-changes service a rewind uses; the service is optional on a Host. */
+/** The part of the workspace-changes service an undo uses; the service is optional on a Host. */
 interface WorkspaceRewinder {
   restore(
     sessionId: SessionId, cwd: string, afterTurn: number, signal: AbortSignal,
   ): Promise<{ restored: readonly string[]; removed: readonly string[] }>
+  /** Give a new Session the file checkpoints of another one's turns, so an undo there can go back further. */
+  inherit?(fromSessionId: SessionId, toSessionId: SessionId, cwd: string, throughTurn: number): Promise<void>
 }
 
-/** Milliseconds a file rewind may take before it is abandoned. */
+/** Milliseconds putting files back may take before the undo is abandoned. */
 const REWIND_TIMEOUT_MS = 120_000
+
+/**
+ * Cancel the input still queued at the end of a fork seed. The undone prompt was queued before its turn started, so
+ * the kept history ends with it (and any later queued prompt) pending; without this it would wait to run again.
+ * @param seed - the fork seed, extended in place.
+ * @returns the same seed.
+ */
+export function cancelPendingInput(seed: SessionEvent[]): SessionEvent[] {
+  const pending = { 'next-turn': 0, 'next-step': 0 }
+  for (const event of seed) {
+    if (event.type === 'agent/inbox/spliced') pending[event.data.target] += event.data.inserted.length - (event.data.removedCount ?? 0)
+  }
+  const last = seed.at(-1)
+  if (last === undefined) return seed
+  let seq: number = last.seq
+  for (const target of ['next-turn', 'next-step'] as const) {
+    if (pending[target] <= 0) continue
+    seq += 1
+    seed.push({
+      type: 'agent/inbox/spliced', seq: SessionSeq(seq), time: last.time,
+      data: { target, start: 0, removedCount: pending[target], inserted: [], outcome: 'canceled' },
+    } as SessionEvent)
+  }
+  return seed
+}
+
+/** Where an undo cuts a Session: the last kept event, the last turn whose file changes stay, and the undone text. */
+export interface UndoCut {
+  /** Last kept event seq; -1 when nothing comes before the prompt. */
+  readonly boundary: number
+  readonly afterTurn: number
+  readonly prompt: string
+}
+
+/**
+ * Find where undoing the person's newest prompt cuts the Session. A prompt that opened a turn is cut together with the
+ * turn's opening events and the files go back to before that turn; a prompt sent into a running turn is cut on its
+ * own and that turn's file changes stay, since files are checkpointed per turn.
+ * @param events - the Session's events, indexed by seq.
+ * @returns the cut, or undefined when the person has sent no prompt.
+ */
+export function undoCut(events: readonly SessionEvent[]): UndoCut | undefined {
+  const index = events.findLastIndex(event =>
+    event.type === 'user/message' && event.surfaceOp === 'append' && event.data.source.kind === 'user')
+  const prompt = events[index]
+  if (prompt?.type !== 'user/message') return undefined
+  let opened: number | undefined
+  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+    const event = events[cursor]
+    if (event === undefined || event.type === 'turn/end' || event.type === 'assistant/message' || event.type.startsWith('tool/')) break
+    if (event.type === 'turn/start') {
+      opened = cursor
+      break
+    }
+  }
+  const start = opened === undefined ? undefined : events[opened]
+  const text = prompt.data.content.flatMap(part => part.type === 'text' ? [part.text] : []).join('\n')
+  return {
+    boundary: (opened ?? index) - 1,
+    afterTurn: start?.type === 'turn/start' ? start.data.turn - 1 : turnAt(events, index),
+    prompt: text,
+  }
+}
 
 /**
  * The turn an event belongs to, counting a point between turns as the turn that ended before it.
@@ -249,8 +314,10 @@ export class SessionCommandController {
    * Create a new ordinary Session from an exact event prefix. An explicit
    * `atSeq` is the inclusive cut; an omitted value selects the latest
    * completed-turn prefix. An open cut receives synthetic fork closers.
+   * With `undoLastPrompt` the cut is the one {@link undoCut} finds and the
+   * files go back to before the undone turn first.
    * @param request - source Session and optional exact event boundary.
-   * @returns the new Session identity.
+   * @returns the new Session identity, and with an undo the undone prompt.
    */
   async fork(request: SessionForkRequest): Promise<SessionForkValue> {
     let atSeq: ReturnType<typeof SessionSeq> | undefined
@@ -276,8 +343,16 @@ export class SessionCommandController {
       )
     }
     using source = observed
-    const boundary = atSeq ?? latestCompletedPrefixBoundary(source.events)
-    if (boundary === undefined || source.events[boundary]?.seq !== boundary) {
+    const undo = request.undoLastPrompt === true ? undoCut(source.events) : undefined
+    if (request.undoLastPrompt === true && undo === undefined) {
+      throw new RemoteError('session/fork-unavailable', `session "${request.sessionId}" has no prompt to undo`, { sessionId: request.sessionId })
+    }
+    // Undoing a Session's only prompt keeps nothing, so the result is a blank Session in the same place.
+    const blank = undo !== undefined && undo.boundary < 0
+    const boundary = undo === undefined
+      ? atSeq ?? latestCompletedPrefixBoundary(source.events)
+      : SessionSeq(Math.max(undo.boundary, 0))
+    if (boundary === undefined || (!blank && source.events[boundary]?.seq !== boundary)) {
       throw new RemoteError(
         'session/fork-unavailable',
         request.atSeq === undefined
@@ -286,10 +361,7 @@ export class SessionCommandController {
         { sessionId: request.sessionId },
       )
     }
-    const seed = buildForkSeed(source.events, boundary)
-    const restoredFiles = request.restoreFiles === true
-      ? await this.rewindFiles(request.sessionId, source.header.cwd, turnAt(source.events, boundary))
-      : undefined
+    const files = undo === undefined ? undefined : await this.undoFiles(request.sessionId, source.header.cwd, undo.afterTurn)
     let workspace: Workspace | undefined
     try {
       workspace = await this.forkWorkspace(source.header)
@@ -300,6 +372,33 @@ export class SessionCommandController {
         {},
       )
     }
+    const childId = blank ? await this.createBlankChild(source) : await this.createForkChild(source, boundary, undo !== undefined)
+    if (workspace !== undefined) {
+      try {
+        await workspace.attachSession(childId)
+      } catch (error) {
+        throw new RemoteError(
+          'session/workspace-attach-failed',
+          `session "${childId}" was forked but could not attach to workspace "${workspace.id}": ${String(error)}`,
+          { sessionId: childId, workspaceId: workspace.id },
+        )
+      }
+    }
+    if (undo === undefined || files === undefined) return { sessionId: childId }
+    await this.inheritCheckpoints(request.sessionId, childId, source.header.cwd, undo.afterTurn)
+    return { sessionId: childId, undone: { prompt: undo.prompt, ...files } }
+  }
+
+  /**
+   * Create the Agent of a fork seeded with the source's events through `boundary`.
+   * @param source - the observed source Session.
+   * @param boundary - the last inherited event.
+   * @param emptyInbox - cancel the input still queued at the cut, for an undo.
+   * @returns the new Session identity.
+   */
+  private async createForkChild(
+    source: SessionObservation, boundary: ReturnType<typeof SessionSeq>, emptyInbox: boolean,
+  ): Promise<SessionId> {
     const childId = brandString<SessionId>(`session-${randomUUID()}`)
     const composition = await this.agents.composeAgent(this.agents.presetForObservation(source))
     await this.settleDefaultModel()
@@ -307,7 +406,7 @@ export class SessionCommandController {
       const { provider, model } = this.ctx.agentDefaultModel.currentSelection()
       await this.ctx.agents.create({
         sessionId: childId,
-        seed,
+        seed: emptyInbox ? cancelPendingInput(buildForkSeed(source.events, boundary)) : buildForkSeed(source.events, boundary),
         inheritedEventCount: SessionLogOffset(boundary + 1),
         meta: {
           ...(source.header.cwd === undefined ? {} : { cwd: source.header.cwd }),
@@ -322,45 +421,79 @@ export class SessionCommandController {
     } catch (error) {
       throw new RemoteError(
         'gateway/internal',
-        `failed to fork session "${request.sessionId}": ${String(error)}`,
+        `failed to fork session "${source.header.id}": ${String(error)}`,
         {},
       )
     }
-    if (workspace !== undefined) {
-      try {
-        await workspace.attachSession(childId)
-      } catch (error) {
-        throw new RemoteError(
-          'session/workspace-attach-failed',
-          `session "${childId}" was forked but could not attach to workspace "${workspace.id}": ${String(error)}`,
-          { sessionId: childId, workspaceId: workspace.id },
-        )
-      }
-    }
-    return { sessionId: childId, ...restoredFiles === undefined ? {} : { restoredFiles } }
+    return childId
   }
 
   /**
-   * Put a Session's workspace files back to how they were after one of its turns, for a rewind.
-   * @param sessionId - the Session being rewound.
+   * Create an empty Session in the source's directory and preset, for undoing a Session's only prompt.
+   * @param source - the observed source Session.
+   * @returns the new Session identity.
+   */
+  private async createBlankChild(source: SessionObservation): Promise<SessionId> {
+    await this.settleDefaultModel()
+    const preset = this.agents.presetForObservation(source)
+    try {
+      const created = await this.agents.createSession({
+        cwd: source.header.cwd ?? this.defaultCwd,
+        ...(preset === undefined ? {} : { agentPreset: preset }),
+        reusable: () => false,
+      })
+      return created.agent.id
+    } catch (error) {
+      throw new RemoteError(
+        'gateway/internal',
+        `failed to undo the prompt of session "${source.header.id}": ${String(error)}`,
+        {},
+      )
+    }
+  }
+
+  /**
+   * Put a Session's workspace files back to how they were after one of its turns, for an undo. A Session without a
+   * working directory, or a Host that does not record workspace changes, keeps its files and the undo goes on.
+   * @param sessionId - the Session whose prompt is undone.
    * @param cwd - its working directory.
    * @param afterTurn - the last turn whose file changes stay.
    * @returns how many files were written back and removed.
-   * @throws RemoteError when the Session has no working directory, the Host cannot rewind files, or the restore fails.
+   * @throws RemoteError when the restore fails, so a conversation is never undone without its files.
    */
-  private async rewindFiles(
+  private async undoFiles(
     sessionId: SessionId, cwd: string | undefined, afterTurn: number,
   ): Promise<{ restored: number; removed: number }> {
-    const changes = (this.ctx as unknown as { get(name: string): unknown }).get('workspaceChanges') as WorkspaceRewinder | undefined
-    if (cwd === undefined || changes === undefined) {
-      throw new RemoteError('session/rewind-failed', `session "${sessionId}" cannot rewind files: ${cwd === undefined ? 'it has no working directory' : 'this Host does not record workspace changes'}`, { sessionId })
-    }
+    const changes = this.rewinder()
+    if (cwd === undefined || changes === undefined) return { restored: 0, removed: 0 }
     try {
       const outcome = await changes.restore(sessionId, cwd, afterTurn, AbortSignal.timeout(REWIND_TIMEOUT_MS))
       return { restored: outcome.restored.length, removed: outcome.removed.length }
     } catch (error) {
-      throw new RemoteError('session/rewind-failed', `could not rewind the files of session "${sessionId}": ${String(error)}`, { sessionId })
+      throw new RemoteError('session/undo-failed', `could not put back the files of session "${sessionId}": ${String(error)}`, { sessionId })
     }
+  }
+
+  /**
+   * Carry the kept turns' file checkpoints over to the new Session, so an undo there can go back further. A failure
+   * only limits later undos, so it is logged, not raised.
+   * @param from - the source Session.
+   * @param to - the new Session.
+   * @param cwd - the shared working directory.
+   * @param throughTurn - the last kept turn.
+   */
+  private async inheritCheckpoints(from: SessionId, to: SessionId, cwd: string | undefined, throughTurn: number): Promise<void> {
+    const changes = this.rewinder()
+    if (cwd === undefined || changes?.inherit === undefined || throughTurn < 1) return
+    try {
+      await changes.inherit(from, to, cwd, throughTurn)
+    } catch (error) {
+      this.ctx.logger.warn(`session undo: could not carry file checkpoints to "${to}": ${String(error)}`)
+    }
+  }
+
+  private rewinder(): WorkspaceRewinder | undefined {
+    return (this.ctx as unknown as { get(name: string): unknown }).get('workspaceChanges') as WorkspaceRewinder | undefined
   }
 
   /**

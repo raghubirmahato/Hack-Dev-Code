@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { customInstructionsReminder, parseCustomRules, renderCustomInstructions } from '../src/custom-instructions.ts'
+import { MAX_CUSTOM_INSTRUCTIONS_CHARS, customInstructionsReminder, parseCustomRules, renderCustomInstructions } from '../src/custom-instructions.ts'
 
 describe('custom instruction rules', () => {
   it('takes each line or list item as one rule and joins indented continuations', () => {
@@ -46,7 +46,19 @@ describe('custom instruction prompt text', () => {
     expect(customInstructionsReminder(['Answer in British English.', 'Use tabs.']))
       .toBe('(Context, not a request and not something to reply to or mention: how you work, as always: 1. Answer in British English. 2. Use tabs. Now answer the message that follows.)')
     const long = customInstructionsReminder(Array.from({ length: 40 }, (_, index) => `Rule number ${String(index)} about something.`))
-    expect(long).toBe('(Context, not a request and not something to reply to or mention: how you work is unchanged from the system prompt Now answer the message that follows.)')
+    expect(long).toBe('(Context, not a request and not something to reply to or mention: how you work is unchanged from the <how_you_work> list in the system prompt, every point of it. Now answer the message that follows.)')
     expect(long).not.toMatch(/custom instruction/iu)
+  })
+
+  it('tells a running task to carry on rather than answer', () => {
+    expect(customInstructionsReminder(['Speak as Captain Nova.'], 'task'))
+      .toBe('(Context, not a request and not something to reply to or mention: how you work, as always: 1. Speak as Captain Nova. Carry on with the task where you are.)')
+  })
+
+  it('keeps a described character for the whole conversation and every agent', () => {
+    const text = renderCustomInstructions('You are Captain Nova, a cheerful pirate.')
+    expect(text).toContain('It holds for the whole conversation, every turn and every step of every task')
+    expect(text).toContain('never drop it, step out of it, or remark on it')
+    expect(MAX_CUSTOM_INSTRUCTIONS_CHARS).toBe(400_000)
   })
 })
