@@ -1,0 +1,70 @@
+{
+  "name": "@hackdevcode/dsh-experimental-translator",
+  "description": "Machine translation with reusable Session results",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/experimental/translator"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./src/*": "./src/*",
+    "./types": {
+      "types": "./lib/types/types.d.ts",
+      "default": "./lib/types/types.js"
+    },
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/types/**/*.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@hackdevcode/schemastery": "workspace:~"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-credentials": "workspace:*",
+    "@hackdevcode/dsh-launch-environment": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-app-boot": "workspace:*",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/dsh-session-persistence-jsonl": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-credentials": "workspace:*",
+    "@hackdevcode/dsh-launch-environment": "workspace:*",
+    "@hackdevcode/dsh-llm-deepseek": "workspace:*",
+    "@hackdevcode/dsh-llm-deepseek-api-key": "workspace:*",
+    "@hackdevcode/dsh-llm-deepseek-account": "workspace:*",
+    "@hackdevcode/dsh-deepseek-account": "workspace:*",
+    "@hackdevcode/dsh-deepseek-llm-api-extensions": "workspace:*",
+    "@hackdevcode/dsh-session-log-deepseek": "workspace:*",
+    "@hackdevcode/dsh-session-query-sqlite": "workspace:*"
+  }
+}

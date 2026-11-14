@@ -1,0 +1,3 @@
+- name: '@hackdevcode/dsh-session'
+- name: '@hackdevcode/dsh-session-projection'
+- name: './legacy-plugin.ts'

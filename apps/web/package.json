@@ -1,0 +1,81 @@
+{
+  "name": "@hackdevcode/dsh-web-frontend",
+  "description": "Web application entry: vite build over the @hackdevcode/dsh-client-web shell library; dist/ served by apps/cli's dsh web",
+  "version": "0.2.2-alpha.2",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "apps/web"
+  },
+  "type": "module",
+  "exports": {
+    "./dist/*": "./dist/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "!dist/**/*.map",
+    "!dist/preview.html",
+    "!dist/preview"
+  ],
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "watch": "vite build --watch --no-emptyOutDir",
+    "build:preview": "pnpm --filter @hackdevcode/dsh-experimental-webworker-runtime exec tsdown && pnpm --filter @hackdevcode/dsh-experimental-webworker-packer exec tsdown && vite build && dsh-pack-vfs-image --out dist/preview/vfs-image.tar.gz",
+    "serve:preview": "http-server dist -a 0.0.0.0 -p 4173 -c-1",
+    "render:app-icons": "tsx scripts/render-app-icons.ts"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@hackdevcode/cordis-plugin-group": "workspace:~",
+    "@hackdevcode/dsh-client-modules": "workspace:*",
+    "@hackdevcode/dsh-client-store": "workspace:*",
+    "@hackdevcode/dsh-llm-mock-server": "workspace:*",
+    "@hackdevcode/dsh-client-test-runtime": "workspace:*",
+    "@hackdevcode/dsh-client-ui-deliverables": "workspace:*",
+    "@hackdevcode/dsh-client-ui-dockkit": "workspace:*",
+    "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
+    "@hackdevcode/dsh-client-ui-slots": "workspace:*",
+    "@hackdevcode/dsh-client-web": "workspace:*",
+    "@hackdevcode/dsh-cmdline": "workspace:*",
+    "@hackdevcode/dsh-pwsh-local": "workspace:*",
+    "@hackdevcode/dsh-experimental-agent-team": "workspace:*",
+    "@hackdevcode/dsh-experimental-webworker-packer": "workspace:*",
+    "@hackdevcode/dsh-experimental-webworker-runtime": "workspace:*",
+    "@hackdevcode/dsh-remote-mock": "workspace:*",
+    "@hackdevcode/dsh-session-projection-cache": "workspace:*",
+    "@hackdevcode/dsh-tool-testkit": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@types/node": "^22.20.1",
+    "@types/ws": "8.18.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "http-server": "^14.1.1",
+    "fflate": "^0.8.2",
+    "playwright": "^1.49.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "sharp": "0.35.5",
+    "typescript": "^6.0.3",
+    "vite": "^6.4.3",
+    "vitest": "^4.1.11",
+    "ws": "8.21.3",
+    "@hackdevcode/dsh-client-ui-theme": "workspace:*",
+    "@hackdevcode/dsh-launch-environment": "workspace:*",
+    "@hackdevcode/dsh-workspace-changes": "workspace:*",
+    "@hackdevcode/dsh-subprocess-local": "workspace:*",
+    "@hackdevcode/dsh-experimental-auto-review": "workspace:*",
+    "@hackdevcode/dsh-experimental-speech-to-text": "workspace:*",
+    "@hackdevcode/dsh-experimental-voice-input-bundle": "workspace:*",
+    "@hackdevcode/dsh-experimental-cot-translation-bundle": "workspace:*",
+    "@hackdevcode/dsh-experimental-worktree": "workspace:*",
+    "@hackdevcode/dsh-experimental-plugin-market-bundle": "workspace:*",
+    "@hackdevcode/dsh-experimental-forge-bundle": "workspace:*"
+  },
+  "dependencies": {
+    "@hackdevcode/dsh-message-quotes": "workspace:*"
+  }
+}

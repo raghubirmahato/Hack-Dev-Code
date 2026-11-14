@@ -1,0 +1,46 @@
+- insert:
+    - id: subagent-model-selection-settings
+      name: '@hackdevcode/dsh-tool-subagent/model-selection-settings'
+    - id: agent-preset-registry
+      name: '@hackdevcode/dsh-agent-preset-registry'
+      config:
+        default: parent
+    - id: preset-parent
+      name: '@hackdevcode/dsh-agent-preset'
+      config:
+        id: parent
+        name: Parent
+        description: Headless parent tools.
+        plugins: []
+    - id: preset-reviewer
+      name: '@hackdevcode/dsh-agent-preset'
+      config:
+        id: reviewer
+        name: Reviewer
+        description: File review.
+        plugins:
+          - id: persona
+            name: '@hackdevcode/dsh-persona'
+            config:
+              prefix: You are a file reviewer. Inspect the requested files and report your findings.
+          - id: tool-fs
+            name: '@hackdevcode/dsh-tool-fs'
+          - id: tool-subagent
+            name: '@hackdevcode/dsh-tool-subagent'
+            config:
+              provider: spawn
+              toolName: reviewer_delegate
+              allowedAgentPresets: [reviewer]
+    - id: parent-agent-preset
+      name: '../../../packages/test-support/session-snapshot/tests/fixtures/parent-agent-preset.ts'
+      config:
+        presets: [parent, reviewer, parent, reviewer, parent]
+
+- id: tool-subagent
+  name: '@hackdevcode/dsh-tool-subagent'
+  inject: [agentPresets]
+  config:
+    provider: spawn
+    toolName: subagent
+    maxDepth: 1
+    allowedAgentPresets: [reviewer]

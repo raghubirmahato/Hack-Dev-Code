@@ -1,0 +1,10 @@
+- insert:
+    - id: experimental-inspector
+      name: '@hackdevcode/dsh-experimental-inspector'
+      disabled: false
+      config:
+        captureFetch: true
+    - id: session-inspector
+      name: '@hackdevcode/dsh-experimental-session-inspector'
+    - id: client-ui-stats
+      name: '@hackdevcode/dsh-experimental-client-ui-stats'

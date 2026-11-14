@@ -1,0 +1,5 @@
+- insert:
+    - id: worktree
+      name: '@hackdevcode/dsh-experimental-worktree'
+    - id: tool-worktree
+      name: '@hackdevcode/dsh-experimental-tool-worktree'

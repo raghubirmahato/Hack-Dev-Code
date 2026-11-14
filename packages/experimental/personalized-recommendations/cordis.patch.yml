@@ -1,0 +1,13 @@
+- insert:
+    - id: action-cards
+      name: '@hackdevcode/dsh-action-cards'
+    - id: client-ui-action-cards
+      name: '@hackdevcode/dsh-client-ui-action-cards'
+    - id: creation-recommendations
+      name: '@hackdevcode/dsh-creation-recommendations'
+    - id: client-ui-creation-recommendations
+      name: '@hackdevcode/dsh-client-ui-creation-recommendations'
+    - id: plugin-recommendations
+      name: '@hackdevcode/dsh-plugin-recommendations'
+    - id: client-ui-plugin-recommendations
+      name: '@hackdevcode/dsh-client-ui-plugin-recommendations'

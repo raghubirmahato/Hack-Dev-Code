@@ -1,0 +1,64 @@
+{
+  "name": "@hackdevcode/dsh-ssh-helper-runtime",
+  "description": "Private executable carrier for the POSIX SSH helper and managed workers",
+  "version": "0.2.2-alpha.2",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-app-boot": "workspace:*",
+    "@hackdevcode/dsh-fs-ssh": "workspace:*",
+    "@hackdevcode/dsh-subprocess-ssh": "workspace:*",
+    "@hackdevcode/dsh-sandbox-ssh": "workspace:*"
+  },
+  "dependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cosmokit": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-fs": "workspace:*",
+    "@hackdevcode/dsh-fs-local": "workspace:*",
+    "@hackdevcode/dsh-fs-sandbox": "workspace:*",
+    "@hackdevcode/dsh-http-proxy": "workspace:*",
+    "@hackdevcode/dsh-lazy-require": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-ptc-runtime": "workspace:*",
+    "@hackdevcode/dsh-ptc-runtime-node": "workspace:*",
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-sandbox-local": "workspace:*",
+    "@hackdevcode/dsh-sandbox-policy": "workspace:*",
+    "@hackdevcode/dsh-sandbox-windows-acl": "workspace:*",
+    "@hackdevcode/dsh-scope": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-skill": "workspace:*",
+    "@hackdevcode/dsh-ssh": "workspace:*",
+    "@hackdevcode/dsh-subprocess": "workspace:*",
+    "@hackdevcode/dsh-subprocess-local": "workspace:*",
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/dsh-util-crypto": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/dsh-win32-process": "workspace:*",
+    "@hackdevcode/node-addon-system": "workspace:~",
+    "@hackdevcode/schemastery": "workspace:~"
+  }
+}

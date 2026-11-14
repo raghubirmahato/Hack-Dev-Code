@@ -1,0 +1,9 @@
+- insert:
+    - id: subagent-codex
+      name: '@hackdevcode/dsh-subagent-codex'
+    - id: tool-subagent-codex
+      name: '@hackdevcode/dsh-tool-subagent'
+      config:
+        provider: codex
+        toolName: subagent_codex
+        maxDepth: provider-managed

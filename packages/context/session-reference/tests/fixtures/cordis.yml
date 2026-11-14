@@ -1,0 +1,20 @@
+- name: '@hackdevcode/dsh-session'
+- name: '@hackdevcode/dsh-system-prompt'
+- name: '@hackdevcode/dsh-tools'
+- name: '@hackdevcode/dsh-tool-executor-native'
+- name: '@hackdevcode/dsh-fs-local'
+- name: '@hackdevcode/dsh-session-projection'
+- name: '@hackdevcode/dsh-working-directory'
+- name: '@hackdevcode/dsh-tool-fs'
+- name: '@hackdevcode/dsh-session-query-sqlite'
+  config:
+    path: ':memory:'
+    openAt: never
+- name: '@hackdevcode/dsh-session-reference'
+  config:
+    maxReferenceBytes: 360
+- name: './source-session.ts'
+- name: '@hackdevcode/dsh-spill-local'
+  config:
+    root: '{{spillRoot}}'
+    cleanupPeriodDays: 0

@@ -1,0 +1,39 @@
+# Minimal tool-pwsh composition: real app boot path, real pwsh executor, real
+# foreground + background tool calls; driven by the package's loader.spec.ts.
+- id: system-prompt
+  name: '@hackdevcode/dsh-system-prompt'
+
+- id: fs
+  name: '@hackdevcode/dsh-fs-local'
+
+- id: session-projections
+  name: '@hackdevcode/dsh-session-projection'
+
+- id: working-directory
+  name: '@hackdevcode/dsh-working-directory'
+
+- id: tools
+  name: '@hackdevcode/dsh-tools'
+
+- id: tool-executor-native
+  name: '@hackdevcode/dsh-tool-executor-native'
+
+- id: subprocess
+  name: '@hackdevcode/dsh-subprocess-local'
+
+- id: bash
+  name: '@hackdevcode/dsh-pwsh-local'
+  config:
+    graceMs: 200
+
+- id: shell-env
+  name: '@hackdevcode/dsh-shell-env'
+
+- id: tasks
+  name: '@hackdevcode/dsh-jobs-local'
+
+- id: tool-jobs
+  name: '@hackdevcode/dsh-tool-jobs'
+
+- id: tool-pwsh
+  name: '@hackdevcode/dsh-tool-pwsh'
