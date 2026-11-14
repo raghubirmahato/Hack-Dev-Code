@@ -24,17 +24,12 @@ import { isExperimentalPackageName } from './experimental-package-policy.ts'
 // The independently published entry package owns platform-engine dependencies.
 const EXTERNAL_KIT_PACKAGES = new Set(['@deepseek-ai/libreoffice-kit'])
 /**
- * Experimental packages the product deliberately ships switched on: desktop and Chrome control is part of the
- * default Web profile. Remove a name here (and from the profile template) to make it opt-in again.
+ * Experimental packages the product deliberately ships switched on. Desktop and Chrome control used to be listed here;
+ * they are product packages now (packages/computer-use, packages/browser-use, packages/bundle/cua-bundle). Remove a name here
+ * (and from the profile template) to make it opt-in again.
  */
 export const DEFAULT_ON_EXPERIMENTAL: ReadonlySet<string> = new Set([
-  '@hackdevcode/dsh-cua-bundle',
   '@hackdevcode/dsh-experimental-plugin-market-bundle',
-  '@hackdevcode/dsh-cua',
-  '@hackdevcode/dsh-experimental-cua-macos',
-  '@hackdevcode/dsh-experimental-computer-use-cua-driver-native',
-  '@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp',
-  '@hackdevcode/dsh-experimental-browser-use-runtime',
 ])
 const PROFILE_SOURCE = 'packages/util/official-bundles/src/bundles.ts'
 const PRESET_PATTERN = 'packages/bundle/web-app/presets/*.patch.yml'

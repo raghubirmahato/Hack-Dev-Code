@@ -191,7 +191,7 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   '@hackdevcode/dsh-experimental-subagent-oar': ['LICENSE-OAR'],
   // CUA publishes its client API and attributed native source for local macOS builds.
   '@hackdevcode/dsh-cua': ['lib/remote-types.js', 'lib/api.js', 'lib/bridge.js', 'lib/native-client.js', 'lib/protocol.js'],
-  '@hackdevcode/dsh-experimental-cua-macos': ['native/bin', 'native/Package.swift', 'native/Sources', 'native/tests/swift', 'native/tests/test_swift.py', 'native/LICENSE.cua-driver', 'native/upstream.json', 'native/README.md', 'native/protocol.schema.json'],
+  '@hackdevcode/dsh-cua-macos': ['native/bin', 'native/Package.swift', 'native/Sources', 'native/tests/swift', 'native/tests/test_swift.py', 'native/LICENSE.cua-driver', 'native/upstream.json', 'native/README.md', 'native/protocol.schema.json'],
   '@hackdevcode/dsh-webhook-github': ['examples/github-review/cordis.yml', 'examples/github-review/github-ready-review-rule.mjs'],
   // Liveshare publishes its built Relay gateway entry and the shared runtime
   // chunk that entry imports, plus the declaration-plane entry and its chunk.

@@ -38,6 +38,9 @@ async function bench() {
     removeCustom: vi.fn(async () => ok(undefined)),
     connect: vi.fn(async () => ok({ authorizeUrl: 'https://example.com/authorize' })),
     disconnect: vi.fn(async () => ok(undefined)),
+    addSite: vi.fn(async () => ok({ id: 'forum' })),
+    openSite: vi.fn(async () => ok(undefined)),
+    removeSite: vi.fn(async () => ok(undefined)),
     installSkill: vi.fn(async () => ok(undefined)),
     removeSkill: vi.fn(async () => ok(undefined)),
   }
@@ -84,6 +87,12 @@ describe('client-ui-customize browser plugin', () => {
     expect(b.remote.removeCustom).toHaveBeenCalledWith('mine')
     expect(b.remote.connect).toHaveBeenCalledWith({ id: 'docs' })
     expect(b.remote.disconnect).toHaveBeenCalledWith('docs')
+    expect(await b.face.addSite({ url: 'forum.example.com' })).toBe('forum')
+    await b.face.openSite('forum')
+    await b.face.removeSite('forum')
+    expect(b.remote.addSite).toHaveBeenCalledWith({ url: 'forum.example.com' })
+    expect(b.remote.openSite).toHaveBeenCalledWith('forum')
+    expect(b.remote.removeSite).toHaveBeenCalledWith('forum')
     expect(b.remote.installSkill).toHaveBeenCalledWith('review')
     expect(b.remote.removeSkill).toHaveBeenCalledWith('review')
   })

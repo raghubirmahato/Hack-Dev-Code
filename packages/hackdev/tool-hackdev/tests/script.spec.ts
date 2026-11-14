@@ -1,7 +1,7 @@
 import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { HACKDEV_REVIEW_SCRIPT, HACKDEV_SCRIPT } from '../src/script.ts'
-import { agentBudget, ENGINE_AGENT_CEILING, readReport, resolveCap } from '../src/index.ts'
+import { agentBudget, DELEGATION_REFUSAL, ENGINE_AGENT_CEILING, isNotesPath, namedToolNote, READ_ONLY_REFUSAL, READ_ONLY_ROLE, readOnlyRefusal, readReport, resolveCap } from '../src/index.ts'
 import { boundText, compactReport, PRESENTATION_VERSION, renderReport } from '../src/render.ts'
 import type { HackDevReport } from '../src/render.ts'
 
@@ -103,7 +103,7 @@ function integrator(over: Record<string, unknown> = {}) {
 }
 
 /** Default behaviour for each agent role; individual tests override what they need (first matching prefix wins). */
-function defaultImpl(overrides: Partial<Record<string, (call: AgentCall, n: number) => unknown>> = {}, tasks = [task('a'), task('b', ['a']), task('c')]): AgentImpl {
+function defaultImpl(overrides: Partial<Record<string, (call: AgentCall, n: number) => unknown>> = {}, tasks: unknown[] = [task('a'), task('b', ['a']), task('c')]): AgentImpl {
   return (call, n) => {
     for (const [prefix, fn] of Object.entries(overrides)) {
       if (call.label.startsWith(prefix) && fn !== undefined) return fn(call, n)
@@ -160,6 +160,19 @@ describe('HACKDEV_SCRIPT', () => {
     expect(value.tasks.find(t => t.id === 'readme')!.role).toBe('fullstack')
   })
 
+  it('accepts the dependency shorthand weaker models write instead of rejecting the plan', async () => {
+    const loose = [
+      { ...task('logic'), dependsOn: ['-'] },
+      { title: 'Write the tests', role: 'test', dependsOn: ['Task logic', 'none', ''], ownedPaths: [] },
+    ]
+    const { value, calls } = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl({}, loose))
+    expect(calls.filter(c => c.label.startsWith('Council: planner'))).toHaveLength(1)
+    expect(value.tasks.map(t => t.id).sort()).toEqual(['logic', 'write-the-tests'])
+    // The tests task waits for the task its title named, so its builder starts after that one.
+    const labels = calls.map(c => c.label)
+    expect(labels.indexOf('Builder: write-the-tests')).toBeGreaterThan(labels.indexOf('Builder: logic'))
+  })
+
   it('never runs more builders at once than maxParallel', async () => {
     let active = 0
     let peak = 0
@@ -204,8 +217,8 @@ describe('HACKDEV_SCRIPT', () => {
   it('gives the custom instructions to every builder and gate prompt', async () => {
     const { calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, customInstructions: 'Use tabs and never add dependencies.' }, defaultImpl())
     const builder = calls.find(c => c.label === 'Builder: a')!
-    expect(builder.prompt).toContain("The person's custom instructions, numbered")
-    expect(builder.prompt).toContain('<custom_instructions>')
+    expect(builder.prompt).toContain('How you work on this mission.')
+    expect(builder.prompt).toContain('<how_you_work>')
     expect(builder.prompt).toContain('Use tabs and never add dependencies.')
     expect(calls.find(c => c.label.startsWith('Gate 1'))!.prompt).toContain('Use tabs and never add dependencies.')
   })
@@ -601,6 +614,70 @@ describe('HACKDEV_SCRIPT', () => {
     }
   })
 
+  it('pins the planner, builders and gates to the model configured for their role', async () => {
+    const { calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, visionModel: 'eyes', models: { planner: 'big', builder: 'small', verifier: 'strict' } }, defaultImpl())
+    expect(calls.find(c => c.label.startsWith('Council: planner'))!.model).toBe('big')
+    expect(calls.find(c => c.label.startsWith('Integrator'))!.model).toBe('big')
+    expect(calls.filter(c => c.label.startsWith('Builder')).every(c => c.model === 'small')).toBe(true)
+    expect(calls.find(c => c.label.startsWith('Gate 1 Verifier'))!.model).toBe('strict')
+    expect(calls.find(c => c.label.startsWith('Fact-checker'))!.model).toBe('strict')
+    // The vision model still wins for the visual gate.
+    expect(calls.find(c => c.label.startsWith('Gate 2'))!.model).toBe('eyes')
+  })
+
+  it('runs tasks that own the same path one after the other instead of side by side', async () => {
+    let active = 0
+    let peak = 0
+    const tasks = [{ ...task('a'), ownedPaths: ['src/shared/'] }, { ...task('b'), ownedPaths: ['./src/shared/util.ts'] }, task('c')]
+    const { calls } = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl({
+      Builder: async (call) => {
+        if (call.label === 'Builder: a' || call.label === 'Builder: b') { active += 1; peak = Math.max(peak, active) }
+        await new Promise(resolve => setTimeout(resolve, 5))
+        if (call.label === 'Builder: a' || call.label === 'Builder: b') active -= 1
+        return worker()
+      },
+    }, tasks))
+    expect(peak).toBe(1)
+    expect(calls.find(c => c.label === 'Builder: b')!.prompt).toContain('after: a')
+  })
+
+  it('gives the planner three attempts', async () => {
+    let attempts = 0
+    const { value } = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl({
+      'Council: planner': () => { attempts += 1; return attempts < 3 ? plan([task('a', ['a'])]) : plan([task('a')]) },
+    }))
+    expect(attempts).toBe(3)
+    expect(value.planFallback).toBe(false)
+  })
+
+  it('stops the follow-up waves when a wave makes no progress', async () => {
+    let wave = 0
+    const { value, calls } = await runScript(HACKDEV_SCRIPT, { ...ARGS, maxWaves: 6 }, defaultImpl({
+      Integrator: () => {
+        wave += 1
+        return integrator({ criteria: [{ criterion: 'c1', met: false, evidence: 'still failing' }], followUpTasks: [{ ...task(`fix-${wave}`), replaces: [] }] })
+      },
+    }))
+    // Wave 1 sets the baseline, wave 2 leaves as much undone: the run stops there instead of using all six waves.
+    expect(calls.filter(c => c.label.startsWith('Integrator'))).toHaveLength(2)
+    expect((value as unknown as { stalled: boolean }).stalled).toBe(true)
+    expect(value.status).toBe('needs-attention')
+  })
+
+  it('keeps the earlier gate verdicts when a follow-up wave changed nothing', async () => {
+    const { calls, value } = await runScript(HACKDEV_SCRIPT, ARGS, defaultImpl({
+      'Builder: fix': () => { throw new Error('crash') },
+      Splitter: () => null,
+      Integrator: (_call, n) => n < 12
+        ? integrator({ criteria: [{ criterion: 'c1', met: false, evidence: '' }], followUpTasks: [{ ...task('fix'), replaces: [] }] })
+        : integrator({ criteria: [{ criterion: 'c1', met: false, evidence: '' }] }),
+    }))
+    expect(value.waves).toBe(2)
+    // The gates ran once, for wave 1; wave 2 finished nothing, so they were not run again.
+    expect(calls.filter(c => c.label.startsWith('Gate 1 Verifier'))).toHaveLength(1)
+    expect(value.gates).toHaveLength(3)
+  })
+
   it('never exceeds the agent budget on the worst path', async () => {
     let wave = 0
     const budget = agentBudget(ARGS.maxTasks, ARGS.maxFixRounds, true, ARGS.maxWaves)
@@ -707,7 +784,7 @@ describe('helpers', () => {
     const shots = Array.from({ length: 6 }, () => shot)
     const meta = compactReport({ ...REPORT, gates: [{ ...REPORT.gates[0]!, uiEvidence: shots }] }) as Record<string, unknown>
     expect(meta['v']).toBe(PRESENTATION_VERSION)
-    expect(PRESENTATION_VERSION).toBe(2)
+    expect(PRESENTATION_VERSION).toBe(3)
     expect(meta['waves']).toBe(2)
     expect(meta['criteriaCount']).toBe(2)
     const tasks = meta['tasks'] as Record<string, unknown>[]
@@ -734,11 +811,11 @@ describe('helpers', () => {
   })
 
   it('computes the worst-case agent budget and clamps it to the engine ceiling', () => {
-    // Council 4 + wave(6 per task + fact-check + gates 4*3+2 + integrator) + chronicler.
-    expect(agentBudget(12, 2, true)).toBe(4 + (72 + 1 + 14 + 1) + 1)
-    expect(agentBudget(24, 2, true, 3)).toBe(4 + 160 + 2 * 64 + 1)
+    // Council 5 + wave(6 per task + fact-check + gates 4*3+2 + integrator) + chronicler.
+    expect(agentBudget(12, 2, true)).toBe(5 + (72 + 1 + 14 + 1) + 1)
+    expect(agentBudget(24, 2, true, 3)).toBe(5 + 160 + 2 * 64 + 1)
     expect(agentBudget(1, 0, false)).toBe(7)
-    expect(agentBudget(12, 2, true, 1, true)).toBe(4 + (96 + 1 + 14 + 1) + 1)
+    expect(agentBudget(12, 2, true, 1, true)).toBe(5 + (96 + 1 + 14 + 1) + 1)
     expect(agentBudget(64, 6, true, 10)).toBe(ENGINE_AGENT_CEILING)
   })
 
@@ -747,5 +824,51 @@ describe('helpers', () => {
     expect(() => readReport(null)).toThrow('malformed')
     expect(() => readReport({ ...REPORT, status: 'weird' })).toThrow('malformed')
     expect(() => readReport({ ...REPORT, tasks: 'no' })).toThrow('malformed')
+  })
+})
+
+describe('namedToolNote', () => {
+  it('names the mission tool a message asks for', () => {
+    expect(namedToolNote('Use hackdev to build: a todo app')).toContain('`hackdev`')
+    expect(namedToolNote('Use a swarm (hackdev_swarm) to build: a game')).toContain('`hackdev_swarm`')
+    expect(namedToolNote('Please call the hackdev_review tool on this repo')).toContain('`hackdev_review`')
+    expect(namedToolNote('RUN HACKDEV on it')).toContain('`hackdev`')
+  })
+
+  it('leaves other messages alone', () => {
+    expect(namedToolNote('Fix the bug in textkit.js')).toBeUndefined()
+    expect(namedToolNote('use .hackdev/PROGRESS.md as notes')).toBeUndefined()
+    expect(namedToolNote('use hackdev/notes.md')).toBeUndefined()
+    expect(namedToolNote('what does hackdev do?')).toBeUndefined()
+  })
+})
+
+describe('read-only roles', () => {
+  it('lists the roles that plan, check or report, and none that build or fix', () => {
+    for (const label of ['Council: codebase scout', 'Council: planner (attempt 2)', 'Splitter: api', 'Fact-checker (wave 1)', 'Integrator (wave 1)', 'Chronicler', '@coordinator: form the swarm (attempt 1)', '@coordinator: final report', 'Worktree: api']) {
+      expect(READ_ONLY_ROLE.test(label)).toBe(true)
+    }
+    for (const label of ['Builder: api', 'Verifier', 'Gate 1 Verifier round 1', 'Merge: api', '@parser', 'Chronicler 2']) {
+      expect(READ_ONLY_ROLE.test(label)).toBe(false)
+    }
+  })
+
+  it('lets them write only inside a .hackdev directory', () => {
+    expect(isNotesPath('.hackdev/PROJECT_MAP.md')).toBe(true)
+    expect(isNotesPath(String.raw`C:\work\app\.hackdev\PROGRESS.md`)).toBe(true)
+    expect(isNotesPath('textkit.js')).toBe(false)
+    expect(isNotesPath('.hackdev/../textkit.js')).toBe(false)
+    expect(isNotesPath('src/.hackdevrc')).toBe(false)
+  })
+})
+
+describe('readOnlyRefusal', () => {
+  it('refuses project edits and delegation, and allows notes and everything else', () => {
+    expect(readOnlyRefusal('write', { file_path: 'textkit.js', content: '' })).toBe(READ_ONLY_REFUSAL)
+    expect(readOnlyRefusal('edit', { file_path: 'src/a.ts' })).toBe(READ_ONLY_REFUSAL)
+    expect(readOnlyRefusal('edit', null)).toBe(READ_ONLY_REFUSAL)
+    for (const tool of ['workflow', 'subagent', 'subagent_fork']) expect(readOnlyRefusal(tool, {})).toBe(DELEGATION_REFUSAL)
+    expect(readOnlyRefusal('write', { file_path: '.hackdev/PROJECT_MAP.md', content: '' })).toBeUndefined()
+    for (const tool of ['read', 'glob', 'grep', 'pwsh', 'team_board']) expect(readOnlyRefusal(tool, {})).toBeUndefined()
   })
 })

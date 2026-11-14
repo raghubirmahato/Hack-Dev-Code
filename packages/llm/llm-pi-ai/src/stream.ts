@@ -122,8 +122,12 @@ export function mapStopReason(message: AssistantMessage, contextWindow?: number)
       failure: { message: message.errorMessage ?? 'pi-ai stream aborted', code: 'ABORTED' },
     }
     case 'error': {
-      const text = message.errorMessage ?? 'pi-ai stream error'
-      return { kind: 'error', failure: { message: text, code: classifyPiAiError(text) } }
+      const raw = message.errorMessage ?? 'pi-ai stream error'
+      // Ollama's wording names the registry path, not what to do about it.
+      const text = NO_TOOL_SUPPORT.test(raw)
+        ? `${raw}. Hack Dev Code needs a model that can call tools: choose one whose Ollama page lists "tools" (for example qwen3, llama3.1, mistral-nemo or gpt-oss) in Settings, Models.`
+        : raw
+      return { kind: 'error', failure: { message: text, code: classifyPiAiError(raw) } }
     }
   }
 }
@@ -140,6 +144,154 @@ export function withoutInlineThinking(text: string): string {
   return match === null ? text : text.slice(match[0].length)
 }
 
+/** A tool call a model wrote into its answer as text. */
+export interface InlineToolCall {
+  name: string
+  /** The arguments as JSON text. */
+  arguments: string
+}
+
+/** One JSON value that may be a tool call: `{"name": ..., "arguments"|"parameters": {...}}`, or an OpenAI-style `{"function": {...}}`. */
+function asInlineCall(value: unknown, tools: ReadonlySet<string>): InlineToolCall | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  const inner = typeof record['function'] === 'object' && record['function'] !== null ? record['function'] as Record<string, unknown> : record
+  const name = inner['name']
+  if (typeof name !== 'string' || !tools.has(name)) return undefined
+  let args: unknown = inner['arguments'] ?? inner['parameters'] ?? {}
+  if (typeof args === 'string') {
+    try { args = JSON.parse(args) as unknown } catch { return undefined }
+  }
+  if (typeof args !== 'object' || args === null || Array.isArray(args)) return undefined
+  return { name, arguments: JSON.stringify(args) }
+}
+
+/** Every tool call in one JSON text: an object, or an array of them. All entries must be calls, or none counts. */
+function parseInlineCalls(json: string, tools: ReadonlySet<string>): InlineToolCall[] | undefined {
+  let value: unknown
+  try { value = JSON.parse(json) } catch { return undefined }
+  const entries = Array.isArray(value) ? value as unknown[] : [value]
+  if (entries.length === 0) return undefined
+  const calls = entries.map(entry => asInlineCall(entry, tools))
+  return calls.every((call): call is InlineToolCall => call !== undefined) ? calls : undefined
+}
+
+/** Gemma's string delimiter in its own tool-call syntax. */
+const GEMMA_QUOTE = '<|"|>'
+
+/**
+ * Read one value of Gemma's tool-call syntax: a `<|"|>`-delimited string, an object with bare keys, a list, or a bare
+ * number, `true`, `false` or `null`.
+ * @param src - the text.
+ * @param start - where the value begins.
+ * @returns the value and the index after it, or undefined when the text is not that syntax.
+ */
+function readGemmaValue(src: string, start: number): { value: unknown; end: number } | undefined {
+  let i = start
+  while (/\s/u.test(src[i] ?? '')) i += 1
+  if (src.startsWith(GEMMA_QUOTE, i)) {
+    const close = src.indexOf(GEMMA_QUOTE, i + GEMMA_QUOTE.length)
+    return close < 0 ? undefined : { value: src.slice(i + GEMMA_QUOTE.length, close), end: close + GEMMA_QUOTE.length }
+  }
+  if (src[i] === '{' || src[i] === '[') {
+    const isObject = src[i] === '{'
+    const closer = isObject ? '}' : ']'
+    const record: Record<string, unknown> = {}
+    const list: unknown[] = []
+    i += 1
+    for (;;) {
+      while (/[\s,]/u.test(src[i] ?? '')) i += 1
+      if (src[i] === closer) return { value: isObject ? record : list, end: i + 1 }
+      if (i >= src.length) return undefined
+      if (isObject) {
+        const key = /^([A-Za-z_][\w-]*)\s*:/u.exec(src.slice(i))
+        if (key === null) return undefined
+        const item = readGemmaValue(src, i + key[0].length)
+        if (item === undefined) return undefined
+        record[key[1] ?? ''] = item.value
+        i = item.end
+      } else {
+        const item = readGemmaValue(src, i)
+        if (item === undefined) return undefined
+        list.push(item.value)
+        i = item.end
+      }
+    }
+  }
+  const bare = /^(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)(?=[\s,}\]]|$)/u.exec(src.slice(i))
+  if (bare === null) return undefined
+  return { value: JSON.parse(bare[1] ?? 'null') as unknown, end: i + (bare[1] ?? '').length }
+}
+
+/**
+ * Tool calls written in Gemma's own syntax, `call:name{key:<|"|>text<|"|>,count:2}`, with or without the `call:`
+ * prefix and the `<|tool_call>` … `<tool_call|>` wrapper, which Gemma models served through Ollama leave in their
+ * answer when the server does not parse them.
+ * @param text - the answer text.
+ * @param tools - names of the offered tools.
+ * @returns the text without the calls and the calls, or undefined when it holds none.
+ */
+export function recoverGemmaToolCalls(text: string, tools: ReadonlySet<string>): { text: string; calls: InlineToolCall[] } | undefined {
+  const calls: InlineToolCall[] = []
+  let rest = ''
+  let from = 0
+  const opener = /(?:<\|tool_call>\s*)?(?:call:)?([A-Za-z_][\w.-]*)\{/gu
+  for (let match = opener.exec(text); match !== null; match = opener.exec(text)) {
+    const name = match[1] ?? ''
+    if (!tools.has(name)) continue
+    const args = readGemmaValue(text, match.index + match[0].length - 1)
+    if (args === undefined || typeof args.value !== 'object' || args.value === null || Array.isArray(args.value)) continue
+    calls.push({ name, arguments: JSON.stringify(args.value) })
+    const closing = /^\s*<tool_call\|>/u.exec(text.slice(args.end))
+    rest += text.slice(from, match.index)
+    from = args.end + (closing?.[0].length ?? 0)
+    opener.lastIndex = from
+  }
+  return calls.length === 0 ? undefined : { text: (rest + text.slice(from)).trim(), calls }
+}
+
+/**
+ * Find tool calls a model wrote into its answer instead of sending them as tool calls. Models served locally
+ * (through Ollama, LM Studio, llama.cpp or vLLM) do this when their chat template is not applied: Qwen and Hermes
+ * write `<tool_call>{...}</tool_call>`, Llama 3.1 writes `<|python_tag|>{...}`, Mistral writes `[TOOL_CALLS] [...]`,
+ * Gemma writes `call:name{key:<|"|>text<|"|>}`,
+ * and many write a lone JSON object, sometimes in a code fence. Left as text, the agent stops with a JSON blob for an
+ * answer. A call counts only when it names a tool that was offered and its arguments are a JSON object, so prose
+ * that merely shows JSON stays prose.
+ * @param text - the completed answer text.
+ * @param tools - names of the tools offered in the request.
+ * @returns the text without the calls and the calls found, or undefined when the text holds none.
+ */
+export function recoverInlineToolCalls(text: string, tools: ReadonlySet<string>): { text: string; calls: InlineToolCall[] } | undefined {
+  if (tools.size === 0 || !/[{[]/u.test(text)) return undefined
+  const gemma = recoverGemmaToolCalls(text, tools)
+  if (gemma !== undefined) return gemma
+  const calls: InlineToolCall[] = []
+  // Tagged calls: each tag holds one call or a list; everything outside the tags stays as text.
+  let rest = text.replace(/<tool_call>\s*([\s\S]*?)\s*(?:<\/tool_call>|$)/gu, (whole, body: string) => {
+    const found = parseInlineCalls(body, tools)
+    if (found === undefined) return whole
+    calls.push(...found)
+    return ''
+  })
+  if (calls.length > 0) return { text: rest.trim(), calls }
+  const marked = /^([\s\S]*?)(?:<\|python_tag\|>|\[TOOL_CALLS\])\s*([\s\S]+?)\s*(?:<\|eom_id\|>|<\|eot_id\|>|<\/s>)?\s*$/u.exec(text)
+  if (marked !== null) {
+    const found = parseInlineCalls(marked[2] ?? '', tools)
+    if (found !== undefined) return { text: (marked[1] ?? '').trim(), calls: found }
+  }
+  // The whole answer is one JSON value, bare or in a code fence.
+  rest = text.trim()
+  const fenced = /^```(?:json)?\s*\n([\s\S]*?)\n```$/u.exec(rest)
+  const body = fenced === null ? rest : (fenced[1] ?? '').trim()
+  if (!/^[{[]/u.test(body)) return undefined
+  const found = parseInlineCalls(body, tools)
+  return found === undefined ? undefined : { text: '', calls: found }
+}
+
+/** Ollama's refusal when a model without tool support is sent tool definitions. */
+const NO_TOOL_SUPPORT = /does not support tools/iu
+
 /**
  * Translate the pi-ai event stream into StreamChunks. pi-ai never throws
  * mid-stream — failures arrive as `error` events, which become error/aborted
@@ -149,6 +301,8 @@ export function withoutInlineThinking(text: string): string {
  * @param callerSignal - caller cancellation state; an aborted caller makes any
  *   in-band terminal error an aborted finish.
  * @param requestedModel - request model identity recorded for durable replay.
+ * @param inlineTools - names of the offered tools, for a locally served model: tool calls it wrote into its answer
+ *   as text become real tool calls (see {@link recoverInlineToolCalls}). Omitted for hosted providers.
  * @returns the harness chunks, ending with `usage` then `finish`; throws
  *   `LlmError` (`STREAM_CLOSED`) if the source ends without a terminal event. A
  *   tool call whose completed arguments are invalid keeps the text the model sent,
@@ -160,14 +314,19 @@ export async function* toStreamChunks(
   contextWindow?: number,
   callerSignal?: AbortSignal,
   requestedModel?: string,
+  inlineTools?: ReadonlySet<string>,
 ): AsyncGenerator<StreamChunk> {
   // pi-ai contentIndex ↔ our block index map 1:1 (both count blocks from 0
   // in stream order), but we track ids per index for tool calls.
   const toolIds = new Map<number, { id: string; name: string }>()
   // Argument text as streamed, kept for a call whose JSON pi-ai could not parse.
   const rawArguments = new Map<number, string>()
+  // Tool calls recovered from answer text, emitted as blocks after the last block the model sent.
+  const recovered: InlineToolCall[] = []
+  let lastIndex = -1
 
   for await (const event of events) {
+    if ('contentIndex' in event) lastIndex = Math.max(lastIndex, event.contentIndex)
     switch (event.type) {
       case 'start':
         break
@@ -177,9 +336,13 @@ export async function* toStreamChunks(
       case 'text_delta':
         yield { type: 'text-delta', index: event.contentIndex, text: event.delta }
         break
-      case 'text_end':
-        yield { type: 'block-end', index: event.contentIndex, block: { type: 'text', text: withoutInlineThinking(event.content) } }
+      case 'text_end': {
+        const answer = withoutInlineThinking(event.content)
+        const inline = inlineTools === undefined ? undefined : recoverInlineToolCalls(answer, inlineTools)
+        if (inline !== undefined) recovered.push(...inline.calls)
+        yield { type: 'block-end', index: event.contentIndex, block: { type: 'text', text: inline === undefined ? answer : inline.text } }
         break
+      }
       case 'thinking_start':
         yield { type: 'block-start', index: event.contentIndex, blockType: 'reasoning' }
         break
@@ -240,14 +403,28 @@ export async function* toStreamChunks(
           },
         }
         break
-      case 'done':
+      case 'done': {
+        // Calls the model sent properly win; text that also looks like a call is then only text.
+        const inline = event.message.stopReason === 'stop' && toolIds.size === 0 ? recovered : []
+        for (const [offset, call] of inline.entries()) {
+          const index = lastIndex + 1 + offset
+          const id = brandString<ToolCallId>(`inline_${String(index)}_${Date.now().toString(36)}`)
+          yield { type: 'block-start', index, blockType: 'tool-call' }
+          yield { type: 'block-end', index, block: { type: 'tool-call', id, name: call.name, arguments: call.arguments } }
+        }
         yield { type: 'usage', usage: mapUsage(event.message.usage) }
+        if (inline.length > 0) {
+          // No replay state: the provider message holds the calls as text, which would not match the blocks above.
+          yield { type: 'finish', reason: { kind: 'tool-calls' } }
+          return
+        }
         yield {
           type: 'finish',
           reason: mapStopReason(event.message, contextWindow),
           replayState: toPiReplayState(event.message, requestedModel),
         }
         return
+      }
       case 'error':
         // In-stream error delivery (pi-ai's style) → error finish chunk
         // (the harness's other sanctioned error path besides throwing).

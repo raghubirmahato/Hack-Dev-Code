@@ -29,7 +29,7 @@ import {
 import { apply, inject } from '../src/client/index.ts'
 import { en } from '../src/client/locales.ts'
 import {
-  workflowRunDefinition, type WorkflowRunChatData,
+  WORKFLOW_LOG_LINES, workflowRunDefinition, type WorkflowRunChatData,
 } from '../src/client/workflow-definition.ts'
 import { apply as applyNode } from '../src/index.ts'
 import type {} from '../src/client/index.ts'
@@ -136,6 +136,19 @@ function completeEvents(): SessionLiveEventEntry[] {
 }
 
 describe('workflow-run Conversation Definition', () => {
+  it('folds the lines a run logged, keeping only the newest', () => {
+    const events = completeEvents()
+    const logs = Array.from({ length: WORKFLOW_LOG_LINES + 5 }, (_, index) =>
+      at(100 + index, 'tool-workflow/log', { runId: 'run-1', message: `[board #${String(index + 1)}] @api -> @all (status): line ${String(index + 1)}` }))
+    const value = assembler([...events.slice(0, 4), ...logs, ...events.slice(4)])
+    const log = workflowData(value)?.log ?? []
+    expect(log).toHaveLength(WORKFLOW_LOG_LINES)
+    expect(log.at(-1)).toContain(`line ${String(WORKFLOW_LOG_LINES + 5)}`)
+    expect(log[0]).toContain('line 6')
+    // A run that logged nothing carries no log at all.
+    expect(workflowData(assembler(completeEvents()))?.log).toBeUndefined()
+  })
+
   it('groups exact phase identities in first-member order and preserves terminal members', () => {
     const value = assembler(completeEvents())
     const data = workflowData(value)
@@ -376,6 +389,23 @@ function panelProps(data: WorkflowRunChatData, sessions = listState(), openSessi
 }
 
 describe('WorkflowRunPanel', () => {
+  it('shows a swarm board while the run is going and other runs\' notes as a live log', () => {
+    const board = render(<WorkflowRunPanel {...panelProps({
+      name: 'hackdev-swarm', status: 'running', phases: [],
+      log: ['[board #1] @coordinator -> @api (assignment): build the API', '[board #2] @api -> @all (status): done'],
+    })} />)
+    expect(board.getByText('Message board')).toBeTruthy()
+    expect(board.getByText('@coordinator -> @api (assignment): build the API')).toBeTruthy()
+    expect(board.container.querySelectorAll('[data-workflow-log] li')).toHaveLength(2)
+    board.unmount()
+    const notes = render(<WorkflowRunPanel {...panelProps({ name: 'hackdev-mission', status: 'running', phases: [], log: ['Wave 2 made no progress'] })} />)
+    expect(notes.getByText('Live log')).toBeTruthy()
+    expect(notes.getByText('Wave 2 made no progress')).toBeTruthy()
+    notes.unmount()
+    const silent = render(<WorkflowRunPanel {...panelProps({ name: 'quiet', status: 'running', phases: [] })} />)
+    expect(silent.container.querySelector('[data-workflow-log]')).toBeNull()
+  })
+
   it('keeps live run and phase controls manual across ordinary updates and outer hiding', () => {
     const running: WorkflowRunChatData = {
       name: 'audit', status: 'running', phases: [phase({ key: 'research', phase: 'Research' })],

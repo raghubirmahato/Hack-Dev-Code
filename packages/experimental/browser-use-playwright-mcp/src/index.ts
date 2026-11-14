@@ -3,7 +3,7 @@
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Context } from '@hackdevcode/cordis'
-import { BrowserMcpConfig, mountSessionMcp, validateBrowserMcpConfig } from '@hackdevcode/dsh-experimental-browser-use-runtime/mcp'
+import { BrowserMcpConfig, mountSessionMcp, validateBrowserMcpConfig } from '@hackdevcode/dsh-browser-use-runtime/mcp'
 import type {} from '@hackdevcode/dsh-working-directory'
 
 /** Cordis identity for the Playwright MCP browser provider. */

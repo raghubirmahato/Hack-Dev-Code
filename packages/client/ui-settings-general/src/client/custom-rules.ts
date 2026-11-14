@@ -9,6 +9,7 @@ const SENTENCE_BREAK = /(?<=[.!?])\s+(?=[A-Z])/u
 const ABBREVIATION = /\b(?:e\.g|i\.e|etc|vs|Mr|Mrs|Ms|Dr|No|approx)\.$/iu
 
 /**
+ * Show how the text being edited splits into rules, the same way agents receive them.
  * @param text - the text being edited.
  * @returns the rules in order.
  */

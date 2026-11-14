@@ -4,7 +4,7 @@ import type {
 import type { ChatConversationViewNode } from '@hackdevcode/dsh-client-ui-chat/client'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 import type {
-  ToolWorkflowAgentEndData, ToolWorkflowAgentStartData,
+  ToolWorkflowAgentEndData, ToolWorkflowAgentStartData, ToolWorkflowLogData,
 } from '@hackdevcode/dsh-tool-workflow/types'
 import type { WorkflowAgentOutcome, WorkflowStopReason } from '@hackdevcode/dsh-workflow/types'
 
@@ -32,7 +32,12 @@ export interface WorkflowRunChatData {
   readonly name: string
   readonly status: WorkflowRunStatus
   readonly phases: readonly WorkflowRunPhaseData[]
+  /** The newest lines the script logged, oldest first: a swarm's board posts, a mission's notes; absent when it logged none. */
+  readonly log?: readonly string[]
 }
+
+/** Logged lines the run view keeps. */
+export const WORKFLOW_LOG_LINES = 60
 
 declare module '@hackdevcode/dsh-client-ui-chat/client' {
   interface ChatNodeDataMap {
@@ -49,6 +54,7 @@ interface WorkflowState {
   readonly name: string
   readonly stopReason?: WorkflowStopReason
   readonly members: readonly WorkflowMemberState[]
+  readonly log: readonly string[]
 }
 
 /**
@@ -128,7 +134,13 @@ function projectWorkflow(
       ? interrupted ? 'interrupted' : 'running'
       : statusFromStopReason(state.stopReason),
     phases: projectedPhases,
+    ...state.log.length === 0 ? {} : { log: state.log },
   }
+}
+
+function updateLog(state: WorkflowState, data: ToolWorkflowLogData): WorkflowState {
+  const log = [...state.log, data.message]
+  return { ...state, log: log.length > WORKFLOW_LOG_LINES ? log.slice(-WORKFLOW_LOG_LINES) : log }
 }
 
 function updateAgentStart(state: WorkflowState, data: ToolWorkflowAgentStartData): WorkflowState {
@@ -158,6 +170,7 @@ export const workflowRunDefinition: ConversationNodeDefinition<WorkflowState> = 
     if (event.type === 'tool-workflow/run-start') return { id: String(event.data.runId), role: 'start' }
     if (event.type === 'tool-workflow/agent-start'
       || event.type === 'tool-workflow/agent-end'
+      || event.type === 'tool-workflow/log'
       || event.type === 'tool-workflow/run-end') {
       return { id: String(event.data.runId), role: 'update' }
     }
@@ -167,7 +180,7 @@ export const workflowRunDefinition: ConversationNodeDefinition<WorkflowState> = 
     if (match.event.type !== 'tool-workflow/run-start') {
       throw new Error('workflow-run start requires tool-workflow/run-start')
     }
-    return { name: match.event.data.name, members: [] }
+    return { name: match.event.data.name, members: [], log: [] }
   },
   update: (context, match) => {
     if (match.event.type === 'tool-workflow/agent-start') {
@@ -175,6 +188,9 @@ export const workflowRunDefinition: ConversationNodeDefinition<WorkflowState> = 
     }
     if (match.event.type === 'tool-workflow/agent-end') {
       return updateAgentEnd(context.state, match.event.data)
+    }
+    if (match.event.type === 'tool-workflow/log') {
+      return updateLog(context.state, match.event.data)
     }
     if (match.event.type === 'tool-workflow/run-end') {
       return { ...context.state, stopReason: match.event.data.stopReason }

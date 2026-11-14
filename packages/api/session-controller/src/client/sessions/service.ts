@@ -466,6 +466,7 @@ export class ClientSessions implements ISessions {
     increaseTitle?: boolean
     onCreated?: (childId: SessionId) => void
     allowMigration?: boolean
+    restoreFiles?: boolean
   }): Promise<SessionId> {
     const sourceTitle = opts.increaseTitle
       ? this.list.getSnapshot().byId[opts.sessionId]?.title
@@ -474,6 +475,7 @@ export class ClientSessions implements ISessions {
       sessionId: opts.sessionId,
       ...(opts.atSeq === undefined ? {} : { atSeq: SessionSeq(opts.atSeq) }),
       ...(opts.allowMigration === undefined ? {} : { allowMigration: opts.allowMigration }),
+      ...(opts.restoreFiles === true ? { restoreFiles: true } : {}),
     })
     if (!result.ok) throw new SessionForkError(result.error, opts.sessionId)
     this.projectList()

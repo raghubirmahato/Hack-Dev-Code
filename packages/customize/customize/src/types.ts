@@ -1,5 +1,5 @@
 /**
- * Wire types of the Customize settings area: MCP servers, connectors and skills.
+ * Wire types of the Customize settings area: MCP servers, connectors, website sessions and skills.
  * @module
  */
 
@@ -110,16 +110,46 @@ export interface CustomizeSkill {
   description: string
   license: string
   /**
-   * `directory`: installed from the directory; `other`: a folder of that name exists that the directory did not install;
-   * `no`: not installed.
+   * `builtin`: ships inside Hack Dev Code and is always available; `directory`: installed from the directory;
+   * `other`: a folder of that name exists that the directory did not install; `no`: not installed.
    */
-  state: 'directory' | 'other' | 'no'
+  state: 'builtin' | 'directory' | 'other' | 'no'
+}
+
+/** A website to sign in to. */
+export interface CustomizeSiteChoice {
+  /** The website's link; `https://` is assumed when the scheme is left out. */
+  url: string
+  /** The name shown for it; its host when unset. */
+  title?: string
+}
+
+/** One website session as the settings page shows it. */
+export interface CustomizeSite {
+  id: string
+  title: string
+  /** The page the sign-in window opens at. */
+  url: string
+  host: string
+  enabled: boolean
+  /** Why a session that is on cannot be used, such as no browser being installed; empty otherwise. */
+  note: string
+  /** True once an agent recorded how to do something on this website. */
+  playbook: boolean
+}
+
+/** The result of adding a website session. */
+export interface CustomizeSiteResult {
+  /** The id the session is stored under; its tools load with the group `mcp-<id>`. */
+  id: string
 }
 
 /** Everything the Customize page shows, read in one call. */
 export interface CustomizeSnapshot {
   servers: CustomizeServer[]
   connectors: CustomizeConnector[]
+  /** Websites the person signed in to. */
+  sites: CustomizeSite[]
   skills: CustomizeSkill[]
 }
 

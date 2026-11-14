@@ -1,0 +1,66 @@
+{
+  "name": "@hackdevcode/dsh-cua-bundle",
+  "description": "Computer use for the whole desktop and Chrome: apps, windows, mouse, keyboard and browser pages",
+  "version": "0.2.2-alpha.2",
+  "icon": "./icon.svg",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/bundle/cua-bundle"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "icon.svg",
+    "locale/*.json",
+    "docs",
+    "lib/index.js",
+    "cordis.patch.yml",
+    "lib/types/**/*.d.ts"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "listedByDefault": true,
+      "patch": "./cordis.patch.yml",
+      "platforms": [
+        "darwin",
+        "win32",
+        "linux"
+      ]
+    }
+  },
+  "dependencies": {
+    "@hackdevcode/dsh-browser-use": "workspace:*",
+    "@hackdevcode/dsh-computer-use": "workspace:*",
+    "@hackdevcode/dsh-cua": "workspace:*",
+    "@hackdevcode/dsh-browser-use-chrome-devtools-mcp": "workspace:*",
+    "@hackdevcode/dsh-computer-use-cua-driver-native": "workspace:*"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cordis-plugin-include": "workspace:~",
+    "js-yaml": "^4.2.0",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~"
+  },
+  "optionalDependencies": {
+    "@hackdevcode/dsh-cua-macos": "workspace:*"
+  }
+}

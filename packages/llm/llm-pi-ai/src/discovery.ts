@@ -26,6 +26,7 @@ import { INVALID_CREDENTIAL_CODE, LlmError, normalizeApiKey } from '@hackdevcode
 import type { LlmDiscoveredModel, LlmModelDiscoveryOperation } from '@hackdevcode/dsh-llm'
 import { attributionHeaders } from '@hackdevcode/dsh-llm'
 import { catalogModels } from './catalog.ts'
+import { OLLAMA_DEFAULT_NUM_CTX, describeOllamaModels, isOllamaRoute } from './ollama-context.ts'
 
 /**
  * Protocols whose model listing this module can read. OpenAI protocols use
@@ -41,6 +42,9 @@ const LISTABLE_PROTOCOLS: ReadonlySet<string> = new Set([
   'openai-completions',
   'openai-responses',
 ])
+
+/** The key the Ollama settings card sends: Ollama accepts any, and the client refuses to send none. */
+export const OLLAMA_PLACEHOLDER_KEY = 'ollama'
 
 /** Stable API version required by Anthropic's model-listing endpoint. */
 const ANTHROPIC_VERSION = '2023-06-01'
@@ -230,6 +234,38 @@ function readListing(body: unknown): LlmDiscoveredModel[] {
 }
 
 /**
+ * Complete an Ollama listing with what Ollama knows about each model. Its OpenAI-compatible listing carries ids
+ * only, so without this every model is recorded with the same assumed context and as text-only, embedding models
+ * are offered as chat models, and a model that cannot call tools looks the same as one that can.
+ * @param models - the listed models.
+ * @param baseURL - the endpoint that listed them.
+ * @param named - the draft is an Ollama one, so a server on any port is asked.
+ * @param signal - cancels the questions.
+ * @returns the models that can chat, each with its real context (capped to what Hack Dev Code serves Ollama models
+ *   with), whether it sees images and whether it calls tools; the listing unchanged when the server is not Ollama.
+ */
+export async function withOllamaFacts(
+  models: readonly LlmDiscoveredModel[], baseURL: string, named = false, signal?: AbortSignal,
+): Promise<readonly LlmDiscoveredModel[]> {
+  const facts = await describeOllamaModels(baseURL, models.map(model => model.id), named, undefined, signal)
+  if (facts.size === 0) return models
+  return models.flatMap((model) => {
+    // The larger-context copies Hack Dev Code makes of a model are its own plumbing, not models to choose.
+    if (model.id.startsWith('hackdev/')) return []
+    const known = facts.get(model.id)
+    if (known === undefined) return [model]
+    const can = known.capabilities
+    // An embedding model answers no chat request.
+    if (can !== undefined && !can.includes('completion')) return []
+    return [{
+      ...model,
+      ...known.trained === undefined ? {} : { contextWindow: Math.min(known.trained, model.contextWindow ?? OLLAMA_DEFAULT_NUM_CTX) },
+      ...can === undefined ? {} : { inputModalities: can.includes('vision') ? ['text', 'image'] as const : ['text'] as const, toolCalling: can.includes('tools') },
+    }]
+  })
+}
+
+/**
  * Accept one probe key, or refuse it before the header is built. Without this
  * the `fetch` below would throw a ByteString `TypeError` that this function's
  * catch reports as `could not reach <url>` — blaming the network for a local,
@@ -359,5 +395,9 @@ export async function discoverModels(
   } catch (error: unknown) {
     throw new LlmError(`${url} did not answer with JSON`, 'DISCOVERY_FAILED', { cause: error })
   }
-  return readListing(body)
+  const listed = readListing(body)
+  if (api !== 'openai-completions') return listed
+  // The Ollama card lists with Ollama's placeholder key, which marks a draft that has no route id yet.
+  const named = isOllamaRoute(request.provider) || request.apiKey === OLLAMA_PLACEHOLDER_KEY
+  return withOllamaFacts(listed, request.baseURL, named, request.signal)
 }

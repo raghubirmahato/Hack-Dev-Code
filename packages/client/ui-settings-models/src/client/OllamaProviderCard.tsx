@@ -90,7 +90,8 @@ export function OllamaProviderCard(props: OllamaProviderCardProps): ReactNode {
       const unique = [...new Map(answer.models.map(model => [model.id, model])).values()]
       setModels(unique)
       setListedURL(address.trim())
-      setPicked(new Set(unique.map(model => model.id)))
+      // A model that cannot call tools cannot drive the agent, so it starts unchecked.
+      setPicked(new Set(unique.filter(model => model.toolCalling !== false).map(model => model.id)))
     } catch (error: unknown) {
       // A lost connection to the Host rejects instead of refusing; it reads the same to the person.
       setModels(undefined)
@@ -125,6 +126,7 @@ export function OllamaProviderCard(props: OllamaProviderCardProps): ReactNode {
             ...model.name === undefined ? {} : { name: model.name },
             contextWindow: model.contextWindow ?? OLLAMA_CONTEXT_WINDOW,
             ...model.maxTokens === undefined ? {} : { maxTokens: model.maxTokens },
+            ...model.inputModalities === undefined ? {} : { input: [...model.inputModalities] },
           })),
         } as JsonValue,
       }], openedAt)
@@ -184,6 +186,8 @@ export function OllamaProviderCard(props: OllamaProviderCardProps): ReactNode {
               <label key={model.id} className={styles['ollamaModel']}>
                 <input type="checkbox" checked={picked.has(model.id)} disabled={disabled} onChange={() => { toggle(model.id) }} />
                 <span>{model.name ?? model.id}</span>
+                {model.toolCalling === false ? <span className={styles['advancedHint']}>{t('ollamaNoTools')}</span> : null}
+                {model.inputModalities?.includes('image') === true ? <span className={styles['advancedHint']}>{t('ollamaVision')}</span> : null}
               </label>
             ))}
           </fieldset>

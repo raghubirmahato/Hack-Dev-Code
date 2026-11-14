@@ -592,6 +592,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       interrupt_agent: 'packages/subagent/tool-subagent-control/src/index.ts',
       list_agents: 'packages/subagent/tool-subagent-control/src/list-agents.ts',
       send_message: 'packages/subagent/tool-subagent-control/src/index.ts',
+      team_board: 'packages/subagent/tool-subagent-control/src/index.ts',
     },
     requires: ['ctx.tools', 'ctx.subagents', 'ctx.agents'],
     writes: ['tool/call', 'tool/result', 'child session events through ctx.subagents'],

@@ -12,7 +12,7 @@
  */
 
 import { createHash, randomBytes } from 'node:crypto'
-import { lstat, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { setTimeout as wait } from 'node:timers/promises'
 
@@ -72,7 +72,9 @@ export interface WriteFileAtomicOptions {
  * one filesystem. Windows replacement retries transient `EACCES`, `EBUSY`,
  * and `EPERM` failures for a bounded interval while the complete temp file
  * remains the rename source. On any remaining failure the temp file is
- * removed and the failure rethrown. Crash durability (fsync) is out of scope.
+ * removed and the failure rethrown. The temporary file is flushed to disk before the rename, so a crash leaves
+ * the old file or the complete new one, never an empty or partial one; the directory entry is flushed where the
+ * platform allows it.
  * @param filename - final path receiving the content.
  * @param content - complete next file content.
  * @param options - permission bits for the replacement inode.
@@ -82,15 +84,38 @@ export async function writeFileAtomic(filename: string, content: string | Uint8A
     recursive: true,
     ...options.dirMode === undefined ? {} : { mode: options.dirMode },
   })
-  // TODO(settings-atomic-durability): Use a replacement that fsyncs the file
-  // and parent directory and preserves owner-only permissions on Windows.
   const temp = `${filename}.${randomBytes(6).toString('hex')}.tmp`
   try {
-    await writeFile(temp, content, { mode: options.mode, flag: 'wx' })
+    const handle = await open(temp, 'wx', options.mode)
+    try {
+      await handle.writeFile(content)
+      await handle.sync()
+    } finally {
+      await handle.close()
+    }
     await renameAtomicTemp(temp, filename)
   } catch (error) {
     await rm(temp, { force: true })
     throw error
+  }
+  await syncDirectory(dirname(filename))
+}
+
+/**
+ * Flush a directory entry after a rename. Windows cannot open a directory for flushing, and a filesystem that
+ * refuses is no worse off than before the write, so a refusal is ignored.
+ * @param directory - the directory that holds the renamed file.
+ */
+async function syncDirectory(directory: string): Promise<void> {
+  if (process.platform === 'win32') return
+  const handle = await open(directory, 'r').catch(() => undefined)
+  if (handle === undefined) return
+  try {
+    await handle.sync()
+  } catch {
+    // Some filesystems do not support flushing a directory.
+  } finally {
+    await handle.close()
   }
 }
 

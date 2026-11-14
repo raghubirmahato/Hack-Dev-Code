@@ -1,6 +1,6 @@
 /**
  * Remote gateway of the Customize settings area. It forwards a settings page's reads and changes to the
- * directory of MCP servers, connectors and skills, and holds no state of its own.
+ * directory of MCP servers, connectors, website sessions and skills, and holds no state of its own.
  * @module
  */
 
@@ -15,12 +15,14 @@ import type {
   CustomizeConnectorChoice,
   CustomizeCustomServer,
   CustomizeServerChange,
+  CustomizeSiteChoice,
+  CustomizeSiteResult,
   CustomizeSnapshot,
 } from './types.ts'
 
 export type * from './types.ts'
 
-/** Remote-only service a settings page calls to manage MCP servers, connectors and skills. */
+/** Remote-only service a settings page calls to manage MCP servers, connectors, website sessions and skills. */
 export class Customize extends TypertRemoteService {
   constructor(ctx: Context) {
     super(ctx, 'customize')
@@ -55,14 +57,16 @@ export class Customize extends TypertRemoteService {
 
   /**
    * Read the whole page.
-   * @returns the servers, connectors and skills as they stand now.
+   * @returns the servers, connectors, website sessions and skills as they stand now.
    * @throws {RemoteError} `customize/unavailable` or `customize/failed`.
    */
   @Remote('read')
   async read(): Promise<CustomizeSnapshot> {
     return this.run(async (directory) => {
-      const [servers, connectors, skills] = await Promise.all([directory.servers(), directory.connectors(), directory.skills()])
-      return { servers, connectors, skills }
+      const [servers, connectors, sites, skills] = await Promise.all([
+        directory.servers(), directory.connectors(), directory.sites(), directory.skills(),
+      ])
+      return { servers, connectors, sites, skills }
     })
   }
 
@@ -118,6 +122,37 @@ export class Customize extends TypertRemoteService {
   @Remote('disconnect')
   async disconnect(id: string): Promise<void> {
     await this.run(directory => directory.disconnect(id))
+  }
+
+  /**
+   * Add a website session and open its sign-in window on the machine the Host runs on.
+   * @param site - the website.
+   * @returns the id the session is stored under.
+   * @throws {RemoteError} `customize/unavailable` or `customize/failed`.
+   */
+  @Remote('addSite')
+  async addSite(site: CustomizeSiteChoice): Promise<CustomizeSiteResult> {
+    return this.run(directory => directory.addSite(site))
+  }
+
+  /**
+   * Open a website session's sign-in window again.
+   * @param id - the session id.
+   * @throws {RemoteError} `customize/unavailable` or `customize/failed`.
+   */
+  @Remote('openSite')
+  async openSite(id: string): Promise<void> {
+    await this.run(directory => directory.openSite(id))
+  }
+
+  /**
+   * Remove a website session with its browser profile and playbook.
+   * @param id - the session id.
+   * @throws {RemoteError} `customize/unavailable` or `customize/failed`.
+   */
+  @Remote('removeSite')
+  async removeSite(id: string): Promise<void> {
+    await this.run(directory => directory.removeSite(id))
   }
 
   /**

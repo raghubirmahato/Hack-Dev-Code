@@ -49,6 +49,7 @@ function childRequest(value: unknown): ChildStartRequest {
   const provider = request.provider === undefined ? undefined : text(request.provider, 'provider')
   const model = request.model === undefined ? undefined : text(request.model, 'model')
   const cwd = request.cwd === undefined ? undefined : text(request.cwd, 'cwd')
+  const session = request.session === undefined ? undefined : text(request.session, 'session')
   let schema: ObjectJsonSchema | undefined
   if (request.schema !== undefined) {
     const candidate = object(request.schema)
@@ -60,6 +61,7 @@ function childRequest(value: unknown): ChildStartRequest {
     ...provider === undefined ? {} : { provider },
     ...model === undefined ? {} : { model },
     ...cwd === undefined ? {} : { cwd },
+    ...session === undefined ? {} : { session },
     ...schema === undefined ? {} : { schema },
   }
 }
@@ -117,6 +119,8 @@ export class PtcWorkflowRun implements WorkflowRun {
   readonly result: Promise<WorkflowResult>
   private readonly controller = new AbortController()
   private readonly children = new Map<number, ChildRecord>()
+  /** Named conversations this run started, so a later agent() call with the same name continues the same child. */
+  private readonly sessions = new Map<string, SessionId>()
   private readonly pending = new Set<Promise<unknown>>()
   private readonly liveAgents = new Map<number, WorkflowAgentInfo>()
   private started = 0
@@ -203,25 +207,42 @@ export class PtcWorkflowRun implements WorkflowRun {
   private async startChild(request: ChildStartRequest): Promise<PtcJsonValue> {
     this.requireActive()
     const callId = ++this.started
-    const run = await this.subagents.startActivation({
-      provider: this.provider,
-      label: `${this.meta.name} child ${callId}`,
-      delivery: 'caller',
-      signal: this.controller.signal,
-      request: {
-        // A child may run in its own directory, such as a builder's worktree; relative paths resolve against the run's.
-        cwd: request.cwd === undefined ? await this.cwd : resolve(await this.cwd, request.cwd),
-        prompt: [{ type: 'text', text: request.prompt }],
-        parent: this.parent,
-        ...request.schema === undefined ? {} : { outputSchema: request.schema },
-        ...request.provider === undefined && request.model === undefined ? {} : {
-          agentOptions: {
-            ...request.provider === undefined ? {} : { provider: request.provider },
-            ...request.model === undefined ? {} : { model: request.model },
+    // A named conversation this run already started is continued, with its whole history, instead of started anew.
+    const earlier = request.session === undefined ? undefined : this.sessions.get(request.session)
+    const run = earlier !== undefined
+      ? await this.subagents.startActivation({
+        provider: this.provider,
+        label: `${this.meta.name} child ${callId}`,
+        delivery: 'caller',
+        childId: earlier,
+        resume: true,
+        signal: this.controller.signal,
+        request: {
+          prompt: [{ type: 'text', text: request.prompt }],
+          parent: this.parent,
+          ...request.schema === undefined ? {} : { outputSchema: request.schema },
+        },
+      })
+      : await this.subagents.startActivation({
+        provider: this.provider,
+        label: `${this.meta.name} child ${callId}`,
+        delivery: 'caller',
+        signal: this.controller.signal,
+        request: {
+          // A child may run in its own directory, such as a builder's worktree; relative paths resolve against the run's.
+          cwd: request.cwd === undefined ? await this.cwd : resolve(await this.cwd, request.cwd),
+          prompt: [{ type: 'text', text: request.prompt }],
+          parent: this.parent,
+          ...request.schema === undefined ? {} : { outputSchema: request.schema },
+          ...request.provider === undefined && request.model === undefined ? {} : {
+            agentOptions: {
+              ...request.provider === undefined ? {} : { provider: request.provider },
+              ...request.model === undefined ? {} : { model: request.model },
+            },
           },
         },
-      },
-    })
+      })
+    if (request.session !== undefined && earlier === undefined) this.sessions.set(request.session, run.childId)
     const record: ChildRecord = { callId, run }
     this.children.set(callId, record)
     // A provider can publish after the signal fired while startup was pending.

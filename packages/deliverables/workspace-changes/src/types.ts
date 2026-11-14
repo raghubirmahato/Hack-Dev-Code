@@ -94,6 +94,28 @@ export interface WorkspaceChanges {
    * @throws when a snapshot read fails for a live Session.
    */
   diff(sessionId: SessionId, seq: number, index: number, signal: AbortSignal): Promise<WorkspaceFileDiff | undefined>
+  /**
+   * Put the workspace's files back to how they were right after a turn, undoing the changes of every later recorded
+   * turn: files written since are restored, files created since are removed, ignored files are left alone. Works from
+   * durable checkpoints, so it also serves a Session that has ended; it needs git and a git repository.
+   * @param sessionId - the Session whose turns are undone.
+   * @param cwd - its working directory.
+   * @param afterTurn - the last turn to keep; 0 undoes every recorded turn.
+   * @param signal - cancels the git commands.
+   * @returns what changed, empty when no recorded turn changed files after that point.
+   * @throws when git is unavailable, the directory is no longer a repository, or a git command fails.
+   */
+  restore(sessionId: SessionId, cwd: string, afterTurn: number, signal: AbortSignal): Promise<WorkspaceRestore>
+}
+
+/** What a rewind changed in the workspace. */
+export interface WorkspaceRestore {
+  /** Paths written back, relative to the repository root. */
+  restored: string[]
+  /** Paths removed because they did not exist at that point. */
+  removed: string[]
+  /** Snapshot tree of the files just before the rewind, when it changed anything. */
+  backup?: string
 }
 
 declare module '@hackdevcode/dsh-session/types' {

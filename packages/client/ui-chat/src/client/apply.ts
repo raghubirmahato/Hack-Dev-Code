@@ -296,15 +296,22 @@ export function apply(ctx: Context): void {
             },
             read: () => chatScrollPositions.get(sessionId) ?? null,
           },
-          forkAt: (seq) => {
+          // Failures land in the session's prompt error, which the composer already shows.
+          continueTask: () => { void session.prompt([{ type: 'text', text: t('message.continuePrompt') }], 'queue') },
+          forkAt: (seq, options) => {
+            const restoreFiles = options?.restoreFiles === true
+            // A rewind changes files on disk, so it asks first; a plain branch does not.
+            if (restoreFiles && !globalThis.confirm(t('message.rewindConfirm'))) return
             const turn = [...chat.getSnapshot().timeline.turns.values()].find(turn => turn.end?.seq === seq)
             const messageId = turn?.data.get('turn-tail')?.closing?.finalNode.messageId
-            ctx.sessions.fork({ sessionId, atSeq: seq, increaseTitle: true, onCreated: (childId) => {
+            const rewind = restoreFiles ? { restoreFiles } : {}
+            ctx.sessions.fork({ sessionId, atSeq: seq, increaseTitle: true, ...rewind, onCreated: (childId) => {
               ctx.get('productAnalytics')?.track('branch_session_click', { session_id: childId, parent_session_id: sessionId, ...messageId === undefined ? {} : { parent_message_id: messageId }, click_position: 'footer' })
             } })
               .then((childId) => { ctx.uiWorkspace.openSession(childId) })
-              .catch(() => {
-                // Fork or child-title failure leaves the source view unchanged.
+              .catch((error: unknown) => {
+                // Fork or child-title failure leaves the source view unchanged; a failed rewind says why.
+                if (restoreFiles) globalThis.alert(t('message.rewindFailed', { reason: error instanceof Error ? error.message : String(error) }))
               })
           },
         }

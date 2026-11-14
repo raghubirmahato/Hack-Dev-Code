@@ -24,6 +24,7 @@ export interface DirectorySkill {
 }
 
 const ANTHROPIC_SKILLS = 'https://github.com/anthropics/skills.git'
+const OPENAI_SKILLS = 'https://github.com/openai/skills.git'
 
 /** The skill directory, in display order. */
 export const SKILLS: readonly DirectorySkill[] = [
@@ -39,6 +40,26 @@ export const SKILLS: readonly DirectorySkill[] = [
   { id: 'web-artifacts-builder', title: 'Web artifact builder', description: 'Build self-contained HTML apps with React, Tailwind and shadcn/ui.', repository: ANTHROPIC_SKILLS, path: 'skills/web-artifacts-builder', license: 'Apache-2.0' },
   { id: 'canvas-design', title: 'Canvas design', description: 'Create posters and visual designs as PNG and PDF.', repository: ANTHROPIC_SKILLS, path: 'skills/canvas-design', license: 'Apache-2.0' },
   { id: 'theme-factory', title: 'Theme factory', description: 'Apply consistent colour and font themes to documents, slides and pages.', repository: ANTHROPIC_SKILLS, path: 'skills/theme-factory', license: 'Apache-2.0' },
+  { id: 'algorithmic-art', title: 'Algorithmic art', description: 'Create generative art with p5.js: seeded randomness, flow fields and particle systems.', repository: ANTHROPIC_SKILLS, path: 'skills/algorithmic-art', license: 'Apache-2.0' },
+  { id: 'brand-guidelines', title: 'Brand guidelines', description: 'Apply a brand\'s colours and typography consistently to documents and designs.', repository: ANTHROPIC_SKILLS, path: 'skills/brand-guidelines', license: 'Apache-2.0' },
+  { id: 'internal-comms', title: 'Internal communications', description: 'Write status reports, leadership updates, newsletters, FAQs and incident reports.', repository: ANTHROPIC_SKILLS, path: 'skills/internal-comms', license: 'Apache-2.0' },
+  { id: 'slack-gif-creator', title: 'Animated GIF creator', description: 'Make animated GIFs sized and optimised for chat apps.', repository: ANTHROPIC_SKILLS, path: 'skills/slack-gif-creator', license: 'Apache-2.0' },
+  { id: 'claude-api', title: 'Claude API', description: 'Build applications on the Claude API and Agent SDK: models, tools, streaming and caching.', repository: ANTHROPIC_SKILLS, path: 'skills/claude-api', license: 'Apache-2.0' },
+  { id: 'gh-fix-ci', title: 'Fix failing CI', description: 'Inspect failing GitHub Actions checks with the gh CLI, find the cause and fix it.', repository: OPENAI_SKILLS, path: 'skills/.curated/gh-fix-ci', license: 'Apache-2.0' },
+  { id: 'gh-address-comments', title: 'Address review comments', description: 'Work through the review and issue comments on the open pull request of the current branch.', repository: OPENAI_SKILLS, path: 'skills/.curated/gh-address-comments', license: 'Apache-2.0' },
+  { id: 'security-best-practices', title: 'Security best practices', description: 'Review code against language and framework specific security best practices.', repository: OPENAI_SKILLS, path: 'skills/.curated/security-best-practices', license: 'Apache-2.0' },
+  { id: 'security-threat-model', title: 'Threat modelling', description: 'Build a repository-grounded threat model: trust boundaries, assets, abuse paths and mitigations.', repository: OPENAI_SKILLS, path: 'skills/.curated/security-threat-model', license: 'Apache-2.0' },
+  { id: 'security-ownership-map', title: 'Security ownership map', description: 'Map who owns which code from Git history and find sensitive code with a low bus factor.', repository: OPENAI_SKILLS, path: 'skills/.curated/security-ownership-map', license: 'Apache-2.0' },
+  { id: 'playwright', title: 'Playwright CLI', description: 'Automate a real browser from the terminal: navigation, forms, snapshots, screenshots and data extraction.', repository: OPENAI_SKILLS, path: 'skills/.curated/playwright', license: 'Apache-2.0' },
+  { id: 'jupyter-notebook', title: 'Jupyter notebooks', description: 'Create and edit Jupyter notebooks for experiments, explorations and tutorials.', repository: OPENAI_SKILLS, path: 'skills/.curated/jupyter-notebook', license: 'Apache-2.0' },
+  { id: 'aspnet-core', title: 'ASP.NET Core', description: 'Build, review and refactor ASP.NET Core web applications following current official guidance.', repository: OPENAI_SKILLS, path: 'skills/.curated/aspnet-core', license: 'Apache-2.0' },
+  { id: 'winui-app', title: 'WinUI apps', description: 'Bootstrap and develop WinUI 3 desktop applications with C# and the Windows App SDK.', repository: OPENAI_SKILLS, path: 'skills/.curated/winui-app', license: 'Apache-2.0' },
+  { id: 'vercel-deploy', title: 'Deploy to Vercel', description: 'Deploy applications and websites to Vercel and return the link.', repository: OPENAI_SKILLS, path: 'skills/.curated/vercel-deploy', license: 'MIT' },
+  { id: 'netlify-deploy', title: 'Deploy to Netlify', description: 'Deploy web projects to Netlify with the Netlify CLI.', repository: OPENAI_SKILLS, path: 'skills/.curated/netlify-deploy', license: 'Apache-2.0' },
+  { id: 'cloudflare-deploy', title: 'Deploy to Cloudflare', description: 'Deploy applications to Cloudflare Workers, Pages and related services.', repository: OPENAI_SKILLS, path: 'skills/.curated/cloudflare-deploy', license: 'Apache-2.0' },
+  { id: 'render-deploy', title: 'Deploy to Render', description: 'Deploy applications to Render by generating a render.yaml Blueprint.', repository: OPENAI_SKILLS, path: 'skills/.curated/render-deploy', license: 'Apache-2.0' },
+  { id: 'sentry', title: 'Sentry triage', description: 'Inspect Sentry issues and events and summarise recent production errors with the Sentry CLI.', repository: OPENAI_SKILLS, path: 'skills/.curated/sentry', license: 'Apache-2.0' },
+  { id: 'linear', title: 'Linear workflows', description: 'Read, create and update Linear issues, projects and team workflows.', repository: OPENAI_SKILLS, path: 'skills/.curated/linear', license: 'Apache-2.0' },
 ]
 
 /** Marker file written into each skill this directory installed, so removal never touches skills the person added. */
@@ -125,6 +146,7 @@ export async function removeSkill(skill: DirectorySkill, skillsDir: string): Pro
  * @returns `directory`, `other` for a folder of the same name the directory did not install, or `no`.
  */
 export async function skillState(skill: DirectorySkill, skillsDir: string): Promise<'directory' | 'other' | 'no'> {
+  // Built-in skills are never in this list; they need no folder.
   const target = join(skillsDir, skill.id)
   if (!await exists(target)) return 'no'
   return await exists(join(target, INSTALLED_MARKER)) ? 'directory' : 'other'

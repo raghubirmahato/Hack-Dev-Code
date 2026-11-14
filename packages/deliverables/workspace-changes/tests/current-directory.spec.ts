@@ -33,7 +33,7 @@ it.each(['write', 'edit', 'str_replace_editor'] as const)('captures the resolved
   await ctx.plugin(LocalSubprocessRuntime)
   await ctx.plugin(ToolFs)
   await ctx.plugin(StrReplaceEditor)
-  await ctx.plugin(WorkspaceChanges)
+  await ctx.plugin(WorkspaceChanges, { checkpointDir: join(origin, '.checkpoints') } as WorkspaceChanges.Config)
   const args = name === 'write'
     ? { file_path: 'witness.txt', content: 'after\n' }
     : name === 'edit'
@@ -72,7 +72,8 @@ it('delegates filesystem intents without a recorded tool actor and preserves a r
   cleanups.push(() => ctx.fiber.dispose())
   await mountAgentLoopTestDependencies(ctx, { workingDirectory: true })
   await ctx.plugin(LocalSubprocessRuntime)
-  await ctx.plugin(WorkspaceChanges)
+  // No turn is recorded here, so the checkpoint directory is never created.
+  await ctx.plugin(WorkspaceChanges, { checkpointDir: join(tmpdir(), 'dsh-unused-checkpoints') } as WorkspaceChanges.Config)
   const target = await ctx.fs.resolve('witness.txt')
   const bare = vi.fn(() => undefined)
   await ctx.waterfall('fs/write-intent', target, undefined, bare)

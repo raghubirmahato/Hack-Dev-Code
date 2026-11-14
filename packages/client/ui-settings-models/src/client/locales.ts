@@ -24,6 +24,8 @@ export const en = {
   ollamaRefresh: 'Refresh the model list',
   ollamaLoading: 'Looking for downloaded models…',
   ollamaModels: 'Downloaded models',
+  ollamaNoTools: 'cannot call tools, so it cannot run the agent',
+  ollamaVision: 'sees images',
   ollamaNone: 'Ollama has no downloaded models yet. Download one with "ollama pull <model>", such as "ollama pull qwen2.5-coder", then refresh.',
   ollamaUnreachable: 'Ollama did not answer at this address. Start Ollama (or install it from ollama.com), then refresh.',
   addCatalogHint: 'Pick OpenAI, Anthropic, Kimi, or another provider from the built-in catalog and enter its API key.',

@@ -389,7 +389,6 @@ describe('bash tool', () => {
   // Value constraints the ParameterSchemaSpec can't express stay in the tool body.
   it.each([
     [{ command: '  ', description: 'd' }, /invalid command/],
-    [{ command: 'x', description: '   ' }, /invalid description/],
     [{ command: 'x', description: 'd', timeoutMs: -1 }, /invalid timeoutMs/],
   ])('rejects value-invalid args %j', async (args, pattern) => {
     const ctx = await setup()
@@ -752,7 +751,6 @@ describe('sandbox escalation through the generic task producer', () => {
 
     for (const args of [
       { command: 'true', description: 'd', sandbox_permissions: 'workspace-write' },
-      { command: 'true', description: 'd', justification: 'why' },
       { command: 'true', description: 'd', sandbox_permissions: 'workspace-write', justification: ' ' },
     ]) {
       expect((await call(ctx, 'bash', args)).isError).toBe(true)
@@ -791,7 +789,7 @@ describe('sandbox escalation through the generic task producer', () => {
     }
   })
 
-  it('rejects injected escalation without a sandbox and narrower escalation without prompting', async () => {
+  it('rejects injected escalation without a sandbox and runs a narrower request in the current mode without prompting', async () => {
     const plain = await setup()
     expect(text(await call(plain, 'bash', escalate))).toContain('not available in this composition')
 
@@ -799,7 +797,8 @@ describe('sandbox escalation through the generic task producer', () => {
     const prompted = vi.fn()
     ctx.on('approval/request', () => { prompted(); return Promise.resolve<ApprovalOutcome>('allowed-once') })
     const result = await call(ctx, 'bash', { ...escalate, sandbox_permissions: 'workspace-write' }, sandboxAgent('danger-full-access'))
-    expect(text(result)).toContain('not strictly wider')
+    // The session already has more than the call asked for: nothing to grant, nothing to refuse.
+    expect(result.isError).toBe(false)
     expect(prompted).not.toHaveBeenCalled()
 
     const malformed = sandboxAgent()

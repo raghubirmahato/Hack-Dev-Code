@@ -6,7 +6,7 @@
 import type { Context } from '@hackdevcode/cordis'
 import Schema from '@hackdevcode/schemastery'
 import { BrowserUseProviderName } from '@hackdevcode/dsh-browser-use/brand'
-import { SessionResources } from '@hackdevcode/dsh-experimental-browser-use-runtime'
+import { SessionResources } from '@hackdevcode/dsh-browser-use-runtime'
 import { createMcpToolDefinition } from '@hackdevcode/dsh-mcp-client'
 import { z } from 'zod'
 import { browserInputs, stagehandModelSchema, StagehandDrainError } from './native.ts'

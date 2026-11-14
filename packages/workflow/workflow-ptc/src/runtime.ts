@@ -30,7 +30,7 @@ export interface ExecutionObserver {
 }
 
 /** The `agent()` options the script may pass; everything else rejects loud. */
-const SUPPORTED_AGENT_OPTIONS = new Set(['label', 'phase', 'schema', 'provider', 'model', 'cwd'])
+const SUPPORTED_AGENT_OPTIONS = new Set(['label', 'phase', 'schema', 'provider', 'model', 'cwd', 'session'])
 /** Deferred Claude Code options we name explicitly in the rejection message. */
 const DEFERRED_AGENT_OPTIONS = new Set(['effort', 'isolation', 'agentType'])
 
@@ -186,6 +186,7 @@ export class WorkflowExecution {
           ...opts.provider !== undefined ? { provider: opts.provider } : {},
           ...opts.model !== undefined ? { model: opts.model } : {},
           ...opts.cwd !== undefined ? { cwd: opts.cwd } : {},
+          ...opts.session !== undefined ? { session: opts.session } : {},
         })
       } catch (error: unknown) {
         throw new WorkflowError(`agent() could not start a child: ${renderThrown(error)}`, 'AGENT_START', { cause: error })
@@ -236,6 +237,7 @@ export class WorkflowExecution {
     provider?: string
     model?: string
     cwd?: string
+    session?: string
     schema?: ObjectJsonSchema
   } {
     if (rawOpts === undefined) return {}
@@ -254,11 +256,11 @@ export class WorkflowExecution {
     for (const key of Object.keys(record)) {
       if (SUPPORTED_AGENT_OPTIONS.has(key)) continue
       if (DEFERRED_AGENT_OPTIONS.has(key)) {
-        throw new WorkflowError(`agent() option "${key}" is deferred and not supported by this engine (supported: label, phase, schema, provider, model, cwd)`, 'UNSUPPORTED_OPTION')
+        throw new WorkflowError(`agent() option "${key}" is deferred and not supported by this engine (supported: label, phase, schema, provider, model, cwd, session)`, 'UNSUPPORTED_OPTION')
       }
-      throw new WorkflowError(`agent() option "${key}" is not recognized (supported: label, phase, schema, provider, model, cwd)`, 'UNSUPPORTED_OPTION')
+      throw new WorkflowError(`agent() option "${key}" is not recognized (supported: label, phase, schema, provider, model, cwd, session)`, 'UNSUPPORTED_OPTION')
     }
-    for (const key of ['label', 'phase', 'provider', 'model', 'cwd'] as const) {
+    for (const key of ['label', 'phase', 'provider', 'model', 'cwd', 'session'] as const) {
       if (record[key] !== undefined && typeof record[key] !== 'string') {
         throw new WorkflowError(`agent() option "${key}" must be a string`, 'INVALID_ARGUMENT')
       }
@@ -280,6 +282,7 @@ export class WorkflowExecution {
       ...record.provider !== undefined ? { provider: record.provider as string } : {},
       ...record.model !== undefined ? { model: record.model as string } : {},
       ...record.cwd !== undefined && (record.cwd as string).trim().length > 0 ? { cwd: record.cwd as string } : {},
+      ...record.session !== undefined && (record.session as string).trim().length > 0 ? { session: (record.session as string).trim() } : {},
       ...schema !== undefined ? { schema } : {},
     }
   }

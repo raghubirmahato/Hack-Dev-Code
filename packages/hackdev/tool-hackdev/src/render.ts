@@ -2,6 +2,7 @@
 
 import type { JsonValue } from '@hackdevcode/dsh-util-values'
 
+/** One task (or swarm worker) of a run. */
 export interface HackDevTask {
   id: string
   title: string
@@ -23,12 +24,14 @@ export interface HackDevTask {
   subtasks?: number
 }
 
+/** One screenshot a gate captured and viewed. */
 export interface HackDevUiEvidence {
   viewport: string
   artifact: string
   observation: string
 }
 
+/** One gate (or swarm verifier) with its verdict, checks and issues. */
 export interface HackDevGate {
   gate: string
   verdict: 'pass' | 'fail'
@@ -44,12 +47,48 @@ export interface HackDevGate {
   limitations: string[]
 }
 
+/** One acceptance criterion as the integrator judged it. */
 export interface HackDevCriterion {
   criterion: string
   met: boolean
   evidence: string
 }
 
+/** One post on a swarm's shared message board. */
+export interface HackDevPost {
+  n: number
+  round: number
+  from: string
+  to: string[]
+  kind: string
+  text: string
+}
+
+/** One member of a swarm. */
+export interface HackDevMember {
+  name: string
+  kind: 'coordinator' | 'worker' | 'verifier'
+  role: string
+  /** The model the member was pinned to; '' when it inherited the conversation's model. */
+  model: string
+  /** Turns the member took. */
+  rounds: number
+}
+
+/** The swarm a `hackdev_swarm` run formed, with its message board. */
+export interface HackDevSwarm {
+  name: string
+  rounds: number
+  /** The monitor ended the swarm because it went quiet before finishing. */
+  stalled: boolean
+  members: HackDevMember[]
+  /** Posts made over the whole run. */
+  posts: number
+  /** The newest posts, oldest first. */
+  board: HackDevPost[]
+}
+
+/** The whole result of a mission, swarm or review run. */
 export interface HackDevReport {
   status: 'complete' | 'needs-attention'
   mission: string
@@ -64,11 +103,20 @@ export interface HackDevReport {
   needsHuman: string[]
   memoryEntries: number
   recorded?: boolean
+  /** The follow-up waves stopped early because a wave made no progress. */
+  stalled?: boolean
+  /** Present for a swarm run. */
+  swarm?: HackDevSwarm
 }
 
 const TRUNCATION_NOTICE = '\n… [truncated]'
 
-/** Bound complete parent-facing text, including its truncation marker. */
+/**
+ * Bound complete parent-facing text, including its truncation marker.
+ * @param text - the text.
+ * @param maxChars - its largest allowed length.
+ * @returns the text, cut with a marker when it was longer.
+ */
 export function boundText(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text
   if (maxChars <= TRUNCATION_NOTICE.length) return TRUNCATION_NOTICE.slice(0, maxChars)
@@ -94,10 +142,16 @@ function taskLine(t: HackDevTask): string {
   return `- ${t.id} [${tags.join(', ')}] ${t.title} — ${t.evidence.length} evidence item(s), ${t.filesChanged.length} file(s)`
 }
 
-/** Render the report; open issues, unmet criteria and human-approval items come first so truncation never hides them. */
+/**
+ * Render the report; open issues, unmet criteria and human-approval items come first so truncation never hides them.
+ * @param report - the run's report.
+ * @param maxChars - the largest text returned to the lead agent.
+ * @returns the report as text.
+ */
 export function renderReport(report: HackDevReport, maxChars: number): string {
   const lines: string[] = []
-  lines.push(`Hack Dev Code run: ${report.status === 'complete' ? 'COMPLETE' : 'NEEDS ATTENTION'}`)
+  const swarm = report.swarm
+  lines.push(`Hack Dev Code ${swarm === undefined ? 'run' : `swarm "${swarm.name}"`}: ${report.status === 'complete' ? 'COMPLETE' : 'NEEDS ATTENTION'}`)
   const open = report.gates.flatMap(g => g.issues.filter(i => i.status === 'open').map(i => `[${i.severity}] ${i.title} (${g.gate})`))
   const deferred = report.gates.flatMap(g => g.issues.filter(i => i.status === 'deferred').map(i => `[${i.severity}] ${i.title} (${g.gate})`))
   const unfinished = report.tasks.filter(isUnfinished)
@@ -113,7 +167,12 @@ export function renderReport(report: HackDevReport, maxChars: number): string {
   const complexity = report.plan.complexity === undefined ? '' : ` [${report.plan.complexity}]`
   lines.push('', `Plan${complexity}: ${report.plan.summary}${report.planFallback ? ' (planner fell back to a single task)' : ''}`)
   if (report.plan.stack !== '') lines.push(`Stack: ${report.plan.stack}`)
-  if (report.waves !== undefined && report.waves > 1) lines.push(`Waves: ${report.waves} (follow-up waves closed unmet acceptance criteria)`)
+  if (swarm !== undefined) {
+    lines.push(`Swarm: ${swarm.members.filter(m => m.kind === 'worker').length} worker(s), ${swarm.members.filter(m => m.kind === 'verifier').length} verifier(s), ${swarm.rounds} round(s), ${swarm.posts} post(s) on the board${swarm.stalled ? '; the monitor stopped it because it went quiet before finishing' : ''}`)
+    lines.push(`Members: ${swarm.members.map(m => `@${m.name}${m.model === '' ? '' : ` (${m.model})`}`).join(', ')}`)
+  } else if (report.waves !== undefined && report.waves > 1) {
+    lines.push(`Waves: ${report.waves} (follow-up waves closed unmet acceptance criteria)${report.stalled === true ? '; stopped early because the last wave made no progress' : ''}`)
+  }
   if (report.tasks.length > 0) {
     lines.push('', `Tasks (${report.tasks.filter(t => t.status === 'done').length}/${report.tasks.length} done):`)
     for (const t of report.tasks) lines.push(taskLine(t))
@@ -136,12 +195,17 @@ export function renderReport(report: HackDevReport, maxChars: number): string {
     }
     for (const l of g.limitations) lines.push(`  limitation: ${l}`)
   }
+  if (swarm !== undefined && swarm.board.length > 0) {
+    const shown = swarm.board.slice(-12)
+    lines.push('', `Message board (last ${shown.length} of ${swarm.posts} posts; the whole board is in .hackdev/swarm/BOARD.md):`)
+    for (const p of shown) lines.push(`- #${p.n} @${p.from} -> ${p.to.map(t => `@${t}`).join(' ')} (${p.kind}): ${clipText(p.text, 200)}`)
+  }
   lines.push('', `Shared memory entries: ${report.memoryEntries}. Run record ${report.recorded === true ? 'written to' : 'could NOT be written to'} .hackdev/RUN_REPORT.md, .hackdev/PROGRESS.md and .hackdev/MEMORY.md.`)
   return boundText(lines.join('\n'), maxChars)
 }
 
 /** Version of the persisted presentation payload the Web card narrows. */
-export const PRESENTATION_VERSION = 2
+export const PRESENTATION_VERSION = 3
 
 function clipText(text: string, max: number): string {
   return text.length <= max ? text : `${text.slice(0, max - 1)}…`
@@ -155,6 +219,8 @@ function clipList(items: readonly string[], count: number, max: number): string[
  * Project a report into the bounded JSON persisted with the tool result for
  * Web presenters. Counts stay exact while lists and strings are clipped, so one
  * large run cannot bloat the session log.
+ * @param report - the run's report.
+ * @returns the payload the card narrows.
  */
 export function compactReport(report: HackDevReport): JsonValue {
   const criteria = report.criteria ?? []
@@ -179,7 +245,7 @@ export function compactReport(report: HackDevReport): JsonValue {
     })),
     criteria: criteria.slice(0, 20).map(c => ({ criterion: clipText(c.criterion, 200), met: c.met, evidence: clipText(c.evidence, 160) })),
     criteriaCount: criteria.length,
-    gates: report.gates.slice(0, 4).map(g => ({
+    gates: report.gates.slice(0, 8).map(g => ({
       gate: clipText(g.gate, 80),
       verdict: g.verdict,
       rounds: g.rounds,
@@ -202,5 +268,23 @@ export function compactReport(report: HackDevReport): JsonValue {
     needsHuman: clipList(report.needsHuman, 10, 200),
     memoryEntries: report.memoryEntries,
     recorded: report.recorded === true,
+    stalled: report.stalled === true,
+    ...report.swarm === undefined
+      ? {}
+      : {
+        swarm: {
+          name: clipText(report.swarm.name, 60),
+          rounds: report.swarm.rounds,
+          stalled: report.swarm.stalled,
+          members: report.swarm.members.slice(0, 32).map(m => ({
+            name: clipText(m.name, 40), kind: m.kind, role: clipText(m.role, 24), model: clipText(m.model, 60), rounds: m.rounds,
+          })),
+          posts: report.swarm.posts,
+          board: report.swarm.board.slice(-60).map(p => ({
+            n: p.n, round: p.round, from: clipText(p.from, 40), to: clipList(p.to, 6, 40),
+            kind: clipText(p.kind, 16), text: clipText(p.text, 320),
+          })),
+        },
+      },
   }
 }

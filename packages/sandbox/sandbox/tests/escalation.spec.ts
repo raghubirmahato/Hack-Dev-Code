@@ -36,10 +36,14 @@ describe('validateEscalationArgs', () => {
     expect(() => { validateEscalationArgs('workspace-write', 'because the workspace needs it') }).not.toThrow()
   })
 
-  it('rejects one field without the other, and a blank justification', () => {
+  it('rejects a request without its reason, and a blank reason', () => {
     expect(() => { validateEscalationArgs('workspace-write', undefined) }).toThrow(/requires a justification/)
-    expect(() => { validateEscalationArgs(undefined, 'orphan reason') }).toThrow(/only valid together with sandbox_permissions/)
     expect(() => { validateEscalationArgs('workspace-write', '   ') }).toThrow(/non-empty sentence/)
+  })
+
+  it('ignores a reason that comes without a request: it asks for nothing', () => {
+    expect(() => { validateEscalationArgs(undefined, 'orphan reason') }).not.toThrow()
+    expect(() => { validateEscalationArgs(undefined, '  ') }).not.toThrow()
   })
 })
 
@@ -102,13 +106,14 @@ describe('approveEscalation', () => {
       .resolves.toBe(mode)
   })
 
-  it('a narrower or unsupported target fails closed without asking', async () => {
+  it('a mode the call already exceeds runs in the current mode without asking, and an unsupported target fails closed', async () => {
     const seen: unknown[] = []
     const spy = ingredients({ approver: approver('allowed-once', r => seen.push(r)) })
+    // Asking for less than the call has grants nothing and refuses nothing: the mode stays what it was.
     await expect(approveEscalation(req({ requestedMode: 'read-only', effectiveMode: 'workspace-write' }), spy))
-      .rejects.toThrow(/not strictly wider than this call's current "workspace-write" mode/)
+      .resolves.toBe('workspace-write')
     await expect(approveEscalation(req({ requestedMode: 'workspace-write', effectiveMode: 'danger-full-access' as never }), spy))
-      .rejects.toThrow(/not strictly wider/)
+      .resolves.toBe('danger-full-access')
     await expect(approveEscalation(req({ requestedMode: 'unknown-mode' }), spy))
       .rejects.toThrow(/not strictly wider/)
     expect(seen).toEqual([])

@@ -39,6 +39,32 @@ describe('the Ollama card', () => {
     expect(storeCredential).toHaveBeenCalledWith('OLLAMA_2_API_KEY', 'ollama')
   })
 
+  it('leaves a model that cannot call tools unchecked and records what each chosen model accepts', async () => {
+    const { ops, writeSettings } = operations({
+      kind: 'found',
+      models: [
+        { id: 'qwen3:8b', contextWindow: 32768, inputModalities: ['text'], toolCalling: true },
+        { id: 'gemma3:4b', contextWindow: 8192, inputModalities: ['text', 'image'], toolCalling: false },
+        { id: 'older:latest' },
+      ],
+    })
+    const onClose = vi.fn()
+    render(<OllamaProviderCard {...base} operations={ops} onClose={onClose} />)
+    await screen.findByText(en.ollamaModels)
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[]
+    // A model whose abilities are unknown stays checked; one known to lack tools does not.
+    expect(boxes.map(box => box.checked)).toEqual([true, false, true])
+    expect(screen.getByText(en.ollamaNoTools)).toBeTruthy()
+    expect(screen.getByText(en.ollamaVision)).toBeTruthy()
+    fireEvent.click(screen.getByText(en.create))
+    await waitFor(() => { expect(onClose).toHaveBeenCalledWith(true) })
+    expect(writeSettings).toHaveBeenCalledWith('llm-pi-ai', [expect.objectContaining({
+      value: expect.objectContaining({
+        models: [{ id: 'qwen3:8b', contextWindow: 32768, input: ['text'] }, { id: 'older:latest', contextWindow: 32768 }],
+      }) as unknown,
+    })], 1)
+  })
+
   it('says how to start Ollama when it does not answer, and how to download a model when it has none', async () => {
     const unreachable = operations({ kind: 'refused', message: 'connect ECONNREFUSED' })
     const { unmount } = render(<OllamaProviderCard {...base} operations={unreachable.ops} onClose={vi.fn()} />)

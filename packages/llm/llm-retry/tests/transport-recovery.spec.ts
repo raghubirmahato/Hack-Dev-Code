@@ -59,6 +59,7 @@ async function harness(
     retryPolicy: {
       mode: 'normal',
       maxRetries: 2,
+      networkRetries: 2,
       backoff: {
         initialDelayMs: options.initialDelayMs ?? 10,
         maxDelayMs: options.initialDelayMs ?? 10,

@@ -9,7 +9,7 @@ import type { ToolCallViewProps } from '@hackdevcode/dsh-client-ui-tool/client'
 import {
   attentionItems, headerCounts, missionFromArgs, readHackDevMeta,
   type AttentionItem, type CheckOutcome, type HackDevView, type IssueStatus, type Severity, type TaskStatus, type ViewGate,
-  type ViewTask,
+  type ViewSwarm, type ViewTask,
 } from './model.ts'
 import { NS } from './locales.ts'
 import css from './HackDevCard.module.css'
@@ -133,12 +133,71 @@ function GateSection({ gate, t }: { gate: ViewGate; t: T }) {
   )
 }
 
-function taskMeta(task: ViewTask, t: T): string {
+/** Board posts shown before the rest sit behind a toggle. */
+export const BOARD_PREVIEW = 8
+
+function SwarmSection({ swarm, t }: { swarm: ViewSwarm; t: T }) {
+  const [showAll, setShowAll] = useState(false)
+  const hidden = Math.max(0, swarm.board.length - BOARD_PREVIEW)
+  // The newest posts say where the swarm ended up, so the preview is the tail of the board.
+  const visible = showAll ? swarm.board : swarm.board.slice(-BOARD_PREVIEW)
+  return (
+    <>
+      <section className={css.section} data-testid="hackdev-swarm">
+        <h4 className={css.sectionTitle}>{t('swarm', { name: swarm.name })}</h4>
+        <span className={css.rowMeta}>
+          {t('swarm.summary', {
+            workers: swarm.members.filter(m => m.kind === 'worker').length,
+            verifiers: swarm.members.filter(m => m.kind === 'verifier').length,
+            count: swarm.rounds,
+          })}
+        </span>
+        {swarm.stalled ? <span className={css.rowMeta}>{t('swarm.stalled')}</span> : null}
+        <ul className={css.members}>
+          {swarm.members.map(member => (
+            <li key={member.name} className={css.member} data-kind={member.kind}>
+              <span className={css.mono}>@{member.name}</span>
+              <span className={css.rowMeta}>
+                {[t(`swarm.kind.${member.kind}`), member.model === '' ? null : member.model, t('swarm.rounds', { count: member.rounds })]
+                  .filter((part): part is string => part !== null).join(' · ')}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+      {swarm.board.length === 0 ? null : (
+        <section className={css.section} data-testid="hackdev-board">
+          <h4 className={css.sectionTitle}>{t('board', { count: swarm.posts })}</h4>
+          {swarm.posts > swarm.board.length ? <span className={css.rowMeta}>{t('board.showing', { shown: swarm.board.length })}</span> : null}
+          <ol className={css.board}>
+            {visible.map(post => (
+              <li key={post.n} className={css.post} data-kind={post.kind}>
+                <span className={css.postHead}>
+                  <span className={css.mono}>#{post.n} @{post.from} → {post.to.map(name => `@${name}`).join(' ')}</span>
+                  <Tag tone={post.kind === 'problem' ? 'danger' : post.kind === 'question' ? 'warning' : 'neutral'}>{post.kind}</Tag>
+                  <span className={css.rowMeta}>{t('board.round', { count: post.round })}</span>
+                </span>
+                <span className={css.postText}>{post.text}</span>
+              </li>
+            ))}
+          </ol>
+          {hidden === 0 ? null : (
+            <button type="button" className={css.linkButton} aria-expanded={showAll} onClick={() => { setShowAll(open => !open) }}>
+              {showAll ? t('attention.showFewer') : t('attention.showAll', { count: hidden })}
+            </button>
+          )}
+        </section>
+      )}
+    </>
+  )
+}
+
+function taskMeta(task: ViewTask, t: T, swarm: boolean): string {
   return [
     t(`taskStatus.${task.status}`),
     task.role === '' ? null : t('task.role', { role: task.role }),
-    task.wave > 1 ? t('task.wave', { count: task.wave }) : null,
-    task.verified === true ? t('task.verified') : task.verified === false ? t('task.unverified') : null,
+    task.wave > 1 ? t(swarm ? 'task.rounds' : 'task.wave', { count: task.wave }) : null,
+    task.verified === true ? t(swarm ? 'task.verifiedSwarm' : 'task.verified') : task.verified === false ? t(swarm ? 'task.unverifiedSwarm' : 'task.unverified') : null,
     task.replaced ? t('task.replaced') : null,
     t('task.files', { count: task.files }),
     t('task.evidence', { count: task.evidenceCount }),
@@ -171,9 +230,11 @@ function Report({ view, t }: { view: HackDevView; t: T }) {
           <p className={css.gateSummary}>{view.plan.summary}</p>
           {view.plan.stack === '' ? null : <span className={css.rowMeta}>{t('stack')}: {view.plan.stack}</span>}
           {view.planFallback ? <span className={css.rowMeta}>{t('planFallback')}</span> : null}
-          {view.waves > 1 ? <span className={css.rowMeta}>{t('waves', { count: view.waves })}</span> : null}
+          {view.swarm === null && view.waves > 1 ? <span className={css.rowMeta}>{t('waves', { count: view.waves })}</span> : null}
+          {view.swarm === null && view.stalled ? <span className={css.rowMeta}>{t('stalled')}</span> : null}
         </section>
       )}
+      {view.swarm === null ? null : <SwarmSection swarm={view.swarm} t={t} />}
       {view.criteria.length === 0 ? null : (
         <section className={css.section}>
           <h4 className={css.sectionTitle}>{t('criteria', { met: view.criteria.filter(c => c.met).length, count: view.criteriaCount })}</h4>
@@ -192,16 +253,16 @@ function Report({ view, t }: { view: HackDevView; t: T }) {
       )}
       {view.tasks.length === 0 ? null : (
         <section className={css.section}>
-          <h4 className={css.sectionTitle}>{t('tasks')}</h4>
+          <h4 className={css.sectionTitle}>{t(view.swarm === null ? 'tasks' : 'workers')}</h4>
           <ul className={css.list} data-testid="hackdev-tasks">
             {view.tasks.map(task => (
               <li key={task.id} className={css.row} data-status={task.status}>
                 <span className={css.rowDot}><StateDot state={taskDot(task.status)} /></span>
                 <span className={css.rowMain}>
                   <span className={css.rowTitle}>
-                    <span className={css.mono}>{task.id}</span> {task.title}
+                    <span className={css.mono}>{view.swarm === null ? task.id : `@${task.id}`}</span> {task.title}
                   </span>
-                  <span className={css.rowMeta}>{taskMeta(task, t)}</span>
+                  <span className={css.rowMeta}>{taskMeta(task, t, view.swarm !== null)}</span>
                 </span>
               </li>
             ))}
@@ -210,7 +271,7 @@ function Report({ view, t }: { view: HackDevView; t: T }) {
       )}
       {view.gates.length === 0 ? null : (
         <section className={css.section}>
-          <h4 className={css.sectionTitle}>{t('gates')}</h4>
+          <h4 className={css.sectionTitle}>{t(view.swarm === null ? 'gates' : 'verifiers')}</h4>
           {view.gates.map(gate => <GateSection key={gate.gate} gate={gate} t={t} />)}
         </section>
       )}
@@ -236,7 +297,7 @@ export const HackDevCard = memo(function HackDevCard(props: HackDevCardProps) {
   const { expanded, toggle } = useDisclosure()
   const isReview = toolName === 'hackdev_review'
   const icon = isReview ? <IconShieldOutlineRegular /> : <IconUsersOutlineRegular />
-  const title = t(isReview ? 'title.review' : 'title.mission')
+  const title = t(isReview ? 'title.review' : toolName === 'hackdev_swarm' ? 'title.swarm' : 'title.mission')
 
   const view = useMemo(() => phase === 'result' && !block.isError ? readHackDevMeta(block.meta) : null, [phase, block])
 

@@ -41,6 +41,12 @@ export interface SubagentActivationSpec {
   readonly signal: AbortSignal
   /** Parent delivery notifies the model; caller delivery only returns the result. Local children always enter the parent catalog. */
   readonly delivery: 'parent' | 'caller'
+  /**
+   * Continue the existing local child `childId` instead of creating one: it is restored from its session with its
+   * whole conversation, and `request.prompt` becomes its next message. Only the request's prompt and output schema
+   * apply; the child keeps its own directory, route and composition. The child must not be running.
+   */
+  readonly resume?: boolean
 }
 
 /** A managed execution; disposal addresses this exact activation, never a later resume. */

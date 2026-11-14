@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "@browserbasehq/stagehand": "4.1.0",
-    "@hackdevcode/dsh-experimental-browser-use-runtime": "workspace:*",
+    "@hackdevcode/dsh-browser-use-runtime": "workspace:*",
     "@hackdevcode/dsh-mcp-client": "workspace:*",
     "@hackdevcode/dsh-util-values": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~",

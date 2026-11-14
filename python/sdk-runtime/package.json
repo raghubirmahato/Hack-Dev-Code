@@ -160,6 +160,7 @@
     "@hackdevcode/dsh-workspace": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~",
     "@hackdevcode/dsh-tool-working-directory": "workspace:*",
-    "@hackdevcode/dsh-working-directory": "workspace:*"
+    "@hackdevcode/dsh-working-directory": "workspace:*",
+    "@hackdevcode/dsh-tool-hackdev": "workspace:*"
   }
 }

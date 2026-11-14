@@ -6,8 +6,6 @@
  * experimental status keeps their names.
  */
 export const EXPERIMENTAL_PACKAGE_NAME_EXCEPTIONS: Readonly<Record<string, string>> = {
-  'packages/experimental/cua': '@hackdevcode/dsh-cua',
-  'packages/experimental/cua-bundle': '@hackdevcode/dsh-cua-bundle',
   'packages/experimental/tool-session-query': '@hackdevcode/dsh-tool-session-query',
   'packages/experimental/session-title-all-prompts-llm': '@hackdevcode/dsh-session-title-all-prompts-llm',
   'packages/experimental/tool-terminal': '@hackdevcode/dsh-tool-terminal',

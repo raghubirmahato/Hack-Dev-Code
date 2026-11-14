@@ -94,6 +94,40 @@ describe('workflow host callback validation', () => {
     }
   })
 
+  it('continues a named conversation instead of starting a fresh child, and keeps names apart', async () => {
+    const { ctx, start } = await setup(async (bindings) => {
+      await bindings.startChild!({ prompt: 'build the parser', session: 'parser' })
+      await bindings.startChild!({ prompt: 'build the CLI', session: 'cli' })
+      await bindings.startChild!({ prompt: 'fix what the verifier found', session: 'parser' })
+      await bindings.startChild!({ prompt: 'unnamed' })
+      return completed
+    })
+    let next = 0
+    const childStart = vi.spyOn(ctx.subagents, 'startActivation').mockImplementation(async (spec) => {
+      next += 1
+      return {
+        childId: spec.childId ?? SessionId(`child-${String(next)}`),
+        result: Promise.resolve({ output: [], stopReason: 'completed' }),
+        dispose: () => Promise.resolve(),
+      } satisfies SubagentActivation
+    })
+    const run = start()
+    try {
+      expect((await run.result).stopReason).toBe('completed')
+      const calls = childStart.mock.calls.map(([spec]) => ({ childId: spec.childId, resume: spec.resume }))
+      expect(calls).toEqual([
+        { childId: undefined, resume: undefined },
+        { childId: undefined, resume: undefined },
+        // The third call continues the first child, the one named parser.
+        { childId: SessionId('child-1'), resume: true },
+        { childId: undefined, resume: undefined },
+      ])
+      expect(childStart.mock.calls[2]![0].request.prompt).toEqual([{ type: 'text', text: 'fix what the verifier found' }])
+    } finally {
+      await run.dispose()
+    }
+  })
+
   it('retains its selected directory for the process and later children when the parent moves', async () => {
     const entered = Promise.withResolvers<undefined>()
     const release = Promise.withResolvers<undefined>()

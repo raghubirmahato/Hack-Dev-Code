@@ -482,8 +482,33 @@ export function WorkflowRunPanel({ node, sessionId, useSessions, useSessionStatu
                 />
               )
             })}
+          {node.data.log === undefined || node.data.log.length === 0 ? null : <RunLog lines={node.data.log} t={t} />}
         </div>
       </RunHeader>
     </section>
+  )
+}
+
+/** Prefix of the lines a swarm logs for each message-board post. */
+const BOARD_LINE = /^\[board #\d+\] /u
+
+/**
+ * The newest lines the run logged. A swarm logs each message-board post, so its board can be followed while it
+ * runs; other runs show their notes.
+ * @param props.lines - the lines, oldest first.
+ * @param props.t - locale seat.
+ * @returns the log section.
+ */
+function RunLog({ lines, t }: { lines: readonly string[]; t: WorkflowRunPanelProps['t'] }): ReactNode {
+  const board = lines.some(line => BOARD_LINE.test(line))
+  return (
+    <details className={css.log} open data-workflow-log>
+      <summary className={css.logTitle}>{t(board ? 'log.board' : 'log.title')}</summary>
+      <ol className={css.logLines} aria-live="polite">
+        {lines.map((line, index) => (
+          <li key={index} className={css.logLine}>{line.replace(BOARD_LINE, '')}</li>
+        ))}
+      </ol>
+    </details>
   )
 }

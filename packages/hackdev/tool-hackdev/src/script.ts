@@ -19,7 +19,7 @@
  */
 
 /** Shared helpers prepended to every Hack Dev Code script. No backticks or template literals: this is guest source. */
-const LIBRARY = String.raw`
+export const LIBRARY = String.raw`
 const SEVERITIES = ['critical', 'high', 'medium', 'low']
 const NOTE_KINDS = ['decision', 'contract', 'fact', 'risk', 'warning', 'handoff', 'question']
 // Contracts and decisions are pinned: every agent must see them even when the board is large.
@@ -29,13 +29,24 @@ const memory = { entries: [], seen: {} }
 const projectMap = { text: '' }
 
 function clip(text, max) {
-  const s = typeof text === 'string' ? text : JSON.stringify(text)
+  // A field a model left out is empty text, not a crash: JSON.stringify(undefined) has no length.
+  const s = typeof text === 'string' ? text : text === undefined || text === null ? '' : JSON.stringify(text)
   return s.length <= max ? s : s.slice(0, max) + ' …[truncated]'
 }
 
 function isText(v) { return typeof v === 'string' && v.trim().length > 0 }
 function textList(v) { return Array.isArray(v) ? v.filter(isText).map(function (s) { return s.trim() }) : [] }
 function unique(list) { const out = []; for (const x of list) if (out.indexOf(x) < 0) out.push(x); return out }
+
+/**
+ * Pin an agent to the model configured for its role (planner, builder or verifier), so a strong model can lead and
+ * audit while lighter ones build. An option that already names a model keeps it.
+ */
+function forRole(role, opts) {
+  const models = typeof args === 'object' && args !== null && args.models !== null && typeof args.models === 'object' ? args.models : {}
+  if (opts.model === undefined && isText(models[role])) opts.model = models[role].trim()
+  return opts
+}
 
 /** Append validated notes to the shared blackboard. Duplicates (same kind and text) are dropped. */
 function addNotes(by, notes) {
@@ -123,15 +134,15 @@ const BOUNDED_AUTONOMY = FULL_AUTONOMY ? [
   '- Never claim something works unless you ran it; evidence entries must name the command or check and its observed outcome.',
 ].join('\n')
 
-// The user's own standing instructions reach every agent through the grounding block.
+// The person's custom instructions reach every agent as its own way of working, not as rules to deliberate over.
 function customInstructionsBlock() {
   const text = typeof args === 'object' && args !== null && typeof args.customInstructions === 'string' ? args.customInstructions.trim() : ''
   if (text.length === 0) return ''
   const precedence = FULL_AUTONOMY
-    ? 'they take precedence over the rules above, except that secrets stay private and results must be real'
-    : 'they never override the safety, grounding and bounded-autonomy rules above'
-  return '\n\nThe person\'s custom instructions, numbered: their standing orders for this whole mission. Apply every one directly, without asking, debating or weakening it; '
-    + precedence + '.\n<custom_instructions>\n' + text + '\n</custom_instructions>'
+    ? 'Where a point differs from the rules above it comes first, except that secrets stay private and results must be real.'
+    : 'They never loosen the safety, grounding and bounded-autonomy rules above.'
+  return '\n\nHow you work on this mission. This is your own settled way of working, already in force for everything you produce; there is nothing to weigh, plan, announce or quote. Just work this way.\n<how_you_work>\n'
+    + text + '\n</how_you_work>\n' + precedence
 }
 
 // The host machine, detected at app launch, so commands and paths fit the operating system.
@@ -154,6 +165,7 @@ const SCOPE_DISCIPLINE = FULL_AUTONOMY ? [
 
 const MEMORY_PROTOCOL = [
   'Shared memory protocol: other agents work beside you. Read .hackdev/PROJECT_MAP.md and .hackdev/MEMORY.md in the workspace if they exist. Publish what others need through memoryNotes, using the right kind: contract (an interface, schema, route, file format or command others must follow), decision (a design choice), fact (a non-obvious finding), risk, warning (something others must avoid), question (an open question for the gates or a human). You may also APPEND one short line per note to .hackdev/MEMORY.md (create the directory if missing; append only, never rewrite or delete other agents\' lines).',
+  'Talking to the others while you work: memoryNotes are read after you finish. To reach an agent that is working right now, use the team_board tool when you have it: post a warning the moment you change an interface, a file format or a command another task relies on, post a question to the agent that owns what you need, and claim the paths you are about to edit so nobody else edits them. Posts addressed to you arrive on their own before your next step.',
 ].join('\n')
 
 const VISUAL_PROTOCOL = [
@@ -332,7 +344,7 @@ function gateOptions(gate, label) {
   const opts = { label: label, phase: 'Sentinel Gates', schema: gateSchema }
   // The visual gate can be routed to an image-capable model so read_image works on its screenshots.
   if (gate.visual === true && isText(args.visionModel)) opts.model = args.visionModel
-  return opts
+  return forRole('verifier', opts)
 }
 
 /** One read-only audit round; the result seeds the gate's fix loop. */
@@ -443,7 +455,76 @@ function gateSummaries(gates) {
   })
 }
 
-async function chronicle(report) {
+// Phase the worktree and merge managers report under; the swarm script renames it.
+let BUILD_PHASE = 'Forge'
+
+const worktreeSchema = {
+  type: 'object',
+  properties: {
+    created: { type: 'boolean' },
+    path: { type: 'string' },
+    reason: { type: 'string' },
+  },
+  required: ['created', 'path', 'reason'],
+}
+
+const mergeSchema = {
+  type: 'object',
+  properties: {
+    merged: { type: 'boolean' },
+    conflicts: { type: 'array', items: { type: 'string' } },
+    summary: { type: 'string' },
+  },
+  required: ['merged', 'conflicts', 'summary'],
+}
+
+const mergeLimit = makeLimiter(1)
+
+/** Give one task its own git worktree holding the workspace as it stands now, uncommitted work included. */
+async function isolate(task, wave) {
+  const path = '.hackdev/worktrees/w' + wave + '-' + task.id
+  const steps = isText(args.worktreeHelper)
+    ? [
+      'Run exactly this one command in the workspace root: node "' + args.worktreeHelper + '" add ' + path,
+      'It prints one line of JSON with created, path and, when it failed, reason. Report exactly those values; do not run git yourself and do not retry with other commands.',
+    ]
+    : [
+      '1. If the workspace is not a git repository, or it has no commit yet, create nothing and return created=false with the reason.',
+      '2. Otherwise run: git worktree add --detach ' + path + ' HEAD',
+      '3. Bring the uncommitted state across so the builder starts from exactly what the main workspace holds now: apply the tracked changes (git diff HEAD --binary, applied inside the worktree with git apply) and copy every untracked, not ignored file (git ls-files --others --exclude-standard), except anything under .hackdev/.',
+      '4. Confirm with git -C ' + path + ' status that the worktree matches, then return created=true and path=' + path + '.',
+      'If any step fails, remove the partial worktree (git worktree remove --force ' + path + ') and return created=false with the reason.',
+    ]
+  const raw = await agent([
+    'You are the WORKSPACE ISOLATION MANAGER. Create an isolated git worktree for builder task ' + task.id + ' at ' + path + ' (relative to the workspace root). Do not change any source file in the main workspace and do not commit there.',
+  ].concat(steps, [BOUNDED_AUTONOMY, 'Your part ends with your report. Do not carry out the task: do not create or edit any project file; the builder does that in the worktree.']).join('\n\n'), forRole('builder', { label: 'Worktree: ' + task.id, phase: BUILD_PHASE, schema: worktreeSchema }))
+  if (raw === null || typeof raw !== 'object' || raw.created !== true) {
+    log('Task ' + task.id + ' shares the main workspace: ' + (raw !== null && typeof raw === 'object' && isText(raw.reason) ? raw.reason : 'isolation failed'))
+    return null
+  }
+  // The path was chosen here, so a report that leaves it out or garbles it still names this worktree.
+  return path
+}
+
+/** Merge one worktree's changes into the main workspace, one merge at a time, and remove the worktree. */
+async function mergeBack(task, tree) {
+  const raw = await mergeLimit(function () {
+    return agent([
+      'You are the MERGE MANAGER. Builder task ' + task.id + ' worked in the isolated git worktree ' + tree + '. Bring every change it made into the main workspace, then remove the worktree. Do not commit in the main workspace.',
+      '1. In the worktree run git add -A, then write its full change set against the worktree base: git -C ' + tree + ' diff --cached --binary HEAD.',
+      '2. Keep only what the builder changed: the worktree started from the main workspace including its uncommitted state, so leave out anything the main workspace already contains.',
+      '3. Apply the result in the main workspace with git apply --3way, or by editing files when a hunk does not apply. Resolve every conflict by keeping both intents and never discard work of another task. List each file whose conflict you resolved in conflicts.',
+      '4. Verify the merged files exist and the project still builds or its quick checks pass, then run git worktree remove --force ' + tree + '.',
+      'Return merged=true only when every change reached the main workspace.',
+      BOUNDED_AUTONOMY,
+      GROUNDING,
+    ].join('\n\n'), forRole('builder', { label: 'Merge: ' + task.id, phase: BUILD_PHASE, schema: mergeSchema }))
+  })
+  if (raw === null || typeof raw !== 'object') return { merged: false, conflicts: [], summary: 'the merge manager returned no report' }
+  return { merged: raw.merged === true, conflicts: textList(raw.conflicts).slice(0, 20), summary: clip(isText(raw.summary) ? raw.summary : '', 600) }
+}
+
+async function chronicle(report, extra) {
   phase('Chronicle')
   const prompt = [
     'You are the CHRONICLER. Persist the run record to the workspace. Do not change any source code.',
@@ -452,15 +533,16 @@ async function chronicle(report) {
     '3. Update .hackdev/PROGRESS.md: the progress ledger a rerun resumes from. List every task with status, every acceptance criterion with met/unmet, and the remaining work as concrete next tasks.',
     'Run data (JSON):\n' + clip(JSON.stringify(report), 24000),
     'Shared memory entries (JSON):\n' + clip(JSON.stringify(memory.entries), 8000),
+    isText(extra) ? extra : '',
     'Reply with the single line: recorded.',
-  ].join('\n\n')
+  ].filter(function (s) { return s.length > 0 }).join('\n\n')
   const out = await agent(prompt, { label: 'Chronicler', phase: 'Chronicle' })
   return out !== null
 }
 `
 
-/** Full pipeline: council, waves of forge + fact-check + gates + integrator, chronicle. */
-export const HACKDEV_SCRIPT = LIBRARY + String.raw`
+/** Task vocabulary shared by the mission and swarm scripts: roles, the task schema, validation and ownership ordering. */
+export const PLANNING = String.raw`
 
 const PLAN_TASK_ID = /^[a-z0-9][a-z0-9-]{0,39}$/
 const ROLES = ['frontend', 'backend', 'fullstack', 'data', 'api', 'infra', 'test', 'docs', 'design', 'security', 'other']
@@ -491,8 +573,50 @@ const taskSchema = {
     ownedPaths: { type: 'array', items: { type: 'string' } },
     acceptance: { type: 'string' },
   },
-  required: ['id', 'title', 'role', 'description', 'dependsOn', 'ownedPaths', 'acceptance'],
+  // Only the title is essential: validateTasks derives a missing id, description or acceptance from it, and the
+  // lists are filled in as empty, so a model that leaves one out is not rejected for it.
+  required: ['title', 'dependsOn', 'ownedPaths'],
   additionalProperties: false,
+}
+
+/** A lowercase kebab-case task id made from a title. */
+function kebab(text) {
+  const id = String(text).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '')
+  return id.length === 0 ? 'task' : id
+}
+
+/** Fill what a task can do without: an id from its title, its title as description, a default acceptance. */
+function completeTasks(tasks) {
+  const renamed = {}
+  const used = {}
+  for (const t of tasks) {
+    if (t === null || typeof t !== 'object' || !isText(t.title)) continue
+    const original = t.id
+    if (typeof t.id !== 'string' || !PLAN_TASK_ID.test(t.id)) {
+      let id = kebab(isText(t.id) ? t.id : t.title)
+      for (let n = 2; used[id]; n += 1) id = kebab(t.title).slice(0, 36) + '-' + n
+      t.id = id
+      if (isText(original)) renamed[original] = id
+    }
+    used[t.id] = true
+    if (!isText(t.description)) t.description = t.title
+    if (!isText(t.acceptance)) t.acceptance = 'What the description asks for works, checked by running it.'
+  }
+  // A dependency written as another task's title points at that task.
+  const byTitle = {}
+  for (const t of tasks) if (t !== null && typeof t === 'object' && isText(t.title)) byTitle[kebab(t.title)] = t.id
+  for (const t of tasks) {
+    if (t !== null && typeof t === 'object' && Array.isArray(t.dependsOn)) {
+      t.dependsOn = t.dependsOn
+        // "-", "none", "n/a" or an empty entry is how weaker models write "no dependencies".
+        .filter(function (d) { return typeof d === 'string' && !/^\s*(?:-+|none|n\/?a|null|nil)?\s*$/i.test(d) })
+        .map(function (d) {
+          if (renamed[d] !== undefined) return renamed[d]
+          if (used[d]) return d
+          return byTitle[kebab(d)] === undefined ? d : byTitle[kebab(d)]
+        })
+    }
+  }
 }
 
 /** Validate a task list: ids, fields, dependencies inside the list, acyclic graph, and size cap. */
@@ -501,6 +625,7 @@ function validateTasks(tasks, cap, reservedIds) {
   if (!Array.isArray(tasks)) return ['plan has no tasks array']
   if (tasks.length < 1) errors.push('plan needs at least one task')
   if (tasks.length > cap) errors.push('plan has ' + tasks.length + ' tasks; the limit is ' + cap + ' — merge related tasks')
+  completeTasks(tasks)
   const ids = {}
   for (const t of tasks) {
     if (t === null || typeof t !== 'object') { errors.push('a task is not an object'); continue }
@@ -535,6 +660,61 @@ function validateTasks(tasks, cap, reservedIds) {
   return errors
 }
 
+function ownedKey(path) {
+  let p = String(path).trim().split('\\').join('/').toLowerCase()
+  const star = p.indexOf('*')
+  if (star >= 0) p = p.slice(0, star)
+  while (p.indexOf('./') === 0) p = p.slice(2)
+  while (p.length > 0 && p.charAt(p.length - 1) === '/') p = p.slice(0, -1)
+  return p
+}
+
+function ownershipOverlaps(a, b) {
+  for (const x of a.ownedPaths) {
+    const p = ownedKey(x)
+    if (p === '') continue
+    for (const y of b.ownedPaths) {
+      const q = ownedKey(y)
+      if (q === '') continue
+      if (p === q || p.indexOf(q + '/') === 0 || q.indexOf(p + '/') === 0) return true
+    }
+  }
+  return false
+}
+
+/**
+ * Two tasks that may edit the same files must not run side by side. When neither already waits for the other, the
+ * later one is made to depend on the earlier one, which can never close a cycle. Returns the pairs it ordered.
+ */
+function serializeOverlaps(tasks) {
+  const byId = {}
+  for (const t of tasks) byId[t.id] = t
+  function waitsFor(from, to, seen) {
+    if (from === to) return true
+    if (seen[from]) return false
+    seen[from] = true
+    const t = byId[from]
+    if (t === undefined) return false
+    for (const d of t.dependsOn) if (waitsFor(d, to, seen)) return true
+    return false
+  }
+  const ordered = []
+  for (let i = 0; i < tasks.length; i += 1) {
+    for (let j = i + 1; j < tasks.length; j += 1) {
+      const a = tasks[i]
+      const b = tasks[j]
+      if (!ownershipOverlaps(a, b) || waitsFor(a.id, b.id, {}) || waitsFor(b.id, a.id, {})) continue
+      b.dependsOn.push(a.id)
+      ordered.push(b.id + ' after ' + a.id)
+    }
+  }
+  return ordered
+}
+`
+
+/** Full pipeline: council, waves of forge + fact-check + gates + integrator, chronicle. */
+export const HACKDEV_SCRIPT = LIBRARY + PLANNING + String.raw`
+
 function validatePlan(plan) {
   if (plan === null || typeof plan !== 'object' || !Array.isArray(plan.tasks)) return ['plan has no tasks array']
   return validateTasks(plan.tasks, args.maxTasks, {})
@@ -551,7 +731,8 @@ const planSchema = {
     contracts: { type: 'array', items: { type: 'string' } },
     tasks: { type: 'array', items: taskSchema },
   },
-  required: ['summary', 'complexity', 'requirements', 'acceptanceCriteria', 'stack', 'contracts', 'tasks'],
+  // Summary, complexity and stack have defaults after planning; the lists are filled in as empty when left out.
+  required: ['requirements', 'acceptanceCriteria', 'contracts', 'tasks'],
   additionalProperties: false,
 }
 
@@ -568,7 +749,7 @@ const projectMapSchema = {
     risks: { type: 'array', items: { type: 'string' } },
     priorProgress: { type: 'string' },
   },
-  required: ['summary', 'stack', 'hasUi', 'entryPoints', 'commands', 'conventions', 'keyFiles', 'risks', 'priorProgress'],
+  required: ['summary', 'hasUi', 'entryPoints', 'commands', 'conventions', 'keyFiles', 'risks'],
   additionalProperties: false,
 }
 
@@ -662,6 +843,8 @@ const integratorSchema = {
 }
 
 const missionText = clip(args.mission, 6000)
+// Last in each council prompt, where small models weigh text most: they otherwise start building the mission.
+const COUNCIL_LIMIT = 'Your part ends with your report. Do not carry out the mission: do not create or edit the project\'s files (notes under .hackdev are not project files) and do not start another mission; the builders do that after the council.'
 
 // ---------------------------------------------------------------- Council
 phase("Shogun's Council")
@@ -669,19 +852,21 @@ const advisorOutputs = await parallel([
   function () {
     return agent([
       'You are the REQUIREMENTS ANALYST on the planning council. Read-only: do not modify files.',
-      'Mission:\n' + missionText,
+      'The mission, which builders carry out after the council (you only analyse it):\n' + missionText,
       'Produce: (1) the explicit requirements, (2) implicit requirements a user would expect (error handling, validation, responsive UI, accessibility, security, tests, docs), (3) measurable acceptance criteria, each checkable by running something, (4) ambiguities with the assumption you chose for each, (5) an honest complexity estimate (trivial, small, medium or large) with the main components. Be concise and concrete.',
-    ].join('\n\n'), { label: 'Council: requirements analyst', phase: "Shogun's Council" })
+      COUNCIL_LIMIT,
+    ].join('\n\n'), forRole('planner', { label: 'Council: requirements analyst', phase: "Shogun's Council" }))
   },
   function () {
     return agent([
       'You are the CODEBASE SCOUT on the planning council. Do not modify source files; the only file you may write is .hackdev/PROJECT_MAP.md.',
-      'Mission:\n' + missionText,
+      'The mission, which builders carry out after the council (you only map the project for them):\n' + missionText,
       'Inspect the workspace and build the PROJECT MAP every other agent will receive: what the project is, stack and versions actually installed, whether it has a UI, entry points, the exact install/build/test/run/lint commands (verified to exist, for example in package.json scripts), conventions (layout, naming, style, test framework), the key files a newcomer must read, and risks.',
       'Read .hackdev/MEMORY.md (long-term memory from earlier runs) and .hackdev/PROGRESS.md (the ledger of an earlier, possibly unfinished run) if they exist, and summarize in priorProgress what was already completed and what remains, so the planner resumes instead of restarting. Write priorProgress as "none" when there is no ledger.',
       'If the workspace is empty, say so and recommend a lean, mainstream stack with a one-line justification.',
       'Write the map as markdown to .hackdev/PROJECT_MAP.md (create the directory if missing), then return it as the structured report. ' + GROUNDING,
-    ].join('\n\n'), { label: 'Council: codebase scout', phase: "Shogun's Council", schema: projectMapSchema })
+      COUNCIL_LIMIT,
+    ].join('\n\n'), forRole('planner', { label: 'Council: codebase scout', phase: "Shogun's Council", schema: projectMapSchema }))
   },
 ])
 const analysis = advisorOutputs[0] === null ? '(analyst unavailable)' : clip(advisorOutputs[0], 5000)
@@ -708,27 +893,45 @@ if (scout !== null && typeof scout === 'object' && isText(scout.summary)) {
 
 let plan = null
 let planErrors = []
-for (let attempt = 1; attempt <= 2 && plan === null; attempt += 1) {
-  const raw = await agent([
+// A rejected plan is fixed by the planner that wrote it, in the same conversation, from the reasons alone; a planner
+// that failed outright, or one that cannot be continued, is replaced by a fresh one with the full brief.
+let plannerSession = 'planner:1'
+let plannerCanContinue = false
+for (let attempt = 1; attempt <= 3 && plan === null; attempt += 1) {
+  const plannerOptions = forRole('planner', { label: 'Council: planner (attempt ' + attempt + ')', phase: "Shogun's Council", schema: planSchema, session: plannerSession })
+  let raw
+  if (plannerCanContinue) {
+    try {
+      raw = await agent('Your plan was rejected for these reasons; fix them and report the corrected plan with structured_output:\n- ' + planErrors.join('\n- ') + '\n\n' + COUNCIL_LIMIT, plannerOptions)
+    } catch (error) {
+      plannerCanContinue = false
+    }
+  }
+  if (!plannerCanContinue) {
+    plannerSession = 'planner:' + attempt
+    plannerOptions.session = plannerSession
+    raw = await agent([
     'You are the PLANNER, the head of the planning council and the lead of the build team. Read-only: do not modify files.',
-    'Mission:\n' + missionText,
+    'The mission, which builders carry out from your plan (you only plan it):\n' + missionText,
     'Requirements analysis:\n' + analysis,
     'Project map from the scout:\n' + recon,
     'Assemble the build TEAM for this mission: break it into at most ' + args.maxTasks + ' independently verifiable tasks that specialist builder agents execute IN PARALLEL (up to ' + args.maxParallel + ' at a time). Rules:',
     '- Size the team to the mission: trivial change 1-2 tasks; small app 3-6; medium product 6-14; large system up to the limit. Prefer more, smaller tasks over few large ones whenever they can run in parallel; one task should be one specialist\'s focused sitting (roughly a few hundred lines of change at most).',
     '- Give each task a role (frontend, backend, fullstack, data, api, infra, test, docs, design, security, other) so the right specialist builds it.',
     '- Give each task a lowercase kebab-case id, a precise description a builder can execute without asking questions, and acceptance criteria that can be checked by running something.',
-    '- Give each task disjoint ownedPaths (files or directories only that task may edit) so parallel builders never collide. Shared files (package manifests, route tables, config) belong to exactly one early task whose output others depend on.',
+    '- Give each task disjoint ownedPaths (files or directories only that task may edit) so parallel builders never collide. Shared files (package manifests, route tables, config) belong to exactly one early task whose output others depend on. Tasks whose ownedPaths overlap are forced to run one after the other, which wastes the team.',
     '- Use dependsOn only for real ordering needs (for example a data model before the API that uses it). Prefer wide, shallow graphs: maximise parallelism. The graph must be acyclic.',
     '- Include tasks for tests and for README/documentation (architecture, setup, usage, limitations). Do not include review or security-audit tasks: dedicated gate agents run after building.',
     '- Put every shared interface (API routes, data shapes, file formats, component props, CLI flags) in contracts, one per entry, so every builder follows the same conventions.',
     '- If the project map shows prior progress, plan ONLY the remaining work and do not redo completed tasks.',
     planErrors.length === 0 ? '' : 'Your previous plan was rejected for these reasons; fix them:\n- ' + planErrors.join('\n- '),
-  ].filter(function (s) { return s.length > 0 }).join('\n\n'), { label: 'Council: planner (attempt ' + attempt + ')', phase: "Shogun's Council", schema: planSchema })
-  if (raw === null) { planErrors = ['the planner agent failed']; continue }
+    COUNCIL_LIMIT,
+  ].filter(function (s) { return s.length > 0 }).join('\n\n'), plannerOptions)
+  }
+  if (raw === null) { planErrors = ['the planner agent failed']; plannerCanContinue = false; continue }
   const errors = validatePlan(raw)
   if (errors.length === 0) plan = raw
-  else planErrors = errors
+  else { planErrors = errors; plannerCanContinue = true }
 }
 let planFallback = false
 if (plan === null) {
@@ -739,8 +942,13 @@ if (plan === null) {
     tasks: [{ id: 'mission', title: 'Complete the mission', role: 'fullstack', description: missionText, dependsOn: [], ownedPaths: [], acceptance: 'The mission requirements are met and verified.' }],
   }
 }
+const orderedOverlaps = serializeOverlaps(plan.tasks)
+if (orderedOverlaps.length > 0) log('Tasks that own the same paths now run in order: ' + orderedOverlaps.join('; '))
 if (!Array.isArray(plan.contracts)) plan.contracts = []
 if (!Array.isArray(plan.acceptanceCriteria)) plan.acceptanceCriteria = []
+if (!Array.isArray(plan.requirements)) plan.requirements = []
+if (!isText(plan.summary)) plan.summary = clip(missionText, 600)
+if (!isText(plan.stack)) plan.stack = 'as found in the project'
 addNotes('planner', [{ kind: 'decision', text: 'Plan (' + (isText(plan.complexity) ? plan.complexity : 'unsized') + ', ' + plan.tasks.length + ' tasks): ' + plan.summary + ' Stack: ' + plan.stack }])
 addNotes('planner', textList(plan.contracts).slice(0, 20).map(function (c) { return { kind: 'contract', text: c } }))
 
@@ -792,6 +1000,7 @@ function builderPrompt(task, tasks, depResults, extra) {
     depResults.length === 0 ? '' : 'Handoff from the tasks you depend on (build on these exactly):\n' + depResults.map(function (r) { return '- ' + r.id + ' [' + r.status + ']: ' + clip(r.summary, 400) + (r.handoff === '' ? '' : '\n  handoff: ' + clip(r.handoff, 800)) + '\n  files: ' + r.filesChanged.slice(0, 15).join(', ') }).join('\n'),
     'Shared blackboard (contracts, decisions, warnings and facts from other agents):\n' + memoryText(),
     'Method: inspect the workspace first, implement with production-quality code (input validation, error handling, no placeholders or TODO stubs), then VERIFY what you built by running it or its tests. Write tests for your code. Do not run the full-project quality review: dedicated gate agents do that later.',
+    'Keep what already works: add to existing files and tests instead of rewriting them, never delete or weaken an existing test, write new tests in the style and framework the project already uses (when it has none, use what the language ships with, such as node:assert for JavaScript), and do not add a dependency unless you install it and run it.',
     BOUNDED_AUTONOMY,
     GROUNDING,
     MEMORY_PROTOCOL,
@@ -807,7 +1016,7 @@ async function buildOnce(task, tasks, depResults, extra, label, wave) {
   const tree = worktreeOf[task.id]
   const where = tree === undefined ? '' : 'You work in your own isolated git worktree at ' + tree + ' (it is your current directory and holds the whole project). Edit and test only there; your changes are merged back into the main workspace automatically when you finish.'
   const prompt = builderPrompt(task, tasks, depResults, [where, extra].filter(function (s) { return s.length > 0 }).join('\n\n'))
-  const options = { label: label, phase: 'Forge', schema: workerSchema }
+  const options = forRole('builder', { label: label, phase: 'Forge', schema: workerSchema })
   if (tree !== undefined) options.cwd = tree
   const raw = await limit(function () { return agent(prompt, options) })
   if (raw === null || typeof raw !== 'object') return null
@@ -827,7 +1036,8 @@ async function splitTask(task, previous, failure) {
     'What happened: ' + failure + (previous === null ? '' : '\nLast report: ' + clip(previous.summary, 800)),
     'Split the REMAINING work into 2-' + SUBTASK_CAP + ' smaller subtasks that run in order, each with a lowercase kebab-case id, a role, a precise description, ownedPaths inside the parent\'s owned paths, and checkable acceptance. Use dependsOn only between these subtasks. Do not repeat work that is already done.',
     GROUNDING,
-  ].join('\n\n'), { label: 'Splitter: ' + task.id, phase: 'Forge', schema: splitSchema })
+    'Your part ends with your plan. Do not carry out the task yourself: builders run your subtasks.',
+  ].join('\n\n'), forRole('planner', { label: 'Splitter: ' + task.id, phase: 'Forge', schema: splitSchema }))
   if (raw === null || typeof raw !== 'object' || !Array.isArray(raw.subtasks)) return null
   const subtasks = raw.subtasks.slice(0, SUBTASK_CAP).filter(function (s) { return s !== null && typeof s === 'object' })
   if (subtasks.length < 2) return null
@@ -869,65 +1079,6 @@ async function runSubtasks(task, subtasks, depResults, wave) {
     followUps: unique(done.reduce(function (acc, r) { return acc.concat(r.followUps) }, [])).slice(0, 10),
     needsHuman: unique(done.reduce(function (acc, r) { return acc.concat(r.needsHuman) }, [])).slice(0, 10),
   }
-}
-
-const worktreeSchema = {
-  type: 'object',
-  properties: {
-    created: { type: 'boolean' },
-    path: { type: 'string' },
-    reason: { type: 'string' },
-  },
-  required: ['created', 'path', 'reason'],
-}
-
-const mergeSchema = {
-  type: 'object',
-  properties: {
-    merged: { type: 'boolean' },
-    conflicts: { type: 'array', items: { type: 'string' } },
-    summary: { type: 'string' },
-  },
-  required: ['merged', 'conflicts', 'summary'],
-}
-
-const mergeLimit = makeLimiter(1)
-
-/** Give one task its own git worktree holding the workspace as it stands now, uncommitted work included. */
-async function isolate(task, wave) {
-  const path = '.hackdev/worktrees/w' + wave + '-' + task.id
-  const raw = await agent([
-    'You are the WORKSPACE ISOLATION MANAGER. Create an isolated git worktree for builder task ' + task.id + ' at ' + path + ' (relative to the workspace root). Do not change any source file in the main workspace and do not commit there.',
-    '1. If the workspace is not a git repository, or it has no commit yet, create nothing and return created=false with the reason.',
-    '2. Otherwise run: git worktree add --detach ' + path + ' HEAD',
-    '3. Bring the uncommitted state across so the builder starts from exactly what the main workspace holds now: apply the tracked changes (git diff HEAD --binary, applied inside the worktree with git apply) and copy every untracked, not ignored file (git ls-files --others --exclude-standard), except anything under .hackdev/.',
-    '4. Confirm with git -C ' + path + ' status that the worktree matches, then return created=true and path=' + path + '.',
-    'If any step fails, remove the partial worktree (git worktree remove --force ' + path + ') and return created=false with the reason.',
-    BOUNDED_AUTONOMY,
-  ].join('\n\n'), { label: 'Worktree: ' + task.id, phase: 'Forge', schema: worktreeSchema })
-  if (raw === null || typeof raw !== 'object' || raw.created !== true || !isText(raw.path)) {
-    log('Task ' + task.id + ' shares the main workspace: ' + (raw !== null && typeof raw === 'object' && isText(raw.reason) ? raw.reason : 'isolation failed'))
-    return null
-  }
-  return raw.path.trim()
-}
-
-/** Merge one worktree's changes into the main workspace, one merge at a time, and remove the worktree. */
-async function mergeBack(task, tree) {
-  const raw = await mergeLimit(function () {
-    return agent([
-      'You are the MERGE MANAGER. Builder task ' + task.id + ' worked in the isolated git worktree ' + tree + '. Bring every change it made into the main workspace, then remove the worktree. Do not commit in the main workspace.',
-      '1. In the worktree run git add -A, then write its full change set against the worktree base: git -C ' + tree + ' diff --cached --binary HEAD.',
-      '2. Keep only what the builder changed: the worktree started from the main workspace including its uncommitted state, so leave out anything the main workspace already contains.',
-      '3. Apply the result in the main workspace with git apply --3way, or by editing files when a hunk does not apply. Resolve every conflict by keeping both intents and never discard work of another task. List each file whose conflict you resolved in conflicts.',
-      '4. Verify the merged files exist and the project still builds or its quick checks pass, then run git worktree remove --force ' + tree + '.',
-      'Return merged=true only when every change reached the main workspace.',
-      BOUNDED_AUTONOMY,
-      GROUNDING,
-    ].join('\n\n'), { label: 'Merge: ' + task.id, phase: 'Forge', schema: mergeSchema })
-  })
-  if (raw === null || typeof raw !== 'object') return { merged: false, conflicts: [], summary: 'the merge manager returned no report' }
-  return { merged: raw.merged === true, conflicts: textList(raw.conflicts).slice(0, 20), summary: clip(isText(raw.summary) ? raw.summary : '', 600) }
 }
 
 async function runTask(task, tasks, promises, wave) {
@@ -985,7 +1136,7 @@ async function factCheck(results, wave) {
     'For every task: (1) check that each listed file exists (list or stat it) and report the missing ones; (2) re-run the cheapest decisive evidence command(s) (tests, build, a smoke run) — at most ' + factCheckLimit() + ' commands in total across all tasks — and set evidenceConfirmed=false when a claimed result does not reproduce or the evidence is not a real command and outcome. Put the commands you ran in commandsRun.',
     'Claims (JSON):\n' + clip(JSON.stringify(claims.map(function (r) { return { id: r.id, status: r.status, filesChanged: r.filesChanged.slice(0, 30), evidence: r.evidence.slice(0, 8) } })), 12000),
     GROUNDING,
-  ].join('\n\n'), { label: 'Fact-checker (wave ' + wave + ')', phase: 'Fact-check', schema: factCheckSchema })
+  ].join('\n\n'), forRole('verifier', { label: 'Fact-checker (wave ' + wave + ')', phase: 'Fact-check', schema: factCheckSchema }))
   if (raw === null || typeof raw !== 'object' || !Array.isArray(raw.tasks)) { log('Fact-checker unavailable; claims stay unverified'); return }
   for (const r of claims) {
     const verdict = raw.tasks.find(function (t) { return t !== null && typeof t === 'object' && t.id === r.id })
@@ -1026,7 +1177,7 @@ async function integrate(gates, wave, isLastWave) {
       ? 'This is the last allowed wave: return followUpTasks as an empty list and describe remaining work in summary.'
       : 'If anything is unmet or unfinished (' + unfinished.length + ' unfinished tasks), propose at most ' + Math.min(args.maxTasks, FOLLOW_UP_CAP) + ' targeted followUpTasks for the next wave: new lowercase kebab-case ids, a role, precise description, disjoint ownedPaths, dependsOn only among the follow-ups, checkable acceptance, and in replaces the ids of earlier unfinished tasks each follow-up completes. Return an empty list when every criterion is met.',
     GROUNDING,
-  ].join('\n\n'), { label: 'Integrator (wave ' + wave + ')', phase: 'Integrator', schema: integratorSchema })
+  ].join('\n\n'), forRole('planner', { label: 'Integrator (wave ' + wave + ')', phase: 'Integrator', schema: integratorSchema }))
   if (raw === null || typeof raw !== 'object' || !Array.isArray(raw.criteria)) return null
   const criteria = raw.criteria
     .filter(function (c) { return c !== null && typeof c === 'object' && isText(c.criterion) })
@@ -1048,16 +1199,26 @@ let wave = 1
 let gates = []
 let criteria = []
 let integration = null
+let remainingBefore = Infinity
+let stalled = false
 for (;;) {
   for (const t of waveTasks) allTasks.push(t)
   const results = await runForge(waveTasks, wave)
   await factCheck(results, wave)
   for (const r of results) { allResults.push(r); resultById[r.id] = r }
-  gates = await runGates(gateBrief(results))
+  // A wave that finished nothing and changed no file leaves the gates nothing new to review.
+  const produced = results.some(function (r) { return r.status === 'done' || r.filesChanged.length > 0 })
+  if (produced || gates.length === 0) gates = await runGates(gateBrief(results))
+  else log('Wave ' + wave + ' changed nothing; the gates keep their earlier verdicts')
   const isLastWave = wave >= args.maxWaves
   integration = await integrate(gates, wave, isLastWave)
   if (integration !== null) criteria = integration.criteria
   if (integration === null || integration.followUps.length === 0) break
+  // A follow-up wave that left as much undone as the wave before it is not converging: stop instead of repeating it.
+  const remaining = criteria.filter(function (c) { return !c.met }).length
+    + allResults.filter(function (r) { return r.status !== 'done' && r.replaced !== true }).length
+  if (wave > 1 && remaining >= remainingBefore) { log('Wave ' + wave + ' made no progress; stopping the follow-up waves'); stalled = true; break }
+  remainingBefore = remaining
   // The next wave: mark the unfinished tasks the follow-ups complete as replaced.
   for (const f of integration.followUps) {
     for (const id of textList(f.replaces)) if (resultById[id] !== undefined) resultById[id].replaced = true
@@ -1080,6 +1241,7 @@ const report = {
   planFallback: planFallback,
   plan: { summary: plan.summary, stack: plan.stack, requirements: plan.requirements, acceptanceCriteria: plan.acceptanceCriteria, complexity: isText(plan.complexity) ? plan.complexity : 'unsized' },
   waves: wave,
+  stalled: stalled,
   tasks: allResults.map(function (r) {
     const out = { id: r.id, title: r.title, role: r.role, wave: r.wave, status: r.status, summary: r.summary, filesChanged: r.filesChanged, evidence: r.evidence, verified: r.verified, followUps: r.followUps, needsHuman: r.needsHuman }
     if (r.replaced === true) out.replaced = true
@@ -1130,6 +1292,7 @@ export const HACKDEV_META = {
   ],
 }
 
+/** Meta identity block of the gate-only review script. */
 export const HACKDEV_REVIEW_META = {
   name: 'hackdev-review',
   description: 'Run the three Sentinel Gates (verifier, quality/UX, security) on the current workspace.',

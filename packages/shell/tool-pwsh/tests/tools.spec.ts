@@ -428,10 +428,12 @@ describe('registration', () => {
 })
 
 describe('argument validation', () => {
-  it('rejects a blank command or description and a non-positive timeoutMs', async () => {
+  it('rejects a blank command and a non-positive timeoutMs, and runs a command that came without a description', async () => {
     const { ctx } = await setup()
     expect(text(await call(ctx, 'pwsh', { command: '  ', description: 'd' }))).toContain('expected a non-empty string')
-    expect(text(await call(ctx, 'pwsh', { command: 'Write-Output hi', description: ' ' }))).toContain('expected a non-empty string')
+    // Small models leave the description out or blank; the command is then its own description.
+    expect((await call(ctx, 'pwsh', { command: 'Write-Output hi', description: ' ' })).isError).toBe(false)
+    expect((await call(ctx, 'pwsh', { command: 'Write-Output hi' })).isError).toBe(false)
     expect(text(await call(ctx, 'pwsh', { command: 'Write-Output hi', description: 'd', timeoutMs: -1 })))
       .toContain('invalid timeoutMs: expected a positive number')
   })
@@ -657,11 +659,12 @@ describe('sandbox escalation through ctx.approval', () => {
 
     for (const args of [
       { command: 'Write-Output ok', description: 'd', sandbox_permissions: 'workspace-write' },
-      { command: 'Write-Output ok', description: 'd', justification: 'why' },
       { command: 'Write-Output ok', description: 'd', sandbox_permissions: 'workspace-write', justification: ' ' },
     ]) {
       expect((await call(ctx, 'pwsh', args)).isError).toBe(true)
     }
+    // A reason without a request asks for nothing, so the command simply runs.
+    expect((await call(ctx, 'pwsh', { command: 'Write-Output ok', description: 'd', justification: 'why' })).isError).toBe(false)
   })
 
   it('the escalation fields and the confined-mode clauses stay out of sandbox-less compositions', async () => {
@@ -673,7 +676,7 @@ describe('sandbox escalation through ctx.approval', () => {
     expect(schema.parameters.properties).not.toHaveProperty('sandbox_permissions')
   })
 
-  it('rejects injected escalation without a sandbox and narrower escalation without prompting', async () => {
+  it('rejects injected escalation without a sandbox and runs a narrower request in the current mode without prompting', async () => {
     const plain = await setup()
     expect(text(await call(plain.ctx, 'pwsh', escalate))).toContain('not available in this composition')
 
@@ -681,7 +684,8 @@ describe('sandbox escalation through ctx.approval', () => {
     const prompted = vi.fn()
     ctx.on('approval/request', () => { prompted(); return Promise.resolve<ApprovalOutcome>('allowed-once') })
     const result = await call(ctx, 'pwsh', { ...escalate, sandbox_permissions: 'workspace-write' }, sandboxAgent('danger-full-access'))
-    expect(text(result)).toContain('not strictly wider')
+    // The session already has more than the call asked for: nothing to grant, nothing to refuse.
+    expect(result.isError).toBe(false)
     expect(prompted).not.toHaveBeenCalled()
 
     const malformed = sandboxAgent()

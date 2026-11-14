@@ -45,6 +45,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@hackdevcode/dsh-browser-use` | no | Exclusive named browser-use provider registration |
+| `@hackdevcode/dsh-browser-use-chrome-devtools-mcp` | yes | Experimental per-Session Chromium browser tools through chrome-devtools-mcp |
 
 ## bundle
 
@@ -136,6 +137,9 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@hackdevcode/dsh-computer-use` | no | Exclusive named computer-use provider registration |
+| `@hackdevcode/dsh-computer-use-cua-driver-native` | yes | Experimental computer-use provider embedding the Cua Driver native npm SDK |
+| `@hackdevcode/dsh-cua` | no | Shared Computer Use application objects, authorization, and logged tool execution |
+| `@hackdevcode/dsh-cua-macos` | yes | macOS native provider for shared Computer Use application and window objects |
 
 ## context
 
@@ -200,11 +204,9 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@hackdevcode/dsh-client-ui-creation-recommendations` | no | Body of the personalized page card: location choice, creation progress, Keep, Undo and Restore |
 | `@hackdevcode/dsh-client-ui-plugin-recommendations` | no | Official plugin card body with catalog text and enabling |
 | `@hackdevcode/dsh-creation-recommendations` | no | Create persistent removable interface plugins from explicit conversation needs |
-| `@hackdevcode/dsh-cua` | no | Shared Computer Use application objects, authorization, and logged tool execution |
 | `@hackdevcode/dsh-experimental-agent-team` | yes | Implicit-root Agent Teams roster, direct peer messaging, and shared task DAG |
 | `@hackdevcode/dsh-experimental-api-speech-to-text` | yes | Authenticated experimental speech transcription for browser clients |
 | `@hackdevcode/dsh-experimental-auto-review` | no | Per-tool LLM authorization review for the Hack Dev Code Auto permission preset |
-| `@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp` | yes | Experimental per-Session Chromium browser tools through chrome-devtools-mcp |
 | `@hackdevcode/dsh-experimental-browser-use-playwright-mcp` | yes | Experimental per-Session Chromium browser tools through @playwright/mcp |
 | `@hackdevcode/dsh-experimental-browser-use-stagehand-native` | yes | Experimental Stagehand browser tools with separately configured native models |
 | `@hackdevcode/dsh-experimental-claude-code-mods` | yes | Experimental bridge: load Claude Code mods (hooks modules) and run their hook chains on Hack Dev Code extension points |
@@ -215,8 +217,6 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@hackdevcode/dsh-experimental-client-ui-stats` | no | Per-turn and per-step context, timing, cache, and tool-cost table contributed as an experimental conversation View |
 | `@hackdevcode/dsh-experimental-client-ui-voice-input` | no | Record speech and insert editable text into the conversation draft |
 | `@hackdevcode/dsh-experimental-computer-use-cua-driver-mcp` | yes | Experimental computer use through an installed Cua Driver MCP executable |
-| `@hackdevcode/dsh-experimental-computer-use-cua-driver-native` | yes | Experimental computer-use provider embedding the Cua Driver native npm SDK |
-| `@hackdevcode/dsh-experimental-cua-macos` | yes | macOS native provider for shared Computer Use application and window objects |
 | `@hackdevcode/dsh-experimental-forge` | yes | Provider-neutral change request registry with shared status polling |
 | `@hackdevcode/dsh-experimental-forge-github` | yes | GitHub provider for the experimental forge registry, read through the GitHub CLI on the host |
 | `@hackdevcode/dsh-experimental-forge-session` | yes | Binds change requests to the Session that created, pushed, or tracked them |
@@ -348,7 +348,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | Package | Config | Description |
 |---|---|---|
 | `@hackdevcode/dsh-mcp-client` | yes | MCP client bridge: connects to MCP servers and registers their tools on ctx.tools |
-| `@hackdevcode/dsh-mcp-directory` | yes | Directory of MCP servers, OAuth connectors and skills: servers and connectors mount live as mcp-client instances, skills install into the user skill folder |
+| `@hackdevcode/dsh-mcp-directory` | yes | Directory of MCP servers, OAuth connectors, website sessions and skills: servers, connectors and sessions mount live as mcp-client instances; built-in skills are provided from memory and directory skills install into the user skill folder |
 | `@hackdevcode/dsh-mcp-resources` | no | Scoped MCP resource discovery and reading through shared model tools |
 
 ## plan
@@ -483,7 +483,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@hackdevcode/dsh-subagent-fork-in-process` | yes | In-process fork subagent backend: runs a child agent seeded with a prefix of the parent's log |
 | `@hackdevcode/dsh-subagent-spawn-in-process` | yes | In-process spawn subagent backend: runs a fresh child agent on ctx.agents |
 | `@hackdevcode/dsh-tool-subagent` | yes | Model-facing subagent delegation tool over the ctx.subagents seam |
-| `@hackdevcode/dsh-tool-subagent-control` | no | Shared messaging, interruption, and child discovery tools for subagents |
+| `@hackdevcode/dsh-tool-subagent-control` | yes | Shared messaging, interruption, and child discovery tools for subagents |
 
 ## subprocess
 

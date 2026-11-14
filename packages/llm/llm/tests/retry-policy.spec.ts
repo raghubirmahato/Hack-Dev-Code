@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   resolveRetryPolicy,
+  retryBudget,
   RetryPolicySchema,
 } from '@hackdevcode/dsh-llm'
 import type { RetryPolicyConfig } from '@hackdevcode/dsh-llm'
@@ -13,6 +14,7 @@ describe('provider retry policy', () => {
     expect(policy).toEqual({
       mode: 'normal',
       maxRetries: 5,
+      networkRetries: 40,
       retryableCodes: ['EMPTY_RESPONSE', 'RATE_LIMIT', 'STREAM_CLOSED', 'SERVER', 'TIMEOUT', 'TRANSPORT'],
       initialDelayMs: 500,
       maxDelayMs: 60_000,
@@ -42,6 +44,7 @@ describe('provider retry policy', () => {
     expect(policy).toEqual({
       mode: 'normal',
       maxRetries: 4,
+      networkRetries: 40,
       retryableCodes: ['BUSY'],
       initialDelayMs: 25,
       maxDelayMs: 100,
@@ -95,5 +98,20 @@ describe('provider retry policy', () => {
     expect(() => {
       resolveRetryPolicy(config as unknown as RetryPolicyConfig, 'provider.retryPolicy')
     }).toThrow(message)
+  })
+})
+
+describe('network retry budget', () => {
+  it('gives a failed connection the longer network budget and every other failure the general one', () => {
+    const policy = resolveRetryPolicy({ mode: 'normal', maxRetries: 3, networkRetries: 30 }, 'provider.retryPolicy')
+    if (policy.mode !== 'normal') throw new Error('expected normal policy')
+    expect(retryBudget(policy, 'TRANSPORT')).toBe(30)
+    expect(retryBudget(policy, 'STREAM_CLOSED')).toBe(30)
+    expect(retryBudget(policy, 'RATE_LIMIT')).toBe(3)
+    // A network budget below the general one never shortens it.
+    const short = resolveRetryPolicy({ mode: 'normal', maxRetries: 6, networkRetries: 2 }, 'provider.retryPolicy')
+    if (short.mode !== 'normal') throw new Error('expected normal policy')
+    expect(retryBudget(short, 'TRANSPORT')).toBe(6)
+    expect(() => resolveRetryPolicy({ mode: 'normal', networkRetries: -1 }, 'p')).toThrow('networkRetries')
   })
 })

@@ -49,7 +49,10 @@ export interface HostProbe {
   uid: number | undefined
 }
 
-/** Read the live host. */
+/**
+ * Read the live host.
+ * @returns the facts and readers of the machine Hack Dev Code runs on.
+ */
 export function liveProbe(): HostProbe {
   return {
     platform: process.platform,
@@ -143,7 +146,11 @@ export function detectHost(probe: HostProbe = liveProbe()): HostFacts {
   }
 }
 
-/** Whether a Linux distribution belongs to the Debian family (Debian, Ubuntu, Mint, Pop!_OS and others). */
+/**
+ * Whether a Linux distribution belongs to the Debian family (Debian, Ubuntu, Mint, Pop!_OS and others).
+ * @param facts - the detected host.
+ * @returns true for a Debian-family distribution.
+ */
 export function isDebianFamily(facts: HostFacts): boolean {
   return facts.distro !== undefined && (facts.distro.id === 'debian' || facts.distro.like.includes('debian') || facts.distro.like.includes('ubuntu'))
 }

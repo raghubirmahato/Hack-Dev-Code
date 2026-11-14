@@ -4,9 +4,15 @@ import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import ToolRuntime from '@hackdevcode/dsh-tools'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { mkdtemp, readFile, rm, stat } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import SkillRegistry from '@hackdevcode/dsh-skill'
+import { executeToolFixture } from '@hackdevcode/dsh-tool-testkit'
+import { ToolCallId } from '@hackdevcode/dsh-llm'
 import * as Directory from '../src/index.ts'
 import { ConnectorAuth } from '../src/oauth.ts'
-import type { AuthRunner, ConnectorGrant, CustomServer, GrantStore, ServerChoice } from '../src/index.ts'
+import type { AuthRunner, ConnectorGrant, CustomServer, GrantStore, ServerChoice, SiteBrowser, SiteEntry } from '../src/index.ts'
 
 const { CONNECTORS, DIRECTORY, OAUTH_CALLBACK_PATH, customConfig } = Directory
 
@@ -99,7 +105,11 @@ describe('the mcpDirectory service', () => {
     servers?: Record<string, ServerChoice>
     custom?: Record<string, CustomServer>
     connectors?: Record<string, { enabled: boolean; title?: string; url: string }>
+    sites?: Record<string, SiteEntry>
     webServer?: boolean
+    /** The browser website sessions find; none when null. */
+    browser?: SiteBrowser | null
+    skills?: boolean
   }
 
   async function mount(start: Start = {}) {
@@ -108,7 +118,11 @@ describe('the mcpDirectory service', () => {
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
     await ctx.plugin(NativeToolExecutor)
-    const state = { servers: start.servers ?? {}, custom: start.custom ?? {}, connectors: start.connectors ?? {} }
+    const state = { servers: start.servers ?? {}, custom: start.custom ?? {}, connectors: start.connectors ?? {}, sites: start.sites ?? {} }
+    const home = await mkdtemp(join(tmpdir(), 'hackdev-directory-'))
+    onTestFinished(() => rm(home, { recursive: true, force: true }))
+    const launched: { path: string; args: readonly string[] }[] = []
+    if (start.skills === true) await ctx.plugin(SkillRegistry)
     const updates: object[] = []
     class Settings extends Service {
       constructor(inner: Context) { super(inner, 'settings') }
@@ -151,7 +165,11 @@ describe('the mcpDirectory service', () => {
         Object.defineProperty(inner.fiber, 'entry', { value: { options: { id: 'mcp-directory' } } })
         return Directory.apply(inner, {
           servers: { get: () => state.servers }, custom: { get: () => state.custom }, connectors: { get: () => state.connectors },
+          sites: { get: () => state.sites },
           authRunner: fakeRunner,
+          home,
+          browserFinder: () => start.browser === null ? undefined : start.browser ?? { path: '/opt/chrome', channel: 'chrome' },
+          browserLauncher: (path, args) => { launched.push({ path, args }) },
         })
       },
     })
@@ -164,7 +182,7 @@ describe('the mcpDirectory service', () => {
       await routes.get(OAUTH_CALLBACK_PATH)?.({ url, method } as IncomingMessage, res)
       return { status, body }
     }
-    return { ctx, fiber, control: ctx.get('mcpDirectory')!, state, updates, stored, records, routes, callback, changes: () => changes }
+    return { ctx, fiber, control: ctx.get('mcpDirectory')!, state, updates, stored, records, routes, callback, changes: () => changes, home, launched }
   }
 
   it('lists directory servers and the person\'s own with their state', async () => {
@@ -265,9 +283,90 @@ describe('the mcpDirectory service', () => {
     const { control } = await mount()
     const skills = await control.skills()
     expect(skills.length).toBeGreaterThan(0)
-    expect(skills[0]).toMatchObject({ id: expect.any(String) as string, state: expect.stringMatching(/^(directory|other|no)$/u) as string })
+    expect(skills[0]).toMatchObject({ id: 'code-review', state: 'builtin' })
+    expect(skills.at(-1)?.id).toEqual(expect.any(String))
+    expect(skills.at(-1)?.state).toMatch(/^(directory|other|no)$/u)
+    // A built-in skill needs no install and cannot be removed.
+    await expect(control.installSkill('code-review')).rejects.toThrow('no directory skill')
     await expect(control.installSkill('nothing')).rejects.toThrow('no directory skill')
     await expect(control.removeSkill('nothing')).rejects.toThrow('no directory skill')
+  })
+
+  it('adds a website session: opens the sign-in window on its own profile and mounts a browser on that profile', async () => {
+    const { control, state, launched, home, updates } = await mount()
+    expect(await control.sites()).toEqual([])
+    const { id } = await control.addSite({ url: 'www.reddit.com/login', title: 'Reddit' })
+    expect(id).toBe('reddit')
+    const profile = join(home, 'site-sessions', 'reddit', 'profile')
+    expect(launched).toEqual([{ path: '/opt/chrome', args: Directory.signInArgs(profile, 'https://www.reddit.com/login') }])
+    expect((await stat(profile)).isDirectory()).toBe(true)
+    expect(state.sites).toEqual({ reddit: { enabled: true, title: 'Reddit', url: 'https://www.reddit.com/login' } })
+    expect(updates.at(-1)).toEqual({ sites: state.sites })
+    expect(await control.sites()).toEqual([{
+      id: 'reddit', title: 'Reddit', url: 'https://www.reddit.com/login', host: 'www.reddit.com', enabled: true, note: '', playbook: false,
+    }])
+    // Signing in again reuses the session instead of making a second one.
+    expect((await control.addSite({ url: 'https://reddit.com' })).id).toBe('reddit')
+    await control.openSite('reddit')
+    expect(launched).toHaveLength(3)
+  })
+
+  it('refuses a link that is not a website and a session without a browser', async () => {
+    const { control } = await mount()
+    await expect(control.addSite({ url: 'not a link' })).rejects.toThrow('enter the website')
+    await expect(control.addSite({ url: 'file:///etc/passwd' })).rejects.toThrow('enter the website')
+    await expect(control.openSite('nothing')).rejects.toThrow('no website session')
+    const bare = await mount({ browser: null, sites: { reddit: { enabled: true, url: 'https://www.reddit.com/' } } })
+    await expect(bare.control.addSite({ url: 'github.com' })).rejects.toThrow('no Chrome, Edge or Chromium')
+    expect((await bare.control.sites())[0]!.note).toBe('needs Chrome, Edge or Chromium installed')
+  })
+
+  it('names a session apart from a server that already holds the name', async () => {
+    const { control } = await mount()
+    // `github` is a directory server, so the website session gets a suffix.
+    expect((await control.addSite({ url: 'https://github.com/login' })).id).toBe('github-site')
+  })
+
+  it('records a playbook through the site_connector tool and removes the session with its profile', async () => {
+    const { ctx, control, home, state } = await mount({ sites: { reddit: { enabled: true, url: 'https://www.reddit.com/' } } })
+    const run = async (args: Record<string, unknown>) => {
+      const result = await executeToolFixture(ctx, { name: 'site_connector', callId: ToolCallId('c1'), arguments: args, signal: new AbortController().signal })
+      return { isError: result.isError, text: result.content.map(block => block.type === 'text' ? block.text : '').join('') }
+    }
+    expect((await run({ action: 'list' })).text).toContain('reddit (www.reddit.com, www.reddit.com) [ready]: tools in group mcp-reddit, instructions in skill site-reddit')
+    await run({ action: 'learn', id: 'reddit', notes: '## Post to a subreddit\nOpen /r/<name>/submit.' })
+    await run({ action: 'learn', id: 'reddit', notes: 'Wait for the "Post" button to enable.' })
+    const playbook = await readFile(join(home, 'site-sessions', 'reddit', 'PLAYBOOK.md'), 'utf8')
+    expect(playbook).toContain('Open /r/<name>/submit.')
+    expect(playbook).toContain('Wait for the "Post" button')
+    expect((await control.sites())[0]!.playbook).toBe(true)
+    await run({ action: 'learn', id: 'reddit', notes: 'Rewritten.', replace: true })
+    expect(await readFile(join(home, 'site-sessions', 'reddit', 'PLAYBOOK.md'), 'utf8')).toBe('Rewritten.\n')
+    expect(await run({ action: 'learn', id: 'reddit', notes: 'x'.repeat(21_000) })).toMatchObject({ isError: true, text: expect.stringContaining('the limit is 20000') as string })
+    expect(await run({ action: 'learn', id: 'nope', notes: 'x' })).toMatchObject({ isError: true, text: expect.stringContaining('no website session') as string })
+    expect(await run({ action: 'dance' })).toMatchObject({ isError: true, text: expect.stringContaining('action must be') as string })
+    await control.removeSite('reddit')
+    expect(state.sites).toEqual({})
+    await expect(stat(join(home, 'site-sessions', 'reddit'))).rejects.toThrow()
+  })
+
+  it('provides the built-in skills and one skill per website session from memory', async () => {
+    const { ctx, control } = await mount({ skills: true, sites: { reddit: { enabled: true, title: 'Reddit', url: 'https://www.reddit.com/' }, off: { enabled: false, url: 'https://off.example.com/' } } })
+    const names = (await ctx.skills.list()).map(skill => skill.name)
+    expect(names).toEqual(expect.arrayContaining(['code-review', 'systematic-debugging', 'test-first', 'git-commit-and-pr', 'security-review', 'web-research', 'site-reddit']))
+    expect(names).not.toContain('site-off')
+    const review = await ctx.skills.get('code-review')
+    expect(review?.content).toContain('# Code review')
+    expect(review?.source).toBe('bundled')
+    const site = await ctx.skills.get('site-reddit')
+    expect(site?.content).toContain('Load the tools with the group `mcp-reddit`')
+    expect(site?.content).toContain('Nothing is recorded for www.reddit.com yet')
+    await executeToolFixture(ctx, {
+      name: 'site_connector', callId: ToolCallId('c2'), arguments: { action: 'learn', id: 'reddit', notes: 'Search lives at /search.' }, signal: new AbortController().signal,
+    })
+    // The playbook is part of the skill the next session loads.
+    expect((await ctx.skills.get('site-reddit'))?.content).toContain('Search lives at /search.')
+    await control.removeSite('reddit')
   })
 
   it('removes its service, its sign-in seam and its callback route when disposed', async () => {

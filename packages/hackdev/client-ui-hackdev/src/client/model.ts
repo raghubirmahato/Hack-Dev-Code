@@ -3,21 +3,28 @@
  * `presentationMeta` payload that `tool-hackdev` persists on `tool/result`;
  * anything that does not match a known version renders as plain text instead
  * of a half-trusted card. Version 2 adds waves, task roles, fact-check results,
- * acceptance criteria and gate screenshots; version 1 payloads from earlier
- * runs still render with those fields at their neutral defaults.
+ * acceptance criteria and gate screenshots; version 3 adds the swarm (its
+ * members and message board) and the stalled flag. Older payloads still render
+ * with the newer fields at their neutral defaults.
  */
 
-export const PRESENTATION_VERSION = 2
+export const PRESENTATION_VERSION = 3
 
 /** Every payload version this card can narrow. */
-export const SUPPORTED_VERSIONS: readonly number[] = [1, 2]
+export const SUPPORTED_VERSIONS: readonly number[] = [1, 2, 3]
 
+/** How a run ended. */
 export type RunStatus = 'complete' | 'needs-attention'
+/** How one task or swarm worker ended. */
 export type TaskStatus = 'done' | 'partial' | 'blocked' | 'failed' | 'skipped'
+/** How serious an issue a gate found is. */
 export type Severity = 'critical' | 'high' | 'medium' | 'low'
+/** Whether an issue was fixed, is still open, or waits for a person's decision. */
 export type IssueStatus = 'fixed' | 'open' | 'deferred'
+/** The outcome of one check a gate ran. */
 export type CheckOutcome = 'pass' | 'fail' | 'skipped'
 
+/** One task (or swarm worker) as the card shows it. */
 export interface ViewTask {
   readonly id: string
   readonly title: string
@@ -35,30 +42,35 @@ export interface ViewTask {
   readonly replaced: boolean
 }
 
+/** One acceptance criterion and whether it was met. */
 export interface ViewCriterion {
   readonly criterion: string
   readonly met: boolean
   readonly evidence: string
 }
 
+/** One screenshot a gate captured and viewed. */
 export interface ViewScreenshot {
   readonly viewport: string
   readonly artifact: string
   readonly observation: string
 }
 
+/** One check a gate ran. */
 export interface ViewCheck {
   readonly name: string
   readonly outcome: CheckOutcome
   readonly detail: string
 }
 
+/** One issue a gate found. */
 export interface ViewIssue {
   readonly severity: Severity
   readonly title: string
   readonly status: IssueStatus
 }
 
+/** One gate (or swarm verifier) with its verdict and findings. */
 export interface ViewGate {
   readonly gate: string
   readonly verdict: 'pass' | 'fail'
@@ -76,6 +88,41 @@ export interface ViewGate {
   readonly limitations: readonly string[]
 }
 
+/** What a swarm member does. */
+export type MemberKind = 'coordinator' | 'worker' | 'verifier'
+
+/** One swarm member as the card shows it. */
+export interface ViewMember {
+  readonly name: string
+  readonly kind: MemberKind
+  readonly role: string
+  /** Pinned model, or '' when the member inherited the conversation's model. */
+  readonly model: string
+  readonly rounds: number
+}
+
+/** One post on the swarm's message board. */
+export interface ViewPost {
+  readonly n: number
+  readonly round: number
+  readonly from: string
+  readonly to: readonly string[]
+  readonly kind: string
+  readonly text: string
+}
+
+/** The swarm of a run: its members and the newest posts of its board. */
+export interface ViewSwarm {
+  readonly name: string
+  readonly rounds: number
+  readonly stalled: boolean
+  readonly members: readonly ViewMember[]
+  /** Posts made over the whole run; the board holds the newest ones. */
+  readonly posts: number
+  readonly board: readonly ViewPost[]
+}
+
+/** Everything the run card shows, narrowed from the persisted payload. */
 export interface HackDevView {
   readonly status: RunStatus
   readonly planFallback: boolean
@@ -88,6 +135,10 @@ export interface HackDevView {
   readonly needsHuman: readonly string[]
   readonly memoryEntries: number
   readonly recorded: boolean
+  /** Follow-up waves stopped early because a wave made no progress. */
+  readonly stalled: boolean
+  /** The swarm of a `hackdev_swarm` run; null for a mission or a review. */
+  readonly swarm: ViewSwarm | null
 }
 
 /** One item the human should look at, derived from the run. */
@@ -226,6 +277,33 @@ function readGate(value: unknown): ViewGate | null {
   }
 }
 
+const MEMBER_KINDS = ['coordinator', 'worker', 'verifier'] as const
+
+function readMember(value: unknown): ViewMember | null {
+  if (!isRecord(value) || typeof value['name'] !== 'string' || !oneOf(value['kind'], MEMBER_KINDS)
+    || typeof value['role'] !== 'string' || typeof value['model'] !== 'string' || !isCount(value['rounds'])) return null
+  return { name: value['name'], kind: value['kind'], role: value['role'], model: value['model'], rounds: value['rounds'] }
+}
+
+function readPost(value: unknown): ViewPost | null {
+  if (!isRecord(value)) return null
+  const to = readStrings(value['to'])
+  if (!isCount(value['n']) || !isCount(value['round']) || typeof value['from'] !== 'string' || to === null
+    || typeof value['kind'] !== 'string' || typeof value['text'] !== 'string') return null
+  return { n: value['n'], round: value['round'], from: value['from'], to, kind: value['kind'], text: value['text'] }
+}
+
+/** The swarm block: absent is null; present must be well formed, else the whole payload is rejected. */
+function readSwarm(value: unknown): ViewSwarm | null | undefined {
+  if (value === undefined) return null
+  if (!isRecord(value)) return undefined
+  const members = readList(value['members'], readMember)
+  const board = readList(value['board'], readPost)
+  if (typeof value['name'] !== 'string' || !isWave(value['rounds']) || typeof value['stalled'] !== 'boolean'
+    || !isCount(value['posts']) || members === null || board === null) return undefined
+  return { name: value['name'], rounds: value['rounds'], stalled: value['stalled'], members, posts: value['posts'], board }
+}
+
 /**
  * Narrow a persisted `tool/result` meta payload to the card's view model.
  * @param meta - the opaque `meta` of the settled tool result.
@@ -240,6 +318,9 @@ export function readHackDevMeta(meta: unknown): HackDevView | null {
   const criteria = meta['criteria'] === undefined ? [] : readList(meta['criteria'], readCriterion)
   const criteriaCount = optional(meta['criteriaCount'], criteria?.length ?? 0, isCount)
   const waves = optional(meta['waves'], 1, isWave)
+  const stalled = optional(meta['stalled'], false, isBoolean)
+  const swarm = readSwarm(meta['swarm'])
+  if (stalled === null || swarm === undefined) return null
   if (!oneOf(meta['status'], RUN_STATUSES) || typeof meta['planFallback'] !== 'boolean'
     || !isRecord(plan) || typeof plan['summary'] !== 'string' || typeof plan['stack'] !== 'string'
     || tasks === null || gates === null || needsHuman === null || criteria === null
@@ -257,6 +338,8 @@ export function readHackDevMeta(meta: unknown): HackDevView | null {
     needsHuman,
     memoryEntries: meta['memoryEntries'],
     recorded: meta['recorded'],
+    stalled,
+    swarm,
   }
 }
 
@@ -264,6 +347,8 @@ export function readHackDevMeta(meta: unknown): HackDevView | null {
  * Items a human should act on, most urgent first: unfinished tasks (a task a
  * later wave replaced is settled), unmet acceptance criteria, open issues,
  * deferred issues, approvals.
+ * @param view - the run.
+ * @returns the items in that order.
  */
 export function attentionItems(view: HackDevView): AttentionItem[] {
   const items: AttentionItem[] = []
@@ -287,7 +372,11 @@ export function attentionItems(view: HackDevView): AttentionItem[] {
   return items
 }
 
-/** Aggregate counts for the collapsed header. */
+/**
+ * Aggregate counts for the collapsed header.
+ * @param view - the run.
+ * @returns tasks done, gates passed, criteria met and the number of items to review.
+ */
 export function headerCounts(view: HackDevView): {
   tasksDone: number
   tasks: number
@@ -308,7 +397,11 @@ export function headerCounts(view: HackDevView): {
   }
 }
 
-/** The mission text from a call's raw argument JSON, or null when absent or malformed. */
+/**
+ * The mission text from a call's raw argument JSON.
+ * @param argsRaw - the call's arguments as streamed.
+ * @returns the mission, or null when absent or malformed.
+ */
 export function missionFromArgs(argsRaw: string | null | undefined): string | null {
   if (argsRaw === null || argsRaw === undefined) return null
   try {

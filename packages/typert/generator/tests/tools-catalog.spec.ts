@@ -51,10 +51,13 @@ describe('model-driven tool package generation', () => {
         .map(member => member.signature),
     }).toEqual((() => {
       const api = SERVICE_API.find(candidate => candidate.key === 'tools')
+      // The catalog lists a service's fields beside its methods; the registry model keeps them apart, so they are left out here.
+      const fields = new Set(service?.members.filter(member => member.kind === 'property').map(member => member.name))
+      const isField = (signature: string): boolean => fields.has(/^(?:readonly\s+)?(\w+)\??:/u.exec(signature)?.[1] ?? '')
       return {
         key: api?.key,
         summary: api?.summary,
-        methods: api?.methods.map(method => method.signature),
+        methods: api?.methods.map(method => method.signature).filter(signature => !isField(signature)),
       }
     })())
     const events = [...record?.model.events ?? [], ...executor?.model.events ?? []]

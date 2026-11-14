@@ -205,3 +205,52 @@
     color: var(--dsw-alias-label-primary);
   }
 }
+
+.members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.post {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: 8px;
+  border-left: 2px solid var(--dsw-alias-border-l3);
+}
+
+.post[data-kind='problem'] {
+  border-left-color: var(--dsw-alias-state-error-primary);
+}
+
+.postHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.postText {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--dsw-alias-label-secondary);
+}

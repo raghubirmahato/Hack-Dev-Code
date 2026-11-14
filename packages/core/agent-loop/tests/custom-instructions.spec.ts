@@ -49,7 +49,7 @@ function runTurn(ctx: Context, agent: Agent, text = 'go'): Promise<void> {
   return idle
 }
 
-const REMINDER = "(Note from Hack Dev Code, not a request from the person: keep following the person's 2 custom instructions from the system prompt. Reply to the person's message that follows.)"
+const REMINDER = '(Context, not a request and not something to reply to or mention: how you work, as always: 1. Answer in British English. 2. Use tabs. Now answer the message that follows.)'
 
 describe('custom instructions in requests', () => {
   it('sends numbered standing orders and reminds once per turn', async () => {
@@ -59,7 +59,7 @@ describe('custom instructions in requests', () => {
     )
     await runTurn(ctx, agent)
     const [first, second] = adapter.requests.map(request => JSON.stringify(request))
-    expect(first).toContain('<custom_instructions>\\n1. Answer in British English.\\n2. Use tabs.\\n</custom_instructions>')
+    expect(first).toContain('<how_you_work>\\n1. Answer in British English.\\n2. Use tabs.\\n</how_you_work>')
     expect(first).toContain(REMINDER)
     // The note comes before the person's message, so the model answers the person and not the note.
     const messages = JSON.stringify(adapter.requests[0]?.messages ?? [])
@@ -80,7 +80,7 @@ describe('custom instructions in requests', () => {
     const { ctx, adapter, agent } = await harness([textResponse('done')], '  ')
     await runTurn(ctx, agent)
     const request = JSON.stringify(adapter.requests[0])
-    expect(request).not.toContain('custom_instructions')
-    expect(request).not.toContain('custom instruction')
+    expect(request).not.toContain('how_you_work')
+    expect(request).not.toContain('how you work')
   })
 })

@@ -10,9 +10,9 @@ import { chromium, type Browser } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished, vi } from 'vitest'
 import { captureStableAria, compareOrRefreshGolden, launchWebScaffold, webSnapshotMode, watchConsole, type WebScaffold } from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, PLUGIN_TOGGLE_SETTLE_MS, saveFailureShot } from './support.ts'
-import { installNativeFixture, startFixtureHost } from '../../../packages/experimental/cua-macos/tests/native-fixture.ts'
+import { installNativeFixture, startFixtureHost } from '../../../packages/computer-use/cua-macos/tests/native-fixture.ts'
 
-const bundle = fileURLToPath(new URL('../../../packages/experimental/cua-bundle', import.meta.url))
+const bundle = fileURLToPath(new URL('../../../packages/bundle/cua-bundle', import.meta.url))
 const expected = fileURLToPath(new URL('./expected/cua-permissions/missing.expected.md', import.meta.url))
 
 // System-permission onboarding belongs to the macOS-only bundle; rendering and policy units remain portable.

@@ -43,7 +43,8 @@
     "@hackdevcode/dsh-session": "workspace:*",
     "@hackdevcode/dsh-subprocess": "workspace:*",
     "@hackdevcode/dsh-tools": "workspace:*",
-    "@hackdevcode/dsh-fs": "workspace:*"
+    "@hackdevcode/dsh-fs": "workspace:*",
+    "@hackdevcode/dsh-home-paths": "workspace:*"
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -61,6 +62,7 @@
     "@hackdevcode/dsh-agent-loop": "workspace:*",
     "@hackdevcode/dsh-working-directory": "workspace:*",
     "@hackdevcode/dsh-tool-fs": "workspace:*",
-    "@hackdevcode/dsh-tool-str-replace-editor": "workspace:*"
+    "@hackdevcode/dsh-tool-str-replace-editor": "workspace:*",
+    "@hackdevcode/dsh-home-paths": "workspace:*"
   }
 }

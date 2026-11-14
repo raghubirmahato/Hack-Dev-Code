@@ -280,6 +280,12 @@ export class SubagentRuntime extends TypertRemoteService {
       throw new SubagentError('subagent creation requires the exact live parent agent', 'UNAUTHORIZED')
     }
     if (spec.request.outputSchema !== undefined) assertObjectJsonSchema(spec.request.outputSchema)
+    if (spec.resume === true) {
+      if (spec.childId === undefined || provider.prepareContinuable === undefined) {
+        throw new SubagentError('continuing a child needs its childId and a local backend', 'UNSUPPORTED_CAPABILITY')
+      }
+      return manager.resumeLocal({ ...spec, childId: spec.childId })
+    }
     return provider.prepareContinuable === undefined
       ? manager.startExternal(spec)
       : manager.startLocal(spec)

@@ -36,24 +36,30 @@ importers:
       '@hackdevcode/dsh-browser-use':
         specifier: workspace:*
         version: link:packages/browser-use/browser-use
+      '@hackdevcode/dsh-browser-use-chrome-devtools-mcp':
+        specifier: workspace:*
+        version: link:packages/browser-use/browser-use-chrome-devtools-mcp
+      '@hackdevcode/dsh-browser-use-runtime':
+        specifier: workspace:*
+        version: link:packages/browser-use/browser-use-runtime
       '@hackdevcode/dsh-computer-use':
         specifier: workspace:*
         version: link:packages/computer-use/computer-use
+      '@hackdevcode/dsh-computer-use-cua-driver-native':
+        specifier: workspace:*
+        version: link:packages/computer-use/computer-use-cua-driver-native
       '@hackdevcode/dsh-cua':
         specifier: workspace:*
-        version: link:packages/experimental/cua
+        version: link:packages/computer-use/cua
       '@hackdevcode/dsh-cua-bundle':
         specifier: workspace:*
-        version: link:packages/experimental/cua-bundle
-      '@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp':
+        version: link:packages/bundle/cua-bundle
+      '@hackdevcode/dsh-cua-macos':
         specifier: workspace:*
-        version: link:packages/experimental/browser-use-chrome-devtools-mcp
+        version: link:packages/computer-use/cua-macos
       '@hackdevcode/dsh-experimental-browser-use-playwright-mcp':
         specifier: workspace:*
         version: link:packages/experimental/browser-use-playwright-mcp
-      '@hackdevcode/dsh-experimental-browser-use-runtime':
-        specifier: workspace:*
-        version: link:packages/experimental/browser-use-runtime
       '@hackdevcode/dsh-experimental-browser-use-stagehand-native':
         specifier: workspace:*
         version: link:packages/experimental/browser-use-stagehand-native
@@ -63,12 +69,6 @@ importers:
       '@hackdevcode/dsh-experimental-computer-use-cua-driver-mcp':
         specifier: workspace:*
         version: link:packages/experimental/computer-use-cua-driver-mcp
-      '@hackdevcode/dsh-experimental-computer-use-cua-driver-native':
-        specifier: workspace:*
-        version: link:packages/experimental/computer-use-cua-driver-native
-      '@hackdevcode/dsh-experimental-cua-macos':
-        specifier: workspace:*
-        version: link:packages/experimental/cua-macos
       '@hackdevcode/dsh-experimental-forge':
         specifier: workspace:*
         version: link:packages/experimental/forge
@@ -338,7 +338,7 @@ importers:
         version: link:../../packages/extensions/cordis-client-runner
       '@hackdevcode/dsh-cua-bundle':
         specifier: workspace:*
-        version: link:../../packages/experimental/cua-bundle
+        version: link:../../packages/bundle/cua-bundle
       '@hackdevcode/dsh-experimental-agent-team-profile':
         specifier: workspace:*
         version: link:../../packages/experimental/agent-team-profile
@@ -2245,6 +2245,137 @@ importers:
         specifier: workspace:*
         version: link:../../util/brand
 
+  packages/browser-use/browser-use-chrome-devtools-mcp:
+    dependencies:
+      '@hackdevcode/dsh-browser-use-runtime':
+        specifier: workspace:*
+        version: link:../browser-use-runtime
+      '@hackdevcode/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      chrome-devtools-mcp:
+        specifier: 1.9.0
+        version: 1.9.0
+      ws:
+        specifier: ^8.21.3
+        version: 8.21.3
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/cordis-plugin-include':
+        specifier: workspace:~
+        version: link:../../../vendor/include
+      '@hackdevcode/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      '@hackdevcode/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@hackdevcode/dsh-agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
+      '@hackdevcode/dsh-browser-use':
+        specifier: workspace:*
+        version: link:../browser-use
+      '@hackdevcode/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@hackdevcode/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@hackdevcode/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+      '@hackdevcode/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@hackdevcode/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+      '@hackdevcode/dsh-working-directory':
+        specifier: workspace:*
+        version: link:../../session/working-directory
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+
+  packages/browser-use/browser-use-runtime:
+    dependencies:
+      '@hackdevcode/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/cordis-plugin-include':
+        specifier: workspace:~
+        version: link:../../../vendor/include
+      '@hackdevcode/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      '@hackdevcode/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@hackdevcode/dsh-agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
+      '@hackdevcode/dsh-agent-loop-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/agent-loop-testkit
+      '@hackdevcode/dsh-attachment-local':
+        specifier: workspace:*
+        version: link:../../attachment/attachment-local
+      '@hackdevcode/dsh-browser-use':
+        specifier: workspace:*
+        version: link:../browser-use
+      '@hackdevcode/dsh-fs-local':
+        specifier: workspace:*
+        version: link:../../fs/fs-local
+      '@hackdevcode/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@hackdevcode/dsh-mcp-client':
+        specifier: workspace:*
+        version: link:../../mcp/mcp-client
+      '@hackdevcode/dsh-mcp-resources':
+        specifier: workspace:*
+        version: link:../../mcp/mcp-resources
+      '@hackdevcode/dsh-ptc-runtime':
+        specifier: workspace:*
+        version: link:../../ptc-runtime/ptc-runtime
+      '@hackdevcode/dsh-scope':
+        specifier: workspace:*
+        version: link:../../core/scope
+      '@hackdevcode/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@hackdevcode/dsh-session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-jsonl
+      '@hackdevcode/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+      '@hackdevcode/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@hackdevcode/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@hackdevcode/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
+      '@hackdevcode/dsh-tool-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/tool-testkit
+      '@hackdevcode/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+      '@hackdevcode/dsh-working-directory':
+        specifier: workspace:*
+        version: link:../../session/working-directory
+
   packages/bundle/acp-app:
     dependencies:
       '@hackdevcode/dsh-acp':
@@ -2570,6 +2701,41 @@ importers:
       '@hackdevcode/cordis':
         specifier: workspace:~
         version: link:../../../vendor/cordis
+
+  packages/bundle/cua-bundle:
+    dependencies:
+      '@hackdevcode/dsh-browser-use':
+        specifier: workspace:*
+        version: link:../../browser-use/browser-use
+      '@hackdevcode/dsh-browser-use-chrome-devtools-mcp':
+        specifier: workspace:*
+        version: link:../../browser-use/browser-use-chrome-devtools-mcp
+      '@hackdevcode/dsh-computer-use':
+        specifier: workspace:*
+        version: link:../../computer-use/computer-use
+      '@hackdevcode/dsh-computer-use-cua-driver-native':
+        specifier: workspace:*
+        version: link:../../computer-use/computer-use-cua-driver-native
+      '@hackdevcode/dsh-cua':
+        specifier: workspace:*
+        version: link:../../computer-use/cua
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/cordis-plugin-include':
+        specifier: workspace:~
+        version: link:../../../vendor/include
+      '@hackdevcode/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      js-yaml:
+        specifier: ^4.2.0
+        version: 4.3.2
+    optionalDependencies:
+      '@hackdevcode/dsh-cua-macos':
+        specifier: workspace:*
+        version: link:../../computer-use/cua-macos
 
   packages/bundle/headless:
     dependencies:
@@ -7071,6 +7237,369 @@ importers:
         specifier: workspace:*
         version: link:../../util/brand
 
+  packages/computer-use/computer-use-cua-driver-native:
+    dependencies:
+      '@hackdevcode/dsh-mcp-client':
+        specifier: workspace:*
+        version: link:../../mcp/mcp-client
+      '@hackdevcode/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      '@trycua/cua-driver':
+        specifier: 0.28.0
+        version: 0.28.0
+      zod:
+        specifier: 4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/cordis-plugin-include':
+        specifier: workspace:~
+        version: link:../../../vendor/include
+      '@hackdevcode/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      '@hackdevcode/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@hackdevcode/dsh-agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
+      '@hackdevcode/dsh-agent-loop-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/agent-loop-testkit
+      '@hackdevcode/dsh-attachment':
+        specifier: workspace:*
+        version: link:../../attachment/attachment
+      '@hackdevcode/dsh-attachment-local':
+        specifier: workspace:*
+        version: link:../../attachment/attachment-local
+      '@hackdevcode/dsh-computer-use':
+        specifier: workspace:*
+        version: link:../computer-use
+      '@hackdevcode/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@hackdevcode/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@hackdevcode/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+      '@hackdevcode/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@hackdevcode/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@hackdevcode/dsh-tool-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/tool-testkit
+      '@hackdevcode/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+
+  packages/computer-use/cua:
+    dependencies:
+      '@hackdevcode/dsh-atomic-write':
+        specifier: workspace:*
+        version: link:../../util/atomic-write
+      '@hackdevcode/dsh-computer-use':
+        specifier: workspace:*
+        version: link:../computer-use
+      '@hackdevcode/dsh-storage-domain':
+        specifier: workspace:*
+        version: link:../../storage/storage-domain
+      '@hackdevcode/dsh-typert-protocol':
+        specifier: workspace:*
+        version: link:../../typert/protocol
+      '@hackdevcode/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/cordis-plugin-include':
+        specifier: workspace:~
+        version: link:../../../vendor/include
+      '@hackdevcode/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      '@hackdevcode/cordis-plugin-timer':
+        specifier: workspace:~
+        version: link:../../../vendor/timer
+      '@hackdevcode/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@hackdevcode/dsh-agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
+      '@hackdevcode/dsh-agent-loop-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/agent-loop-testkit
+      '@hackdevcode/dsh-agent-preset-registry':
+        specifier: workspace:*
+        version: link:../../preset/agent-preset-registry
+      '@hackdevcode/dsh-api-gateway':
+        specifier: workspace:*
+        version: link:../../api/gateway
+      '@hackdevcode/dsh-api-remotes':
+        specifier: workspace:*
+        version: link:../../api/remotes
+      '@hackdevcode/dsh-app-boot':
+        specifier: workspace:*
+        version: link:../../boot/app-boot
+      '@hackdevcode/dsh-attachment':
+        specifier: workspace:*
+        version: link:../../attachment/attachment
+      '@hackdevcode/dsh-attachment-local':
+        specifier: workspace:*
+        version: link:../../attachment/attachment-local
+      '@hackdevcode/dsh-brand':
+        specifier: workspace:*
+        version: link:../../util/brand
+      '@hackdevcode/dsh-client-locale':
+        specifier: workspace:*
+        version: link:../../client/locale
+      '@hackdevcode/dsh-client-store':
+        specifier: workspace:*
+        version: link:../../client/store
+      '@hackdevcode/dsh-client-test-runtime':
+        specifier: workspace:*
+        version: link:../../test-support/client-runtime
+      '@hackdevcode/dsh-client-ui-approval':
+        specifier: workspace:*
+        version: link:../../client/ui-approval
+      '@hackdevcode/dsh-client-ui-conversation':
+        specifier: workspace:*
+        version: link:../../client/ui-conversation
+      '@hackdevcode/dsh-client-ui-layout':
+        specifier: workspace:*
+        version: link:../../client/ui-layout
+      '@hackdevcode/dsh-client-ui-plugin-manager':
+        specifier: workspace:*
+        version: link:../../client/ui-plugin-manager
+      '@hackdevcode/dsh-client-ui-primitives':
+        specifier: workspace:*
+        version: link:../../client/ui-primitives
+      '@hackdevcode/dsh-client-ui-renderer':
+        specifier: workspace:*
+        version: link:../../client/ui-renderer
+      '@hackdevcode/dsh-client-ui-settings':
+        specifier: workspace:*
+        version: link:../../client/ui-settings
+      '@hackdevcode/dsh-client-ui-slots':
+        specifier: workspace:*
+        version: link:../../client/ui-slots
+      '@hackdevcode/dsh-client-ui-user-questions':
+        specifier: workspace:*
+        version: link:../../client/ui-user-questions
+      '@hackdevcode/dsh-config-editor':
+        specifier: workspace:*
+        version: link:../../boot/config-editor
+      '@hackdevcode/dsh-fs-local':
+        specifier: workspace:*
+        version: link:../../fs/fs-local
+      '@hackdevcode/dsh-hmr':
+        specifier: workspace:*
+        version: link:../../boot/hmr
+      '@hackdevcode/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@hackdevcode/dsh-llm-deepseek':
+        specifier: workspace:*
+        version: link:../../llm/llm-deepseek
+      '@hackdevcode/dsh-loader-smoke':
+        specifier: workspace:*
+        version: link:../../test-support/loader-smoke
+      '@hackdevcode/dsh-ptc-runtime':
+        specifier: workspace:*
+        version: link:../../ptc-runtime/ptc-runtime
+      '@hackdevcode/dsh-ptc-runtime-node':
+        specifier: workspace:*
+        version: link:../../ptc-runtime/ptc-runtime-node
+      '@hackdevcode/dsh-sandbox-local':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-local
+      '@hackdevcode/dsh-sandbox-policy':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-policy
+      '@hackdevcode/dsh-scope':
+        specifier: workspace:*
+        version: link:../../core/scope
+      '@hackdevcode/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@hackdevcode/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+      '@hackdevcode/dsh-storage':
+        specifier: workspace:*
+        version: link:../../storage/storage
+      '@hackdevcode/dsh-storage-json':
+        specifier: workspace:*
+        version: link:../../storage/storage-json
+      '@hackdevcode/dsh-subprocess':
+        specifier: workspace:*
+        version: link:../../subprocess/subprocess
+      '@hackdevcode/dsh-subprocess-local':
+        specifier: workspace:*
+        version: link:../../subprocess/subprocess-local
+      '@hackdevcode/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@hackdevcode/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+      '@hackdevcode/dsh-user-questions':
+        specifier: workspace:*
+        version: link:../../interaction/user-questions
+      '@hackdevcode/dsh-util-values':
+        specifier: workspace:*
+        version: link:../../util/values
+      '@hackdevcode/dsh-working-directory':
+        specifier: workspace:*
+        version: link:../../session/working-directory
+      '@testing-library/react':
+        specifier: ^16.1.0
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      react:
+        specifier: ^18.2.0
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.2.0
+        version: 18.3.1(react@18.3.1)
+      sharp:
+        specifier: ^0.35.3
+        version: 0.35.5(@types/node@22.20.1)
+
+  packages/computer-use/cua-macos:
+    dependencies:
+      '@hackdevcode/dsh-atomic-write':
+        specifier: workspace:*
+        version: link:../../util/atomic-write
+      '@hackdevcode/dsh-cua':
+        specifier: workspace:*
+        version: link:../cua
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@hackdevcode/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@hackdevcode/cordis-plugin-include':
+        specifier: workspace:~
+        version: link:../../../vendor/include
+      '@hackdevcode/cordis-plugin-loader':
+        specifier: workspace:~
+        version: link:../../../vendor/loader
+      '@hackdevcode/cordis-plugin-timer':
+        specifier: workspace:~
+        version: link:../../../vendor/timer
+      '@hackdevcode/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@hackdevcode/dsh-agent-loop':
+        specifier: workspace:*
+        version: link:../../core/agent-loop
+      '@hackdevcode/dsh-agent-loop-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/agent-loop-testkit
+      '@hackdevcode/dsh-app-boot':
+        specifier: workspace:*
+        version: link:../../boot/app-boot
+      '@hackdevcode/dsh-attachment':
+        specifier: workspace:*
+        version: link:../../attachment/attachment
+      '@hackdevcode/dsh-attachment-local':
+        specifier: workspace:*
+        version: link:../../attachment/attachment-local
+      '@hackdevcode/dsh-computer-use':
+        specifier: workspace:*
+        version: link:../computer-use
+      '@hackdevcode/dsh-config-editor':
+        specifier: workspace:*
+        version: link:../../boot/config-editor
+      '@hackdevcode/dsh-fs-local':
+        specifier: workspace:*
+        version: link:../../fs/fs-local
+      '@hackdevcode/dsh-hmr':
+        specifier: workspace:*
+        version: link:../../boot/hmr
+      '@hackdevcode/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@hackdevcode/dsh-llm-deepseek':
+        specifier: workspace:*
+        version: link:../../llm/llm-deepseek
+      '@hackdevcode/dsh-ptc-runtime':
+        specifier: workspace:*
+        version: link:../../ptc-runtime/ptc-runtime
+      '@hackdevcode/dsh-ptc-runtime-node':
+        specifier: workspace:*
+        version: link:../../ptc-runtime/ptc-runtime-node
+      '@hackdevcode/dsh-sandbox-local':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-local
+      '@hackdevcode/dsh-sandbox-policy':
+        specifier: workspace:*
+        version: link:../../sandbox/sandbox-policy
+      '@hackdevcode/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@hackdevcode/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+      '@hackdevcode/dsh-settings':
+        specifier: workspace:*
+        version: link:../../settings/settings
+      '@hackdevcode/dsh-storage':
+        specifier: workspace:*
+        version: link:../../storage/storage
+      '@hackdevcode/dsh-storage-domain':
+        specifier: workspace:*
+        version: link:../../storage/storage-domain
+      '@hackdevcode/dsh-storage-json':
+        specifier: workspace:*
+        version: link:../../storage/storage-json
+      '@hackdevcode/dsh-subprocess':
+        specifier: workspace:*
+        version: link:../../subprocess/subprocess
+      '@hackdevcode/dsh-subprocess-local':
+        specifier: workspace:*
+        version: link:../../subprocess/subprocess-local
+      '@hackdevcode/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@hackdevcode/dsh-tool-executor-native':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-native
+      '@hackdevcode/dsh-tool-executor-ptc':
+        specifier: workspace:*
+        version: link:../../core/tool-executor-ptc
+      '@hackdevcode/dsh-tool-testkit':
+        specifier: workspace:*
+        version: link:../../test-support/tool-testkit
+      '@hackdevcode/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+      '@hackdevcode/dsh-user-questions':
+        specifier: workspace:*
+        version: link:../../interaction/user-questions
+      '@hackdevcode/dsh-working-directory':
+        specifier: workspace:*
+        version: link:../../session/working-directory
+      sharp:
+        specifier: ^0.35.3
+        version: 0.35.5(@types/node@22.20.1)
+
   packages/context/agent-instructions:
     dependencies:
       '@hackdevcode/dsh-util-values':
@@ -7957,6 +8486,9 @@ importers:
       '@hackdevcode/dsh-fs-local':
         specifier: workspace:*
         version: link:../../fs/fs-local
+      '@hackdevcode/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../../util/home-paths
       '@hackdevcode/dsh-llm':
         specifier: workspace:*
         version: link:../../llm/llm
@@ -8280,66 +8812,11 @@ importers:
         specifier: workspace:~
         version: link:../../../vendor/cordis
 
-  packages/experimental/browser-use-chrome-devtools-mcp:
-    dependencies:
-      '@hackdevcode/dsh-experimental-browser-use-runtime':
-        specifier: workspace:*
-        version: link:../browser-use-runtime
-      '@hackdevcode/schemastery':
-        specifier: link:../../../vendor/schemastery
-        version: link:../../../vendor/schemastery
-      chrome-devtools-mcp:
-        specifier: 1.9.0
-        version: 1.9.0
-      ws:
-        specifier: ^8.21.3
-        version: 8.21.3
-    devDependencies:
-      '@hackdevcode/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@hackdevcode/cordis-plugin-include':
-        specifier: workspace:~
-        version: link:../../../vendor/include
-      '@hackdevcode/cordis-plugin-loader':
-        specifier: workspace:~
-        version: link:../../../vendor/loader
-      '@hackdevcode/dsh-agent':
-        specifier: workspace:*
-        version: link:../../core/agent
-      '@hackdevcode/dsh-agent-loop':
-        specifier: workspace:*
-        version: link:../../core/agent-loop
-      '@hackdevcode/dsh-browser-use':
-        specifier: workspace:*
-        version: link:../../browser-use/browser-use
-      '@hackdevcode/dsh-llm':
-        specifier: workspace:*
-        version: link:../../llm/llm
-      '@hackdevcode/dsh-session':
-        specifier: workspace:*
-        version: link:../../core/session
-      '@hackdevcode/dsh-session-projection':
-        specifier: workspace:*
-        version: link:../../session/session-projection
-      '@hackdevcode/dsh-system-prompt':
-        specifier: workspace:*
-        version: link:../../core/system-prompt
-      '@hackdevcode/dsh-tools':
-        specifier: workspace:*
-        version: link:../../core/tools
-      '@hackdevcode/dsh-working-directory':
-        specifier: workspace:*
-        version: link:../../session/working-directory
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-
   packages/experimental/browser-use-playwright-mcp:
     dependencies:
-      '@hackdevcode/dsh-experimental-browser-use-runtime':
+      '@hackdevcode/dsh-browser-use-runtime':
         specifier: workspace:*
-        version: link:../browser-use-runtime
+        version: link:../../browser-use/browser-use-runtime
       '@playwright/mcp':
         specifier: 0.0.80
         version: 0.0.80
@@ -8381,90 +8858,14 @@ importers:
         specifier: workspace:*
         version: link:../../session/working-directory
 
-  packages/experimental/browser-use-runtime:
-    dependencies:
-      '@hackdevcode/schemastery':
-        specifier: link:../../../vendor/schemastery
-        version: link:../../../vendor/schemastery
-    devDependencies:
-      '@hackdevcode/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@hackdevcode/cordis-plugin-include':
-        specifier: workspace:~
-        version: link:../../../vendor/include
-      '@hackdevcode/cordis-plugin-loader':
-        specifier: workspace:~
-        version: link:../../../vendor/loader
-      '@hackdevcode/dsh-agent':
-        specifier: workspace:*
-        version: link:../../core/agent
-      '@hackdevcode/dsh-agent-loop':
-        specifier: workspace:*
-        version: link:../../core/agent-loop
-      '@hackdevcode/dsh-agent-loop-testkit':
-        specifier: workspace:*
-        version: link:../../test-support/agent-loop-testkit
-      '@hackdevcode/dsh-attachment-local':
-        specifier: workspace:*
-        version: link:../../attachment/attachment-local
-      '@hackdevcode/dsh-browser-use':
-        specifier: workspace:*
-        version: link:../../browser-use/browser-use
-      '@hackdevcode/dsh-fs-local':
-        specifier: workspace:*
-        version: link:../../fs/fs-local
-      '@hackdevcode/dsh-llm':
-        specifier: workspace:*
-        version: link:../../llm/llm
-      '@hackdevcode/dsh-mcp-client':
-        specifier: workspace:*
-        version: link:../../mcp/mcp-client
-      '@hackdevcode/dsh-mcp-resources':
-        specifier: workspace:*
-        version: link:../../mcp/mcp-resources
-      '@hackdevcode/dsh-ptc-runtime':
-        specifier: workspace:*
-        version: link:../../ptc-runtime/ptc-runtime
-      '@hackdevcode/dsh-scope':
-        specifier: workspace:*
-        version: link:../../core/scope
-      '@hackdevcode/dsh-session':
-        specifier: workspace:*
-        version: link:../../core/session
-      '@hackdevcode/dsh-session-persistence-jsonl':
-        specifier: workspace:*
-        version: link:../../session/session-persistence-jsonl
-      '@hackdevcode/dsh-session-projection':
-        specifier: workspace:*
-        version: link:../../session/session-projection
-      '@hackdevcode/dsh-system-prompt':
-        specifier: workspace:*
-        version: link:../../core/system-prompt
-      '@hackdevcode/dsh-tool-executor-native':
-        specifier: workspace:*
-        version: link:../../core/tool-executor-native
-      '@hackdevcode/dsh-tool-executor-ptc':
-        specifier: workspace:*
-        version: link:../../core/tool-executor-ptc
-      '@hackdevcode/dsh-tool-testkit':
-        specifier: workspace:*
-        version: link:../../test-support/tool-testkit
-      '@hackdevcode/dsh-tools':
-        specifier: workspace:*
-        version: link:../../core/tools
-      '@hackdevcode/dsh-working-directory':
-        specifier: workspace:*
-        version: link:../../session/working-directory
-
   packages/experimental/browser-use-stagehand-native:
     dependencies:
       '@browserbasehq/stagehand':
         specifier: 4.1.0
         version: 4.1.0
-      '@hackdevcode/dsh-experimental-browser-use-runtime':
+      '@hackdevcode/dsh-browser-use-runtime':
         specifier: workspace:*
-        version: link:../browser-use-runtime
+        version: link:../../browser-use/browser-use-runtime
       '@hackdevcode/dsh-mcp-client':
         specifier: workspace:*
         version: link:../../mcp/mcp-client
@@ -9305,70 +9706,6 @@ importers:
         specifier: workspace:*
         version: link:../../core/tools
 
-  packages/experimental/computer-use-cua-driver-native:
-    dependencies:
-      '@hackdevcode/dsh-mcp-client':
-        specifier: workspace:*
-        version: link:../../mcp/mcp-client
-      '@hackdevcode/schemastery':
-        specifier: link:../../../vendor/schemastery
-        version: link:../../../vendor/schemastery
-      '@trycua/cua-driver':
-        specifier: 0.28.0
-        version: 0.28.0
-      zod:
-        specifier: 4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@hackdevcode/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@hackdevcode/cordis-plugin-include':
-        specifier: workspace:~
-        version: link:../../../vendor/include
-      '@hackdevcode/cordis-plugin-loader':
-        specifier: workspace:~
-        version: link:../../../vendor/loader
-      '@hackdevcode/dsh-agent':
-        specifier: workspace:*
-        version: link:../../core/agent
-      '@hackdevcode/dsh-agent-loop':
-        specifier: workspace:*
-        version: link:../../core/agent-loop
-      '@hackdevcode/dsh-agent-loop-testkit':
-        specifier: workspace:*
-        version: link:../../test-support/agent-loop-testkit
-      '@hackdevcode/dsh-attachment':
-        specifier: workspace:*
-        version: link:../../attachment/attachment
-      '@hackdevcode/dsh-attachment-local':
-        specifier: workspace:*
-        version: link:../../attachment/attachment-local
-      '@hackdevcode/dsh-computer-use':
-        specifier: workspace:*
-        version: link:../../computer-use/computer-use
-      '@hackdevcode/dsh-llm':
-        specifier: workspace:*
-        version: link:../../llm/llm
-      '@hackdevcode/dsh-session':
-        specifier: workspace:*
-        version: link:../../core/session
-      '@hackdevcode/dsh-session-projection':
-        specifier: workspace:*
-        version: link:../../session/session-projection
-      '@hackdevcode/dsh-system-prompt':
-        specifier: workspace:*
-        version: link:../../core/system-prompt
-      '@hackdevcode/dsh-tool-executor-native':
-        specifier: workspace:*
-        version: link:../../core/tool-executor-native
-      '@hackdevcode/dsh-tool-testkit':
-        specifier: workspace:*
-        version: link:../../test-support/tool-testkit
-      '@hackdevcode/dsh-tools':
-        specifier: workspace:*
-        version: link:../../core/tools
-
   packages/experimental/cot-translation-bundle:
     dependencies:
       '@hackdevcode/dsh-experimental-client-ui-cot-translation':
@@ -9448,340 +9785,6 @@ importers:
       '@hackdevcode/dsh-tools':
         specifier: workspace:*
         version: link:../../core/tools
-
-  packages/experimental/cua:
-    dependencies:
-      '@hackdevcode/dsh-atomic-write':
-        specifier: workspace:*
-        version: link:../../util/atomic-write
-      '@hackdevcode/dsh-computer-use':
-        specifier: workspace:*
-        version: link:../../computer-use/computer-use
-      '@hackdevcode/dsh-storage-domain':
-        specifier: workspace:*
-        version: link:../../storage/storage-domain
-      '@hackdevcode/dsh-typert-protocol':
-        specifier: workspace:*
-        version: link:../../typert/protocol
-      '@hackdevcode/schemastery':
-        specifier: link:../../../vendor/schemastery
-        version: link:../../../vendor/schemastery
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@hackdevcode/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@hackdevcode/cordis-plugin-include':
-        specifier: workspace:~
-        version: link:../../../vendor/include
-      '@hackdevcode/cordis-plugin-loader':
-        specifier: workspace:~
-        version: link:../../../vendor/loader
-      '@hackdevcode/cordis-plugin-timer':
-        specifier: workspace:~
-        version: link:../../../vendor/timer
-      '@hackdevcode/dsh-agent':
-        specifier: workspace:*
-        version: link:../../core/agent
-      '@hackdevcode/dsh-agent-loop':
-        specifier: workspace:*
-        version: link:../../core/agent-loop
-      '@hackdevcode/dsh-agent-loop-testkit':
-        specifier: workspace:*
-        version: link:../../test-support/agent-loop-testkit
-      '@hackdevcode/dsh-agent-preset-registry':
-        specifier: workspace:*
-        version: link:../../preset/agent-preset-registry
-      '@hackdevcode/dsh-api-gateway':
-        specifier: workspace:*
-        version: link:../../api/gateway
-      '@hackdevcode/dsh-api-remotes':
-        specifier: workspace:*
-        version: link:../../api/remotes
-      '@hackdevcode/dsh-app-boot':
-        specifier: workspace:*
-        version: link:../../boot/app-boot
-      '@hackdevcode/dsh-attachment':
-        specifier: workspace:*
-        version: link:../../attachment/attachment
-      '@hackdevcode/dsh-attachment-local':
-        specifier: workspace:*
-        version: link:../../attachment/attachment-local
-      '@hackdevcode/dsh-brand':
-        specifier: workspace:*
-        version: link:../../util/brand
-      '@hackdevcode/dsh-client-locale':
-        specifier: workspace:*
-        version: link:../../client/locale
-      '@hackdevcode/dsh-client-store':
-        specifier: workspace:*
-        version: link:../../client/store
-      '@hackdevcode/dsh-client-test-runtime':
-        specifier: workspace:*
-        version: link:../../test-support/client-runtime
-      '@hackdevcode/dsh-client-ui-approval':
-        specifier: workspace:*
-        version: link:../../client/ui-approval
-      '@hackdevcode/dsh-client-ui-conversation':
-        specifier: workspace:*
-        version: link:../../client/ui-conversation
-      '@hackdevcode/dsh-client-ui-layout':
-        specifier: workspace:*
-        version: link:../../client/ui-layout
-      '@hackdevcode/dsh-client-ui-plugin-manager':
-        specifier: workspace:*
-        version: link:../../client/ui-plugin-manager
-      '@hackdevcode/dsh-client-ui-primitives':
-        specifier: workspace:*
-        version: link:../../client/ui-primitives
-      '@hackdevcode/dsh-client-ui-renderer':
-        specifier: workspace:*
-        version: link:../../client/ui-renderer
-      '@hackdevcode/dsh-client-ui-settings':
-        specifier: workspace:*
-        version: link:../../client/ui-settings
-      '@hackdevcode/dsh-client-ui-slots':
-        specifier: workspace:*
-        version: link:../../client/ui-slots
-      '@hackdevcode/dsh-client-ui-user-questions':
-        specifier: workspace:*
-        version: link:../../client/ui-user-questions
-      '@hackdevcode/dsh-config-editor':
-        specifier: workspace:*
-        version: link:../../boot/config-editor
-      '@hackdevcode/dsh-fs-local':
-        specifier: workspace:*
-        version: link:../../fs/fs-local
-      '@hackdevcode/dsh-hmr':
-        specifier: workspace:*
-        version: link:../../boot/hmr
-      '@hackdevcode/dsh-llm':
-        specifier: workspace:*
-        version: link:../../llm/llm
-      '@hackdevcode/dsh-llm-deepseek':
-        specifier: workspace:*
-        version: link:../../llm/llm-deepseek
-      '@hackdevcode/dsh-loader-smoke':
-        specifier: workspace:*
-        version: link:../../test-support/loader-smoke
-      '@hackdevcode/dsh-ptc-runtime':
-        specifier: workspace:*
-        version: link:../../ptc-runtime/ptc-runtime
-      '@hackdevcode/dsh-ptc-runtime-node':
-        specifier: workspace:*
-        version: link:../../ptc-runtime/ptc-runtime-node
-      '@hackdevcode/dsh-sandbox-local':
-        specifier: workspace:*
-        version: link:../../sandbox/sandbox-local
-      '@hackdevcode/dsh-sandbox-policy':
-        specifier: workspace:*
-        version: link:../../sandbox/sandbox-policy
-      '@hackdevcode/dsh-scope':
-        specifier: workspace:*
-        version: link:../../core/scope
-      '@hackdevcode/dsh-session':
-        specifier: workspace:*
-        version: link:../../core/session
-      '@hackdevcode/dsh-session-projection':
-        specifier: workspace:*
-        version: link:../../session/session-projection
-      '@hackdevcode/dsh-storage':
-        specifier: workspace:*
-        version: link:../../storage/storage
-      '@hackdevcode/dsh-storage-json':
-        specifier: workspace:*
-        version: link:../../storage/storage-json
-      '@hackdevcode/dsh-subprocess':
-        specifier: workspace:*
-        version: link:../../subprocess/subprocess
-      '@hackdevcode/dsh-subprocess-local':
-        specifier: workspace:*
-        version: link:../../subprocess/subprocess-local
-      '@hackdevcode/dsh-system-prompt':
-        specifier: workspace:*
-        version: link:../../core/system-prompt
-      '@hackdevcode/dsh-tools':
-        specifier: workspace:*
-        version: link:../../core/tools
-      '@hackdevcode/dsh-user-questions':
-        specifier: workspace:*
-        version: link:../../interaction/user-questions
-      '@hackdevcode/dsh-util-values':
-        specifier: workspace:*
-        version: link:../../util/values
-      '@hackdevcode/dsh-working-directory':
-        specifier: workspace:*
-        version: link:../../session/working-directory
-      '@testing-library/react':
-        specifier: ^16.1.0
-        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7(@types/react@18.3.31))(@types/react@18.3.31)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      react:
-        specifier: ^18.2.0
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.2.0
-        version: 18.3.1(react@18.3.1)
-      sharp:
-        specifier: ^0.35.3
-        version: 0.35.5(@types/node@22.20.1)
-
-  packages/experimental/cua-bundle:
-    dependencies:
-      '@hackdevcode/dsh-browser-use':
-        specifier: workspace:*
-        version: link:../../browser-use/browser-use
-      '@hackdevcode/dsh-computer-use':
-        specifier: workspace:*
-        version: link:../../computer-use/computer-use
-      '@hackdevcode/dsh-cua':
-        specifier: workspace:*
-        version: link:../cua
-      '@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp':
-        specifier: workspace:*
-        version: link:../browser-use-chrome-devtools-mcp
-      '@hackdevcode/dsh-experimental-computer-use-cua-driver-native':
-        specifier: workspace:*
-        version: link:../computer-use-cua-driver-native
-    devDependencies:
-      '@hackdevcode/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@hackdevcode/cordis-plugin-include':
-        specifier: workspace:~
-        version: link:../../../vendor/include
-      '@hackdevcode/cordis-plugin-loader':
-        specifier: workspace:~
-        version: link:../../../vendor/loader
-      js-yaml:
-        specifier: ^4.2.0
-        version: 4.3.2
-    optionalDependencies:
-      '@hackdevcode/dsh-experimental-cua-macos':
-        specifier: workspace:*
-        version: link:../cua-macos
-
-  packages/experimental/cua-macos:
-    dependencies:
-      '@hackdevcode/dsh-atomic-write':
-        specifier: workspace:*
-        version: link:../../util/atomic-write
-      '@hackdevcode/dsh-cua':
-        specifier: workspace:*
-        version: link:../cua
-      zod:
-        specifier: ^4.4.3
-        version: 4.4.3
-    devDependencies:
-      '@hackdevcode/cordis':
-        specifier: workspace:~
-        version: link:../../../vendor/cordis
-      '@hackdevcode/cordis-plugin-include':
-        specifier: workspace:~
-        version: link:../../../vendor/include
-      '@hackdevcode/cordis-plugin-loader':
-        specifier: workspace:~
-        version: link:../../../vendor/loader
-      '@hackdevcode/cordis-plugin-timer':
-        specifier: workspace:~
-        version: link:../../../vendor/timer
-      '@hackdevcode/dsh-agent':
-        specifier: workspace:*
-        version: link:../../core/agent
-      '@hackdevcode/dsh-agent-loop':
-        specifier: workspace:*
-        version: link:../../core/agent-loop
-      '@hackdevcode/dsh-agent-loop-testkit':
-        specifier: workspace:*
-        version: link:../../test-support/agent-loop-testkit
-      '@hackdevcode/dsh-app-boot':
-        specifier: workspace:*
-        version: link:../../boot/app-boot
-      '@hackdevcode/dsh-attachment':
-        specifier: workspace:*
-        version: link:../../attachment/attachment
-      '@hackdevcode/dsh-attachment-local':
-        specifier: workspace:*
-        version: link:../../attachment/attachment-local
-      '@hackdevcode/dsh-computer-use':
-        specifier: workspace:*
-        version: link:../../computer-use/computer-use
-      '@hackdevcode/dsh-config-editor':
-        specifier: workspace:*
-        version: link:../../boot/config-editor
-      '@hackdevcode/dsh-fs-local':
-        specifier: workspace:*
-        version: link:../../fs/fs-local
-      '@hackdevcode/dsh-hmr':
-        specifier: workspace:*
-        version: link:../../boot/hmr
-      '@hackdevcode/dsh-llm':
-        specifier: workspace:*
-        version: link:../../llm/llm
-      '@hackdevcode/dsh-llm-deepseek':
-        specifier: workspace:*
-        version: link:../../llm/llm-deepseek
-      '@hackdevcode/dsh-ptc-runtime':
-        specifier: workspace:*
-        version: link:../../ptc-runtime/ptc-runtime
-      '@hackdevcode/dsh-ptc-runtime-node':
-        specifier: workspace:*
-        version: link:../../ptc-runtime/ptc-runtime-node
-      '@hackdevcode/dsh-sandbox-local':
-        specifier: workspace:*
-        version: link:../../sandbox/sandbox-local
-      '@hackdevcode/dsh-sandbox-policy':
-        specifier: workspace:*
-        version: link:../../sandbox/sandbox-policy
-      '@hackdevcode/dsh-session':
-        specifier: workspace:*
-        version: link:../../core/session
-      '@hackdevcode/dsh-session-projection':
-        specifier: workspace:*
-        version: link:../../session/session-projection
-      '@hackdevcode/dsh-settings':
-        specifier: workspace:*
-        version: link:../../settings/settings
-      '@hackdevcode/dsh-storage':
-        specifier: workspace:*
-        version: link:../../storage/storage
-      '@hackdevcode/dsh-storage-domain':
-        specifier: workspace:*
-        version: link:../../storage/storage-domain
-      '@hackdevcode/dsh-storage-json':
-        specifier: workspace:*
-        version: link:../../storage/storage-json
-      '@hackdevcode/dsh-subprocess':
-        specifier: workspace:*
-        version: link:../../subprocess/subprocess
-      '@hackdevcode/dsh-subprocess-local':
-        specifier: workspace:*
-        version: link:../../subprocess/subprocess-local
-      '@hackdevcode/dsh-system-prompt':
-        specifier: workspace:*
-        version: link:../../core/system-prompt
-      '@hackdevcode/dsh-tool-executor-native':
-        specifier: workspace:*
-        version: link:../../core/tool-executor-native
-      '@hackdevcode/dsh-tool-executor-ptc':
-        specifier: workspace:*
-        version: link:../../core/tool-executor-ptc
-      '@hackdevcode/dsh-tool-testkit':
-        specifier: workspace:*
-        version: link:../../test-support/tool-testkit
-      '@hackdevcode/dsh-tools':
-        specifier: workspace:*
-        version: link:../../core/tools
-      '@hackdevcode/dsh-user-questions':
-        specifier: workspace:*
-        version: link:../../interaction/user-questions
-      '@hackdevcode/dsh-working-directory':
-        specifier: workspace:*
-        version: link:../../session/working-directory
-      sharp:
-        specifier: ^0.35.3
-        version: 0.35.5(@types/node@22.20.1)
 
   packages/experimental/forge:
     dependencies:
@@ -10333,7 +10336,7 @@ importers:
         version: link:../../client/web
       '@hackdevcode/dsh-cua':
         specifier: workspace:*
-        version: link:../cua
+        version: link:../../computer-use/cua
       '@hackdevcode/dsh-experimental-api-speech-to-text':
         specifier: workspace:*
         version: link:../api-speech-to-text
@@ -13503,6 +13506,9 @@ importers:
       '@hackdevcode/dsh-settings':
         specifier: workspace:*
         version: link:../../settings/settings
+      '@hackdevcode/dsh-skill':
+        specifier: workspace:*
+        version: link:../../skill/skill
       '@hackdevcode/dsh-system-prompt':
         specifier: workspace:*
         version: link:../../core/system-prompt
@@ -16535,6 +16541,9 @@ importers:
       '@hackdevcode/dsh-util-values':
         specifier: workspace:*
         version: link:../../util/values
+      '@hackdevcode/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
     devDependencies:
       '@hackdevcode/cordis':
         specifier: workspace:~
@@ -16548,6 +16557,12 @@ importers:
       '@hackdevcode/dsh-agent-loop-testkit':
         specifier: workspace:*
         version: link:../../test-support/agent-loop-testkit
+      '@hackdevcode/dsh-atomic-write':
+        specifier: workspace:*
+        version: link:../../util/atomic-write
+      '@hackdevcode/dsh-home-paths':
+        specifier: workspace:*
+        version: link:../../util/home-paths
       '@hackdevcode/dsh-llm':
         specifier: workspace:*
         version: link:../../llm/llm
@@ -18133,6 +18148,9 @@ importers:
       '@hackdevcode/dsh-tool-goal':
         specifier: workspace:*
         version: link:../../packages/goal/tool-goal
+      '@hackdevcode/dsh-tool-hackdev':
+        specifier: workspace:*
+        version: link:../../packages/hackdev/tool-hackdev
       '@hackdevcode/dsh-tool-jobs':
         specifier: workspace:*
         version: link:../../packages/jobs/tool-jobs

@@ -15,6 +15,8 @@ export interface CustomServerDraft {
 export type ServerRow = CustomizeSnapshot['servers'][number]
 /** One connector row of the page. */
 export type ConnectorRow = CustomizeSnapshot['connectors'][number]
+/** One website session row of the page. */
+export type SiteRow = CustomizeSnapshot['sites'][number]
 /** One skill row of the page. */
 export type SkillRow = CustomizeSnapshot['skills'][number]
 

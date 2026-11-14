@@ -4,8 +4,10 @@
  * live as the choice changes, with its tools in an on-demand group so they cost nothing until an agent loads them.
  * Choices live in this entry's volatile `servers` setting, which Settings forms and the `mcp_directory` tool edit.
  * The person's own servers (`custom`) and connectors (`connectors`: remote servers signed in to with OAuth) mount
- * the same way. The `mcpDirectory` service is the same set of changes for a settings page, and `mcpAuth` hands a
- * connector's connection its sign-in.
+ * the same way, and so do website sessions (`sites`: any website the person signed in to in a browser profile kept
+ * for Hack Dev Code, driven through a browser MCP server). The `mcpDirectory` service is the same set of changes for
+ * a settings page, and `mcpAuth` hands a connector's connection its sign-in. The plugin also provides the built-in
+ * skills and one skill per website session.
  * @module @hackdevcode/dsh-mcp-directory
  */
 
@@ -16,6 +18,7 @@ import * as McpClient from '@hackdevcode/dsh-mcp-client'
 import { defineTool } from '@hackdevcode/dsh-tools'
 import type {} from '@hackdevcode/dsh-settings'
 import type {} from '@hackdevcode/cordis-plugin-loader'
+import { appendFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { resolveDshHome } from '@hackdevcode/dsh-home-paths'
 import { credentialRef } from '@hackdevcode/dsh-credentials'
@@ -26,20 +29,29 @@ import type { ToolRunContext } from '@hackdevcode/dsh-tools'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type {} from '@hackdevcode/dsh-host-webserver'
 import { credentialKey } from '@hackdevcode/dsh-credentials'
+// Type-only: the optional skill registry the built-in and website skills are provided to.
+import type { SkillCandidate, SkillProvider } from '@hackdevcode/dsh-skill'
+import { BUILTIN_SKILL_PROVIDER, BUILTIN_SKILLS } from './builtin-skills.ts'
+import { findBrowser, launchBrowser, signInArgs, siteClientConfig, siteId, siteSkillBody, siteUrl } from './sites.ts'
+import type { BrowserLauncher, SiteBrowser, SiteEntry } from './sites.ts'
 import { CONNECTORS, DIRECTORY, findServer } from './catalog.ts'
 import { ConnectorAuth } from './oauth.ts'
 import { findSkill, installSkill, removeSkill, SKILLS, skillState } from './skills.ts'
 import type { DirectoryServer } from './catalog.ts'
 import type { AuthRunner, ConnectorGrant, GrantStore } from './oauth.ts'
-import type { ConnectorStatus, CustomServer, McpDirectoryControl, ServerStatus } from './types.ts'
+import type { ConnectorStatus, CustomServer, McpDirectoryControl, ServerStatus, SiteStatus } from './types.ts'
 
 export { CONNECTORS, DIRECTORY, findServer } from './catalog.ts'
 export type { DirectoryConnector, DirectoryServer } from './catalog.ts'
 export { ConnectorAuth } from './oauth.ts'
 export type { AuthRunner, ConnectorGrant, GrantStore } from './oauth.ts'
 export type {
-  ConnectorChoice, ConnectorStatus, CustomServer, McpDirectoryControl, ServerChange, ServerStatus, SkillStatus,
+  ConnectorChoice, ConnectorStatus, CustomServer, McpDirectoryControl, ServerChange, ServerStatus, SiteChoice, SiteStatus, SkillStatus,
 } from './types.ts'
+export { BUILTIN_SKILL_PROVIDER, BUILTIN_SKILLS } from './builtin-skills.ts'
+export type { BuiltinSkill } from './builtin-skills.ts'
+export { browserCandidates, findBrowser, signInArgs, siteClientConfig, siteId, siteSkillBody, siteUrl } from './sites.ts'
+export type { BrowserLauncher, SiteBrowser, SiteEntry } from './sites.ts'
 
 declare module '@hackdevcode/cordis' {
   interface Context {
@@ -99,9 +111,23 @@ export interface Config {
   custom: Volatile<Record<string, CustomServer>>
   /** Connectors the person added, by id. */
   connectors: Volatile<Record<string, ConnectorEntry>>
+  /** Websites the person signed in to, by id. */
+  sites: Volatile<Record<string, SiteEntry>>
   /** Test seam: the OAuth flow; the MCP SDK's when unset. */
   authRunner?: AuthRunner | undefined
+  /** Test seam: the Hack Dev Code home that holds skills and website profiles; resolved from the environment when unset. */
+  home?: string | undefined
+  /** Test seam: finds the browser website sessions run in; the installed Chrome, Edge or Chromium when unset. */
+  browserFinder?: (() => SiteBrowser | undefined) | undefined
+  /** Test seam: opens the sign-in window; starts the browser when unset. */
+  browserLauncher?: BrowserLauncher | undefined
 }
+
+/** Rank of a skill that ships with the app (mirrors `BUNDLED_SKILL_RANK` of the skill registry): the person's own skills win. */
+const BUILTIN_SKILL_RANK = 600
+
+/** Longest playbook kept for one website, so its skill stays small enough to load. */
+const MAX_PLAYBOOK_CHARS = 20_000
 
 export const Config: z<Config> = z.object({
   servers: z.dict(z.object({
@@ -119,6 +145,11 @@ export const Config: z<Config> = z.object({
     headers: z.dict(z.string().role('secret')),
   })).default({}).volatile(),
   connectors: z.dict(z.object({
+    enabled: z.boolean().default(true),
+    title: z.string(),
+    url: z.string().required(),
+  })).default({}).volatile(),
+  sites: z.dict(z.object({
     enabled: z.boolean().default(true),
     title: z.string(),
     url: z.string().required(),
@@ -192,7 +223,16 @@ export function clientConfig(
 // oxlint-disable-next-line typescript/require-await -- async keeps a load-time failure a rejection
 export async function apply(ctx: Context, config: Config): Promise<void> {
   const entryId = ctx.fiber.entry?.options.id
-  const skillsDir = join(resolveDshHome(), 'skills')
+  const home = resolveDshHome(config.home)
+  const skillsDir = join(home, 'skills')
+  /** Each website session keeps its browser profile and its playbook in its own folder here. */
+  const sitesDir = join(home, 'site-sessions')
+  const profileOf = (id: string): string => join(sitesDir, id, 'profile')
+  const playbookOf = (id: string): string => join(sitesDir, id, 'PLAYBOOK.md')
+  const siteBrowser = (): SiteBrowser | undefined => (config.browserFinder ?? findBrowser)()
+  const readPlaybook = (id: string): Promise<string> => readFile(playbookOf(id), 'utf8').catch(() => '')
+  /** Set once a skill registry is present: tells it the skills this plugin provides have changed. */
+  let invalidateSkills = (): void => {}
   /** Running clients by server id, with the config each was started with. */
   const running = new Map<string, { fiber: Fiber; key: string }>()
   const notes = new Map<string, string>()
@@ -250,6 +290,13 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         ? customConfig(id, { enabled: true, title: connector.title, url: connector.url })
         : { note: 'needs sign-in' })
     }
+    const browser = siteBrowser()
+    for (const [id, site] of Object.entries(config.sites.get())) {
+      if (!site.enabled || result.has(id) || siteUrl(site.url) === undefined) continue
+      result.set(id, browser === undefined
+        ? { note: 'needs Chrome, Edge or Chromium installed' }
+        : { config: siteClientConfig(id, site, profileOf(id), browser) })
+    }
     return result
   }
   const syncOnce = async (): Promise<void> => {
@@ -274,7 +321,10 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     syncing = syncing.then(syncOnce).catch((error: unknown) => { ctx.logger.warn('mcp-directory: could not apply the server choices: %s', error) })
     return syncing
   }
-  ctx.on('loader/volatile-update', () => { void sync() })
+  ctx.on('loader/volatile-update', () => {
+    void sync()
+    invalidateSkills()
+  })
   void sync()
 
   /** Changes that start code or write outside the workspace need full access or the person's approval for this call. */
@@ -364,18 +414,33 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       await credentials.set(credentialRef(key), value)
     }
   }
-  const takenBy = (id: string, own: 'custom' | 'connectors'): string | undefined => {
+  const takenBy = (id: string, own: 'custom' | 'connectors' | 'sites'): string | undefined => {
     if (!ID_PATTERN.test(id)) return 'an id is 1 to 32 lowercase letters, digits and hyphens, starting with a letter'
     if (DIRECTORY.some(server => server.id === id)) return `"${id}" is the id of a directory server`
-    const other = own === 'custom' ? config.connectors.get() : config.custom.get()
-    return Object.hasOwn(other, id) ? `"${id}" is already used by a ${own === 'custom' ? 'connector' : 'server'}` : undefined
+    if (own !== 'custom' && Object.hasOwn(config.custom.get(), id)) return `"${id}" is already used by a server`
+    if (own !== 'connectors' && Object.hasOwn(config.connectors.get(), id)) return `"${id}" is already used by a connector`
+    if (own !== 'sites' && Object.hasOwn(config.sites.get(), id)) return `"${id}" is already used by a website session`
+    return undefined
   }
   const without = <T>(record: Readonly<Record<string, T>>, id: string): Record<string, T> =>
     Object.fromEntries(Object.entries(record).filter(([key]) => key !== id))
-  const patch = async (change: Partial<Record<'servers' | 'custom' | 'connectors', object>>): Promise<void> => {
+  const patch = async (change: Partial<Record<'servers' | 'custom' | 'connectors' | 'sites', object>>): Promise<void> => {
     const settings = ctx.get('settings')
     if (settings === undefined || entryId === undefined) throw new Error('settings are not available in this profile')
     await settings.update(entryId, change)
+  }
+
+  /** Open the sign-in window of one website session on its own profile. */
+  const openSignIn = async (id: string, site: SiteEntry): Promise<void> => {
+    const browser = siteBrowser()
+    if (browser === undefined) throw new Error('no Chrome, Edge or Chromium browser was found on this machine; install one to sign in to websites')
+    await mkdir(profileOf(id), { recursive: true })
+    ;(config.browserLauncher ?? launchBrowser)(browser.path, signInArgs(profileOf(id), site.url))
+  }
+  const siteOf = (id: string): SiteEntry => {
+    const site = config.sites.get()[id]
+    if (site === undefined) throw new Error(`no website session has the id "${id}"`)
+    return site
   }
 
   const control: McpDirectoryControl = {
@@ -475,10 +540,53 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
       await auth.forget(id)
       await patch({ connectors: without(config.connectors.get(), id) })
     },
+    async sites() {
+      const browser = siteBrowser()
+      const rows: SiteStatus[] = []
+      for (const [id, site] of Object.entries(config.sites.get())) {
+        const url = siteUrl(site.url)
+        rows.push({
+          id, title: site.title ?? url?.hostname ?? id, url: site.url, host: url?.hostname ?? '', enabled: site.enabled,
+          note: url === undefined ? 'the address is not an http or https link' : browser === undefined ? 'needs Chrome, Edge or Chromium installed' : notes.get(id) ?? '',
+          playbook: (await readPlaybook(id)).trim() !== '',
+        })
+      }
+      return rows
+    },
+    async addSite(choice) {
+      const url = siteUrl(choice.url)
+      if (url === undefined) throw new Error('enter the website\'s address, such as reddit.com or https://www.reddit.com/login')
+      const base = siteId(url)
+      if (base === undefined) throw new Error(`a session cannot be named after "${url.hostname}"; use the website's domain name`)
+      const current = config.sites.get()
+      // A second sign-in to the same website reuses its session; a name another server holds gets a suffix.
+      const id = Object.hasOwn(current, base) || takenBy(base, 'sites') === undefined ? base : `${base.slice(0, 27)}-site`
+      const taken = Object.hasOwn(current, id) ? undefined : takenBy(id, 'sites')
+      if (taken !== undefined) throw new Error(taken)
+      const title = choice.title?.trim()
+      const entry: SiteEntry = { enabled: true, ...title === undefined || title === '' ? {} : { title }, url: url.href }
+      await openSignIn(id, entry)
+      await patch({ sites: { ...current, [id]: entry } })
+      return { id }
+    },
+    async openSite(id) {
+      await openSignIn(id, siteOf(id))
+    },
+    async removeSite(id) {
+      siteOf(id)
+      await patch({ sites: without(config.sites.get(), id) })
+      // The profile is locked while its browser is open; what is left behind is removed with the next session of that name.
+      await rm(join(sitesDir, id), { recursive: true, force: true, maxRetries: 3, retryDelay: 200 }).catch((error: unknown) => {
+        ctx.logger.warn('mcp-directory: could not delete the profile of website session %s: %s', id, error)
+      })
+      invalidateSkills()
+    },
     async skills() {
-      return Promise.all(SKILLS.map(async skill => ({
+      const builtin = BUILTIN_SKILLS.map(skill => ({ id: skill.name, title: skill.title, description: skill.description, license: 'MIT', state: 'builtin' as const }))
+      const listed = await Promise.all(SKILLS.map(async skill => ({
         id: skill.id, title: skill.title, description: skill.description, license: skill.license, state: await skillState(skill, skillsDir),
       })))
+      return [...builtin, ...listed]
     },
     async installSkill(id) {
       const skill = findSkill(id)
@@ -523,6 +631,104 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
     )
   })
   ctx.tools.register(defineTool({
+    name: 'site_connector',
+    description: 'Use websites as the person, with their own account: they sign in once in a browser window that keeps its own profile, and you '
+      + 'then drive that signed-in browser (any website works: no API key or app registration). list shows the sessions; add opens the sign-in '
+      + 'window for a website on the person\'s screen and creates its session, whose tools load with the group mcp-<id> and whose instructions '
+      + 'are the skill site-<id>; open shows the sign-in window again (to sign in afresh); learn records how to do something on that website in '
+      + 'its playbook for later sessions; remove deletes the session and its profile. Never type the person\'s password yourself.',
+    parameters: {
+      action: { type: 'string', required: true, description: 'list, add, open, learn or remove.' },
+      url: { type: 'string', description: 'For add: the website, such as reddit.com or https://www.reddit.com/login.' },
+      title: { type: 'string', description: 'For add: an optional name for the session.' },
+      id: { type: 'string', description: 'For open, learn and remove: the session id from list.' },
+      notes: { type: 'string', description: 'For learn: Markdown notes on how to do a task on this website (the page, the controls, what to wait for, pitfalls).' },
+      replace: { type: 'boolean', description: 'For learn: replace the whole playbook with notes instead of adding to it.' },
+    },
+    output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+    async execute(args, exec) {
+      if (args.action === 'list') {
+        const rows = await control.sites()
+        return rows.length === 0
+          ? 'No website sessions yet. Add one with action add and the website\'s address; the person then signs in in the window that opens.'
+          : rows.map(row => `${row.id} (${row.title}, ${row.host}) [${row.note === '' ? 'ready' : row.note}]: tools in group mcp-${row.id}, instructions in skill site-${row.id}${row.playbook ? ', playbook recorded' : ''}`).join('\n')
+      }
+      if (args.action === 'add') {
+        if (args.url === undefined || args.url.trim() === '') throw new Error('add needs url, the website to sign in to')
+        await approve(exec, `open a sign-in window for ${args.url.trim()} and keep its browser session`)
+        const { id } = await control.addSite({ url: args.url, title: args.title })
+        return `A browser window opened at ${siteOf(id).url} on the person's screen. Ask them to sign in there and to close that window when they are done; do not continue until they say so. Then load the tools with the group mcp-${id} and read the skill site-${id}. After you have worked out how the website's main tasks are done, record them with action learn so later sessions can repeat them.`
+      }
+      if (args.action !== 'open' && args.action !== 'learn' && args.action !== 'remove') throw new Error('action must be list, add, open, learn or remove')
+      const id = (args.id ?? '').trim()
+      const site = siteOf(id)
+      if (args.action === 'open') {
+        await control.openSite(id)
+        return `The sign-in window for ${site.url} opened on the person's screen. Ask them to finish there and close it before you use the session.`
+      }
+      if (args.action === 'remove') {
+        await approve(exec, `remove the website session ${id} and its sign-in`)
+        await control.removeSite(id)
+        return `Removed the website session ${id}; its sign-in and playbook are gone.`
+      }
+      const text = (args.notes ?? '').trim()
+      if (text === '') throw new Error('learn needs notes')
+      const before = args.replace === true ? '' : (await readPlaybook(id)).trim()
+      const next = before === '' ? text : `${before}\n\n${text}`
+      if (next.length > MAX_PLAYBOOK_CHARS) {
+        throw new Error(`the playbook would be ${String(next.length)} characters; the limit is ${String(MAX_PLAYBOOK_CHARS)}. Call learn with replace and a condensed playbook.`)
+      }
+      await mkdir(join(sitesDir, id), { recursive: true })
+      if (args.replace === true || before === '') await writeFile(playbookOf(id), `${text}\n`)
+      else await appendFile(playbookOf(id), `\n${text}\n`)
+      invalidateSkills()
+      ctx.emit('mcp-directory/changed')
+      return `Recorded in the playbook of ${id}; the skill site-${id} now includes it.`
+    },
+  }))
+
+  // Built-in skills and one skill per website session, provided from memory: nothing is installed or downloaded.
+  ctx.inject(['skills'], (scope) => {
+    const summary = (skillName: string, description: string, locator: unknown): SkillCandidate => ({
+      name: skillName, description, invocation: { modelInvocable: true, userInvocable: true },
+      provider: BUILTIN_SKILL_PROVIDER, source: 'bundled', rank: BUILTIN_SKILL_RANK, locator,
+    })
+    const provider: SkillProvider = {
+      name: BUILTIN_SKILL_PROVIDER,
+      list: () => Promise.resolve([
+        ...BUILTIN_SKILLS.map(skill => summary(skill.name, skill.description, { builtin: skill.name })),
+        ...Object.entries(config.sites.get()).flatMap(([id, site]) => {
+          const url = siteUrl(site.url)
+          return !site.enabled || url === undefined
+            ? []
+            : [summary(`site-${id}`, `Use the person's signed-in ${url.hostname} account (${site.title ?? url.hostname}) through its browser session: read pages and act as them.`, { site: id })]
+        }),
+      ]),
+      async get(candidate) {
+        const { rank: _rank, locator, ...rest } = candidate
+        const where = locator as { builtin?: string; site?: string }
+        if (where.builtin !== undefined) {
+          const skill = BUILTIN_SKILLS.find(entry => entry.name === where.builtin)
+          return skill === undefined ? undefined : { ...rest, content: skill.content }
+        }
+        const site = where.site === undefined ? undefined : config.sites.get()[where.site]
+        if (where.site === undefined || site === undefined || siteUrl(site.url) === undefined) return undefined
+        return { ...rest, content: siteSkillBody(where.site, site, await readPlaybook(where.site)) }
+      },
+    }
+    scope.effect(() => {
+      const dispose = scope.skills.registerProvider((registration) => {
+        invalidateSkills = registration.invalidate
+        return provider
+      })
+      return () => {
+        invalidateSkills = () => {}
+        dispose()
+      }
+    }, 'mcp-directory: built-in and website skills')
+  })
+
+  ctx.tools.register(defineTool({
     name: 'skill_directory',
     description: 'Browse and install skills from the curated skill directory (MCP server building, web app testing with Playwright, frontend design, '
       + 'Word, Excel, PowerPoint and PDF files, skill writing and more). list shows each skill and whether it is installed; install adds one '
@@ -540,7 +746,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
           const label = state === 'directory' ? 'installed' : state === 'other' ? 'a folder of this name exists' : 'not installed'
           return `${skill.id} (${skill.title}) [${label}]: ${skill.description} (${skill.license})`
         }))
-        return rows.join('\n')
+        return [...BUILTIN_SKILLS.map(skill => `${skill.name} (${skill.title}) [built in, always available]: ${skill.description}`), ...rows].join('\n')
       }
       if (args.action !== 'install' && args.action !== 'remove') throw new Error('action must be list, install or remove')
       const skill = args.skill === undefined ? undefined : findSkill(args.skill)

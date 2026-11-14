@@ -2513,7 +2513,6 @@ describe('per-program execution controls', () => {
 
   it.each([
     { sandbox_permissions: 'workspace-write' },
-    { justification: 'Need writes' },
     { sandbox_permissions: 'workspace-write', justification: ' ' },
     { sandbox_permissions: 'read-only', justification: 'No widening' },
   ])('rejects invalid escalation pairing or mode: %j', async (args) => {

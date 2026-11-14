@@ -462,6 +462,69 @@ export type Config = LocalConfig
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-bash-sandbox -->
 
+<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-browser-use-chrome-devtools-mcp -->
+<a id="hackdevcodedsh-browser-use-chrome-devtools-mcp"></a>
+
+## `@hackdevcode/dsh-browser-use-chrome-devtools-mcp`
+
+- `inject`: `browserUse` · `agents` · `tools` · `systemPrompt` · `workingDirectory`
+- `refs`: `BrowserMcpAttachConfig` (`@hackdevcode/dsh-browser-use-runtime/mcp`) · `BrowserMcpLaunchConfig` (`@hackdevcode/dsh-browser-use-runtime/mcp`)
+- `source`: [`packages/browser-use/browser-use-chrome-devtools-mcp/src/index.ts:67`](../packages/browser-use/browser-use-chrome-devtools-mcp/src/index.ts)
+
+```ts config-catalog
+/** Fixed Chromium launch, debugging-endpoint attachment, or connection to the running Chrome. */
+export type Config = ChromeLaunchConfig | ChromeAttachConfig | ChromeConnectConfig
+
+/** Launch Chrome for each live Session. */
+export interface ChromeLaunchConfig extends BrowserMcpLaunchConfig, ChromeCapabilities {
+  /**
+   * Use a throwaway profile that is deleted when the browser closes; defaults to true. With false the
+   * browser keeps one persistent profile, so sign-ins and cookies survive between sessions.
+   */
+  isolated?: boolean
+  /** Persistent profile directory used when `isolated` is false; omission uses the upstream default. */
+  userDataDir?: string
+  /** Chrome channel to launch; omission uses stable. */
+  channel?: ChromeChannel
+  /** Initial window size such as `1280x800`. */
+  viewport?: string
+}
+
+/** Attach to a browser through its debugging endpoint. */
+export interface ChromeAttachConfig extends BrowserMcpAttachConfig, ChromeCapabilities {}
+
+/**
+ * Connect to the person's own running Chrome (version 144 or newer) with its tabs and sign-ins. Chrome must
+ * have remote debugging switched on once from chrome://inspect/#remote-debugging.
+ */
+export interface ChromeConnectConfig extends ChromeCapabilities {
+  /** Connect to the running Chrome profile of this channel. */
+  mode: 'connect'
+  /** Chrome channel whose running browser is used; omission uses stable. */
+  channel?: ChromeChannel
+  /** Per-call timeout override in milliseconds; omission uses the MCP client default. */
+  toolCallTimeoutMs?: number
+}
+
+/** Capabilities shared by every Chrome connection mode. */
+export interface ChromeCapabilities {
+  /** Add coordinate tools such as click_at(x, y) for screenshot-driven control; defaults to false. */
+  vision?: boolean
+  /** Downscale screenshots wider than this many pixels, which keeps image tokens bounded. */
+  screenshotMaxWidth?: number
+  /** Expose performance tracing, Lighthouse and memory tools; defaults to false, which keeps every request smaller. */
+  performanceTools?: boolean
+  /** Expose device and network emulation tools; defaults to false. */
+  emulationTools?: boolean
+  /** Keep the Chrome tools out of every request until the agent loads the `chrome` group; defaults to true. */
+  onDemand?: boolean
+}
+
+/** Chrome release channels chrome-devtools-mcp accepts. */
+export type ChromeChannel = 'stable' | 'beta' | 'dev' | 'canary'
+```
+<!-- END GENERATED config-catalog:@hackdevcode/dsh-browser-use-chrome-devtools-mcp -->
+
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-client-connection -->
 <a id="hackdevcodedsh-client-connection"></a>
 
@@ -803,6 +866,38 @@ export interface ToolResultPruneConfig {
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-compaction-tool-result-pruner -->
 
+<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-computer-use-cua-driver-native -->
+<a id="hackdevcodedsh-computer-use-cua-driver-native"></a>
+
+## `@hackdevcode/dsh-computer-use-cua-driver-native`
+
+- `inject`: `computerUse` · `tools` · `systemPrompt`
+- `source`: [`packages/computer-use/computer-use-cua-driver-native/src/index.ts:25`](../packages/computer-use/computer-use-cua-driver-native/src/index.ts)
+
+```ts config-catalog
+/** Which part of the driver catalog the model sees. */
+export interface Config {
+  /**
+   * `essential` (default) leaves out tools agents rarely need (trajectory recording and replay, the agent cursor
+   * overlay, driver configuration and session bookkeeping, ffmpeg installation), which keeps every request smaller;
+   * `all` exposes the whole catalog.
+   */
+  toolset?: 'essential' | 'all'
+  /**
+   * Keep the desktop tools out of every request until the agent loads them: the `desktop` group holds the
+   * whole-desktop tools and the core window tools, `desktop-more` the rest of the driver catalog. Defaults to true.
+   */
+  onDemand?: boolean
+  /**
+   * Windows: how real input reaches windows of apps that run as administrator. `ask` (default) starts an
+   * administrator helper the first time it is needed, which shows Windows' UAC prompt for the person to approve;
+   * `off` refuses such input with an explanation.
+   */
+  elevation?: 'ask' | 'off'
+}
+```
+<!-- END GENERATED config-catalog:@hackdevcode/dsh-computer-use-cua-driver-native -->
+
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-cordis-host-runner -->
 <a id="hackdevcodedsh-cordis-host-runner"></a>
 
@@ -849,6 +944,21 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-credentials-local -->
+
+<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-cua-macos -->
+<a id="hackdevcodedsh-cua-macos"></a>
+
+## `@hackdevcode/dsh-cua-macos`
+
+- `inject`: `computerUse` · `tools` · `systemPrompt` · `subprocess` · `agents`
+- `refs`: [`CuaConfig`](../packages/computer-use/cua/src/index.ts)
+- `source`: [`packages/computer-use/cua-macos/src/index.ts:16`](../packages/computer-use/cua-macos/src/index.ts)
+
+```ts config-catalog
+/** Native preparation, operation bounds, and profile-local application grants. */
+export type Config = CuaConfig
+```
+<!-- END GENERATED config-catalog:@hackdevcode/dsh-cua-macos -->
 
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-deepseek-account-platform -->
 <a id="hackdevcodedsh-deepseek-account-platform"></a>
@@ -933,76 +1043,13 @@ export interface Config {
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-api-speech-to-text -->
 
-<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp -->
-<a id="hackdevcodedsh-experimental-browser-use-chrome-devtools-mcp"></a>
-
-## `@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp`
-
-- `inject`: `browserUse` · `agents` · `tools` · `systemPrompt` · `workingDirectory`
-- `refs`: `BrowserMcpAttachConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`) · `BrowserMcpLaunchConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`)
-- `source`: [`packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts:67`](../packages/experimental/browser-use-chrome-devtools-mcp/src/index.ts)
-
-```ts config-catalog
-/** Fixed Chromium launch, debugging-endpoint attachment, or connection to the running Chrome. */
-export type Config = ChromeLaunchConfig | ChromeAttachConfig | ChromeConnectConfig
-
-/** Launch Chrome for each live Session. */
-export interface ChromeLaunchConfig extends BrowserMcpLaunchConfig, ChromeCapabilities {
-  /**
-   * Use a throwaway profile that is deleted when the browser closes; defaults to true. With false the
-   * browser keeps one persistent profile, so sign-ins and cookies survive between sessions.
-   */
-  isolated?: boolean
-  /** Persistent profile directory used when `isolated` is false; omission uses the upstream default. */
-  userDataDir?: string
-  /** Chrome channel to launch; omission uses stable. */
-  channel?: ChromeChannel
-  /** Initial window size such as `1280x800`. */
-  viewport?: string
-}
-
-/** Attach to a browser through its debugging endpoint. */
-export interface ChromeAttachConfig extends BrowserMcpAttachConfig, ChromeCapabilities {}
-
-/**
- * Connect to the person's own running Chrome (version 144 or newer) with its tabs and sign-ins. Chrome must
- * have remote debugging switched on once from chrome://inspect/#remote-debugging.
- */
-export interface ChromeConnectConfig extends ChromeCapabilities {
-  /** Connect to the running Chrome profile of this channel. */
-  mode: 'connect'
-  /** Chrome channel whose running browser is used; omission uses stable. */
-  channel?: ChromeChannel
-  /** Per-call timeout override in milliseconds; omission uses the MCP client default. */
-  toolCallTimeoutMs?: number
-}
-
-/** Capabilities shared by every Chrome connection mode. */
-export interface ChromeCapabilities {
-  /** Add coordinate tools such as click_at(x, y) for screenshot-driven control; defaults to false. */
-  vision?: boolean
-  /** Downscale screenshots wider than this many pixels, which keeps image tokens bounded. */
-  screenshotMaxWidth?: number
-  /** Expose performance tracing, Lighthouse and memory tools; defaults to false, which keeps every request smaller. */
-  performanceTools?: boolean
-  /** Expose device and network emulation tools; defaults to false. */
-  emulationTools?: boolean
-  /** Keep the Chrome tools out of every request until the agent loads the `chrome` group; defaults to true. */
-  onDemand?: boolean
-}
-
-/** Chrome release channels chrome-devtools-mcp accepts. */
-export type ChromeChannel = 'stable' | 'beta' | 'dev' | 'canary'
-```
-<!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-browser-use-chrome-devtools-mcp -->
-
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-experimental-browser-use-playwright-mcp -->
 <a id="hackdevcodedsh-experimental-browser-use-playwright-mcp"></a>
 
 ## `@hackdevcode/dsh-experimental-browser-use-playwright-mcp`
 
 - `inject`: `browserUse` · `agents` · `tools` · `systemPrompt` · `workingDirectory`
-- `refs`: `BrowserMcpConfig` (`@hackdevcode/dsh-experimental-browser-use-runtime/mcp`)
+- `refs`: `BrowserMcpConfig` (`@hackdevcode/dsh-browser-use-runtime/mcp`)
 - `source`: [`packages/experimental/browser-use-playwright-mcp/src/index.ts:16`](../packages/experimental/browser-use-playwright-mcp/src/index.ts)
 
 ```ts config-catalog
@@ -1169,53 +1216,6 @@ export interface Config {
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-computer-use-cua-driver-mcp -->
-
-<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-experimental-computer-use-cua-driver-native -->
-<a id="hackdevcodedsh-experimental-computer-use-cua-driver-native"></a>
-
-## `@hackdevcode/dsh-experimental-computer-use-cua-driver-native`
-
-- `inject`: `computerUse` · `tools` · `systemPrompt`
-- `source`: [`packages/experimental/computer-use-cua-driver-native/src/index.ts:25`](../packages/experimental/computer-use-cua-driver-native/src/index.ts)
-
-```ts config-catalog
-/** Which part of the driver catalog the model sees. */
-export interface Config {
-  /**
-   * `essential` (default) leaves out tools agents rarely need (trajectory recording and replay, the agent cursor
-   * overlay, driver configuration and session bookkeeping, ffmpeg installation), which keeps every request smaller;
-   * `all` exposes the whole catalog.
-   */
-  toolset?: 'essential' | 'all'
-  /**
-   * Keep the desktop tools out of every request until the agent loads them: the `desktop` group holds the
-   * whole-desktop tools and the core window tools, `desktop-more` the rest of the driver catalog. Defaults to true.
-   */
-  onDemand?: boolean
-  /**
-   * Windows: how real input reaches windows of apps that run as administrator. `ask` (default) starts an
-   * administrator helper the first time it is needed, which shows Windows' UAC prompt for the person to approve;
-   * `off` refuses such input with an explanation.
-   */
-  elevation?: 'ask' | 'off'
-}
-```
-<!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-computer-use-cua-driver-native -->
-
-<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-experimental-cua-macos -->
-<a id="hackdevcodedsh-experimental-cua-macos"></a>
-
-## `@hackdevcode/dsh-experimental-cua-macos`
-
-- `inject`: `computerUse` · `tools` · `systemPrompt` · `subprocess` · `agents`
-- `refs`: [`CuaConfig`](../packages/experimental/cua/src/index.ts)
-- `source`: [`packages/experimental/cua-macos/src/index.ts:16`](../packages/experimental/cua-macos/src/index.ts)
-
-```ts config-catalog
-/** Native preparation, operation bounds, and profile-local application grants. */
-export type Config = CuaConfig
-```
-<!-- END GENERATED config-catalog:@hackdevcode/dsh-experimental-cua-macos -->
 
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-experimental-forge -->
 <a id="hackdevcodedsh-experimental-forge"></a>
@@ -2418,7 +2418,7 @@ export interface ReplayModelConfig {
 ## `@hackdevcode/dsh-llm-retry`
 
 - `inject`: `agents` · `sessionProjections`
-- `source`: [`packages/llm/llm-retry/src/index.ts:25`](../packages/llm/llm-retry/src/index.ts)
+- `source`: [`packages/llm/llm-retry/src/index.ts:26`](../packages/llm/llm-retry/src/index.ts)
 
 ```ts config-catalog
 /** This policy executor has no config; providers own `retryPolicy`. */
@@ -2566,7 +2566,7 @@ export interface ReconnectConfig {
 
 - `inject`: `tools`
 - `refs`: `OAuthClientProvider` (`@modelcontextprotocol/client`) · `Volatile` (`@hackdevcode/cosmokit`)
-- `source`: [`packages/mcp/mcp-directory/src/index.ts:95`](../packages/mcp/mcp-directory/src/index.ts)
+- `source`: [`packages/mcp/mcp-directory/src/index.ts:107`](../packages/mcp/mcp-directory/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config. */
@@ -2577,8 +2577,16 @@ export interface Config {
   custom: Volatile<Record<string, CustomServer>>
   /** Connectors the person added, by id. */
   connectors: Volatile<Record<string, ConnectorEntry>>
+  /** Websites the person signed in to, by id. */
+  sites: Volatile<Record<string, SiteEntry>>
   /** Test seam: the OAuth flow; the MCP SDK's when unset. */
   authRunner?: AuthRunner | undefined
+  /** Test seam: the Hack Dev Code home that holds skills and website profiles; resolved from the environment when unset. */
+  home?: string | undefined
+  /** Test seam: finds the browser website sessions run in; the installed Chrome, Edge or Chromium when unset. */
+  browserFinder?: (() => SiteBrowser | undefined) | undefined
+  /** Test seam: opens the sign-in window; starts the browser when unset. */
+  browserLauncher?: BrowserLauncher | undefined
 }
 
 /** One server the person turned on. */
@@ -2622,10 +2630,31 @@ export interface ConnectorEntry {
   url: string
 }
 
+/** One website session the person added. */
+export interface SiteEntry {
+  /** Use the session; a session turned off keeps its sign-in for later. */
+  enabled: boolean
+  /** Name shown for the session; its host when unset. */
+  title?: string | undefined
+  /** The page the sign-in window opens at. */
+  url: string
+}
+
 /** Runs one step of the authorization flow; the MCP SDK's `auth` in production. */
 export type AuthRunner = (
   provider: OAuthClientProvider, options: AuthStep,
 ) => Promise<'AUTHORIZED' | 'REDIRECT'>
+
+/** A browser found on this machine that can keep a profile and be driven afterwards. */
+export interface SiteBrowser {
+  /** Absolute path of the executable. */
+  path: string
+  /** How the browser MCP server names it: a channel, or `chromium` for a plain executable path. */
+  channel: 'chrome' | 'msedge' | 'chromium'
+}
+
+/** Starts a browser detached from Hack Dev Code; replaceable in tests. */
+export type BrowserLauncher = (path: string, args: readonly string[]) => void
 
 /** What one step of the authorization flow needs. */
 export interface AuthStep {
@@ -4153,7 +4182,7 @@ export interface Config {
 ## `@hackdevcode/dsh-tool-bash-persistent`
 
 - `inject`: `tools` · `terminals` · `workingDirectory`
-- `source`: [`packages/shell/tool-bash-persistent/src/index.ts:447`](../packages/shell/tool-bash-persistent/src/index.ts)
+- `source`: [`packages/shell/tool-bash-persistent/src/index.ts:445`](../packages/shell/tool-bash-persistent/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the persistent Bash tool. */
@@ -4279,7 +4308,7 @@ export interface Config {
 ## `@hackdevcode/dsh-tool-hackdev`
 
 - `inject`: `tools` · `workflowEngine` · `subagents` · `systemPrompt`
-- `source`: [`packages/hackdev/tool-hackdev/src/index.ts:34`](../packages/hackdev/tool-hackdev/src/index.ts)
+- `source`: [`packages/hackdev/tool-hackdev/src/index.ts:118`](../packages/hackdev/tool-hackdev/src/index.ts)
 
 ```ts config-catalog
 /** Deployment policy for the fixed Hack Dev Code pipelines. */
@@ -4314,6 +4343,26 @@ export interface Config {
   autonomy?: 'full' | 'bounded'
   /** Standing instructions from the user that every pipeline agent and the lead agent follow (default ''). */
   customInstructions?: string
+  /**
+   * Model each role runs on; empty inherits the conversation's model. `planner` leads (council, coordinator,
+   * integrator), `builder` builds (builders, swarm workers) and `verifier` audits (gates, fact-checker, swarm
+   * verifiers), so a strong model can plan and audit while a lighter one builds.
+   */
+  models?: RoleModels
+  /** Deployment ceiling for workers in one swarm (default 8). */
+  maxWorkers?: number
+  /** Deployment ceiling for swarm rounds: the first build plus the rounds that wake workers again (default 3). */
+  maxSwarmRounds?: number
+}
+
+/** A model per pipeline role; empty inherits. */
+export interface RoleModels {
+  /** Model for the council, splitter, integrator and swarm coordinator (default '', which inherits). */
+  planner?: string
+  /** Model for builders, worktree and merge managers and swarm workers (default '', which inherits). */
+  builder?: string
+  /** Model for the gates, the fact-checker and swarm verifiers (default '', which inherits). */
+  verifier?: string
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-tool-hackdev -->
@@ -4436,7 +4485,7 @@ export interface Config {
 ## `@hackdevcode/dsh-tool-pwsh-persistent`
 
 - `inject`: `tools` · `terminals` · `workingDirectory`
-- `source`: [`packages/shell/tool-pwsh-persistent/src/index.ts:458`](../packages/shell/tool-pwsh-persistent/src/index.ts)
+- `source`: [`packages/shell/tool-pwsh-persistent/src/index.ts:456`](../packages/shell/tool-pwsh-persistent/src/index.ts)
 
 ```ts config-catalog
 /** Configuration for the persistent pwsh tool. */
@@ -4588,6 +4637,23 @@ export interface PresetSelectionConfig {
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-tool-subagent -->
+
+<!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-tool-subagent-control -->
+<a id="hackdevcodedsh-tool-subagent-control"></a>
+
+## `@hackdevcode/dsh-tool-subagent-control`
+
+- `inject`: `tools` · `subagents` · `agents`
+- `source`: [`packages/subagent/tool-subagent-control/src/index.ts:39`](../packages/subagent/tool-subagent-control/src/index.ts)
+
+```ts config-catalog
+/** Plugin config. */
+export interface Config {
+  /** Folder the team boards are kept in; `team-boards` under the Hack Dev Code home when unset. */
+  boardDir?: string
+}
+```
+<!-- END GENERATED config-catalog:@hackdevcode/dsh-tool-subagent-control -->
 
 <!-- BEGIN GENERATED config-catalog:@hackdevcode/dsh-tool-terminal -->
 <a id="hackdevcodedsh-tool-terminal"></a>
@@ -5023,7 +5089,7 @@ export interface Config {
 ## `@hackdevcode/dsh-workspace-changes`
 
 - `inject`: `subprocess` · `fs`
-- `source`: [`packages/deliverables/workspace-changes/src/index.ts:34`](../packages/deliverables/workspace-changes/src/index.ts)
+- `source`: [`packages/deliverables/workspace-changes/src/index.ts:37`](../packages/deliverables/workspace-changes/src/index.ts)
 
 ```ts config-catalog
 /** Snapshot, capture, and comparison bounds. Invalid values fail plugin load. */
@@ -5041,6 +5107,11 @@ export interface Config {
   maxFileBytes: number
   /** Milliseconds a line comparison may run before it degrades to whole-file replacement. */
   diffTimeoutMs: number
+  /**
+   * Directory for durable checkpoints, so a workspace can be rewound after its Session ends: snapshot objects and a
+   * per-Session index of each turn's snapshots. Empty uses `checkpoints` in the Hack Dev Code home.
+   */
+  checkpointDir: string
 }
 ```
 <!-- END GENERATED config-catalog:@hackdevcode/dsh-workspace-changes -->
@@ -5126,7 +5197,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@hackdevcode/dsh-config-editor` | `loader` · `profileContext` | [`packages/boot/config-editor/src/index.ts`](../packages/boot/config-editor/src/index.ts) |
 | `@hackdevcode/dsh-cordis-client-runner` | — | [`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts) |
 | `@hackdevcode/dsh-creation-recommendations` | `tools` · `pluginManager` · `agents` · `subagents` · `profileContext` · `skills` · `actionCards` | [`packages/experimental/creation-recommendations/src/index.ts`](../packages/experimental/creation-recommendations/src/index.ts) |
-| `@hackdevcode/dsh-cua` | — | [`packages/experimental/cua/src/index.ts`](../packages/experimental/cua/src/index.ts) |
+| `@hackdevcode/dsh-cua` | — | [`packages/computer-use/cua/src/index.ts`](../packages/computer-use/cua/src/index.ts) |
 | `@hackdevcode/dsh-customize` | — | [`packages/customize/customize/src/index.ts`](../packages/customize/customize/src/index.ts) |
 | `@hackdevcode/dsh-deepseek-llm-api-extensions` | — | [`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../packages/llm/deepseek-llm-api-extensions/src/index.ts) |
 | `@hackdevcode/dsh-deliverable-file-references` | `systemPrompt` | [`packages/deliverables/deliverable-file-references/src/index.ts`](../packages/deliverables/deliverable-file-references/src/index.ts) |
@@ -5166,7 +5237,6 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 | `@hackdevcode/dsh-tool-cordis` | `tools` · `cordisInspect` | [`packages/extensions/tool-cordis/src/index.ts`](../packages/extensions/tool-cordis/src/index.ts) |
 | `@hackdevcode/dsh-tool-executor-native` | `tools` | [`packages/core/tool-executor-native/src/index.ts`](../packages/core/tool-executor-native/src/index.ts) |
 | `@hackdevcode/dsh-tool-schedule` | `tools` | [`packages/schedule/tool-schedule/src/index.ts`](../packages/schedule/tool-schedule/src/index.ts) |
-| `@hackdevcode/dsh-tool-subagent-control` | `tools` · `subagents` · `agents` | [`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts) |
 | `@hackdevcode/dsh-tool-working-directory` | `tools` · `workingDirectory` | [`packages/session/tool-working-directory/src/index.ts`](../packages/session/tool-working-directory/src/index.ts) |
 | `@hackdevcode/dsh-tools` | `systemPrompt` | [`packages/core/tools/src/index.ts`](../packages/core/tools/src/index.ts) |
 | `@hackdevcode/dsh-user-questions` | — | [`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts) |
@@ -5212,6 +5282,7 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@hackdevcode/dsh-atomic-write` | — | [`packages/util/atomic-write/src/index.ts`](../packages/util/atomic-write/src/index.ts) |
 | `@hackdevcode/dsh-base` | — | [`packages/bundle/base/src/index.ts`](../packages/bundle/base/src/index.ts) |
 | `@hackdevcode/dsh-brand` | — | [`packages/util/brand/src/index.ts`](../packages/util/brand/src/index.ts) |
+| `@hackdevcode/dsh-browser-use-runtime` | — | [`packages/browser-use/browser-use-runtime/src/index.ts`](../packages/browser-use/browser-use-runtime/src/index.ts) |
 | `@hackdevcode/dsh-chunked-list` | — | [`packages/util/chunked-list/src/index.ts`](../packages/util/chunked-list/src/index.ts) |
 | `@hackdevcode/dsh-client-store` | — | [`packages/client/store/src/index.ts`](../packages/client/store/src/index.ts) |
 | `@hackdevcode/dsh-client-test-runtime` | — | [`packages/test-support/client-runtime/src/index.ts`](../packages/test-support/client-runtime/src/index.ts) |
@@ -5220,11 +5291,10 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 | `@hackdevcode/dsh-client-ui-slots` | — | [`packages/client/ui-slots/src/index.ts`](../packages/client/ui-slots/src/index.ts) |
 | `@hackdevcode/dsh-client-web` | — | [`packages/client/web/src/index.ts`](../packages/client/web/src/index.ts) |
 | `@hackdevcode/dsh-cmdline` | — | [`packages/boot/cmdline/src/index.ts`](../packages/boot/cmdline/src/index.ts) |
-| `@hackdevcode/dsh-cua-bundle` | — | [`packages/experimental/cua-bundle/src/index.ts`](../packages/experimental/cua-bundle/src/index.ts) |
+| `@hackdevcode/dsh-cua-bundle` | — | [`packages/bundle/cua-bundle/src/index.ts`](../packages/bundle/cua-bundle/src/index.ts) |
 | `@hackdevcode/dsh-deque` | — | [`packages/util/deque/src/index.ts`](../packages/util/deque/src/index.ts) |
 | `@hackdevcode/dsh-experimental-agent-team-profile` | — | [`packages/experimental/agent-team-profile/src/index.ts`](../packages/experimental/agent-team-profile/src/index.ts) |
 | `@hackdevcode/dsh-experimental-badge-skill-bundle` | — | [`packages/experimental/badge-skill-bundle/src/index.ts`](../packages/experimental/badge-skill-bundle/src/index.ts) |
-| `@hackdevcode/dsh-experimental-browser-use-runtime` | — | [`packages/experimental/browser-use-runtime/src/index.ts`](../packages/experimental/browser-use-runtime/src/index.ts) |
 | `@hackdevcode/dsh-experimental-cot-translation-bundle` | — | [`packages/experimental/cot-translation-bundle/src/index.ts`](../packages/experimental/cot-translation-bundle/src/index.ts) |
 | `@hackdevcode/dsh-experimental-forge-bundle` | — | [`packages/experimental/forge-bundle/src/index.ts`](../packages/experimental/forge-bundle/src/index.ts) |
 | `@hackdevcode/dsh-experimental-inspector-profile` | — | [`packages/experimental/inspector-profile/src/index.ts`](../packages/experimental/inspector-profile/src/index.ts) |

@@ -162,7 +162,12 @@ export function captureLocalResult(activation: LocalActivation): SubagentResult 
   if (structured !== undefined) {
     const captured = structured.captured()
     if (captured !== undefined) return { output, stopReason, structured: captured.value }
-    if (stopReason === 'completed') return { output, stopReason: 'error' }
+    if (stopReason === 'completed') {
+      // A child that wrote its result as text instead of calling the tool still finished, when the text matches.
+      const text = output.map(block => block.type === 'text' ? block.text : '').join('\n')
+      const recovered = structured.recover(text)
+      return recovered === undefined ? { output, stopReason: 'error' } : { output, stopReason, structured: recovered.value }
+    }
   }
   return { output, stopReason }
 }

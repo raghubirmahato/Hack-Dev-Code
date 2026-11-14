@@ -37,12 +37,12 @@ This table connects model-visible tool names to the plugin package and service s
 | `@hackdevcode/dsh-tool-schedule` | `schedule_create`, `schedule_delete`, `schedule_list`, `schedule_update` | `ctx.tools`, `ctx.schedule` | `tool/call`, `Schedule storage domain create, update, or delete`, `tool/result` | - | A preset or Agent scope mounts this package; the preset decides which agents receive the four management tools. Each call acts on the calling Agent's Session. Accepts after_seconds, explicit absolute at, bounded fixed-rate every_seconds, daily and weekly local times in an explicit IANA zone, and cron as a five-field expression. Management uses the Host storage domain; due messages resume the original Session. |
 | `@hackdevcode/dsh-tool-lsp` | `lsp` | `ctx.workingDirectory`, `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@hackdevcode/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@hackdevcode/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
-| `@hackdevcode/dsh-tool-hackdev` | `hackdev`, `hackdev_review` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every pipeline child)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | Two fixed pipelines (hackdev and hackdev_review) run a planning council, parallel builders with shared memory and three review gates over the workflow seam; the model selects only the mission text and optional caps within deployment ceilings. |
+| `@hackdevcode/dsh-tool-hackdev` | `hackdev`, `hackdev_review`, `hackdev_swarm` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every pipeline child)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | Two fixed pipelines (hackdev and hackdev_review) run a planning council, parallel builders with shared memory and three review gates over the workflow seam; the model selects only the mission text and optional caps within deployment ceilings. |
 | `@hackdevcode/dsh-tool-skill` | `skill` | `ctx.workingDirectory`, `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
 | `@hackdevcode/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `ctx.agents`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
 | `@hackdevcode/dsh-experimental-tool-subagent-oar` | `subagent_oar` | `ctx.tools`, `ctx.subagents` | `tool/call`, `tool/result`, `parent subagent catalog and completion notices` | - | The subagent_oar tool selects among configured aliases for external providers. This catalog shows Codex and Claude Code aliases; each deployment chooses its providers. Native model and permission settings belong to the selected provider configuration. |
 | `@hackdevcode/dsh-tool-subagent` | `list_subagent_models`, `subagent` | `ctx.tools`, `ctx.subagents`, `ctx.systemPrompt`, `ctx.sessionProjections`, `ctx.llm for model discovery and selected-route validation` | `tool/call`, `tool/result`, `child session events through the chosen provider` | `subagent`, `subagent_fork` | The load-time `toolName` selects the delegation name (default `subagent`); `modelSelection` adds optional route fields. `modelDiscovery` defaults off and registers shared discovery on one instance per scope. Web and Desktop presets enable spawn discovery and route fields and leave `subagent_fork` route fields disabled. The Host settings service records authorization for each new top-level Session; child Sessions inherit it. Without a recorded policy, discovery and explicit selection permit only the current parent route. Every delegation returns a child id promptly; local children accept follow-ups, while external backends report their single execution automatically. |
-| `@hackdevcode/dsh-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message` | `ctx.tools`, `ctx.subagents`, `ctx.agents` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The globally named discovery, interruption, and local-message tools over managed subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while one instance of this package registers `send_message`, `interrupt_agent`, and `list_agents`. |
+| `@hackdevcode/dsh-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message`, `team_board` | `ctx.tools`, `ctx.subagents`, `ctx.agents` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The globally named discovery, interruption, and local-message tools over managed subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while one instance of this package registers `send_message`, `interrupt_agent`, and `list_agents`. |
 | `@hackdevcode/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands and PTY sends are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@hackdevcode/dsh-experimental-tool-agent-team` | `interrupt_agent`, `list_agents`, `send_message`, `spawn_teammate`, `team_task_create`, `team_task_get`, `team_task_list`, `team_task_update`, `wait_agent` | `ctx.tools`, `ctx.systemPrompt`, `ctx.agentTeams`, `an exact live Team member Agent` | `tool/call`, `team/member`, `team/task`, `agent/inbox/spliced`, `user/message on inbox claim`, `tool/result` | - | All nine tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names. |
 | `@hackdevcode/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
@@ -705,7 +705,8 @@ Execute a bash command (`bash -c`) and return its stdout/stderr. Each call runs 
   "properties": {
     "description": {
       "type": "string",
-      "description": "Clear, concise description of what this command does in active voice, 5-10 words (shown in the UI). Examples: \"ls\" → \"List files in current directory\"; \"git status\" → \"Show working tree status\"; \"npm install\" → \"Install package dependencies\"."
+      "description": "Clear, concise description of what this command does in active voice, 5-10 words (shown in the UI). Examples: \"ls\" → \"List files in current directory\"; \"git status\" → \"Show working tree status\"; \"npm install\" → \"Install package dependencies\".",
+      "default": ""
     },
     "command": {
       "type": "string",
@@ -793,7 +794,8 @@ Execute a PowerShell command (`pwsh -Command`) and return its stdout/stderr. Eac
   "properties": {
     "description": {
       "type": "string",
-      "description": "Clear, concise description of what this command does in active voice, 5-10 words (shown in the UI). Examples: \"ls\" → \"List files in current directory\"; \"git status\" → \"Show working tree status\"; \"Get-Process\" → \"List running processes\"."
+      "description": "Clear, concise description of what this command does in active voice, 5-10 words (shown in the UI). Examples: \"ls\" → \"List files in current directory\"; \"git status\" → \"Show working tree status\"; \"Get-Process\" → \"List running processes\".",
+      "default": ""
     },
     "command": {
       "type": "string",
@@ -1943,6 +1945,55 @@ Run only the three Hack Dev Code gates on the current workspace: a verifier for 
 
 Source: [`packages/hackdev/tool-hackdev/src/index.ts`](../packages/hackdev/tool-hackdev/src/index.ts)
 
+### `hackdev_swarm`
+
+Run a swarm for one mission: a coordinator maps the project, names a team of workers and gives each a brief (what it owns, what it must not touch, what done means); the workers build in parallel, each in its own worktree when isolation is on, and coordinate only through one shared message board (assignments, questions, diff summaries, test results); one adversarial verifier per two to four workers re-runs the tests, challenges every diff and sends problems back to the worker that wrote the code, which wakes it for another round; the coordinator answers questions between rounds and finally checks every acceptance criterion. Writes .hackdev/swarm/BOARD.md, .hackdev/RUN_REPORT.md and .hackdev/PROGRESS.md. Every worker is a full agent, so a swarm uses far more model quota than one conversation: use it for builds that really split into parallel pieces, or when the person asks for a swarm. The call blocks until the swarm settles.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "mission": {
+      "type": "string",
+      "description": "The complete mission: what to build or change, constraints, stack preferences and acceptance expectations."
+    },
+    "maxWorkers": {
+      "type": "number",
+      "description": "Optional cap on the workers the coordinator may add, bounded by the deployment ceiling."
+    },
+    "maxRounds": {
+      "type": "number",
+      "description": "Optional cap on rounds (the first build plus the rounds that wake workers to resolve problems), bounded by the deployment ceiling."
+    },
+    "review": {
+      "type": "boolean",
+      "description": "Also run the verifier, quality/UX and security gates on the merged result once the swarm settles (default false)."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional instructions from the person posted on the board to every member, such as priorities or things to avoid."
+    },
+    "coordinatorModel": {
+      "type": "string",
+      "description": "Optional model for the coordinator, when the person names one."
+    },
+    "workerModel": {
+      "type": "string",
+      "description": "Optional model for the workers, when the person names one."
+    },
+    "verifierModel": {
+      "type": "string",
+      "description": "Optional model for the verifiers, when the person names one."
+    }
+  },
+  "required": [
+    "mission"
+  ]
+}
+```
+
+Source: [`packages/hackdev/tool-hackdev/src/index.ts`](../packages/hackdev/tool-hackdev/src/index.ts)
+
 Two fixed pipelines (hackdev and hackdev_review) run a planning council, parallel builders with shared memory and three review gates over the workflow seam; the model selects only the mission text and optional caps within deployment ceilings.
 
 <a id="hackdevcodedsh-tool-skill"></a>
@@ -2375,6 +2426,63 @@ Send a message to an agent. A working agent receives it at its next step; an idl
   "required": [
     "agent_id",
     "message"
+  ]
+}
+```
+
+Source: [`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts)
+
+### `team_board`
+
+The shared board of every agent working on this task: you, the agent that started you, the agents you started and their siblings. post writes a note, question, answer, warning or done notice; it reaches the agents it is for at their next step, even while they are working, so use it to steer a running subagent, to ask the agent that started you a question, or to tell a sibling about an interface it depends on. read shows the newest posts and who has claimed which files. claim records the files or folders you are about to edit and tells you when another agent already holds an overlapping path; release gives them up. Posts addressed to you arrive on their own: you do not need to poll with read.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "description": "post, read, claim or release.",
+      "enum": [
+        "post",
+        "read",
+        "claim",
+        "release"
+      ]
+    },
+    "text": {
+      "type": "string",
+      "description": "For post: what to tell the others, at most 1200 characters."
+    },
+    "kind": {
+      "type": "string",
+      "description": "For post: note (default), question, answer, warning or done.",
+      "enum": [
+        "note",
+        "question",
+        "answer",
+        "warning",
+        "done"
+      ]
+    },
+    "to": {
+      "type": "string",
+      "description": "For post: all (default), parent, or the agent id of the one agent it is for (from list_agents or an earlier post)."
+    },
+    "as": {
+      "type": "string",
+      "description": "The short name you go by on the board, such as api or tests; kept from your first post or claim."
+    },
+    "paths": {
+      "type": "array",
+      "description": "For claim and release: files or folders, relative to the workspace.",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "action"
   ]
 }
 ```
@@ -2857,7 +2965,7 @@ Explicit experimental composition only. Creates a new branch and checkout from a
 Run a JavaScript workflow script that orchestrates subagents at scale. Use this for work that fans out across many independent pieces — an audit over many files, a migration, multi-angle research, adversarial verification of findings — where you write the orchestration as a script instead of delegating turn by turn.
 
 Script-body hooks:
-- `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), and independent `provider`/`model` LLM target overrides.
+- `agent(prompt, opts?): Promise<any>` — run one subagent to completion. Without `opts.schema` it resolves to the child's final text; with `opts.schema` (an object-rooted JSON Schema using ONLY type/properties/required/additionalProperties/items/enum/const/oneOf) it resolves to the validated object. Resolves `null` when the child fails (filter with `.filter(Boolean)`). Other opts: `label` (display), `phase` (progress group), independent `provider`/`model` LLM target overrides, and `session`: a name for the conversation; a later call with the same name continues that child with its whole history instead of starting a fresh one.
 - `pipeline(items, ...stages): Promise<any[]>` — run each item through the stages independently with NO barrier between stages (prefer this for multi-stage work). Each stage receives `(prev, item, index)`. A stage throw drops that ITEM to `null` and skips its remaining stages.
 - `parallel(thunks): Promise<any[]>` — run zero-argument functions concurrently and await ALL of them (a barrier; use only when a stage genuinely needs every prior result together). A throwing thunk resolves to `null`.
 - `phase(title)` — start a progress phase; `log(message)` — narrate progress; `args` — the tool call's `args` input, verbatim.

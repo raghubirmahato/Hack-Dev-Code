@@ -139,6 +139,8 @@ export interface ISessions {
     onCreated?: (childId: SessionId) => void
     /** False refuses source migration; omission preserves the Host default. */
     allowMigration?: boolean
+    /** Rewind: also put the workspace's files back to how they were at `atSeq`. */
+    restoreFiles?: boolean
   }): Promise<SessionId>
   /**
    * Borrow an already-retained Agent-scoped Context without extending its lifetime.

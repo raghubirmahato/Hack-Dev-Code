@@ -22,6 +22,13 @@ function fakeDirectory(calls: unknown[][]): McpDirectoryControl {
       id: 'notion', title: 'Notion', description: 'Notes', homepage: 'https://example.com', url: 'https://example.com/mcp',
       custom: false, added: false, signedIn: false,
     }],
+    sites: async () => [{ id: 'reddit', title: 'Reddit', url: 'https://www.reddit.com/', host: 'www.reddit.com', enabled: true, note: '', playbook: false }],
+    addSite: async (site) => {
+      calls.push(['addSite', site])
+      return { id: 'reddit' }
+    },
+    openSite: record('openSite'),
+    removeSite: record('removeSite'),
     skills: async () => [{ id: 'pdf', title: 'PDF', description: 'Read PDFs', license: 'MIT', state: 'no' }],
     setServer: record('setServer'),
     saveCustom: record('saveCustom'),
@@ -57,7 +64,7 @@ describe('Customize', () => {
   it('declares the Remote methods a settings page calls', async () => {
     const customize = await harness(fakeDirectory([]))
     expect(remoteMethods(customize).map(entry => entry.method).sort()).toEqual([
-      'connect', 'disconnect', 'installSkill', 'read', 'removeCustom', 'removeSkill', 'saveCustom', 'setServer',
+      'addSite', 'connect', 'disconnect', 'installSkill', 'openSite', 'read', 'removeCustom', 'removeSite', 'removeSkill', 'saveCustom', 'setServer',
     ])
   })
 
@@ -66,6 +73,7 @@ describe('Customize', () => {
     const snapshot = await customize.read()
     expect(snapshot.servers.map(server => server.id)).toEqual(['time'])
     expect(snapshot.connectors.map(connector => connector.id)).toEqual(['notion'])
+    expect(snapshot.sites.map(site => site.id)).toEqual(['reddit'])
     expect(snapshot.skills.map(skill => skill.id)).toEqual(['pdf'])
   })
 
@@ -84,6 +92,15 @@ describe('Customize', () => {
       ['installSkill', 'pdf'],
       ['removeSkill', 'pdf'],
     ])
+  })
+
+  it('adds, reopens and removes a website session', async () => {
+    const calls: unknown[][] = []
+    const customize = await harness(fakeDirectory(calls))
+    expect(await customize.addSite({ url: 'reddit.com' })).toEqual({ id: 'reddit' })
+    await customize.openSite('reddit')
+    await customize.removeSite('reddit')
+    expect(calls).toEqual([['addSite', { url: 'reddit.com' }], ['openSite', 'reddit'], ['removeSite', 'reddit']])
   })
 
   it('returns the sign-in link only when the directory gives one', async () => {

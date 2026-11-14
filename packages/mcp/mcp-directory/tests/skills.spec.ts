@@ -30,7 +30,7 @@ describe('the skill directory', () => {
   it('lists open-licensed skills with unique folder names', () => {
     const ids = SKILLS.map(skill => skill.id)
     expect(new Set(ids).size).toBe(ids.length)
-    for (const skill of SKILLS) expect(skill.license).toBe('Apache-2.0')
+    for (const skill of SKILLS) expect(['Apache-2.0', 'MIT']).toContain(skill.license)
     expect(findSkill('Web app testing')?.id).toBe('webapp-testing')
     expect(findSkill('nothing')).toBeUndefined()
   })

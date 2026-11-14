@@ -81,6 +81,30 @@ function latestCompletedPrefixBoundary(events: readonly SessionEvent[]): Session
   return boundary
 }
 
+/** The part of the workspace-changes service a rewind uses; the service is optional on a Host. */
+interface WorkspaceRewinder {
+  restore(
+    sessionId: SessionId, cwd: string, afterTurn: number, signal: AbortSignal,
+  ): Promise<{ restored: readonly string[]; removed: readonly string[] }>
+}
+
+/** Milliseconds a file rewind may take before it is abandoned. */
+const REWIND_TIMEOUT_MS = 120_000
+
+/**
+ * The turn an event belongs to, counting a point between turns as the turn that ended before it.
+ * @param events - the Session's events.
+ * @param seq - the point.
+ * @returns the turn number, or 0 before the first turn.
+ */
+function turnAt(events: readonly SessionEvent[], seq: number): number {
+  for (let index = Math.min(seq, events.length - 1); index >= 0; index -= 1) {
+    const event = events[index]
+    if (event?.type === 'turn/end' || event?.type === 'turn/start') return event.data.turn
+  }
+  return 0
+}
+
 /** Implements Session business commands delegated by the Session Controller Remote service. */
 export class SessionCommandController {
   /**
@@ -94,12 +118,6 @@ export class SessionCommandController {
     private readonly defaultCwd: string,
   ) {}
 
-  /**
-   * Create one ordinary Session for a new conversation, reusing the named
-   * blank Session while it is an unarchived member of the requested Workspace.
-   * @param request - optional blank Session to reuse, location, and Agent preset.
-   * @returns the created or reused Session identity and its preset when configured.
-   */
   /**
    * Start new Sessions on a model that works: when no default was chosen yet, or its provider is not registered,
    * save the first available model. A default that is set is never re-listed here, and a slow provider cannot hold
@@ -117,6 +135,12 @@ export class SessionCommandController {
     ])
   }
 
+  /**
+   * Create one ordinary Session for a new conversation, reusing the named
+   * blank Session while it is an unarchived member of the requested Workspace.
+   * @param request - optional blank Session to reuse, location, and Agent preset.
+   * @returns the created or reused Session identity and its preset when configured.
+   */
   async create(request: SessionCreateRequest): Promise<SessionCreateValue> {
     await this.settleDefaultModel()
     if (request.workspaceId !== undefined && request.cwd !== undefined) {
@@ -263,6 +287,9 @@ export class SessionCommandController {
       )
     }
     const seed = buildForkSeed(source.events, boundary)
+    const restoredFiles = request.restoreFiles === true
+      ? await this.rewindFiles(request.sessionId, source.header.cwd, turnAt(source.events, boundary))
+      : undefined
     let workspace: Workspace | undefined
     try {
       workspace = await this.forkWorkspace(source.header)
@@ -310,7 +337,30 @@ export class SessionCommandController {
         )
       }
     }
-    return { sessionId: childId }
+    return { sessionId: childId, ...restoredFiles === undefined ? {} : { restoredFiles } }
+  }
+
+  /**
+   * Put a Session's workspace files back to how they were after one of its turns, for a rewind.
+   * @param sessionId - the Session being rewound.
+   * @param cwd - its working directory.
+   * @param afterTurn - the last turn whose file changes stay.
+   * @returns how many files were written back and removed.
+   * @throws RemoteError when the Session has no working directory, the Host cannot rewind files, or the restore fails.
+   */
+  private async rewindFiles(
+    sessionId: SessionId, cwd: string | undefined, afterTurn: number,
+  ): Promise<{ restored: number; removed: number }> {
+    const changes = (this.ctx as unknown as { get(name: string): unknown }).get('workspaceChanges') as WorkspaceRewinder | undefined
+    if (cwd === undefined || changes === undefined) {
+      throw new RemoteError('session/rewind-failed', `session "${sessionId}" cannot rewind files: ${cwd === undefined ? 'it has no working directory' : 'this Host does not record workspace changes'}`, { sessionId })
+    }
+    try {
+      const outcome = await changes.restore(sessionId, cwd, afterTurn, AbortSignal.timeout(REWIND_TIMEOUT_MS))
+      return { restored: outcome.restored.length, removed: outcome.removed.length }
+    } catch (error) {
+      throw new RemoteError('session/rewind-failed', `could not rewind the files of session "${sessionId}": ${String(error)}`, { sessionId })
+    }
   }
 
   /**

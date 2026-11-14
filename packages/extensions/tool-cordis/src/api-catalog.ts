@@ -2028,6 +2028,102 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'mcpAuth',
+    summary: 'The optional `mcpAuth` service: whoever keeps OAuth sign-ins for remote MCP servers publishes it, and a Streamable HTTP connection asks it for the server\'s sign-in before it connects.',
+    description: 'The optional `mcpAuth` service: whoever keeps OAuth sign-ins for remote MCP servers publishes it, and a Streamable HTTP connection asks it for the server\'s sign-in before it connects.',
+    methods: [
+      {
+        signature: 'provider(serverName: string): OAuthClientProvider | undefined',
+        description: 'The stored sign-in for one server.',
+        parameters: [{ name: 'serverName', description: 'the connection\'s `serverName`.' }],
+        returns: 'the provider the transport authenticates with, or `undefined` when the server has no sign-in.',
+      },
+    ],
+  },
+  {
+    key: 'mcpDirectory',
+    summary: 'The directory\'s changes for a settings page.',
+    description: 'The directory\'s changes for a settings page. The person makes these directly, so none asks for approval.',
+    methods: [
+      {
+        signature: 'servers(): Promise<ServerStatus[]>',
+        description: 'List the directory servers and the person\'s own.',
+        parameters: [],
+        returns: 'the directory servers and the person\'s own.',
+      },
+      {
+        signature: 'setServer(id: string, change: ServerChange): Promise<void>',
+        description: 'Turn a server on or off.',
+        parameters: [{ name: 'id', description: 'a directory or custom server id.' }, { name: 'change', description: 'the new state.' }],
+      },
+      {
+        signature: 'saveCustom(id: string, server: CustomServer): Promise<void>',
+        description: 'Add or replace one of the person\'s own servers.',
+        parameters: [{ name: 'id', description: 'the server id.' }, { name: 'server', description: 'the server.' }],
+      },
+      {
+        signature: 'removeCustom(id: string): Promise<void>',
+        description: 'Remove one of the person\'s own servers.',
+        parameters: [{ name: 'id', description: 'the server id.' }],
+      },
+      {
+        signature: 'connectors(): Promise<ConnectorStatus[]>',
+        description: 'List the catalog connectors and the person\'s own.',
+        parameters: [],
+        returns: 'the catalog connectors and the person\'s own.',
+      },
+      {
+        signature: 'connect(connector: ConnectorChoice): Promise<{ authorizeUrl?: string }>',
+        description: 'Add a connector and start its sign-in.',
+        parameters: [{ name: 'connector', description: 'the connector.' }],
+        returns: 'the link the person opens to approve access, or nothing when the stored sign-in still works.',
+      },
+      {
+        signature: 'disconnect(id: string): Promise<void>',
+        description: 'Sign out of a connector and remove it.',
+        parameters: [{ name: 'id', description: 'the connector id.' }],
+      },
+      {
+        signature: 'sites(): Promise<SiteStatus[]>',
+        description: 'List the website sessions the person added.',
+        parameters: [],
+        returns: 'the sessions.',
+      },
+      {
+        signature: 'addSite(site: SiteChoice): Promise<{ id: string }>',
+        description: 'Add a website session and open its sign-in window on this machine.',
+        parameters: [{ name: 'site', description: 'the website.' }],
+        returns: 'the id the session is stored under.',
+      },
+      {
+        signature: 'openSite(id: string): Promise<void>',
+        description: 'Open a session\'s sign-in window again, to sign in afresh or to check the account.',
+        parameters: [{ name: 'id', description: 'the session id.' }],
+      },
+      {
+        signature: 'removeSite(id: string): Promise<void>',
+        description: 'Remove a website session with its browser profile and playbook.',
+        parameters: [{ name: 'id', description: 'the session id.' }],
+      },
+      {
+        signature: 'skills(): Promise<SkillStatus[]>',
+        description: 'List the built-in and directory skills.',
+        parameters: [],
+        returns: 'the directory skills.',
+      },
+      {
+        signature: 'installSkill(id: string): Promise<void>',
+        description: 'Install a directory skill.',
+        parameters: [{ name: 'id', description: 'the skill id.' }],
+      },
+      {
+        signature: 'removeSkill(id: string): Promise<void>',
+        description: 'Remove a skill the directory installed.',
+        parameters: [{ name: 'id', description: 'the skill id.' }],
+      },
+    ],
+  },
+  {
     key: 'mcpResources',
     summary: 'Scoped resource access plus three tools shared by configured MCP servers.',
     description: 'Scoped resource access plus three tools shared by configured MCP servers.',
@@ -2621,7 +2717,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
       },
       {
         signature: '@Remote async initializeDefaultModel(): Promise<void>',
-        description: 'Select the first available account model after login when no provider API key is configured.',
+        description: 'Make the default model one that works, saving the first available model when no usable default is set.',
         parameters: [],
         returns: 'after saving the first available model or retaining the existing default.',
       },
@@ -3971,6 +4067,11 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Concrete tool registry and scoped executor dispatcher.',
     methods: [
       {
+        signature: 'readonly groups: ToolGroups = new ToolGroups()',
+        description: 'On-demand tool groups and which agents loaded them.',
+        parameters: [],
+      },
+      {
         signature: 'register(definition: ToolDefinition, options: ToolRegistrationOptions = {}): () => void',
         description: 'Register globally or in the calling agent scope. Scoped tools shadow globals; duplicates within one layer and the reserved `run_code` name fail.',
         parameters: [{ name: 'definition', description: 'tool schema, execution, and optional finalization/presentation callbacks.' }, { name: 'options', description: 'optional step-time activation condition.' }],
@@ -4389,6 +4490,13 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'sessionId', description: 'the Session that appended the event.' }, { name: 'seq', description: 'the event\'s sequence number.' }, { name: 'index', description: 'the file\'s index in the summary\'s `files`.' }, { name: 'signal', description: 'cancels the reads.' }],
         returns: 'the comparison, or undefined once its Session was disposed, when this Host never recorded it, or when no file has that index.',
         throws: ['when a snapshot read fails for a live Session.'],
+      },
+      {
+        signature: 'restore(sessionId: SessionId, cwd: string, afterTurn: number, signal: AbortSignal): Promise<WorkspaceRestore>',
+        description: 'Put the workspace\'s files back to how they were right after a turn, undoing the changes of every later recorded turn: files written since are restored, files created since are removed, ignored files are left alone. Works from durable checkpoints, so it also serves a Session that has ended; it needs git and a git repository.',
+        parameters: [{ name: 'sessionId', description: 'the Session whose turns are undone.' }, { name: 'cwd', description: 'its working directory.' }, { name: 'afterTurn', description: 'the last turn to keep; 0 undoes every recorded turn.' }, { name: 'signal', description: 'cancels the git commands.' }],
+        returns: 'what changed, empty when no recorded turn changed files after that point.',
+        throws: ['when git is unavailable, the directory is no longer a repository, or a git command fails.'],
       },
     ],
   },
@@ -4856,6 +4964,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'ref', description: 'the reference whose stored value changed.' }],
   },
   {
+    name: 'customize/changed',
+    mode: 'emit',
+    signature: '\'customize/changed\'(): void',
+    summary: 'A server, connector or skill changed; read the page again.',
+    description: 'A server, connector or skill changed; read the page again.',
+    parameters: [],
+  },
+  {
     name: 'deepseek-account/model-sign-in-required',
     mode: 'emit',
     signature: '\'deepseek-account/model-sign-in-required\'(): void',
@@ -4982,6 +5098,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Waterfall around every streaming model call (retry, replay, routing).',
     description: 'Waterfall around every streaming model call (retry, replay, routing). Bound to the LlmRuntime; call `next()` to reach the resolved adapter\'s stream, or yield your own chunks to short-circuit.',
     parameters: [{ name: 'options', description: 'the full request. A LOOP-built request carries the process-local {@link markAgentLoopRequest} identity and arrives deep-frozen (mutation throws): its content is a pure function of the session log (the reconstructability Agent Note), so listeners read it, never rewrite it. Hand-built calls do not carry that marker; callers own their request inputs and must keep them unchanged until the stream settles.' }],
+  },
+  {
+    name: 'mcp-directory/changed',
+    mode: 'emit',
+    signature: '\'mcp-directory/changed\'(): void',
+    summary: 'A server, connector or skill was turned on, off, added, removed, signed in to or signed out of.',
+    description: 'A server, connector or skill was turned on, off, added, removed, signed in to or signed out of.',
+    parameters: [],
   },
   {
     name: 'permission-presets/catalog-changed',
@@ -5872,6 +5996,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ConnectionTrustRequest {\n    readonly headers: Headers | Readonly<Record<string, string | readonly string[] | undefined>>;\n}',
   },
   {
+    name: 'ConnectorChoice',
+    declaration: 'export interface ConnectorChoice {\n    id: string;\n    url?: string | undefined;\n    title?: string | undefined;\n}',
+  },
+  {
+    name: 'ConnectorStatus',
+    declaration: 'export interface ConnectorStatus {\n    id: string;\n    title: string;\n    description: string;\n    homepage: string;\n    url: string;\n    custom: boolean;\n    added: boolean;\n    signedIn: boolean;\n}',
+  },
+  {
     name: 'ContentBlockMap',
     declaration: 'export interface ContentBlockMap {\n    \'text\': TextBlock;\n    \'reasoning\': ReasoningBlock;\n    \'image\': ImageBlock;\n    \'file\': FileBlock;\n    \'tool-call\': ToolCallBlock;\n    \'tool-addition\': ToolAdditionBlock;\n    \'tool-removal\': ToolRemovalBlock;\n}',
   },
@@ -6062,6 +6194,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CuaSystemPermissionState',
     declaration: 'export interface CuaSystemPermissionState {\n    accessibility: boolean;\n    screenRecording: boolean;\n    helper: CuaPermissionProcess;\n    parent: CuaPermissionProcess;\n    launchApplication?: {\n        name: string;\n        path: string;\n        icon?: string | undefined;\n    } | undefined;\n}',
+  },
+  {
+    name: 'CustomServer',
+    declaration: 'export interface CustomServer {\n    enabled: boolean;\n    title?: string | undefined;\n    command?: string | undefined;\n    args?: readonly string[] | undefined;\n    env?: Readonly<Record<string, string>> | undefined;\n    url?: string | undefined;\n    headers?: Readonly<Record<string, string>> | undefined;\n}',
   },
   {
     name: 'DailyInput',
@@ -6805,7 +6941,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'LlmDiscoveredModel',
-    declaration: 'export interface LlmDiscoveredModel {\n    id: string;\n    name?: string;\n    contextWindow?: number;\n    maxTokens?: number;\n    inputModalities?: readonly ModelModality[];\n}',
+    declaration: 'export interface LlmDiscoveredModel {\n    id: string;\n    name?: string;\n    contextWindow?: number;\n    maxTokens?: number;\n    inputModalities?: readonly ModelModality[];\n    toolCalling?: boolean;\n}',
   },
   {
     name: 'LlmFailure',
@@ -7805,7 +7941,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ResolvedNormalRetryPolicy',
-    declaration: 'export interface ResolvedNormalRetryPolicy extends ResolvedRetryBackoff {\n    readonly mode: \'normal\';\n    readonly maxRetries: number;\n    readonly retryableCodes: readonly string[];\n}',
+    declaration: 'export interface ResolvedNormalRetryPolicy extends ResolvedRetryBackoff {\n    readonly mode: \'normal\';\n    readonly maxRetries: number;\n    readonly networkRetries: number;\n    readonly retryableCodes: readonly string[];\n}',
   },
   {
     name: 'ResolvedRetryBackoff',
@@ -8008,8 +8144,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type SerializedNode = SerializedElement | string;',
   },
   {
+    name: 'ServerChange',
+    declaration: 'export interface ServerChange {\n    enabled: boolean;\n    keys?: Readonly<Record<string, string>> | undefined;\n    roots?: readonly string[] | undefined;\n}',
+  },
+  {
     name: 'ServerResponse',
     declaration: 'export interface ServerResponse {\n    readonly type: \'server-response\';\n    readonly rpcId: RpcId;\n    readonly result: ConnectionRpcResult<unknown>;\n}',
+  },
+  {
+    name: 'ServerStatus',
+    declaration: 'export interface ServerStatus {\n    id: string;\n    title: string;\n    description: string;\n    homepage: string;\n    custom: boolean;\n    enabled: boolean;\n    note: string;\n    requires: {\n        name: string;\n        description: string;\n        set: boolean;\n    }[];\n    opensFolders: boolean;\n    roots: string[];\n    command: string;\n    url: string;\n}',
   },
   {
     name: 'Session',
@@ -8209,7 +8353,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionForkRequest',
-    declaration: 'export interface SessionForkRequest {\n    readonly sessionId: SessionId;\n    readonly atSeq?: number;\n    readonly allowMigration?: boolean;\n}',
+    declaration: 'export interface SessionForkRequest {\n    readonly sessionId: SessionId;\n    readonly atSeq?: number;\n    readonly allowMigration?: boolean;\n    readonly restoreFiles?: boolean;\n}',
   },
   {
     name: 'SessionForkSource',
@@ -8217,7 +8361,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SessionForkValue',
-    declaration: 'export interface SessionForkValue {\n    readonly sessionId: SessionId;\n}',
+    declaration: 'export interface SessionForkValue {\n    readonly sessionId: SessionId;\n    readonly restoredFiles?: {\n        readonly restored: number;\n        readonly removed: number;\n    };\n}',
   },
   {
     name: 'SessionHandle',
@@ -8772,6 +8916,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type SignInErrorCode = \'no-response\' | \'network\' | \'protocol\' | \'expired\' | \'storage\';',
   },
   {
+    name: 'SiteChoice',
+    declaration: 'export interface SiteChoice {\n    url: string;\n    title?: string | undefined;\n}',
+  },
+  {
+    name: 'SiteStatus',
+    declaration: 'export interface SiteStatus {\n    id: string;\n    title: string;\n    url: string;\n    host: string;\n    enabled: boolean;\n    note: string;\n    playbook: boolean;\n}',
+  },
+  {
     name: 'SkillCandidate',
     declaration: 'export interface SkillCandidate extends SkillSummary {\n    readonly rank: number;\n    readonly locator: unknown;\n    readonly metadata?: Readonly<Record<string, unknown>>;\n}',
   },
@@ -8826,6 +8978,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'SkillSource',
     declaration: 'export type SkillSource = \'project-dsh\' | \'project-agents\' | \'runtime\' | \'user-dsh\' | \'user-agents\' | \'custom\' | \'bundled\' | (string & {});',
+  },
+  {
+    name: 'SkillStatus',
+    declaration: 'export interface SkillStatus {\n    id: string;\n    title: string;\n    description: string;\n    license: string;\n    state: \'builtin\' | \'directory\' | \'other\' | \'no\';\n}',
   },
   {
     name: 'SkillSummary',
@@ -8969,7 +9125,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'SubagentActivationSpec',
-    declaration: 'export interface SubagentActivationSpec {\n    readonly provider: string;\n    readonly label: string;\n    readonly childId?: SessionId;\n    readonly request: Omit<SubagentStartRequest, \'label\' | \'signal\'>;\n    readonly signal: AbortSignal;\n    readonly delivery: \'parent\' | \'caller\';\n}',
+    declaration: 'export interface SubagentActivationSpec {\n    readonly provider: string;\n    readonly label: string;\n    readonly childId?: SessionId;\n    readonly request: Omit<SubagentStartRequest, \'label\' | \'signal\'>;\n    readonly signal: AbortSignal;\n    readonly delivery: \'parent\' | \'caller\';\n    readonly resume?: boolean;\n}',
   },
   {
     name: 'SubagentCapabilities',
@@ -9420,6 +9576,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface ToolFailure {\n    message: string;\n    info?: ToolErrorInfo;\n}',
   },
   {
+    name: 'ToolGroups',
+    declaration: 'export class ToolGroups {\n    join(name: string, description: string): () => void;\n    get size(): number;\n    isLoaded(agent: object, name: string): boolean;\n    load(agent: object, name: string): boolean;\n    describe(agent?: object): string;\n}',
+  },
+  {
     name: 'ToolGuard',
     declaration: 'export type ToolGuard = (execution: Readonly<ToolExecution>) => string | undefined;',
   },
@@ -9453,7 +9613,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolRegistrationOptions',
-    declaration: 'export interface ToolRegistrationOptions {\n    readonly when?: (context: ToolActivationContext) => boolean | Promise<boolean>;\n}',
+    declaration: 'export interface ToolRegistrationOptions {\n    readonly when?: (context: ToolActivationContext) => boolean | Promise<boolean>;\n    readonly group?: {\n        readonly name: string;\n        readonly description: string;\n    };\n}',
   },
   {
     name: 'ToolRemovalBlock',
@@ -9489,7 +9649,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'ToolsService',
-    declaration: 'export class ToolsService extends Service {\n    static inject;\n    static Config;\n    constructor(ctx: Context);\n    register(definition: ToolDefinition, options: ToolRegistrationOptions = {}): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    get(name: string, scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolDefinition | undefined;\n    executable(name: string, scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolDefinition | undefined;\n    async resolve(context: ToolActivationContext): Promise<ResolvedToolSet>;\n    definitions(scope?: ScopeKey, toolSet?: ResolvedToolSet): readonly ToolDefinition[];\n    schemas(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolSchema[];\n    setExecutor(executor: ToolExecutor): () => void;\n    async execute(input: ToolBatchInput): Promise<ToolBatchResult>;\n    guard(guard: ToolGuard): () => void;\n    checkGuards(exec: ToolExecution): string | undefined;\n}',
+    declaration: 'export class ToolsService extends Service {\n    static inject;\n    static Config;\n    readonly groups: ToolGroups;\n    constructor(ctx: Context);\n    register(definition: ToolDefinition, options: ToolRegistrationOptions = {}): () => void;\n    restrict(filter: ToolRestriction): () => void;\n    get(name: string, scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolDefinition | undefined;\n    executable(name: string, scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolDefinition | undefined;\n    async resolve(context: ToolActivationContext): Promise<ResolvedToolSet>;\n    definitions(scope?: ScopeKey, toolSet?: ResolvedToolSet): readonly ToolDefinition[];\n    schemas(scope?: ScopeKey, toolSet?: ResolvedToolSet): ToolSchema[];\n    setExecutor(executor: ToolExecutor): () => void;\n    async execute(input: ToolBatchInput): Promise<ToolBatchResult>;\n    guard(guard: ToolGuard): () => void;\n    checkGuards(exec: ToolExecution): string | undefined;\n}',
   },
   {
     name: 'ToolUpdate',
@@ -10034,6 +10194,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WorkspaceRenameRequest',
     declaration: 'export interface WorkspaceRenameRequest {\n    readonly workspaceId: WorkspaceId;\n    readonly title: string;\n}',
+  },
+  {
+    name: 'WorkspaceRestore',
+    declaration: 'export interface WorkspaceRestore {\n    restored: string[];\n    removed: string[];\n    backup?: string;\n}',
   },
   {
     name: 'WorkspaceUnarchiveSessionRequest',

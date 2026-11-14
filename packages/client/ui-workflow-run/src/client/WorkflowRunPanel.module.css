@@ -278,3 +278,32 @@
 .headerContentLayout {
   gap: 6px;
 }
+
+.log {
+  margin-top: 6px;
+}
+
+.logTitle {
+  cursor: pointer;
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+}
+
+.logLines {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  margin: 4px 0 0;
+  padding: 0 0 0 4px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.logLine {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  line-height: calc(18px + var(--dsh-content-font-delta-secondary, 0px));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

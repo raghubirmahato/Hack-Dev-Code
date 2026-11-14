@@ -109,6 +109,8 @@ export const TEXT_TOOL_CALL_FOLLOW_UP = 'Your last reply wrote a tool call as te
 const TEXT_TOOL_CALL = new RegExp([
   String.raw`<\/?tool_call>`,
   String.raw`<function=[\w.-]+>`,
+  String.raw`<\|tool_call>`,
+  String.raw`<\|"\|>`,
   String.raw`<\|?tool[▁_]calls?[▁_]begin\|?>`,
   '<｜tool▁calls?▁begin｜>',
   String.raw`^\s*\{\s*"(name|tool|function)"\s*:\s*"[\w.-]+"\s*,\s*"(arguments|parameters|args|input)"\s*:`,

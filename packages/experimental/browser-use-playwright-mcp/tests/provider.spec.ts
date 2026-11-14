@@ -1,11 +1,11 @@
 import { existsSync } from 'node:fs'
 import { Context } from '@hackdevcode/cordis'
 import { afterEach, expect, it, vi } from 'vitest'
-import { mountSessionMcp } from '@hackdevcode/dsh-experimental-browser-use-runtime/mcp'
+import { mountSessionMcp } from '@hackdevcode/dsh-browser-use-runtime/mcp'
 import * as Provider from '../src/index.ts'
 
-vi.mock('@hackdevcode/dsh-experimental-browser-use-runtime/mcp', async importOriginal => ({
-  ...await importOriginal<typeof import('@hackdevcode/dsh-experimental-browser-use-runtime/mcp')>(),
+vi.mock('@hackdevcode/dsh-browser-use-runtime/mcp', async importOriginal => ({
+  ...await importOriginal<typeof import('@hackdevcode/dsh-browser-use-runtime/mcp')>(),
   mountSessionMcp: vi.fn(),
 }))
 afterEach(() => {

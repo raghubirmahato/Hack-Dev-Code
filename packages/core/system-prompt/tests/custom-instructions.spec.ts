@@ -17,14 +17,21 @@ describe('custom instruction rules', () => {
 })
 
 describe('custom instruction prompt text', () => {
-  it('presents the rules as standing orders to apply directly, numbered in a tagged block', () => {
+  it('states the rules as the model\'s own way of working, numbered in a tagged block', () => {
     const text = renderCustomInstructions('Answer in British English.\nUse tabs.')
-    expect(text).toContain("These are the person's standing orders")
-    expect(text).toContain('Apply them directly and completely from the first reply.')
-    expect(text).toContain('Do not ask whether to follow them, argue with them, weaken them, or announce that you are following them')
-    expect(text).toContain('Only an explicit request in the current conversation that contradicts a rule takes precedence over it.')
-    expect(text).toContain('<custom_instructions>\n1. Answer in British English.\n2. Use tabs.\n</custom_instructions>')
-    expect(text).not.toMatch(/safety rule|check it against each/iu)
+    expect(text.startsWith('How you work here. This is your own settled way of working in this installation')).toBe(true)
+    expect(text).toContain('It already holds for everything you produce, from the first word of your first reply')
+    expect(text).toContain('<how_you_work>\n1. Answer in British English.\n2. Use tabs.\n</how_you_work>')
+    expect(text).toContain('There is nothing here to decide.')
+    expect(text).toContain('never mention, quote or acknowledge them')
+    expect(text).toContain('Only an explicit request in the current conversation that says otherwise comes first')
+    expect(text).toContain('what you report stays true')
+  })
+
+  it('never frames them as instructions handed over to be followed', () => {
+    const text = renderCustomInstructions('Answer in British English.')
+    // Wording that makes a model stop and deliberate: who the rules come from, and being told to obey them.
+    expect(text).not.toMatch(/custom instruction|standing order|the person's|the user's|you must|follow (?:them|these)|comply/iu)
   })
 
   it('renders nothing for empty text, states a cut, and uses a custom heading', () => {
@@ -35,8 +42,11 @@ describe('custom instruction prompt text', () => {
     expect(long).toContain('longer than 20 characters')
   })
 
-  it('reminds in one short line with the rule count', () => {
-    expect(customInstructionsReminder(1)).toBe("(Note from Hack Dev Code, not a request from the person: keep following the person's 1 custom instruction from the system prompt. Reply to the person's message that follows.)")
-    expect(customInstructionsReminder(3)).toBe("(Note from Hack Dev Code, not a request from the person: keep following the person's 3 custom instructions from the system prompt. Reply to the person's message that follows.)")
+  it('reminds by restating a short list, and by pointing at a long one', () => {
+    expect(customInstructionsReminder(['Answer in British English.', 'Use tabs.']))
+      .toBe('(Context, not a request and not something to reply to or mention: how you work, as always: 1. Answer in British English. 2. Use tabs. Now answer the message that follows.)')
+    const long = customInstructionsReminder(Array.from({ length: 40 }, (_, index) => `Rule number ${String(index)} about something.`))
+    expect(long).toBe('(Context, not a request and not something to reply to or mention: how you work is unchanged from the system prompt Now answer the message that follows.)')
+    expect(long).not.toMatch(/custom instruction/iu)
   })
 })

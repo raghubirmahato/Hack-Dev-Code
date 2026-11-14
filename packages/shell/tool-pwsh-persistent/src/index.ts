@@ -15,8 +15,7 @@ import type { TerminalReadResult, TerminalSessionId } from '@hackdevcode/dsh-ter
 import { deadline, timeoutOf } from '@hackdevcode/dsh-timeout'
 import { defineTool } from '@hackdevcode/dsh-tools'
 
-// TODO: Replace the file-search advice; arbitrary command output need not come from a searchable file.
-const TRUNCATED_MESSAGE = '<response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with Select-String in order to find the line numbers of what you are looking for.</NOTE>'
+const TRUNCATED_MESSAGE = '<response clipped><NOTE>To save on context only part of this output is shown. Run the command again with its output narrowed (filter it, or select the lines or fields you need) to see the rest.</NOTE>'
 const LOST_PREFIX_MESSAGE = '<response clipped><NOTE>The beginning of this command output was dropped by the terminal scrollback limit. The following text is the earliest retained output.</NOTE>\n'
 const SHELL_RESET_MESSAGE = 'The persistent pwsh shell was reset; the next pwsh call starts from the workspace with a fresh current directory and environment.'
 const TIMEOUT_CODE = 'PERSISTENT_PWSH_TIMEOUT'
@@ -368,8 +367,7 @@ async function executeCommand(
       )
       await shells.reset(owner, 'persistent pwsh command timed out')
       return [
-        // TODO: Report a timeout only; this signal does not establish an OOM.
-        `Your command timed out after ${Math.round(timedOut.timeoutMs / 1000)} seconds or experienced an OOM error. Below is partial output:`,
+        `Your command timed out after ${Math.round(timedOut.timeoutMs / 1000)} seconds. Below is partial output:`,
         partial,
         SHELL_RESET_MESSAGE,
       ].join('\n')

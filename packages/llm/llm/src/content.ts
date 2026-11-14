@@ -491,7 +491,11 @@ export function projectToolUpdates(
   }
 }
 
-/** Count the image occurrences of request history. */
+/**
+ * Count the image occurrences of request history.
+ * @param messages - the request messages.
+ * @returns how many images they carry.
+ */
 export function countRequestImages(messages: readonly RequestMessage[]): number {
   let count = 0
   for (const message of messages) visitImageBlocks(message.content, () => { count += 1 })

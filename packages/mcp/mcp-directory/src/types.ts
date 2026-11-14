@@ -85,10 +85,32 @@ export interface SkillStatus {
   description: string
   license: string
   /**
-   * `directory`: installed from the directory; `other`: a folder of that name exists that the directory did not install;
-   * `no`: not installed.
+   * `builtin`: ships inside Hack Dev Code and is always available; `directory`: installed from the directory;
+   * `other`: a folder of that name exists that the directory did not install; `no`: not installed.
    */
-  state: 'directory' | 'other' | 'no'
+  state: 'builtin' | 'directory' | 'other' | 'no'
+}
+
+/** A website to sign in to. */
+export interface SiteChoice {
+  /** The website's link; `https://` is assumed when the scheme is left out. */
+  url: string
+  /** The name shown for it; its host when unset. */
+  title?: string | undefined
+}
+
+/** One website session as a settings page shows it. */
+export interface SiteStatus {
+  id: string
+  title: string
+  /** The page the sign-in window opens at. */
+  url: string
+  host: string
+  enabled: boolean
+  /** Why a session that is on cannot be used, such as no browser being installed; empty otherwise. */
+  note: string
+  /** True once an agent recorded how to do something on this website. */
+  playbook: boolean
 }
 
 /** The directory's changes for a settings page. The person makes these directly, so none asks for approval. */
@@ -132,7 +154,28 @@ export interface McpDirectoryControl {
    */
   disconnect(id: string): Promise<void>
   /**
-   * List the directory skills.
+   * List the website sessions the person added.
+   * @returns the sessions.
+   */
+  sites(): Promise<SiteStatus[]>
+  /**
+   * Add a website session and open its sign-in window on this machine.
+   * @param site - the website.
+   * @returns the id the session is stored under.
+   */
+  addSite(site: SiteChoice): Promise<{ id: string }>
+  /**
+   * Open a session's sign-in window again, to sign in afresh or to check the account.
+   * @param id - the session id.
+   */
+  openSite(id: string): Promise<void>
+  /**
+   * Remove a website session with its browser profile and playbook.
+   * @param id - the session id.
+   */
+  removeSite(id: string): Promise<void>
+  /**
+   * List the built-in and directory skills.
    * @returns the directory skills.
    */
   skills(): Promise<SkillStatus[]>

@@ -5,7 +5,7 @@ import type { CustomizeSnapshot } from '@hackdevcode/dsh-api-remotes/client'
 import { Button, Input, SegmentedTabs, Switch, Tag } from '@hackdevcode/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime } from '@hackdevcode/dsh-client-ui-slots'
 import { draftServer, folders, slug } from './forms.ts'
-import type { ConnectorRow, CustomServerDraft, ServerRow, SkillRow } from './forms.ts'
+import type { ConnectorRow, CustomServerDraft, ServerRow, SiteRow, SkillRow } from './forms.ts'
 import css from './CustomizeSection.module.css'
 
 /** Registration-side business face for the section. */
@@ -22,6 +22,12 @@ export interface CustomizeSectionInjected {
   connect: (choice: { id: string; url?: string; title?: string }) => Promise<string | undefined>
   /** Sign out of a connector and remove it. */
   disconnect: (id: string) => Promise<void>
+  /** Add a website session and open its sign-in window; resolves to the session id. */
+  addSite: (site: { url: string; title?: string }) => Promise<string>
+  /** Open a website session's sign-in window again. */
+  openSite: (id: string) => Promise<void>
+  /** Remove a website session with its sign-in. */
+  removeSite: (id: string) => Promise<void>
   /** Install a directory skill. */
   installSkill: (id: string) => Promise<void>
   /** Remove a skill the directory installed. */
@@ -63,7 +69,9 @@ function SkillsPage({ t, busy, run, face, rows }: PageProps & { rows: readonly S
             <div className={css.head}>
               <span className={css.name}>{skill.title}</span>
               <Tag tone="neutral">{skill.license}</Tag>
-              {skill.state !== 'no' && <Tag tone="success">{t(skill.state === 'directory' ? 'skillInstalled' : 'skillOther')}</Tag>}
+              {skill.state !== 'no' && (
+                <Tag tone="success">{t(skill.state === 'builtin' ? 'skillBuiltin' : skill.state === 'directory' ? 'skillInstalled' : 'skillOther')}</Tag>
+              )}
               <span className={css.actions}>
                 {skill.state === 'no' && (
                   <Button variant="outline" size="sm" disabled={busy} onClick={() => { run(() => face.installSkill(skill.id)) }}>
@@ -81,6 +89,70 @@ function SkillsPage({ t, busy, run, face, rows }: PageProps & { rows: readonly S
           </li>
         ))}
       </ul>
+    </>
+  )
+}
+
+/** Website sessions: paste a link, sign in once in the window that opens, and the agent can use that account. */
+function SitesPanel({ t, busy, run, face, rows, note }: PageProps & { rows: readonly SiteRow[]; note: (message: string) => void }) {
+  const [url, setUrl] = useState('')
+  const add = () => {
+    const address = url.trim()
+    run(async () => {
+      await face.addSite({ url: address })
+      note(t('siteOpened', { name: address }))
+    })
+    setUrl('')
+  }
+  return (
+    <>
+      <h3 className={css.subheading}>{t('sitesTitle')}</h3>
+      <p className={css.intro}>{t('sitesIntro')}</p>
+      <div className={css.form}>
+        <Input
+          className={css.wide as string}
+          aria-label={t('siteUrl')}
+          placeholder={t('siteUrl')}
+          value={url}
+          onChange={(event) => { setUrl(event.target.value) }}
+          onKeyDown={(event) => { if (event.key === 'Enter' && !busy && url.trim() !== '') add() }}
+        />
+        <Button variant="primary" size="sm" disabled={busy || url.trim() === ''} onClick={add}>{t('siteAdd')}</Button>
+      </div>
+      {rows.length > 0 && (
+        <ul className={css.cards}>
+          {rows.map(site => (
+            <li key={site.id} className={css.card}>
+              <div className={css.head}>
+                <span className={css.name}>{site.title}</span>
+                {site.note === '' && <Tag tone="success">{t('siteReady')}</Tag>}
+                {site.playbook && <Tag tone="neutral">{t('sitePlaybook')}</Tag>}
+                <span className={css.actions}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={busy}
+                    onClick={() => {
+                      run(async () => {
+                        await face.openSite(site.id)
+                        note(t('siteOpened', { name: site.title }))
+                      })
+                    }}
+                  >
+                    {t('siteOpen')}
+                  </Button>
+                  <Button variant="ghost" size="sm" disabled={busy} onClick={() => { run(() => face.removeSite(site.id)) }}>
+                    {t('siteRemove')}
+                  </Button>
+                </span>
+              </div>
+              <code className={css.code}>{site.url}</code>
+              <p className={css.text}>{t('siteTools', { id: site.id })}</p>
+              {site.note !== '' && <p className={css.note}>{site.note}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   )
 }
@@ -278,6 +350,7 @@ export function CustomizeSection(props: CustomizeSectionProps) {
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [attempt, setAttempt] = useState(0)
+  const [query, setQuery] = useState('')
 
   // Every Host announcement, finished change and retry reads the page again.
   useEffect(() => {
@@ -301,6 +374,14 @@ export function CustomizeSection(props: CustomizeSectionProps) {
     })
   }
   const shared: PageProps = { t, busy, run, face: props }
+  // The directories are long; one box narrows whichever page is open by name, id or description.
+  const needle = query.trim().toLowerCase()
+  const matching = <T extends { id: string; title: string; description: string }>(rows: readonly T[]): readonly T[] =>
+    needle === '' ? rows : rows.filter(row => `${row.id} ${row.title} ${row.description}`.toLowerCase().includes(needle))
+  const skills = matching(snapshot?.skills ?? [])
+  const connectors = matching(snapshot?.connectors ?? [])
+  const servers = matching(snapshot?.servers ?? [])
+  const shown = page === 'skills' ? skills.length : page === 'connectors' ? connectors.length : servers.length
   const tab = (value: Page, label: string) => ({ value, label, id: `${baseId}-tab-${value}`, panelId: `${baseId}-panel` })
 
   return (
@@ -314,6 +395,13 @@ export function CustomizeSection(props: CustomizeSectionProps) {
         value={page}
         onChange={setPage}
         items={[tab('skills', t('tabSkills')), tab('connectors', t('tabConnectors')), tab('servers', t('tabServers'))]}
+      />
+      <Input
+        type="search"
+        aria-label={t('search')}
+        placeholder={t('search')}
+        value={query}
+        onChange={(event) => { setQuery(event.target.value) }}
       />
       {error !== '' && (
         <p role="alert" className={css.error}>
@@ -333,11 +421,15 @@ export function CustomizeSection(props: CustomizeSectionProps) {
       {notice !== '' && <p role="status" className={css.notice}>{notice}</p>}
       <div id={`${baseId}-panel`} role="tabpanel" aria-labelledby={`${baseId}-tab-${page}`} className={css.panel}>
         {snapshot === undefined && error === '' && <p className={css.intro}>{t('loading')}</p>}
-        {snapshot !== undefined && page === 'skills' && <SkillsPage {...shared} rows={snapshot.skills} />}
+        {snapshot !== undefined && needle !== '' && shown === 0 && <p className={css.intro}>{t('noMatch', { query: query.trim() })}</p>}
+        {snapshot !== undefined && page === 'skills' && <SkillsPage {...shared} rows={skills} />}
         {snapshot !== undefined && page === 'connectors' && (
-          <ConnectorsPage {...shared} rows={snapshot.connectors} connectTo={connectTo} fail={setError} />
+          <>
+            <SitesPanel {...shared} rows={snapshot.sites} note={setNotice} />
+            <ConnectorsPage {...shared} rows={connectors} connectTo={connectTo} fail={setError} />
+          </>
         )}
-        {snapshot !== undefined && page === 'servers' && <ServersPage {...shared} rows={snapshot.servers} fail={setError} />}
+        {snapshot !== undefined && page === 'servers' && <ServersPage {...shared} rows={servers} fail={setError} />}
       </div>
       <p className={css.footnote}>{t('pluginsNote')}</p>
     </div>

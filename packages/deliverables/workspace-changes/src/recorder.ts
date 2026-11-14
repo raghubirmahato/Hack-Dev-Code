@@ -8,6 +8,7 @@ import { compareText } from './compare.ts'
 import {
   blobText, diffTrees, gitlinkPaths, ignoredPaths, locateGitWorkspace, snapshotTree, treeBlob, type GitRunner, type GitWorkspace,
 } from './git.ts'
+import { appendCheckpoint, checkpointDir } from './checkpoints.ts'
 import { canonicalPath, compareDisplay, displayPathOf, durablePathOf, isInside, isTemporaryPath, temporaryRoots, toPosix } from './paths.ts'
 import type { WorkspaceChangedFile, WorkspaceChangesSummary, WorkspaceFileDiff } from './types.ts'
 
@@ -25,6 +26,12 @@ export interface RecorderEnvironment {
   diffTimeoutMs: number
   /** Failure reporter; a failed turn records nothing and the next turn retries. */
   warn: (message: string) => void
+  /**
+   * Directory for durable checkpoints: when set, snapshot objects and each Session's checkpoint index are kept there,
+   * one directory per working directory, so a workspace can be rewound after the Session ends. Without it they live
+   * in the Session's temporary directory.
+   */
+  storeRoot?: string
 }
 
 /** Canonical paths every comparison and display uses, resolved once per Session. */
@@ -265,6 +272,12 @@ export class TurnRecorder {
     if (!this.lifetime.signal.aborted) this.env.warn(`workspace-changes: ${String(error)}`)
   }
 
+  /** Where snapshot objects go: the durable checkpoint directory when configured, else the temporary directory. */
+  private storeDir(): Promise<string> {
+    const root = this.env.storeRoot
+    return root === undefined ? this.scratchDir() : checkpointDir(root, this.cwd)
+  }
+
   /** This Session's temporary directory, created on first use. */
   private scratchDir(): Promise<string> {
     this.scratch ??= mkdtemp(join(this.env.tempRoot, 'dsh-workspace-changes-'))
@@ -276,7 +289,7 @@ export class TurnRecorder {
     if (this.repository !== null) return this.repository
     const git = await this.env.git
     if (git === null) return null
-    const workspace = await locateGitWorkspace(git, cwd, () => this.scratchDir(), signal)
+    const workspace = await locateGitWorkspace(git, cwd, () => this.storeDir(), signal)
     if (workspace === null) return null
     this.repository = { git, workspace }
     return this.repository
@@ -363,6 +376,9 @@ export class TurnRecorder {
       sources: kept.map(entry => entry.sources),
     })
     state.recordedAfterSeq = event.seq
+    if (snapshot !== undefined && this.env.storeRoot !== undefined) {
+      await appendCheckpoint(await this.storeDir(), this.session.id, { seq: event.seq, turn: state.turn, ...snapshot })
+    }
   }
 
   /**

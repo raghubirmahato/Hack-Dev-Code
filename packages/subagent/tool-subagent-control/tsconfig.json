@@ -28,6 +28,15 @@
     },
     {
       "path": "../../core/agent"
+    },
+    {
+      "path": "../../util/atomic-write"
+    },
+    {
+      "path": "../../util/home-paths"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     }
   ]
 }

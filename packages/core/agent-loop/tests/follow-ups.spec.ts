@@ -60,6 +60,8 @@ describe('a tool call written as text', () => {
     expect(writesToolCallAsText(text('<function=bash>{"command": "ls"}</function>'))).toBe(true)
     expect(writesToolCallAsText(text('{"name": "read", "arguments": {"path": "a.ts"}}'))).toBe(true)
     expect(writesToolCallAsText(text('<｜tool▁calls▁begin｜><｜tool▁call▁begin｜>function'))).toBe(true)
+    expect(writesToolCallAsText(text('<|tool_call>call:read{file_path:<|"|>a<|"|>}<tool_call|>'))).toBe(true)
+    expect(writesToolCallAsText(text('structured_output{created:false,path:<|"|>x<|"|>}'))).toBe(true)
     expect(writesToolCallAsText(text('Done. I updated the name field in config.json.'))).toBe(false)
     expect(writesToolCallAsText(text('The response looks like {"status": "ok", "count": 3}.'))).toBe(false)
   })

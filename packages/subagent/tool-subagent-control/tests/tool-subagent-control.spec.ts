@@ -1,7 +1,8 @@
 import { executeToolFixture } from '@hackdevcode/dsh-tool-testkit'
+import { agentEvents } from '@hackdevcode/dsh-agent'
 import { mountWorkingDirectoryFixture } from '../../subagent/tests/working-directory-fixture.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@hackdevcode/cordis'
@@ -70,11 +71,13 @@ async function setupWith(adapter: MockAdapter | GatedAdapter, park = true) {
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(SubagentSpawn, { providerName: 'spawn' })
   await ctx.plugin(SubagentFork, { providerName: 'fork' })
-  await ctx.plugin(tool)
+  // Boards go to the test's own folder, never the user's home.
+  const boardDir = join(root, 'boards')
+  const control = await ctx.plugin(tool, { boardDir })
   ctx.llm.registerAdapter(['mock'], adapter)
   const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
   if (park) parkParent(ctx, parent)
-  return { ctx, parent, adapter }
+  return { ctx, parent, adapter, boardDir, control }
 }
 
 async function setup(script: ConstructorParameters<typeof MockAdapter>[0]) {
@@ -330,6 +333,154 @@ describe('dsh-tool-subagent-control', () => {
     expect(text(result)).toContain('another parent session')
   })
 
+  it('compares claimed paths without regard to slashes, case or a leading ./', () => {
+    expect(tool.claimKey('.\\src\\API\\')).toBe('src/api')
+    expect(tool.claimKey('./src/api/routes.ts')).toBe('src/api/routes.ts')
+    expect(tool.claimsOverlap('src/api', 'src/api/routes.ts')).toBe(true)
+    expect(tool.claimsOverlap('src/api/routes.ts', 'src/api')).toBe(true)
+    expect(tool.claimsOverlap('src/api', 'src/api')).toBe(true)
+    // A shared prefix is not containment.
+    expect(tool.claimsOverlap('src/api', 'src/api-tests')).toBe(false)
+  })
+
+  it('delivers a board post to a running subagent at its next step and lets it answer its parent', async () => {
+    const release = Promise.withResolvers<undefined>()
+    const { ctx, parent, adapter } = await setupWith(new GatedAdapter([
+      { chunks: textResponse('child done'), gate: release.promise },
+    ]))
+    expect(text(await callTool(ctx, 'team_board', { action: 'read' }, parent))).toBe('The board is empty.')
+    const posted = await callTool(ctx, 'team_board', { action: 'post', as: 'lead', kind: 'warning', text: 'The API returns ISO dates, not timestamps.' }, parent)
+    expect(text(posted)).toContain('Posted #1 to everyone on the board')
+    const started = await ctx.subagents.startActivation({
+      delivery: 'parent',
+      provider: 'spawn',
+      label: 'worker',
+      request: { prompt: [{ type: 'text', text: 'build the client' }], parent },
+      signal: testToolSignal,
+    })
+    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+    // The child never polled: the post was waiting for it before its first step.
+    const seen = JSON.stringify(adapter.requests[0]!.messages)
+    expect(seen).toContain('New on the team board')
+    expect(seen).toContain('#1 @lead -> @all (warning): The API returns ISO dates, not timestamps.')
+    const child = ctx.agents.get(started.childId)
+    if (child === undefined) throw new Error('expected a live child')
+
+    // The child asks the agent that started it; the question waits for the parent's next step.
+    const asked = await callTool(ctx, 'team_board', { action: 'post', as: 'client', to: 'parent', kind: 'question', text: 'Which time zone?' }, child)
+    expect(text(asked)).toContain('Posted #2 to @parent')
+    const board = text(await callTool(ctx, 'team_board', { action: 'read' }, parent))
+    expect(board).toContain('#2 @client -> @parent (question): Which time zone?')
+    // A name works as an address once its owner has used it.
+    expect(text(await callTool(ctx, 'team_board', { action: 'post', to: 'client', kind: 'answer', text: 'UTC.' }, parent))).toContain(`Posted #3 to @${String(started.childId)}`)
+
+    release.resolve(undefined)
+    await waitNoActivation(ctx, started.childId)
+  })
+
+  it('does not push the posts of an agent that has finished, but keeps them on the board', async () => {
+    const release = Promise.withResolvers<undefined>()
+    const { ctx, parent, adapter } = await setupWith(new GatedAdapter([
+      { chunks: textResponse('child done'), gate: release.promise },
+    ]))
+    const started = await ctx.subagents.startActivation({
+      delivery: 'parent',
+      provider: 'spawn',
+      label: 'worker',
+      request: { prompt: [{ type: 'text', text: 'build the client' }], parent },
+      signal: testToolSignal,
+    })
+    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+    const child = ctx.agents.get(started.childId)
+    if (child === undefined) throw new Error('expected a live child')
+    await callTool(ctx, 'team_board', { action: 'post', as: 'client', kind: 'note', text: 'Client finished; start the server work now.' }, child)
+    release.resolve(undefined)
+    await waitNoActivation(ctx, started.childId)
+    expect(ctx.agents.get(started.childId)).toBeUndefined()
+    // The parent's next step gets the child's result, not its stale post as a fresh instruction.
+    const decision = await agentEvents(ctx, parent).waterfall('agent/pre-step', {
+      modelSelection: { provider: 'mock', model: 'mock' },
+      messages: [], turn: 2, step: 1, signal: new AbortController().signal,
+    }, () => Promise.resolve({ kind: 'enter' as const, messages: [] }))
+    expect(JSON.stringify(decision)).not.toContain('start the server work now')
+    expect(text(await callTool(ctx, 'team_board', { action: 'read' }, parent))).toContain('start the server work now')
+  })
+
+  it('lets one agent claim files and tells another that an overlapping path is held', async () => {
+    const release = Promise.withResolvers<undefined>()
+    const { ctx, parent, adapter } = await setupWith(new GatedAdapter([
+      { chunks: textResponse('child done'), gate: release.promise },
+    ]))
+    const started = await ctx.subagents.startActivation({
+      delivery: 'parent',
+      provider: 'spawn',
+      label: 'worker',
+      request: { prompt: [{ type: 'text', text: 'build' }], parent },
+      signal: testToolSignal,
+    })
+    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+    const child = ctx.agents.get(started.childId)
+    if (child === undefined) throw new Error('expected a live child')
+
+    expect(text(await callTool(ctx, 'team_board', { action: 'claim', as: 'lead', paths: ['src/api/', 'README.md'] }, parent))).toBe('Claimed: src/api/, README.md.')
+    const second = text(await callTool(ctx, 'team_board', { action: 'claim', as: 'ui', paths: ['./src/API/routes.ts', 'src/ui'] }, child))
+    expect(second).toContain('Claimed: src/ui.')
+    expect(second).toContain('NOT claimed: ./src/API/routes.ts overlaps src/api/, held by @lead')
+    expect(text(await callTool(ctx, 'team_board', { action: 'read' }, child))).toContain('Claimed files:\n- src/api/ — @lead\n- README.md — @lead\n- src/ui — @ui')
+    // Only the holder can release a path; once released, the other agent can take it.
+    expect(text(await callTool(ctx, 'team_board', { action: 'release', paths: ['src/api'] }, child))).toBe('Released 0 of 1 path(s).')
+    expect(text(await callTool(ctx, 'team_board', { action: 'release', paths: ['src/api'] }, parent))).toBe('Released 1 of 1 path(s).')
+    expect(text(await callTool(ctx, 'team_board', { action: 'claim', paths: ['src/api/routes.ts'] }, child))).toBe('Claimed: src/api/routes.ts.')
+
+    release.resolve(undefined)
+    await waitNoActivation(ctx, started.childId)
+  })
+
+  it('keeps a board, its claims and who has read what across a restart', async () => {
+    const { ctx, parent, boardDir, control } = await setup([])
+    await callTool(ctx, 'team_board', { action: 'post', as: 'lead', text: 'Use UTC everywhere.' }, parent)
+    await callTool(ctx, 'team_board', { action: 'claim', paths: ['src/api'] }, parent)
+    const files = readdirSync(boardDir)
+    expect(files).toEqual(['parent.json'])
+    // The plugin goes away, as when the app quits, and a fresh one starts on the same folder.
+    await control.dispose()
+    await ctx.plugin(tool, { boardDir })
+    const board = text(await callTool(ctx, 'team_board', { action: 'read' }, parent))
+    expect(board).toContain('#1 @lead -> @all (note): Use UTC everywhere.')
+    expect(board).toContain('- src/api — @lead')
+    expect(text(await callTool(ctx, 'team_board', { action: 'post', text: 'Second.' }, parent))).toContain('Posted #2')
+  })
+
+  it('ignores a damaged board file and keeps only well-formed entries', () => {
+    expect(tool.parseStoredBoard('not json')).toBeUndefined()
+    expect(tool.parseStoredBoard('null')).toBeUndefined()
+    const board = tool.parseStoredBoard(JSON.stringify({
+      posts: [
+        { n: 1, from: 'a', name: 'a', to: 'all', kind: 'note', text: 'kept' },
+        { n: 2, from: 'a', name: 'a', to: 'all', kind: 'shout', text: 'unknown kind' },
+        'garbage',
+      ],
+      count: 'nine',
+      claims: [['src', { by: 'a', name: 'a', path: 'src' }], ['bad', { path: 3 }]],
+      names: [['a', 'api'], ['b', 4]],
+      read: [['a', 1], ['b', -1]],
+    }))
+    expect(board?.posts.map(post => post.text)).toEqual(['kept'])
+    expect(board?.count).toBe(1)
+    expect([...board?.claims.keys() ?? []]).toEqual(['src'])
+    expect([...board?.names ?? []]).toEqual([['a', 'api']])
+    expect([...board?.read ?? []]).toEqual([['a', 1]])
+  })
+
+  it('refuses a board post without text, to oneself, or to a parent that does not exist', async () => {
+    const { ctx, parent } = await setup([])
+    expect(text(await callTool(ctx, 'team_board', { action: 'post', text: '  ' }, parent))).toContain('post needs text')
+    expect(text(await callTool(ctx, 'team_board', { action: 'post', text: 'x', to: 'parent' }, parent))).toContain('you have no parent agent')
+    expect(text(await callTool(ctx, 'team_board', { action: 'post', text: 'x', to: 'parent-id-of-mine', as: 'parent-id-of-mine' }, parent))).toContain('cannot be addressed to yourself')
+    expect(text(await callTool(ctx, 'team_board', { action: 'claim', paths: [] }, parent))).toContain('claim needs paths')
+    expect((await callTool(ctx, 'team_board', { action: 'read' })).isError).toBe(true)
+  })
+
   it('fails loud when invoked without a calling agent', async () => {
     const { ctx } = await setup([])
     const result = await callTool(ctx, 'send_message', { agent_id: 'x', message: 'y' })
@@ -344,13 +495,13 @@ describe('dsh-tool-subagent-control', () => {
     await ctx.plugin(AgentLoop, { agents: [] })
     await mountWorkingDirectoryFixture(ctx)
     await ctx.plugin(SubagentRuntime)
-    const fiber = await ctx.plugin(tool)
+    const fiber = await ctx.plugin(tool, { boardDir: join(tmpdir(), 'dsh-board-hmr-unused') })
     const names = ['send_message', 'interrupt_agent', 'list_agents']
     for (const name of names) expect(ctx.tools.schemas().filter(schema => schema.name === name)).toHaveLength(1)
     expect(ctx.tools.get('list_subagent_models')).toBeUndefined()
     await fiber.dispose()
     for (const name of names) expect(ctx.tools.get(name)).toBeUndefined()
-    const reloaded = await ctx.plugin(tool)
+    const reloaded = await ctx.plugin(tool, { boardDir: join(tmpdir(), 'dsh-board-hmr-unused') })
     for (const name of names) expect(ctx.tools.schemas().filter(schema => schema.name === name)).toHaveLength(1)
     await reloaded.dispose()
   })

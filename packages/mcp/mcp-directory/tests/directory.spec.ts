@@ -82,7 +82,8 @@ describe('the mcp_directory tool', () => {
       inject: Directory.inject,
       apply: (inner: Context) => {
         Object.defineProperty(inner.fiber, 'entry', { value: { options: { id: 'mcp-directory' } } })
-        return Directory.apply(inner, { servers: { get: () => servers }, custom: { get: () => ({}) }, connectors: { get: () => ({}) } })
+        const none = { get: () => ({}) }
+        return Directory.apply(inner, { servers: { get: () => servers }, custom: none, connectors: none, sites: none })
       },
     })
     const call = async (args: Record<string, unknown>) => {

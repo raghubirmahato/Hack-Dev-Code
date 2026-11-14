@@ -16,15 +16,38 @@ import { mutationResult } from './mutation-result.ts'
 import { sessionResolveOptions } from './session-cwd.ts'
 import type { FsSandboxController } from './sandbox.ts'
 
+/** One line as the `read` tool shows it: its line number, a colon and a space, then the text. */
+const NUMBERED_LINE = /^(\d+): ?/u
+
+/**
+ * Remove the line numbers a model copied from `read` output into a whole file. Weaker models do this, and the file
+ * then fails to parse. Only content whose every line carries a number, counting 1, 2, 3 … without a gap, is changed;
+ * a file that really looks like that is unlikely enough that writing it unchanged is the worse outcome.
+ * @param content - the full file text the model sent.
+ * @returns the text without the numbers, or the text unchanged when it is not numbered that way.
+ */
+export function stripReadLineNumbers(content: string): string {
+  const lines = content.split('\n')
+  const body = lines.at(-1) === '' ? lines.slice(0, -1) : lines
+  if (body.length < 2) return content
+  const stripped: string[] = []
+  for (const [index, line] of body.entries()) {
+    const match = NUMBERED_LINE.exec(line)
+    if (match === null || Number(match[1]) !== index + 1) return content
+    stripped.push(line.slice(match[0].length))
+  }
+  return body.length === lines.length ? stripped.join('\n') : `${stripped.join('\n')}\n`
+}
+
 /**
  * Validate value constraints the schema DSL can't express: only a non-blank
  * `file_path` — an empty `content` is legitimate (it writes an empty file).
  * @param args - the schema-validated raw tool arguments.
- * @returns the camelCased input; `content` passes through untouched.
+ * @returns the camelCased input; `content` loses only line numbers copied from `read` output.
  */
 export function parseWriteArgs(args: { file_path: string; content: string }): { filePath: string; content: string } {
   if (args.file_path.trim().length === 0) throw new Error('file_path must be a non-empty string')
-  return { filePath: args.file_path, content: args.content }
+  return { filePath: args.file_path, content: stripReadLineNumbers(args.content) }
 }
 
 /**
@@ -136,7 +159,7 @@ export function applyWriteTool(ctx: Context, sandbox: FsSandboxController): void
       return {
         card: 'diff',
         title: `Write ${args.file_path}`,
-        diffs: [{ path: args.file_path, oldText: null, newText: args.content }],
+        diffs: [{ path: args.file_path, oldText: null, newText: stripReadLineNumbers(args.content) }],
         locations: [{ path: args.file_path }],
       }
     },
@@ -146,7 +169,7 @@ export function applyWriteTool(ctx: Context, sandbox: FsSandboxController): void
     presentResult(args, result: ToolResult): DiffResultView | undefined {
       if (result.isError) return undefined
       const diffs = diffsFromMeta(result.meta)
-        ?? [{ path: pathFromMeta(result.meta) ?? args.file_path, oldText: null, newText: args.content }]
+        ?? [{ path: pathFromMeta(result.meta) ?? args.file_path, oldText: null, newText: stripReadLineNumbers(args.content) }]
       return { card: 'diff', title: `Write ${args.file_path}`, diffs }
     },
   }))

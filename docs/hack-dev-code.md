@@ -26,7 +26,11 @@ Council ──► [ Forge ─► Fact-check ─► Sentinel Gates ─► Integra
 
 The planner is told to size the team to the mission: a trivial change gets one or two tasks, a small app three to six, a medium product six to fourteen, a large system up to `maxTasks` (default 24). It prefers more, smaller tasks whenever they can run in parallel, and assigns every task a **role** (`frontend`, `backend`, `fullstack`, `data`, `api`, `infra`, `test`, `docs`, `design`, `security`, `other`) so the builder gets the matching specialist brief. Every shared interface (routes, data shapes, file formats, component props, CLI flags) goes into the plan's `contracts`, which are pinned on the blackboard for every agent.
 
-The plan is rejected and re-requested (with the reasons) when ids are not unique kebab-case, a dependency is unknown or self-referential, the graph has a cycle (Kahn's algorithm), the plan is empty, or it exceeds `maxTasks`. After two failed attempts the mission runs as a single task and the report says so.
+The plan is rejected and re-requested (with the reasons) when ids are not unique kebab-case, a dependency is unknown or self-referential, the graph has a cycle (Kahn's algorithm), the plan is empty, or it exceeds `maxTasks`. After three failed attempts the mission runs as a single task and the report says so.
+
+**Ownership ordering.** Two tasks whose `ownedPaths` overlap (the same file, or one path inside the other) must not run side by side. When neither already waits for the other, the script makes the later one depend on the earlier one. This is done in code, costs no agent, and cannot close a cycle, so a careless plan becomes a slower plan instead of two builders overwriting each other.
+
+**Models per role.** `models.planner` (council, splitter, integrator, swarm coordinator), `models.builder` (builders, worktree and merge managers, swarm workers) and `models.verifier` (gates, fact-checker, swarm verifiers) pin each role to a model; empty inherits the conversation's model. `visionModel` still wins for the visual gate.
 
 **Concurrency.** Each task is a promise that awaits its dependencies, so independent tasks start together and a dependent starts the moment its last dependency settles. A limiter caps simultaneous builders at `maxParallel` (default 6); the engine's own `maxConcurrentAgents` is a second cap.
 
@@ -36,9 +40,40 @@ The plan is rejected and re-requested (with the reasons) when ids are not unique
 
 After a wave's builders, fact-check and gates settle, the **integrator** checks every acceptance criterion in the workspace (running the cheap checks) and returns `met` or `unmet` with evidence. If anything is unmet it proposes at most eight targeted follow-up tasks (new ids, roles, disjoint owned paths, `replaces` naming the unfinished tasks they complete). The script validates them like a plan, runs them as the next wave through the same Forge, fact-check and gates, and repeats until all criteria are met or `maxWaves` (default 3) is reached. The last allowed wave is told it is last and cannot spawn more.
 
+Two rules keep waves from burning the budget. A follow-up wave that leaves as much undone (unmet criteria plus unfinished tasks) as the wave before it ends the run and the report says it stalled. A wave in which no task finished and no file changed does not re-run the gates; their earlier verdicts stand.
+
 The integrator also writes `.hackdev/PROGRESS.md`, a ledger of tasks, criteria and remaining work. The next run's scout reads it into the project map as `priorProgress`, and the planner is told to plan only the remaining work, so a rerun resumes instead of restarting. A task completed by a later wave is marked `replaced` and no longer counts against the run.
 
 The run is `complete` only when every task is done (or replaced), every gate passes and every acceptance criterion is met.
+
+## Swarm mode
+
+`hackdev_swarm` is a second fixed script over the same seams, for work a person wants to follow as a team conversation.
+
+```text
+Coordinator ──► [ Workers in parallel ─► Coordinator answers ─► Verifiers ] × rounds ──► Report ──► Chronicle
+ forms the        post diffs, tests       questions on            problems go back         criteria    BOARD.md
+ swarm            and questions           the board               to the author            checked
+```
+
+| Member | What it does |
+|---|---|
+| Coordinator | Inspects the workspace, names the swarm and returns the workers: a kebab-case name, a role, a self-contained brief, `owns`, `mustNotTouch`, `done` and `dependsOn`. Reserved names (`coordinator`, `monitor`, `all`, `verify...`) and the same graph errors as a plan are rejected with reasons; after three attempts the swarm is one worker. It answers open questions once per round and writes the final report. |
+| Workers | One agent per worker per round, capped by `maxParallel`, each in its own worktree when isolation is on and more than one runs. Round one follows the dependency graph; a worker whose dependency failed is skipped. |
+| Verifiers | `ceil(workers / 3)`, each with a fixed group so a worker always answers to the same verifier. Read-only. A pass is earned: at least one passing check, no failing check and no problem. |
+| Monitor | A rule in the script, not an agent: when the same workers are woken again and none changed a file, it posts to the board and ends the swarm. |
+
+**The board.** Every post has a number, a round, an author, addressees (`@name`, `@all`, `@workers`, `@verifiers`, `@coordinator`), a kind (`assignment`, `question`, `answer`, `diff`, `test`, `problem`, `status`, `decision`) and a text. An unknown addressee goes to the coordinator. A member's prompt shows the posts addressed to it first (two thirds of `maxMemoryChars`) and the newest other posts after. There is no other channel between members.
+
+**Waking.** After a round, a worker runs again when a verifier found problems in its work or it did not report `done`; a worker blocked on a person is left alone. Only woken workers are run and reviewed in the next round. Everything a verifier held open against a worker is settled by its newest review of that worker, so problems it stops reporting count as fixed. Rounds end when nobody needs waking, at `maxRounds` (default 3, ceiling `maxSwarmRounds`), or when the monitor stops them.
+
+**Result.** The report has the same shape as a mission's, so the same card and renderer apply: workers appear as tasks (`verified` is the verifier's verdict), verifiers as gates, plus a `swarm` block with the members, their pinned models and the newest 200 posts. `review: true` adds the three Sentinel Gates on the merged result. The chronicler also writes `.hackdev/swarm/BOARD.md`.
+
+**Budget.** `3 + rounds × (workers × (1, or 3 when isolated) + 1 + ceil(workers / 3)) + 2`, plus the gates' worst case with `review`.
+
+**Continuity.** In the shared workspace each worker keeps one conversation: its first round starts it under the name `worker:<name>`, and a woken worker continues it through the workflow engine's `session` option, which restores the child from its saved session with its whole history. Its prompt then holds only what is new on the board since its last turn. If a conversation cannot be continued (no session store, or the child is gone), the worker starts a new conversation with the full brief and later rounds continue that one. A worker in its own git worktree gets a new folder each round, so it starts afresh with its last report and the board. While the swarm runs, every board post is also a line in the run view.
+
+**Members that misbehave.** A live run with a 4.6B local model showed why members failed, and each cause is now handled where it starts. Members could start a mission of their own: the mission tools are now offered only to the agent the person talks to. Planning roles built the mission themselves: their prompts end with a limit, and a tool guard refuses their writes outside `.hackdev` and their `workflow`, `subagent` and `subagent_fork` calls. Members ended without a structured report: the subagent service accepts a matching report written as text, fills in list and yes/no fields left out, and reminds a member twice before it counts as failed. Gemma wrote tool calls in its own syntax, which the Ollama route now reads back as real calls. A builder copied read line numbers into a file, which `write` now strips. A rejected plan goes back to the planner that wrote it, and the worktree step runs one packaged helper command (`bin/hackdev-worktree.mjs`) instead of five git steps typed by a model.
 
 ## Communication: the blackboard
 

@@ -9,7 +9,7 @@ import { en, NS, type HackDevKey } from './locales.ts'
 
 declare module '@hackdevcode/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
-    /** Hack Dev Code mission and gate-review card copy. */
+    /** Hack Dev Code mission, swarm and gate-review card copy. */
     hackdev: HackDevKey
   }
 }
@@ -18,10 +18,10 @@ declare module '@hackdevcode/dsh-client-ui-slots' {
 export const inject = ['slots', 'locale']
 
 /** Wire tool names whose calls render as the Hack Dev Code card. */
-export const HACKDEV_TOOL_NAMES = ['hackdev', 'hackdev_review'] as const
+export const HACKDEV_TOOL_NAMES = ['hackdev', 'hackdev_swarm', 'hackdev_review'] as const
 
 /**
- * Register the card dictionaries and the keyed Tool views for both Hack Dev Code tools.
+ * Register the card dictionaries and the keyed Tool views for the Hack Dev Code tools.
  * The card reads only the durable `tool/result` meta; this registration performs no RPC.
  * @param ctx - Client Context carrying the injected slot and locale services.
  */

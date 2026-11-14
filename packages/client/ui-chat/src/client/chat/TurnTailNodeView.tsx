@@ -69,6 +69,8 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
         // turn/end seq it already has, and the Host cuts exactly there.
         onBranch={forkAllowed ? () => { forkAt(data.seq) } : undefined}
         branchUnavailable={data.branchUnavailable || hasLaterChatNode}
+        // Rewind is a branch that also puts the workspace's files back to this turn's end.
+        onRewind={forkAllowed ? () => { forkAt(data.seq, { restoreFiles: true }) } : undefined}
         className={css.actions}
         extraActions={assistantActions}
         usageAction={detailed && data.tokenUsage !== undefined

@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-The **Customize** section of Settings. Three pages let a person give the agent more to work with: **Skills** installs and removes directory skills, **Connectors** signs in to services in the browser or adds one by its MCP address, and **MCP servers** turns directory servers on and off, stores their keys and folders, and adds a server of your own from a command or an address. The plugin marketplace lives on the Plugins page under **Discover**.
+The **Customize** section of Settings. Three pages let a person give the agent more to work with: **Skills** shows the built-in skills and installs and removes directory skills, **Connectors** signs in to any website from a pasted link, signs in to services with a connector, or adds one by its MCP address, and **MCP servers** turns directory servers on and off, stores their keys and folders, and adds a server of your own from a command or an address. The plugin marketplace lives on the Plugins page under **Discover**.
 
 ## Table of Contents
 

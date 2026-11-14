@@ -1,6 +1,6 @@
 {
   "name": "@hackdevcode/dsh-mcp-directory",
-  "description": "Directory of MCP servers, OAuth connectors and skills: servers and connectors mount live as mcp-client instances, skills install into the user skill folder",
+  "description": "Directory of MCP servers, OAuth connectors, website sessions and skills: servers, connectors and sessions mount live as mcp-client instances; built-in skills are provided from memory and directory skills install into the user skill folder",
   "version": "0.2.2-alpha.2",
   "publishConfig": {
     "access": "public"
@@ -36,7 +36,8 @@
     "@hackdevcode/dsh-tools": "workspace:*",
     "@hackdevcode/dsh-home-paths": "workspace:*",
     "@hackdevcode/dsh-credentials": "workspace:*",
-    "@hackdevcode/dsh-sandbox": "workspace:*"
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-skill": "workspace:*"
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -54,6 +55,12 @@
     "@hackdevcode/dsh-sandbox": "workspace:*",
     "@hackdevcode/dsh-sandbox-policy": "workspace:*",
     "@hackdevcode/dsh-user-approval": "workspace:*",
-    "@hackdevcode/dsh-host-webserver": "workspace:*"
+    "@hackdevcode/dsh-host-webserver": "workspace:*",
+    "@hackdevcode/dsh-skill": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@hackdevcode/dsh-skill": {
+      "optional": true
+    }
   }
 }

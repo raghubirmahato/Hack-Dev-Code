@@ -23,6 +23,8 @@ export const en = {
   'status.failed': 'Failed',
   'status.cancelled': 'Cancelled',
   'status.interrupted': 'Interrupted',
+  'log.title': 'Live log',
+  'log.board': 'Message board',
 } satisfies Record<string, string>
 
 /** Union of this namespace's dictionary keys. */

@@ -76,6 +76,9 @@ function nextHandlerId(point: string): string {
 
 const CONTEXT_SOURCE: MessageSource = { kind: 'hooks-codex' }
 
+/** Consecutive times a blocking Stop hook may force one turn to continue before the turn is allowed to stop. */
+export const MAX_FORCED_STOPS = 8
+
 /** The summary cap bounds a persisted event field — a positive integer or the slice misbehaves silently. */
 function assertPositiveInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value < 1) {
@@ -255,20 +258,31 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   // A blocking Stop hook steers at the stopping boundary, which makes the
-  // machine observe pending input and run another step.
-  // TODO(stop-loop-guard): Codex supplies `stop_hook_active` so a Stop hook can
-  // avoid continuing the same turn indefinitely. It is always false here, so an
-  // unconditionally blocking hook force-continues every step until it self-limits.
+  // machine observe pending input and run another step. `stop_hook_active` tells
+  // the hook it already forced this turn on, as Codex does, and a hook that keeps
+  // blocking regardless is stopped after MAX_FORCED_STOPS continuations.
+  /** Forced continuations each agent's current turn has had from blocking Stop hooks. */
+  const forcedStops = new WeakMap<object, { turn: number; count: number }>()
   ctx.on('agent/turn-stopping', async ({ agent, turn, signal }): Promise<void> => {
-    const merged = await runPoint('Stop', '', { ...turnBase(ctx, agent, 'Stop', model), stop_hook_active: false, last_assistant_message: null }, { agent, turn, signal })
+    const previous = forcedStops.get(agent)
+    const forced = previous?.turn === turn ? previous.count : 0
+    const merged = await runPoint('Stop', '', { ...turnBase(ctx, agent, 'Stop', model), stop_hook_active: forced > 0, last_assistant_message: null }, { agent, turn, signal })
     /* jscpd:ignore-end */
-    if (merged.decision === 'deny') {
-      // A blocking Stop hook forces continuation; a block with no reason (exit 2,
-      // empty stderr) still forces it — fall back to a generic steering line
-      // rather than letting the turn stop.
-      const text = merged.reason ?? 'continue: blocked by Stop hook'
-      agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: CONTEXT_SOURCE }))
+    if (merged.decision !== 'deny') {
+      forcedStops.delete(agent)
+      return
     }
+    if (forced >= MAX_FORCED_STOPS) {
+      ctx.logger.warn('hooks-codex: a Stop hook blocked %d times in a row; letting the turn stop', forced)
+      forcedStops.delete(agent)
+      return
+    }
+    forcedStops.set(agent, { turn, count: forced + 1 })
+    // A blocking Stop hook forces continuation; a block with no reason (exit 2,
+    // empty stderr) still forces it — fall back to a generic steering line
+    // rather than letting the turn stop.
+    const text = merged.reason ?? 'continue: blocked by Stop hook'
+    agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: CONTEXT_SOURCE }))
   })
 }
 

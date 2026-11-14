@@ -68,7 +68,7 @@ import type { ResolvedPiAiProviderProfile } from './config.ts'
 import { requestImageTarget, toPiContext } from './context.ts'
 import { adoptForeignGeminiHistory } from './gemini-history.ts'
 import { conversationUpdates, createModels, getSupportedThinkingLevels } from './models.ts'
-import { OllamaContext } from './ollama-context.ts'
+import { OllamaContext, isLocalModelServer, isOllamaRoute } from './ollama-context.ts'
 import { toStreamChunks } from './stream.ts'
 
 /**
@@ -491,6 +491,7 @@ export class PiAiAdapter extends LlmAdapter {
         const wireId = model.api === 'openai-completions'
           ? await this.ollama.modelFor(
             model.baseUrl, model.id, model.contextWindow === DEFAULT_CONTEXT_WINDOW ? undefined : model.contextWindow,
+            isOllamaRoute(options.provider),
           )
           : model.id
         const wire = wireId === model.id ? model : { ...model, id: wireId }
@@ -505,7 +506,11 @@ export class PiAiAdapter extends LlmAdapter {
           headers: requestHeaders(profile.headers),
         })
         // Replay data names the model that actually answered, so its signatures go back to that model on later steps.
-        const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id)[Symbol.asyncIterator]()
+        // A locally served model may write its tool calls into the answer as text; they are read back as tool calls.
+        const inlineTools = model.api === 'openai-completions' && isLocalModelServer(model.baseUrl, options.provider) && tools.length > 0
+          ? new Set(tools.map(tool => tool.name))
+          : undefined
+        const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id, inlineTools)[Symbol.asyncIterator]()
         let exhausted = false
         const retryKeys: string[] = []
         try {

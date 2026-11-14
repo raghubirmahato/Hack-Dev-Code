@@ -21,10 +21,10 @@ async function bench() {
 }
 
 describe('ui-hackdev browser plugin', () => {
-  it('registers a disposable card for both hackdev tools and its dictionaries', async () => {
+  it('registers a disposable card for the hackdev tools and its dictionaries', async () => {
     const b = await bench()
     expect(inject).toEqual(['slots', 'locale'])
-    expect(b.entries().map(entry => entry.options.key).sort()).toEqual(['hackdev', 'hackdev_review'])
+    expect(b.entries().map(entry => entry.options.key).sort()).toEqual(['hackdev', 'hackdev_review', 'hackdev_swarm'])
     expect(b.entries().every(entry => entry.locale === 'hackdev')).toBe(true)
 
     const t = b.ctx.locale.bind('hackdev')

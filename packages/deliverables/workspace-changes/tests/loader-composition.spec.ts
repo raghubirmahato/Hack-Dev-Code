@@ -36,6 +36,8 @@ describe('real Loader composition', () => {
       "- name: '@hackdevcode/dsh-subprocess-local'",
       "- name: '@hackdevcode/dsh-fs-local'",
       "- name: '@hackdevcode/dsh-workspace-changes'",
+      '  config:',
+      `    checkpointDir: ${JSON.stringify(join(root, 'checkpoints'))}`,
       '',
     ].join('\n'))
     context = new Context()

@@ -34,7 +34,9 @@
     "@hackdevcode/dsh-session": "workspace:*",
     "@hackdevcode/dsh-subagent": "workspace:*",
     "@hackdevcode/dsh-tools": "workspace:*",
-    "@hackdevcode/dsh-agent": "workspace:*"
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-atomic-write": "workspace:*",
+    "@hackdevcode/dsh-home-paths": "workspace:*"
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -51,10 +53,13 @@
     "@hackdevcode/dsh-subagent-fork-in-process": "workspace:*",
     "@hackdevcode/dsh-subagent-spawn-in-process": "workspace:*",
     "@hackdevcode/dsh-tool-testkit": "workspace:*",
-    "@hackdevcode/dsh-tools": "workspace:*"
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@hackdevcode/dsh-atomic-write": "workspace:*",
+    "@hackdevcode/dsh-home-paths": "workspace:*"
   },
   "dependencies": {
     "@hackdevcode/dsh-brand": "workspace:*",
-    "@hackdevcode/dsh-util-values": "workspace:*"
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~"
   }
 }

@@ -12,6 +12,11 @@ import { MAX_TIMER_DELAY_MS } from '@hackdevcode/dsh-timeout'
 import { EMPTY_RESPONSE_CODE } from './error.ts'
 
 const DEFAULT_MAX_RETRIES = 5
+// A dropped connection is waited out: with the 60 s delay cap, 40 retries cover about half an hour offline, after
+// which the failed step runs again from where it stopped.
+const DEFAULT_NETWORK_RETRIES = 40
+/** Failure codes that mean the connection itself failed, which {@link retryBudget} gives the longer network budget. */
+export const NETWORK_FAILURE_CODES: readonly string[] = Object.freeze(['TRANSPORT', 'STREAM_CLOSED'])
 const DEFAULT_INITIAL_DELAY_MS = 500
 // Free tiers (Gemini, OpenRouter, Groq) often ask for 20 to 60 s after a rate limit; a shorter cap gave up at once.
 const DEFAULT_MAX_DELAY_MS = 60_000
@@ -42,6 +47,11 @@ export interface NormalRetryPolicyConfig {
   mode: 'normal'
   /** Maximum eligible retries after the first request (default 5). */
   maxRetries?: number
+  /**
+   * Retries for a failed connection (`TRANSPORT`, `STREAM_CLOSED`), so a task waits out a network outage and
+   * resumes at the same step (default 40; never fewer than `maxRetries`).
+   */
+  networkRetries?: number
   /** Stable failure codes eligible for this policy. */
   retryableCodes?: string[]
   /** Local exponential-backoff and jitter configuration. */
@@ -70,6 +80,7 @@ export interface ResolvedRetryBackoff {
 export interface ResolvedNormalRetryPolicy extends ResolvedRetryBackoff {
   readonly mode: 'normal'
   readonly maxRetries: number
+  readonly networkRetries: number
   readonly retryableCodes: readonly string[]
 }
 
@@ -90,6 +101,7 @@ const backoffSchema: z<BackoffConfig> = z.object({
 const normalPolicySchema: z<NormalRetryPolicyConfig> = z.object({
   mode: z.const('normal').required(),
   maxRetries: z.number().step(1).min(0).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_RETRIES),
+  networkRetries: z.number().step(1).min(0).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_NETWORK_RETRIES),
   retryableCodes: z.array(z.string()).default([...DEFAULT_RETRYABLE_CODES]),
   backoff: backoffSchema,
 })
@@ -106,12 +118,12 @@ export const RetryPolicySchema: z<RetryPolicyConfig> = z.union([
 ])
 
 const NORMAL_POLICY_KEYS: ReadonlySet<string> = new Set([
-  'mode', 'maxRetries', 'retryableCodes', 'backoff',
+  'mode', 'maxRetries', 'networkRetries', 'retryableCodes', 'backoff',
 ])
 // Layered configuration can retain normal-only fields after switching modes;
 // always mode ignores those inactive values while still rejecting unknown keys.
 const ALWAYS_POLICY_KEYS: ReadonlySet<string> = new Set([
-  'mode', 'maxRetries', 'retryableCodes', 'backoff',
+  'mode', 'maxRetries', 'networkRetries', 'retryableCodes', 'backoff',
 ])
 const BACKOFF_KEYS: ReadonlySet<string> = new Set(['initialDelayMs', 'maxDelayMs', 'jitterRatio'])
 
@@ -157,6 +169,7 @@ export function resolveRetryPolicy(
     return Object.freeze({
       mode: 'normal',
       maxRetries: DEFAULT_MAX_RETRIES,
+      networkRetries: DEFAULT_NETWORK_RETRIES,
       retryableCodes: DEFAULT_RETRYABLE_CODES,
       ...resolveBackoff(undefined, `${path}.backoff`),
     })
@@ -166,6 +179,10 @@ export function resolveRetryPolicy(
     case 'normal': {
       validateKeys(config, NORMAL_POLICY_KEYS, path)
       const maxRetries = config.maxRetries ?? DEFAULT_MAX_RETRIES
+      const networkRetries = config.networkRetries ?? DEFAULT_NETWORK_RETRIES
+      if (!Number.isSafeInteger(networkRetries) || networkRetries < 0) {
+        throw new Error(`${path}.networkRetries must be a non-negative safe integer`)
+      }
       const retryableCodes = config.retryableCodes ?? [...DEFAULT_RETRYABLE_CODES]
       if (!Number.isSafeInteger(maxRetries) || maxRetries < 0) {
         throw new Error(`${path}.maxRetries must be a non-negative safe integer`)
@@ -182,6 +199,7 @@ export function resolveRetryPolicy(
       return Object.freeze({
         mode: 'normal',
         maxRetries,
+        networkRetries,
         retryableCodes: Object.freeze([...retryableCodes]),
         ...resolveBackoff(config.backoff, `${path}.backoff`),
       })
@@ -195,4 +213,15 @@ export function resolveRetryPolicy(
     default:
       throw new Error(`${path}.mode must be "normal" or "always"`)
   }
+}
+
+/**
+ * How many retries a normal policy allows for one failure: the network budget for a failed connection, the general
+ * one otherwise.
+ * @param policy - the resolved normal policy.
+ * @param code - the failure code.
+ * @returns the retry budget.
+ */
+export function retryBudget(policy: ResolvedNormalRetryPolicy, code: string): number {
+  return NETWORK_FAILURE_CODES.includes(code) ? Math.max(policy.maxRetries, policy.networkRetries) : policy.maxRetries
 }

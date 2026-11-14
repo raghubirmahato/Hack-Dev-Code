@@ -530,7 +530,7 @@ describe('dsh-tool-workflow', () => {
       expect(engine.disposed).toBe(1)
       // The durable session record still brackets the background run.
       expect(session.snapshotEvents().map(event => event.type)).toEqual([
-        'tool-workflow/run-start', 'job/registered', 'tool-workflow/agent-start',
+        'tool-workflow/run-start', 'job/registered', 'tool-workflow/log', 'tool-workflow/agent-start',
         'tool-workflow/agent-end', 'tool-workflow/run-end', 'job/settled',
       ])
       // A straggling event after settlement finds no tracked run and is dropped.

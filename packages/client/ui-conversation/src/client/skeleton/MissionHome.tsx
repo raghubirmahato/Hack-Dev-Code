@@ -7,7 +7,7 @@ import css from './MissionHome.module.css'
 /** The owner's locale seat type, passed as a plain prop. */
 type MissionTranslate = ConversationContentProps['t']
 
-const TEMPLATES = ['build', 'fix', 'review', 'resume'] as const
+const TEMPLATES = ['build', 'swarm', 'fix', 'review', 'resume'] as const
 
 /**
  * Starter missions; choosing one writes its prompt into the composer draft.

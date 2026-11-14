@@ -532,6 +532,52 @@ describe('SubagentRuntime.startActivation', () => {
     expect(hasUserText(loaded.events, 'child task')).toBe(true)
   })
 
+  it('continues a finished child for a caller with its whole conversation and returns the new turn\'s result', async () => {
+    const { ctx, parent, adapter } = await setup([textResponse('first answer'), textResponse('second answer')])
+    const first = await ctx.subagents.startActivation({ ...startSpec(parent), delivery: 'caller' })
+    expect((await first.result).stopReason).toBe('completed')
+    await first.dispose()
+    await waitNoActivation(ctx, first.childId)
+
+    const second = await ctx.subagents.startActivation({
+      provider: 'spawn',
+      label: 'child task',
+      delivery: 'caller',
+      childId: first.childId,
+      resume: true,
+      signal: testSignal,
+      request: { prompt: [{ type: 'text', text: 'now fix what the review found' }], parent },
+    })
+    expect(second.childId).toBe(first.childId)
+    const result = await second.result
+    expect(result.output).toEqual([{ type: 'text', text: 'second answer' }])
+    // The second request carries the first task and answer: the child kept its conversation.
+    const history = JSON.stringify(adapter.requests[1]?.messages)
+    expect(history).toContain('child task')
+    expect(history).toContain('first answer')
+    expect(history).toContain('now fix what the review found')
+    await second.dispose()
+  })
+
+  it('refuses to continue a child that is still running, one that does not exist, or one without its id', async () => {
+    const release = Promise.withResolvers<undefined>()
+    const adapter = new GatedAdapter([{ chunks: textResponse('slow answer'), gate: release.promise }])
+    const { ctx, parent } = await setupWith(adapter)
+    const running = await ctx.subagents.startActivation({ ...startSpec(parent), delivery: 'caller' })
+    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+    const resume = (childId: SessionId | undefined) => ctx.subagents.startActivation({
+      provider: 'spawn', label: 'again', delivery: 'caller', resume: true, signal: testSignal,
+      ...childId === undefined ? {} : { childId },
+      request: { prompt: [{ type: 'text', text: 'again' }], parent },
+    })
+    await expect(resume(running.childId)).rejects.toMatchObject({ code: 'ACTIVATION_ACTIVE' })
+    await expect(resume(SessionId('00000000-0000-4000-8000-00000000dead'))).rejects.toMatchObject({ code: 'NOT_RESUMABLE' })
+    await expect(resume(undefined)).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
+    release.resolve(undefined)
+    await running.result
+    await running.dispose()
+  })
+
   it('uses a caller-reserved child identity and rejects a duplicate reservation', async () => {
     const release = Promise.withResolvers<undefined>()
     const adapter = new GatedAdapter([

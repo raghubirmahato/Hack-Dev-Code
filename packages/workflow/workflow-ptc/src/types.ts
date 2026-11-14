@@ -46,6 +46,11 @@ export interface ChildStartRequest {
   model?: string
   /** The child's working directory, relative to the run's directory unless absolute. */
   cwd?: string
+  /**
+   * A name the script gives a conversation. The first `agent()` call with a name starts the child; a later call
+   * with the same name continues that child's conversation instead of starting a fresh one.
+   */
+  session?: string
 }
 
 /**

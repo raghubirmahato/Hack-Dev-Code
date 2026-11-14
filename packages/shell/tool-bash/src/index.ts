@@ -70,13 +70,18 @@ interface BashToolArgs {
   justification?: string
 }
 
+/** What the UI shows for a command the model gave no description for: its first line, shortened. */
+function describeCommand(command: string): string {
+  const first = command.trim().split('\n')[0] ?? ''
+  return first.length <= 80 ? first : `${first.slice(0, 79)}…`
+}
+
 function validateBashArgs(args: BashToolArgs, effectiveMode: SandboxMode | undefined): void {
   if (args.command.trim().length === 0) {
     throw new Error('invalid command: expected a non-empty string')
   }
-  if (args.description.trim().length === 0) {
-    throw new Error('invalid description: expected a non-empty string')
-  }
+  // A missing description is not worth a failed call: the command itself is shown instead.
+  if (args.description.trim().length === 0) args.description = describeCommand(args.command)
   if (args.timeoutMs !== undefined && (!Number.isFinite(args.timeoutMs) || args.timeoutMs <= 0)) {
     throw new Error(`invalid timeoutMs: expected a positive number, got ${JSON.stringify(args.timeoutMs)}`)
   }
@@ -372,6 +377,8 @@ export function apply(ctx: Context, config: Config = {}): void {
         description: {
           type: 'string',
           required: true,
+          // A model that leaves it out still runs its command; the command is then its own description.
+          default: '',
           description: 'Clear, concise description of what this command does in active voice, '
             + '5-10 words (shown in the UI). Examples: "ls" → "List files in current directory"; '
             + '"git status" → "Show working tree status"; "npm install" → "Install package dependencies".',

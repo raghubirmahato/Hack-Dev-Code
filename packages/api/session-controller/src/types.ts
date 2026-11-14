@@ -203,6 +203,7 @@ declare module '@hackdevcode/dsh-typert-protocol' {
     'session/steer-unavailable': { readonly itemId: MessageId }
     'session/title-invalid': { readonly sessionId: SessionId }
     'session/fork-unavailable': { readonly sessionId: SessionId }
+    'session/rewind-failed': { readonly sessionId: SessionId }
     'session/migration-required': { readonly sessionId: SessionId }
     'subagent/not-found': {
       readonly parentSessionId: SessionId
@@ -310,11 +311,18 @@ export interface SessionForkRequest {
   readonly atSeq?: number
   /** False asks the Host to check for required migration before forking. Defaults to true. */
   readonly allowMigration?: boolean
+  /**
+   * Rewind: also put the workspace's files back to how they were at `atSeq`, undoing the file changes of every later
+   * turn, before the fork is created. Needs a git repository. Defaults to false.
+   */
+  readonly restoreFiles?: boolean
 }
 
 /** Identity of a newly forked Session. */
 export interface SessionForkValue {
   readonly sessionId: SessionId
+  /** With `restoreFiles`: how many files were written back and how many created ones were removed. */
+  readonly restoredFiles?: { readonly restored: number; readonly removed: number }
 }
 
 /** Session prompt request. */

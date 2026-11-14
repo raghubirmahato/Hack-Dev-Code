@@ -22,6 +22,9 @@ import { queueHostSubagentPrompt } from '../src/internal.ts'
 import {
   STRUCTURED_OUTPUT_INSTRUCTION,
   STRUCTURED_OUTPUT_TOOL,
+  MAX_STRUCTURED_REMINDERS,
+  fillEmptyRequired,
+  jsonCandidates,
 } from '../src/structured.ts'
 
 const testToolSignal = new AbortController().signal
@@ -342,19 +345,71 @@ describe('in-process structured output', () => {
     await run.dispose()
   })
 
-  it('a clean finish without a capture is an immediate error to the parent — deliberately NO re-prompt', async () => {
+  it('a prose finish is reminded twice to report, then fails to the parent', async () => {
     const { ctx, parent, adapter } = await setup([
       textResponse('here is my answer in prose'),
+      textResponse('still prose'),
+      textResponse('prose again'),
       textResponse('MUST NOT BE CONSUMED'),
     ])
     const run = await startTestActivation(ctx, 'spawn', structuredRequest(parent))
     const result = await run.result
     expect(result.stopReason).toBe('error')
     expect(result.structured).toBeUndefined()
-    // Exactly one model request and one caller-supplied user message: no nudge turn exists.
-    expect(adapter.requests.length).toBe(1)
+    // The first answer plus one request per reminder, and no more.
+    expect(adapter.requests.length).toBe(1 + MAX_STRUCTURED_REMINDERS)
     const child = run.localAgent
-    expect(child.session.snapshotEvents().filter(e => e.type === 'user/message' && e.data.source.kind !== 'runtime-context').length).toBe(1)
+    const reminders = child.session.snapshotEvents().filter(e => e.type === 'user/message' && e.data.source.kind === 'structured-reminder')
+    expect(reminders.length).toBe(MAX_STRUCTURED_REMINDERS)
+    await run.dispose()
+  })
+
+  it('a reminded child that then reports completes with its result', async () => {
+    const { ctx, parent, adapter } = await setup([
+      textResponse('here is my answer in prose'),
+      toolCallResponse('c1', STRUCTURED_OUTPUT_TOOL, { answer: 5 }),
+    ])
+    const run = await startTestActivation(ctx, 'spawn', structuredRequest(parent))
+    const result = await run.result
+    expect(result.stopReason).toBe('completed')
+    expect(result.structured).toEqual({ answer: 5 })
+    expect(adapter.requests.length).toBe(2)
+    await run.dispose()
+  })
+
+  it('quotes the rejected fields in the reminder after an invalid call the model did not retry', async () => {
+    const { ctx, parent } = await setup([
+      toolCallResponse('c1', STRUCTURED_OUTPUT_TOOL, { note: 'no answer' }),
+      textResponse('gave up'),
+      toolCallResponse('c2', STRUCTURED_OUTPUT_TOOL, { answer: 1 }),
+    ])
+    const run = await startTestActivation(ctx, 'spawn', structuredRequest(parent))
+    const result = await run.result
+    expect(result.structured).toEqual({ answer: 1 })
+    const reminder = run.localAgent.session.snapshotEvents().find(e => e.type === 'user/message' && e.data.source.kind === 'structured-reminder')
+    expect(JSON.stringify(reminder?.type === 'user/message' ? reminder.data.content : '')).toContain('answer')
+    await run.dispose()
+  })
+
+  it('accepts a final text answer whose JSON matches the schema, without a nudge turn', async () => {
+    const { ctx, parent, adapter } = await setup([
+      textResponse('Here is my report:\n```json\n{ "answer": 7, "note": "from text" }\n```\n-- signed'),
+      textResponse('MUST NOT BE CONSUMED'),
+    ])
+    const run = await startTestActivation(ctx, 'spawn', structuredRequest(parent))
+    const result = await run.result
+    expect(result.stopReason).toBe('completed')
+    expect(result.structured).toEqual({ answer: 7, note: 'from text' })
+    expect(adapter.requests.length).toBe(1)
+    await run.dispose()
+  })
+
+  it('keeps the error when the final text holds no JSON matching the schema', async () => {
+    const { ctx, parent } = await setup([textResponse('Result: {"answer": "seven"}')])
+    const run = await startTestActivation(ctx, 'spawn', structuredRequest(parent))
+    const result = await run.result
+    expect(result.stopReason).toBe('error')
+    expect(result.structured).toBeUndefined()
     await run.dispose()
   })
 
@@ -528,6 +583,8 @@ describe('in-process structured output', () => {
     const { ctx, parent, adapter } = await setup([
       toolCallResponse('c1', STRUCTURED_OUTPUT_TOOL, { answer: 7 }),
       textResponse('continues after the blocked capture'),
+      textResponse('reminded once'),
+      textResponse('reminded twice'),
     ])
     // A PostToolUse-style hook turns the tool body's provisional success into
     // the authoritative final error observed by the commit notification.
@@ -548,8 +605,8 @@ describe('in-process structured output', () => {
     expect(results[0]!.data.message.isError).toBe(true)
     expect(JSON.stringify(results[0]!.data.message.content)).toContain('capture rejected by hook')
     // ...and the turn CONTINUED past the blocked call (no captured veto):
-    // the model got to react to the failure with a second step.
-    expect(adapter.requests.length).toBe(2)
+    // the model got to react to the failure with a second step, then to each reminder.
+    expect(adapter.requests.length).toBe(2 + MAX_STRUCTURED_REMINDERS)
     await run.dispose()
   })
 
@@ -642,6 +699,8 @@ describe('in-process structured output', () => {
     const { ctx, parent, adapter } = await setup([
       toolCallResponse('c1', RUN_CODE_NAME, { code: 'await tools.structured_output({ answer: 12 }); throw new Error("boom")', description: 'Capture then fail the program' }),
       textResponse('outer code failed'),
+      textResponse('reminded once'),
+      textResponse('reminded twice'),
     ], {
       toolMode: 'ptc',
       codeRun: async (request) => {
@@ -659,7 +718,7 @@ describe('in-process structured output', () => {
     const result = await run.result
     expect(result.structured).toBeUndefined()
     expect(result.stopReason).toBe('error')
-    expect(adapter.requests).toHaveLength(2)
+    expect(adapter.requests).toHaveLength(2 + MAX_STRUCTURED_REMINDERS)
     const child = run.localAgent
     const outer = child.session.snapshotEvents().find(event =>
       event.type === 'tool/result' && event.data.message.source.callId === ToolCallId('c1'))
@@ -671,6 +730,8 @@ describe('in-process structured output', () => {
     const { ctx, parent, adapter } = await setup([
       toolCallResponse('c1', RUN_CODE_NAME, { code: 'return await tools.structured_output({ answer: 12 })', description: 'Capture the structured answer' }),
       textResponse('outer code was blocked'),
+      textResponse('reminded once'),
+      textResponse('reminded twice'),
     ], {
       toolMode: 'ptc',
       codeRun: async (request) => {
@@ -688,7 +749,7 @@ describe('in-process structured output', () => {
     const result = await run.result
     expect(result.structured).toBeUndefined()
     expect(result.stopReason).toBe('error')
-    expect(adapter.requests).toHaveLength(2)
+    expect(adapter.requests).toHaveLength(2 + MAX_STRUCTURED_REMINDERS)
     await run.dispose()
   })
 
@@ -1001,5 +1062,38 @@ describe('in-process structured output', () => {
     expect(valid.isError).toBeFalsy()
     await run.dispose()
     expect((await run.result).structured).toEqual({ answer: 5 })
+  })
+})
+
+describe('jsonCandidates', () => {
+  it('lists fenced blocks from the last one back, then the outer brace span', () => {
+    const text = 'a ```json\n{"x":1}\n``` b ```\n{"x":2}\n``` c'
+    expect(jsonCandidates(text)).toEqual(['{"x":2}\n', '{"x":1}\n', '{"x":1}\n``` b ```\n{"x":2}'])
+  })
+
+  it('returns nothing for text without braces or fences', () => {
+    expect(jsonCandidates('plain words')).toEqual([])
+  })
+})
+
+describe('fillEmptyRequired', () => {
+  const schema: ObjectJsonSchema = {
+    type: 'object',
+    properties: {
+      title: { type: 'string' },
+      tags: { type: 'array', items: { type: 'string' } },
+      done: { type: 'boolean' },
+      tasks: { type: 'array', items: { type: 'object', properties: { id: { type: 'string' }, deps: { type: 'array' } }, required: ['id', 'deps'] } },
+    },
+    required: ['title', 'tags', 'done', 'tasks'],
+  }
+
+  it('adds missing required lists and booleans at every depth, never strings', () => {
+    expect(fillEmptyRequired(schema, { tasks: [{ id: 'a' }] })).toEqual({ tags: [], done: false, tasks: [{ id: 'a', deps: [] }] })
+  })
+
+  it('keeps present values and non-object input as they are', () => {
+    expect(fillEmptyRequired(schema, { title: 't', tags: ['x'], done: true, tasks: [] })).toEqual({ title: 't', tags: ['x'], done: true, tasks: [] })
+    expect(fillEmptyRequired(schema, 'text')).toBe('text')
   })
 })

@@ -74,6 +74,12 @@ interface MaterializeBase {
   delivery?: 'parent' | 'caller' | undefined
 }
 
+/** What a restore for a caller-awaited turn adds to a plain cold resume. */
+interface RestoreExtras {
+  delivery?: 'parent' | 'caller' | undefined
+  outputSchema?: ObjectJsonSchema | undefined
+}
+
 /** Creation inputs for a local residency or one external backend execution. */
 type MaterializeInputs = MaterializeBase & (
   | {
@@ -469,6 +475,40 @@ export class SubagentManager {
         )
       })
       return { ...this.receipt(established), childId, messageId }
+    } catch (error: unknown) {
+      releaseHold()
+      throw error
+    }
+  }
+
+  /**
+   * Continue one finished local child for a caller: restore it from its session with its whole conversation, give
+   * it the request's prompt as its next message, and hand back that turn's result. The parent must be the child's
+   * own parent, and the child must not be running.
+   * @param spec - the child, its next prompt, an optional output schema for this turn, and cancellation.
+   * @returns the activation of this turn and the accepted message id.
+   * @throws {SubagentError} `ACTIVATION_ACTIVE` while the child is running; `NOT_RESUMABLE` when it cannot be restored.
+   */
+  async resumeLocal(spec: SubagentActivationSpec & { childId: SessionId }): Promise<SubagentActivation & { messageId: MessageId }> {
+    const parent = spec.request.parent
+    const childId = spec.childId
+    this.assertAdmitting(parent)
+    const releaseHold = this.holdOwnership(parent, childId)
+    try {
+      return await this.locks.run(childId, async () => {
+        spec.signal.throwIfAborted()
+        if (this.resident.has(childId)) {
+          throw new SubagentError(`subagent "${childId}" is still running; wait for its result before continuing it`, 'ACTIVATION_ACTIVE')
+        }
+        const activation = await this.restore(parent, childId, spec.signal, {
+          delivery: spec.delivery,
+          outputSchema: spec.request.outputSchema,
+        })
+        const messageId = await this.submitMaterialized(
+          activation, spec.request.prompt, { source: { kind: 'user' }, signal: spec.signal, delivery: 'queue' }, parent,
+        )
+        return { ...this.receipt(activation), messageId }
+      })
     } catch (error: unknown) {
       releaseHold()
       throw error
@@ -1352,19 +1392,51 @@ export class SubagentManager {
     content: ContentBlock[],
     options: ChildDeliveryOptions,
   ): Promise<MessageId> {
+    const activation = await this.restore(parent, childId, options.signal, {})
+    return await this.submitMaterialized(activation, content, options, parent)
+  }
+
+  /**
+   * Restore a child from its persisted session under its own parent.
+   * @param parent - the child's live parent.
+   * @param childId - the child.
+   * @param signal - cancellation.
+   * @param extra - delivery and output schema of a caller-awaited turn, when this restore serves one.
+   * @returns the materialized activation.
+   * @throws {SubagentError} `NOT_RESUMABLE` when the session cannot be observed or holds no continuation state.
+   */
+  private async restore(parent: Agent, childId: SessionId, signal: AbortSignal, extra: RestoreExtras): Promise<Activation> {
     const query = this.requireSessionQuery()
     let observation: SessionObservation
     try {
-      observation = await query.observeSession(childId, {
-        signal: options.signal,
-      })
+      observation = await query.observeSession(childId, { signal })
     } catch (error: unknown) {
-      options.signal.throwIfAborted()
+      signal.throwIfAborted()
       throw new SubagentError(`subagent "${childId}" is unavailable`, 'NOT_RESUMABLE', { cause: error })
     }
     using source = observation
     this.assertAdmitting(parent)
     this.authorizeLineage(parent, childId, source.header.parentSession)
+    // Awaited inside the scope: the observation stays open until the child is materialized from it.
+    return await this.materializeRestored(parent, childId, source, signal, extra)
+  }
+
+  /**
+   * Materialize a child from its observed session.
+   * @param parent - the child's live parent.
+   * @param childId - the child.
+   * @param source - its observed session.
+   * @param signal - cancellation.
+   * @param extra - delivery and output schema of a caller-awaited turn, when this restore serves one.
+   * @returns the materialized activation.
+   */
+  private async materializeRestored(
+    parent: Agent,
+    childId: SessionId,
+    source: SessionObservation,
+    signal: AbortSignal,
+    extra: RestoreExtras,
+  ): Promise<Activation> {
     const ownEvents = source.events.slice(source.inheritedEventCount)
     const descriptor = foldSubagentDescriptor(ownEvents)
     if (descriptor === undefined || descriptor.mode !== 'continuable') {
@@ -1393,14 +1465,16 @@ export class SubagentManager {
             : {},
         },
         composition: { agentPreset: agentPreset ?? undefined, persona: descriptor.persona, toolFilter: descriptor.toolFilter },
-        signal: options.signal,
+        signal,
+        ...extra.delivery === undefined ? {} : { delivery: extra.delivery },
+        ...extra.outputSchema === undefined ? {} : { outputSchema: extra.outputSchema },
       })
     } catch (error: unknown) {
-      options.signal.throwIfAborted()
+      signal.throwIfAborted()
       if (error instanceof SubagentError) throw error
       throw new SubagentError(`subagent "${childId}" is unavailable`, 'NOT_RESUMABLE', { cause: error })
     }
-    return await this.submitMaterialized(activation, content, options, parent)
+    return activation
   }
 
   /** Admit a materialized child, commit its creation fact, and release it on failure. */

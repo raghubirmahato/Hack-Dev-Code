@@ -1,5 +1,5 @@
 ---
-description: "Remote gateway of the Customize settings area: reads and changes MCP servers, connectors and skills for a settings page."
+description: "Remote gateway of the Customize settings area: reads and changes MCP servers, connectors, website sessions and skills for a settings page."
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-The Host side of the Customize settings area. It gives a settings page one Remote, `customize`, to read the directory of MCP servers, connectors and skills and to change it: turn a server on or off, store its keys and folders, add or remove a server of your own, sign in to or disconnect a connector, and install or remove a skill. It keeps no state; every call goes to [mcp-directory](../../mcp/mcp-directory/README.md).
+The Host side of the Customize settings area. It gives a settings page one Remote, `customize`, to read the directory of MCP servers, connectors and skills and to change it: turn a server on or off, store its keys and folders, add or remove a server of your own, sign in to or disconnect a connector, add, reopen or remove a website session, and install or remove a skill. It keeps no state; every call goes to [mcp-directory](../../mcp/mcp-directory/README.md).
 
 ## Table of Contents
 
@@ -33,7 +33,8 @@ A browser plugin calls it through the generated face, `ctx.remote.customize`:
 
 | Method | What it does |
 | --- | --- |
-| `read()` | Returns `{ servers, connectors, skills }` as they stand now. |
+| `read()` | Returns `{ servers, connectors, sites, skills }` as they stand now. |
+| `addSite(site)`, `openSite(id)`, `removeSite(id)` | Add a website session and open its sign-in window on the Host machine, open that window again, or remove the session with its browser profile. |
 | `setServer(id, { enabled, keys?, roots? })` | Turns a server on or off and stores the keys and folders given. |
 | `saveCustom(id, server)` / `removeCustom(id)` | Adds, replaces or removes one of the person's own servers. |
 | `connect({ id, url?, title? })` | Adds a connector and starts its sign-in; returns `{ authorizeUrl }` when a browser step is needed. |

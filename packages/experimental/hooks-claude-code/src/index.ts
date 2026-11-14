@@ -91,6 +91,9 @@ function nextHandlerId(point: string): string {
 /** The `{kind:'hooks-claude-code'}` producer source stamped on every context this bridge injects. */
 const CONTEXT_SOURCE: MessageSource = { kind: 'hooks-claude-code' }
 
+/** Consecutive times a blocking Stop hook may force one turn to continue before the turn is allowed to stop. */
+export const MAX_FORCED_STOPS = 8
+
 /** The summary cap bounds a persisted event field — a positive integer or the slice misbehaves silently. */
 function assertPositiveInteger(name: string, value: number): void {
   if (!Number.isInteger(value) || value < 1) {
@@ -270,15 +273,28 @@ export function apply(ctx: Context, config: Config): void {
   })
 
   // A blocking Stop hook steers at the stopping boundary, which makes the
-  // machine observe pending input and run another step.
-  // TODO(stop-loop-guard): cap consecutive forced continuations; hooks must self-limit meanwhile.
+  // machine observe pending input and run another step. `stop_hook_active` tells
+  // the hook it already forced this turn on, as Claude Code does, and a hook that
+  // keeps blocking regardless is stopped after MAX_FORCED_STOPS continuations.
+  /** Forced continuations each agent's current turn has had from blocking Stop hooks. */
+  const forcedStops = new WeakMap<object, { turn: number; count: number }>()
   ctx.on('agent/turn-stopping', async ({ agent, turn, signal }): Promise<void> => {
-    const merged = await runPoint('Stop', '', stopPayload(agent), { agent, turn, signal })
-    if (merged.decision === 'deny') {
-      // A blocking Stop hook forces continuation.
-      const text = merged.reason ?? 'continue: blocked by Stop hook'
-      agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: CONTEXT_SOURCE }))
+    const previous = forcedStops.get(agent)
+    const forced = previous?.turn === turn ? previous.count : 0
+    const merged = await runPoint('Stop', '', stopPayload(agent, forced > 0), { agent, turn, signal })
+    if (merged.decision !== 'deny') {
+      forcedStops.delete(agent)
+      return
     }
+    if (forced >= MAX_FORCED_STOPS) {
+      ctx.logger.warn('hooks-claude-code: a Stop hook blocked %d times in a row; letting the turn stop', forced)
+      forcedStops.delete(agent)
+      return
+    }
+    forcedStops.set(agent, { turn, count: forced + 1 })
+    // A blocking Stop hook forces continuation.
+    const text = merged.reason ?? 'continue: blocked by Stop hook'
+    agent.steer(createUserMessage({ content: [{ type: 'text', text }], source: CONTEXT_SOURCE }))
   })
 
   // SubagentStart may inject child context; SubagentStop only observes. Both
@@ -346,8 +362,8 @@ function preToolPayload(exec: ToolExecution): Record<string, unknown> {
 function postToolPayload(exec: ToolExecution, result: ToolExecutionResult): Record<string, unknown> {
   return { ...base(exec.agent, 'PostToolUse'), tool_name: exec.name, tool_input: exec.arguments, tool_use_id: exec.callId, tool_response: blocksToText(result.content) }
 }
-function stopPayload(agent: Agent): Record<string, unknown> {
-  return { ...base(agent, 'Stop'), stop_hook_active: false }
+function stopPayload(agent: Agent, active: boolean): Record<string, unknown> {
+  return { ...base(agent, 'Stop'), stop_hook_active: active }
 }
 /**
  * Build a SubagentStart/SubagentStop payload from the CC base (the child's

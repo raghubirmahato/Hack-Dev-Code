@@ -38,6 +38,11 @@ The shipped Web bundle mounts this plugin. Mount it in any composition with the 
 | `maxFiles` | `500` | Maximum files carried by one summary; `total` still reports the complete count |
 | `maxFileBytes` | `2097152` | Bytes a file may hold to be captured around a file-tool edit or read from a snapshot for its comparison; a larger file gets no comparison, and one captured around a file-tool edit is also listed without counts |
 | `diffTimeoutMs` | `100` | Milliseconds a line comparison may run before it degrades to whole-file replacement |
+| `checkpointDir` | `''` | Directory for durable rewind checkpoints; empty uses `checkpoints` in the Hack Dev Code home |
+
+### Rewinding files
+
+In a git repository the turn snapshots double as checkpoints. Their objects are kept under `checkpointDir`, one folder per working directory, with a small index per Session of each recorded turn's start and end trees, so they outlive the Session. `workspaceChanges.restore(sessionId, cwd, afterTurn, signal)` puts the work tree back to how it was right after a turn: files changed since are written back, files created since are removed, ignored files are left alone, and the state just before is snapshotted so the rewind can itself be undone. The chat's Rewind action uses it through a fork with `restoreFiles`.
 
 This plugin requires the `subprocess` and `fs` services. Every Session with a working directory and no subagent origin is recorded; subagent Sessions are not. Snapshots are written through a private index into a temporary object directory owned by the Session, with the repository's own object store attached as a read-only alternate; the repository's index, objects, work tree, and refs stay untouched, and the user's earlier uncommitted changes never enter a summary. Session disposal removes the directory. Nested repositories and submodules inside the working directory are recorded as gitlinks, so their internal changes do not appear. A working directory outside any git repository takes no snapshots. Without git — or, on macOS, with only the developer-tools stub at `/usr/bin/git` — no repository is located either, and the plugin logs that once. Either way the summary lists the file-tool edits alone, as described next, with the working directory as the workspace; shell edits are absent.
 
@@ -78,6 +83,8 @@ None, as the recorder appends a log-only `workspace/changes` event that only cli
 Nothing here enters a model request, so provider cache reuse is unaffected.
 
 ## Known Limitations and Deferred Work
+
+- **Rewinding needs git** — outside a repository, or without git, turns are summarized from file-tool captures but cannot be rewound. Checkpoint objects are never pruned, so `checkpointDir` grows with the turns recorded; deleting it only removes the ability to rewind older turns.
 
 <a id="known-limitations-and-deferred-work"></a>
 

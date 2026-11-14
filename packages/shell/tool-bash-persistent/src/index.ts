@@ -13,13 +13,12 @@ import type { TerminalReadResult, TerminalSessionId } from '@hackdevcode/dsh-ter
 import { deadline, timeoutOf } from '@hackdevcode/dsh-timeout'
 import { defineTool } from '@hackdevcode/dsh-tools'
 
-// TODO: Replace the file-search advice; arbitrary command output need not come from a searchable file.
-const TRUNCATED_MESSAGE = '<response clipped><NOTE>To save on context only part of this file has been shown to you. You should retry this tool after you have searched inside the file with `grep -n` in order to find the line numbers of what you are looking for.</NOTE>'
+const TRUNCATED_MESSAGE = '<response clipped><NOTE>To save on context only part of this output is shown. Run the command again with its output narrowed (filter it, or select the lines or fields you need) to see the rest.</NOTE>'
 const LOST_PREFIX_MESSAGE = '<response clipped><NOTE>The beginning of this command output was dropped by the terminal scrollback limit. The following text is the earliest retained output.</NOTE>\n'
 const SHELL_RESET_MESSAGE = 'The persistent bash shell was reset; the next bash call starts from the workspace with a fresh current directory and environment.'
 // Status trailer for a command that never reported an exit code; settled
 // commands append `[Command finished with exit code N]` instead (see renderCaptured).
-const TIMEOUT_STATUS_MARKER = '[Command timed out or OOM]'
+const TIMEOUT_STATUS_MARKER = '[Command timed out]'
 const TIMEOUT_CODE = 'PERSISTENT_BASH_TIMEOUT'
 // One page is enough to find a just-emitted completion marker; the full
 // scrollback is assembled only when a command settles or needs partial output.
@@ -357,8 +356,7 @@ async function executeCommand(
       )
       await shells.reset(owner, 'persistent bash command timed out')
       return [
-        // TODO: Report a timeout only; this signal does not establish an OOM.
-        `Your command timed out after ${Math.round(timedOut.timeoutMs / 1000)} seconds or experienced an OOM error. Below is partial output:`,
+        `Your command timed out after ${Math.round(timedOut.timeoutMs / 1000)} seconds. Below is partial output:`,
         appendStatusMarker(partial, TIMEOUT_STATUS_MARKER),
         SHELL_RESET_MESSAGE,
       ].join('\n')

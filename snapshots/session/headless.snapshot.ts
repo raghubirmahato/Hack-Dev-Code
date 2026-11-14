@@ -499,7 +499,7 @@ const WORKTREE_CHECKOUT_ATTRIBUTES = 'tracked.txt filter=dsh-snapshot-checkout\n
 const workspaceSetups: Record<string, (cwd: string) => Promise<void>> = {
   async 'cua-script-guidance'(cwd) {
     // Keep the real prompt's bridge URL under the fixture workspace on every host.
-    const source = join(repoRoot, 'packages/experimental/cua')
+    const source = join(repoRoot, 'packages/computer-use/cua')
     const target = join(cwd, 'cua-runtime')
     const face = resolveExampleMode() === 'lib' ? 'lib' : 'src'
     const extension = face === 'lib' ? 'js' : 'ts'
@@ -507,7 +507,7 @@ const workspaceSetups: Record<string, (cwd: string) => Promise<void>> = {
     await cp(join(source, face), join(target, face), { recursive: true })
     await copyFile(join(source, 'package.json'), join(target, 'package.json'))
     await symlink(join(source, 'node_modules'), join(target, 'node_modules'), 'dir')
-    await copyFile(join(repoRoot, `packages/experimental/cua-macos/${guidanceDirectory}/guidance.${extension}`), join(target, `guidance.${extension}`))
+    await copyFile(join(repoRoot, `packages/computer-use/cua-macos/${guidanceDirectory}/guidance.${extension}`), join(target, `guidance.${extension}`))
   },
   async 'windows-acl-skill'(cwd) {
     const target = join(cwd, '.dsh', 'skills', 'diagnose-windows-sandbox-acl', 'SKILL.md')

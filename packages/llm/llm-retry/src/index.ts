@@ -11,6 +11,7 @@ import z from '@hackdevcode/schemastery'
 import { z as zod } from 'zod'
 import type { Agent, RequestErrorAction } from '@hackdevcode/dsh-agent'
 import type { LlmFailure, ResolvedRetryPolicy } from '@hackdevcode/dsh-llm'
+import { retryBudget } from '@hackdevcode/dsh-llm'
 import type {} from '@hackdevcode/dsh-session-projection'
 import { RetryId } from './brand.ts'
 import type { LlmRetryEventData } from './types.ts'
@@ -69,6 +70,7 @@ function retryPolicyKey(policy: ResolvedRetryPolicy): string {
     : JSON.stringify([
       policy.mode,
       policy.maxRetries,
+      policy.networkRetries,
       [...policy.retryableCodes].sort(),
       policy.initialDelayMs,
       policy.maxDelayMs,
@@ -166,7 +168,7 @@ export async function apply(ctx: Context, config: Config = {}, internals: RetryI
         mode: policy.mode,
         policyKey,
         retry,
-        maxRetries: policy.maxRetries,
+        maxRetries: retryBudget(policy, failure.code),
         delayMs,
         failure,
       }
@@ -217,7 +219,7 @@ export async function apply(ctx: Context, config: Config = {}, internals: RetryI
     const retryState = llmRetryProjectionHandle.stateOf(agent.session)
     const previous = retryState[retryStateKey(provider, policyKey)]
     const previousRetry = previous?.retry ?? 0
-    if (policy.mode === 'normal' && previousRetry >= policy.maxRetries) return next()
+    if (policy.mode === 'normal' && previousRetry >= retryBudget(policy, failure.code)) return next()
     const retry = previousRetry + 1
     const retryId = previous?.retryId ?? RetryId(randomUUID())
     let delayMs: number

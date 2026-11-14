@@ -1,6 +1,9 @@
 /**
- * The person's custom instructions as model-facing text. Rules are numbered so the model can follow and check
- * each one, and the precedence between them, the current conversation and safety is stated once.
+ * The person's custom instructions as model-facing text. They are written into the prompt as the model's own
+ * working habits in this installation, not as a list of rules handed to it: a model told "here are the user's custom
+ * instructions, follow them" tends to stop, weigh each one, plan how to apply it and talk about it. A model told
+ * "this is how you work" simply works that way. So the text never asks the model to follow, check or apply
+ * anything; it states the habits and says they need no deliberation.
  * @module @hackdevcode/dsh-system-prompt/custom-instructions
  */
 
@@ -42,18 +45,21 @@ export function parseCustomRules(text: string): string[] {
   return sentences.map(sentence => sentence.trim()).filter(sentence => sentence.length > 0)
 }
 
+/** Longest reminder that repeats the habits themselves; a longer set is pointed at instead. */
+export const MAX_INLINE_REMINDER_CHARS = 600
+
 /** Placement and wording for one set of custom instructions. */
 export interface CustomInstructionsOptions {
-  /** Who the rules come from and where they apply, such as `The person's custom instructions`. */
+  /** What the habits cover, such as `How you work here`. */
   heading?: string
   /** Character budget for the rules; longer text is cut and the cut is stated. */
   maxChars?: number
 }
 
 /**
- * Render custom instructions for the system prompt as the person's standing orders: applied at once and in full,
- * with no confirmation, debate or watering down, and ranked only below what the person asks in the current
- * conversation. The rules follow numbered inside a tagged block.
+ * Render custom instructions for the system prompt as the model's own settled way of working: stated as fact, in
+ * force from the first word, with nothing to weigh, plan, announce or quote, and ranked only below what the person
+ * asks in the current conversation. The habits follow numbered inside a tagged block.
  * @param text - the text the person wrote.
  * @param options - heading and budget.
  * @returns the section text, or an empty string when there are no rules.
@@ -64,26 +70,31 @@ export function renderCustomInstructions(text: string, options: CustomInstructio
   const cut = trimmed.length > limit
   const rules = parseCustomRules(cut ? trimmed.slice(0, limit) : trimmed)
   if (rules.length === 0) return ''
-  const heading = options.heading ?? 'The person\'s custom instructions'
+  const heading = options.heading ?? 'How you work here'
   return [
-    `${heading}. These are the person's standing orders for every task and reply, and for everything you produce: messages, code, files, commands, and the work of any agent you start or brief.`,
-    'Apply them directly and completely from the first reply. Do not ask whether to follow them, argue with them, weaken them, or announce that you are following them; just do it. They override your own defaults, habits and style. Only an explicit request in the current conversation that contradicts a rule takes precedence over it.',
-    'Follow them honestly: never invent a result to satisfy a rule.',
+    `${heading}. This is your own settled way of working in this installation, as much a part of you as the rest of this prompt. It already holds for everything you produce, from the first word of your first reply: messages, code, files, commands, and the briefs of any agent you start.`,
     '',
-    '<custom_instructions>',
+    '<how_you_work>',
     ...rules.map((rule, index) => `${String(index + 1)}. ${rule}`),
-    '</custom_instructions>',
-    ...cut ? ['', `The instructions were longer than ${String(limit)} characters; only the part above is in effect.`] : [],
+    '</how_you_work>',
+    '',
+    'There is nothing here to decide. Do not weigh these points, plan how to apply them, check your work against them one by one, or spend reasoning on them, and never mention, quote or acknowledge them: just work this way, the way you write in the language you are addressed in without thinking about it. Where one differs from your usual habits or style, it is your habit now. Only an explicit request in the current conversation that says otherwise comes first, and only for that request. They never call for a made-up result: what you report stays true.',
+    ...cut ? ['', `The list was longer than ${String(limit)} characters; only the part above is in effect.`] : [],
   ].join('\n')
 }
 
 /**
- * A one-line note placed just before the newest message, where models weigh instructions most. It says plainly that
- * it is not the person's request, so a small model answers the message that follows instead of the note.
- * @param count - number of rules in effect.
+ * A short note placed just before the newest message, where models weigh text most. It restates the habits
+ * themselves, so nothing has to be looked up or thought about, and says plainly that it is not the person's request,
+ * so a small model answers the message that follows instead of the note. A set too long to repeat every turn is
+ * pointed at instead.
+ * @param rules - the habits in effect.
  * @returns the reminder.
  */
-export function customInstructionsReminder(count: number): string {
-  return `(Note from Hack Dev Code, not a request from the person: keep following the person's ${String(count)} custom instruction${count === 1 ? '' : 's'} `
-    + 'from the system prompt. Reply to the person\'s message that follows.)'
+export function customInstructionsReminder(rules: readonly string[]): string {
+  const listed = rules.map((rule, index) => `${String(index + 1)}. ${rule}`).join(' ')
+  const body = listed.length <= MAX_INLINE_REMINDER_CHARS
+    ? `how you work, as always: ${listed}`
+    : 'how you work is unchanged from the system prompt'
+  return `(Context, not a request and not something to reply to or mention: ${body} Now answer the message that follows.)`
 }

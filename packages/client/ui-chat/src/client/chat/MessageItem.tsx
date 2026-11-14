@@ -129,9 +129,10 @@ function ModelRetryItem({ node, active, t }: {
 }
 
 /** Persistent, turn-positioned feedback for a terminal failure. */
-function TurnErrorItem({ node, t }: {
+function TurnErrorItem({ node, t, onContinue }: {
   node: TurnErrorNode
   t: ChatViewSlotProps['t']
+  onContinue?: (() => void) | undefined
 }) {
   return (
     <div className={css.turnErrorRow} role="status">
@@ -141,13 +142,15 @@ function TurnErrorItem({ node, t }: {
         <span className={css.turnErrorMessage}>{failureMessage(node.message, node.code, t)}</span>
       </div>
       {node.code !== undefined && node.code !== 'INTERRUPTED' && <code className={css.turnErrorCode}>{node.code}</code>}
+      {onContinue !== undefined && <ContinueButton onContinue={onContinue} t={t} />}
     </div>
   )
 }
 
 /** Persistent, turn-positioned notice for a turn ended at the output-token cap. */
-function TurnMaxTokensItem({ t }: {
+function TurnMaxTokensItem({ t, onContinue }: {
   t: ChatViewSlotProps['t']
+  onContinue?: (() => void) | undefined
 }) {
   return (
     <div className={css.turnErrorRow} role="status">
@@ -156,6 +159,7 @@ function TurnMaxTokensItem({ t }: {
         <span className={css.maxTokensTitle}>{t('message.maxTokens')}</span>
         <span className={css.turnErrorMessage}>{t('message.maxTokens.hint')}</span>
       </div>
+      {onContinue !== undefined && <ContinueButton onContinue={onContinue} t={t} />}
     </div>
   )
 }
@@ -385,15 +389,32 @@ export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeVi
   return <ModelRetryItem node={data.current} active={data.current.retryState === 'scheduled'} t={t} />
 })
 
-/** Terminal turn-error keyed Chat renderer. */
-export const TurnErrorNodeView = memo(function TurnErrorNodeView({ node, t }: ChatNodeViewProps<'turn-error'>) {
-  return <TurnErrorItem node={node.data} t={t} />
+/** Terminal turn-error keyed Chat renderer; the newest turn's error offers to continue the task. */
+export const TurnErrorNodeView = memo(function TurnErrorNodeView({ node, t, continueTask, useChat }: ChatNodeViewProps<'turn-error'>) {
+  const latest = useLatestTurn(useChat, node.location)
+  return <TurnErrorItem node={node.data} t={t} onContinue={latest ? continueTask : undefined} />
 })
 
-/** Max-tokens turn-end notice keyed Chat renderer. */
-export const TurnMaxTokensNodeView = memo(function TurnMaxTokensNodeView({ t }: ChatNodeViewProps<'turn-max-tokens'>) {
-  return <TurnMaxTokensItem t={t} />
+/** Max-tokens turn-end notice keyed Chat renderer; the newest turn's notice offers to continue. */
+export const TurnMaxTokensNodeView = memo(function TurnMaxTokensNodeView({ node, t, continueTask, useChat }: ChatNodeViewProps<'turn-max-tokens'>) {
+  const latest = useLatestTurn(useChat, node.location)
+  return <TurnMaxTokensItem t={t} onContinue={latest ? continueTask : undefined} />
 })
+
+/** Whether a node belongs to the conversation's newest turn, the only one worth continuing. */
+function useLatestTurn(useChat: ChatNodeViewProps['useChat'], location: ChatNodeViewProps['node']['location']): boolean {
+  const turn = location.kind === 'turn' || location.kind === 'step' ? location.turn : undefined
+  return useChat(snapshot => turn !== undefined && snapshot.timeline.turnOrder.at(-1) === turn.turn)
+}
+
+/** The button that asks the agent to pick a stopped task back up. */
+function ContinueButton({ onContinue, t }: { onContinue: () => void; t: ChatViewSlotProps['t'] }) {
+  return (
+    <button type="button" className={css.continueButton} title={t('message.continueHint')} onClick={onContinue}>
+      {t('message.continue')}
+    </button>
+  )
+}
 
 /** Explicit unknown-surface keyed Chat renderer. */
 export const UnknownNodeView = memo(function UnknownNodeView({ node, t }: ChatNodeViewProps<'unknown'>) {

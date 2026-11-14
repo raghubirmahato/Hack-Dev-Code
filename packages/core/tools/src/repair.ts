@@ -128,8 +128,9 @@ function soleType(schema: JsonSchemaNode): string | undefined {
 /**
  * Convert values to the types a schema declares where the intent is unambiguous: `"5"` for a number or integer,
  * `"true"`/`"false"` for a boolean, a JSON string for an array or object, and one item for an array of that item's
- * type. `null` is left alone: for some tools an absent field means something (an empty replacement), so treating
- * `null` as absent could change what a call does. Everything else is left for validation to report.
+ * type, and the declared `default` for a required field that is missing. `null` is left alone: for some tools an
+ * absent field means something (an empty replacement), so treating `null` as absent could change what a call does.
+ * Everything else is left for validation to report.
  * @param schema - the parameter schema.
  * @param value - the arguments as parsed.
  * @returns the converted arguments; the input is never modified.
@@ -174,6 +175,13 @@ export function coerceToSchema(schema: JsonSchemaNode, value: unknown): unknown 
       Object.defineProperty(out, key, {
         value: declared === undefined ? field : coerceToSchema(declared, field), enumerable: true, writable: true, configurable: true,
       })
+    }
+    // A required field the model left out takes the default its schema declares, when it declares one: the tool's
+    // author named the value to assume, so the call need not fail over it.
+    for (const key of schema.required ?? []) {
+      const declared = Object.hasOwn(properties, key) ? properties[key] : undefined
+      if (Object.hasOwn(out, key) || declared?.default === undefined) continue
+      Object.defineProperty(out, key, { value: structuredClone(declared.default), enumerable: true, writable: true, configurable: true })
     }
     return out
   }

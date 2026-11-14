@@ -349,6 +349,8 @@ export interface LlmDiscoveredModel {
   maxTokens?: number
   /** Accepted input types when disclosed by the catalog or endpoint; absent means unknown. */
   inputModalities?: readonly ModelModality[]
+  /** Whether the model can call tools, when the endpoint discloses it; absent means unknown. An agent needs tools. */
+  toolCalling?: boolean
 }
 
 /**

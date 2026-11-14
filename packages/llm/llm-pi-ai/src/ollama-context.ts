@@ -13,8 +13,27 @@ export const OLLAMA_DEFAULT_NUM_CTX = 32_768
 /** Below this the server default is already large enough for an agent prompt to be unlikely to fit better. */
 const SERVER_DEFAULT_NUM_CTX = 4_096
 
-/** Ollama's port. Only servers on it are probed, so other OpenAI-compatible endpoints never see extra requests. */
+/** Ollama's default port. */
 const OLLAMA_PORT = '11434'
+
+/** How long a local server that answered, but not as Ollama, is left alone before it is asked again. */
+const NOT_OLLAMA_MS = 300_000
+
+/**
+ * Whether a host is this machine or a private network address, where locally served models live.
+ * @param hostname - the URL's host, without brackets for IPv6.
+ * @returns true for loopback, private IPv4 ranges, `.local` names and the container host aliases.
+ */
+export function isLocalHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/gu, '')
+  if (host === 'localhost' || host === '::1' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) return true
+  const parts = host.split('.').map(Number)
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return false
+  const [a = 0, b = 0] = parts
+  // Loopback, the three private ranges, link-local, and the carrier-grade range that mesh VPNs hand out.
+  return a === 127 || a === 10 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31)
+    || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127)
+}
 
 /** The fetch this module uses; replaceable in tests. */
 export type OllamaFetch = (
@@ -23,15 +42,41 @@ export type OllamaFetch = (
 ) => Promise<{ ok: boolean; json: () => Promise<unknown> }>
 
 /**
- * Root of a possible Ollama server for an OpenAI-compatible base URL.
- * @param baseUrl - the route's base URL.
- * @returns `protocol//host:port`, or undefined when the URL is not on Ollama's port.
+ * Whether a route is one the person set up for Ollama: the Ollama card names its routes `ollama`, `ollama-2`, ...
+ * whatever address they point at.
+ * @param provider - the route id.
+ * @returns true when the id starts with `ollama`.
  */
-export function ollamaRoot(baseUrl: string | undefined): string | undefined {
+export function isOllamaRoute(provider: string | undefined): boolean {
+  return provider !== undefined && provider.toLowerCase().startsWith('ollama')
+}
+
+/**
+ * Root of a possible Ollama server for an OpenAI-compatible base URL: a server on Ollama's port, or, for a route the
+ * person set up as Ollama, a server on any port or machine (Ollama moved to another port, in a container, or on
+ * another computer). Whether it really is Ollama is settled by asking it once; other endpoints never see that
+ * question.
+ * @param baseUrl - the route's base URL.
+ * @param named - the route was set up as Ollama (see {@link isOllamaRoute}).
+ * @returns `protocol//host:port`, or undefined when the URL is not taken for an Ollama server.
+ */
+export function ollamaRoot(baseUrl: string | undefined, named = false): string | undefined {
   if (baseUrl === undefined || baseUrl.length === 0) return undefined
   let url: URL
   try { url = new URL(baseUrl) } catch { return undefined }
-  return url.port === OLLAMA_PORT ? `${url.protocol}//${url.host}` : undefined
+  return url.port === OLLAMA_PORT || named ? `${url.protocol}//${url.host}` : undefined
+}
+
+/**
+ * Whether a route serves a model on this machine or the private network, where chat templates are often not applied.
+ * @param baseUrl - the route's base URL.
+ * @param provider - the route id.
+ * @returns true for Ollama's port, an Ollama route, or a local or private-network host.
+ */
+export function isLocalModelServer(baseUrl: string | undefined, provider?: string): boolean {
+  if (ollamaRoot(baseUrl, isOllamaRoute(provider)) !== undefined) return true
+  if (baseUrl === undefined) return false
+  try { return isLocalHost(new URL(baseUrl).hostname) } catch { return false }
 }
 
 /**
@@ -45,7 +90,54 @@ export function ollamaVariantName(model: string): string {
 }
 
 /** Fields of `/api/show` used here. */
-interface ShowAnswer { model_info?: Record<string, unknown>; parameters?: string }
+interface ShowAnswer { model_info?: Record<string, unknown>; parameters?: string; capabilities?: unknown }
+
+/** What Ollama says about one model. */
+export interface OllamaModelFacts {
+  /** The context length the model was trained with. */
+  trained?: number
+  /** What the model can do, such as `completion`, `tools`, `vision`, `thinking`, `embedding`; absent on old servers. */
+  capabilities?: readonly string[]
+}
+
+/**
+ * Ask an Ollama server what its models can do, for the model list a settings page offers.
+ * @param baseUrl - the route's OpenAI-compatible base URL.
+ * @param models - model ids to describe.
+ * @param named - the route was set up as Ollama, so any port is asked.
+ * @param fetchImpl - the fetch to use.
+ * @param signal - cancels the questions.
+ * @returns facts per model id; empty when the server is not Ollama or did not answer in time.
+ */
+export async function describeOllamaModels(
+  baseUrl: string | undefined, models: readonly string[], named = false,
+  fetchImpl: OllamaFetch = (url, init) => fetch(url, init), signal?: AbortSignal,
+): Promise<Map<string, OllamaModelFacts>> {
+  const facts = new Map<string, OllamaModelFacts>()
+  const root = ollamaRoot(baseUrl, named)
+  if (root === undefined || models.length === 0) return facts
+  const within = (ms: number): AbortSignal =>
+    signal === undefined ? AbortSignal.timeout(ms) : AbortSignal.any([signal, AbortSignal.timeout(ms)])
+  try {
+    const version = await fetchImpl(`${root}/api/version`, { signal: within(3_000) })
+    if (!version.ok || typeof (await version.json() as { version?: unknown }).version !== 'string') return facts
+  } catch {
+    return facts
+  }
+  await Promise.all(models.slice(0, 200).map(async (model) => {
+    try {
+      const response = await fetchImpl(`${root}/api/show`, { method: 'POST', body: JSON.stringify({ model }), signal: within(10_000) })
+      if (!response.ok) return
+      const answer = await response.json() as ShowAnswer
+      const { trained } = contextOf(answer)
+      const capabilities = Array.isArray(answer.capabilities) ? answer.capabilities.filter((entry): entry is string => typeof entry === 'string') : undefined
+      facts.set(model, { ...trained === undefined ? {} : { trained }, ...capabilities === undefined ? {} : { capabilities } })
+    } catch {
+      // One model that cannot be described keeps what the listing said about it.
+    }
+  }))
+  return facts
+}
 
 /** The trained context length from `/api/show`, and the `num_ctx` the model already sets, if any. */
 function contextOf(answer: ShowAnswer): { trained?: number; numCtx?: number } {
@@ -62,6 +154,8 @@ function contextOf(answer: ShowAnswer): { trained?: number; numCtx?: number } {
 export class OllamaContext {
   private readonly resolved = new Map<string, Promise<string>>()
   private readonly servers = new Map<string, Promise<boolean>>()
+  /** Local servers that answered but are not Ollama (LM Studio, llama.cpp, vLLM), with when to ask again. */
+  private readonly notOllama = new Map<string, number>()
 
   constructor(private readonly fetchImpl: OllamaFetch = (url, init) => fetch(url, init)) {}
 
@@ -70,10 +164,11 @@ export class OllamaContext {
    * @param baseUrl - the route's OpenAI-compatible base URL.
    * @param model - the configured model id.
    * @param contextWindow - the context the route configures for the model, if any.
+   * @param named - the route was set up as Ollama, so a server on any port is asked whether it is one.
    * @returns the variant name, or `model` when the server is not Ollama or nothing needs to change.
    */
-  async modelFor(baseUrl: string | undefined, model: string, contextWindow?: number): Promise<string> {
-    const root = ollamaRoot(baseUrl)
+  async modelFor(baseUrl: string | undefined, model: string, contextWindow?: number, named = false): Promise<string> {
+    const root = ollamaRoot(baseUrl, named)
     if (root === undefined || model.startsWith('hackdev/')) return model
     const key = `${root} ${model} ${String(contextWindow ?? '')}`
     let pending = this.resolved.get(key)
@@ -89,10 +184,20 @@ export class OllamaContext {
   }
 
   private isOllama(root: string): Promise<boolean> {
+    const retryAt = this.notOllama.get(root)
+    if (retryAt !== undefined) {
+      if (retryAt > Date.now()) return Promise.resolve(false)
+      this.notOllama.delete(root)
+    }
     let known = this.servers.get(root)
     if (known === undefined) {
       known = this.fetchImpl(`${root}/api/version`, { signal: AbortSignal.timeout(5_000) })
-        .then(async response => response.ok && typeof (await response.json() as { version?: unknown }).version === 'string', () => false)
+        .then(async (response) => {
+          const ollama = response.ok && typeof (await response.json() as { version?: unknown }).version === 'string'
+          // Another kind of server answered: it is not asked again on every request.
+          if (!ollama) this.notOllama.set(root, Date.now() + NOT_OLLAMA_MS)
+          return ollama
+        }, () => false)
         .then((ollama) => {
           // Only a confirmed Ollama is remembered; a server that did not answer is asked again next time.
           if (!ollama) this.servers.delete(root)

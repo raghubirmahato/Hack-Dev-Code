@@ -277,3 +277,61 @@ export async function ignoredPaths(
   if (result.exitCode === 1) return new Set()
   return new Set(ok(result, 'git check-ignore').stdout.split('\0').filter(path => path !== ''))
 }
+
+/** What restoring a snapshot changed in the work tree. */
+export interface RestoreOutcome {
+  /** Paths written back to their snapshot content, relative to the repository root. */
+  restored: string[]
+  /** Paths removed because the snapshot did not hold them. */
+  removed: string[]
+  /** Tree id of the work tree just before the restore, to undo it with. */
+  backup: string
+}
+
+/**
+ * Put the work tree back to a snapshot tree. Only paths that differ are touched: files the snapshot holds are written
+ * with its content, and files added since are removed. Ignored files, the repository's index, refs and object store
+ * stay as they are, and the state just before is snapshotted first so the restore can itself be undone.
+ * @param git - command runner.
+ * @param workspace - addressed repository.
+ * @param target - the snapshot tree to restore.
+ * @param signal - cancellation.
+ * @returns the paths written and removed, and the backup tree id.
+ * @throws when git fails or its listing exceeded the cap.
+ */
+export async function restoreTree(git: GitRunner, workspace: GitWorkspace, target: string, signal: AbortSignal): Promise<RestoreOutcome> {
+  const backup = await snapshotTree(git, workspace, signal)
+  if (backup === target) return { restored: [], removed: [], backup }
+  const listing = ok(await git.run(['diff-tree', '-r', '--no-renames', '-z', '--name-status', target, backup], {
+    cwd: workspace.root, env: workspace.env, signal,
+  }), 'git diff-tree')
+  if (listing.truncated) throw new Error('git diff-tree output exceeded the configured cap')
+  const fields = listing.stdout.split('\0')
+  const restored: string[] = []
+  const removed: string[] = []
+  for (let index = 0; index + 1 < fields.length; index += 2) {
+    const status = fields[index] as string
+    const path = fields[index + 1] as string
+    if (status === '') break
+    // "A": the file appeared after the snapshot, so it goes; any other status brings the snapshot's content back.
+    if (status.startsWith('A')) removed.push(path)
+    else restored.push(path)
+  }
+  if (restored.length > 0) {
+    const scratch = await mkdtemp(join(workspace.scratch, 'restore-'))
+    try {
+      const env = { ...workspace.env, GIT_INDEX_FILE: join(scratch, 'index') }
+      ok(await git.run(['read-tree', target], { cwd: workspace.root, env, signal }), 'git read-tree')
+      ok(await git.run(['checkout-index', '--force', '-z', '--stdin'], {
+        cwd: workspace.root, env, stdin: `${restored.join('\0')}\0`, signal,
+      }), 'git checkout-index')
+    } finally {
+      await rm(scratch, { recursive: true, force: true })
+    }
+  }
+  for (const path of removed) await rm(resolve(workspace.root, path), { force: true })
+  // Rewritten files carry new timestamps, and with line-ending conversion new sizes, so `git status` would list them
+  // as modified though their content matches; refreshing the index's cached file facts clears that. Best effort.
+  await git.run(['update-index', '-q', '--refresh'], { cwd: workspace.root, signal }).catch(() => undefined)
+  return { restored, removed, backup }
+}

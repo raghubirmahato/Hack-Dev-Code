@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import type { CustomizeSnapshot } from '@hackdevcode/dsh-api-remotes/client'
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
 import { bindSnapshotSelector } from '@hackdevcode/dsh-client-test-runtime'
@@ -18,6 +18,10 @@ const SNAPSHOT: CustomizeSnapshot = {
     { id: 'review', title: 'Code review', description: 'Reviews a change.', license: 'MIT', state: 'no' },
     { id: 'docs', title: 'Doc writer', description: 'Writes docs.', license: 'Apache-2.0', state: 'directory' },
     { id: 'own', title: 'Own skill', description: 'Hand installed.', license: 'MIT', state: 'other' },
+    { id: 'shipped', title: 'Shipped skill', description: 'Always there.', license: 'MIT', state: 'builtin' },
+  ],
+  sites: [
+    { id: 'forum', title: 'Forum', url: 'https://forum.example.com/login', host: 'forum.example.com', enabled: true, note: '', playbook: true },
   ],
   connectors: [
     {
@@ -59,6 +63,9 @@ function mount(over: Partial<Record<'read' | 'connect', unknown>> = {}) {
     removeCustom: vi.fn(async () => {}),
     connect: vi.fn(async (): Promise<string | undefined> => undefined),
     disconnect: vi.fn(async () => {}),
+    addSite: vi.fn(async () => 'shop'),
+    openSite: vi.fn(async () => {}),
+    removeSite: vi.fn(async () => {}),
     installSkill: vi.fn(async () => {}),
     removeSkill: vi.fn(async () => {}),
     openLink: vi.fn(),
@@ -77,6 +84,49 @@ const open = async (tab: string) => {
 const settled = (calls: number, read: { mock: { calls: unknown[] } }) => waitFor(() => { expect(read.mock.calls).toHaveLength(calls) })
 
 describe('CustomizeSection', () => {
+  it('narrows the open page with the search box and says when nothing matches', async () => {
+    mount()
+    await screen.findByText('Code review')
+    fireEvent.change(screen.getByLabelText(en.search), { target: { value: 'doc' } })
+    expect(screen.queryByText('Code review')).toBeNull()
+    expect(screen.getByText('Doc writer')).toBeTruthy()
+    fireEvent.change(screen.getByLabelText(en.search), { target: { value: 'zzz' } })
+    expect(screen.getByText('Nothing here matches "zzz".')).toBeTruthy()
+    // The same box narrows the next page too.
+    fireEvent.change(screen.getByLabelText(en.search), { target: { value: 'WIKI' } })
+    fireEvent.click(screen.getByRole('tab', { name: en.tabConnectors }))
+    expect(await screen.findByText('Wiki')).toBeTruthy()
+    expect(screen.queryByText('Tracker')).toBeNull()
+  })
+
+  it('marks a built-in skill and offers nothing to install or remove for it', async () => {
+    mount()
+    const name = await screen.findByText('Shipped skill')
+    const card = name.closest('li') as HTMLElement
+    expect(card.textContent).toContain(en.skillBuiltin)
+    expect(card.querySelector('button')).toBeNull()
+  })
+
+  it('signs in to a website from a pasted link, and reopens or removes a kept session', async () => {
+    const { face } = mount()
+    fireEvent.click(await screen.findByRole('tab', { name: en.tabConnectors }))
+    expect(await screen.findByText(en.sitesTitle)).toBeTruthy()
+    const forum = screen.getByText('Forum').closest('li') as HTMLElement
+    expect(forum.textContent).toContain(en.siteReady)
+    expect(forum.textContent).toContain(en.sitePlaybook)
+    expect(forum.textContent).toContain('Tools: mcp-forum · Skill: site-forum')
+    const add = screen.getByRole('button', { name: en.siteAdd }) as HTMLButtonElement
+    expect(add.disabled).toBe(true)
+    fireEvent.change(screen.getByLabelText(en.siteUrl), { target: { value: ' shop.example.com ' } })
+    fireEvent.click(add)
+    await waitFor(() => { expect(face.addSite).toHaveBeenCalledWith({ url: 'shop.example.com' }) })
+    expect((await screen.findByRole('status')).textContent).toContain('Sign in to shop.example.com in the browser window that opened')
+    fireEvent.click(screen.getByRole('button', { name: en.siteOpen }))
+    await waitFor(() => { expect(face.openSite).toHaveBeenCalledWith('forum') })
+    fireEvent.click(within(forum).getByRole('button', { name: en.siteRemove }))
+    await waitFor(() => { expect(face.removeSite).toHaveBeenCalledWith('forum') })
+  })
+
   it('shows a loading line, then the skills with what each one allows', async () => {
     const { face } = mount()
     expect(screen.getByText('Loading…')).toBeTruthy()

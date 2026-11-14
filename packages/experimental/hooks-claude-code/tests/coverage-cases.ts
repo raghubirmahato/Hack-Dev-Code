@@ -221,6 +221,25 @@ export function defineCoverageCases(group: CoverageGroup): void {
       expect(JSON.stringify(adapter.requests[1]!.messages)).toContain('continue please')
     })
 
+    it('stops a Stop hook that always blocks after MAX_FORCED_STOPS continuations, telling it each time it is active', async () => {
+      const d = dir()
+      const log = join(d, 'payloads')
+      // Blocks every time, and records each payload it was given, one per line.
+      const s = sh(d, 'stop.sh', `#!/usr/bin/env bash\ncat >> "${log}"\necho >> "${log}"\necho "keep going" >&2\nexit 2\n`)
+      const path = hooks(d, { Stop: [{ hooks: [{ type: 'command', command: s }] }] })
+      const adapter = new MockAdapter(Array.from({ length: HooksClaude.MAX_FORCED_STOPS + 3 }, (_, i) => textResponse(`reply ${String(i)}`)))
+      const ctx = await harness(path, adapter)
+      const agent = await ctx.agentLoop.create(SessionId('a1'), { provider: 'mock', model: 'mock' })
+      agent.followup(createUserMessage({ content: [{ type: 'text', text: 'go' }], source: { kind: 'user' } }))
+      await waitForIdle(ctx, agent)
+      // The first answer plus MAX_FORCED_STOPS forced continuations, then the turn stops.
+      expect(adapter.requests).toHaveLength(HooksClaude.MAX_FORCED_STOPS + 1)
+      const active = readFileSync(log, 'utf8').split('\n').filter(line => line.trim() !== '')
+        .map(line => (JSON.parse(line) as { stop_hook_active: boolean }).stop_hook_active)
+      expect(active[0]).toBe(false)
+      expect(active.slice(1).every(Boolean)).toBe(true)
+    })
+
     it('a Stop hook that blocks with EMPTY stderr still forces continuation (no reason required)', async () => {
     // A blocking Stop hook with no stderr yields `deny` without a reason. The block still forces
     // continuation; the script self-limits to one block to avoid a loop.

@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-The tool card that shows a `hackdev` mission or `hackdev_review` run in the conversation: header counts, each task with its state, each gate's verdict and findings, and the items that need a person's attention first.
+The tool card that shows a `hackdev` mission, a `hackdev_swarm` run or a `hackdev_review` run in the conversation: header counts, each task with its state, each gate's verdict and findings, and the items that need a person's attention first. A swarm adds its members with their pinned models and the newest posts of its message board.
 
 ## Table of Contents
 
@@ -32,7 +32,7 @@ The Web app bundle mounts the card; it renders for calls of the two mission tool
 |---|---|
 | [src/client/HackDevCard.tsx](src/client/HackDevCard.tsx) | The card: header counts, attention items (six shown, the rest behind a toggle), tasks and gates |
 | [src/client/model.ts](src/client/model.ts) | Reads the mission arguments and the result's presentation data into the view the card draws |
-| [src/client/mount.ts](src/client/mount.ts) | Registers the card for the two tools |
+| [src/client/mount.ts](src/client/mount.ts) | Registers the card for the three tools |
 | [src/client/locales.ts](src/client/locales.ts) | Card copy |
 
 </details>

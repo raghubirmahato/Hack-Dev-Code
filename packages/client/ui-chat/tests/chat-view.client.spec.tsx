@@ -2569,6 +2569,20 @@ describe('ChatView', () => {
     expect(view.queryByRole('button', { name: 'Top up' })).toBeNull()
   })
 
+  it('offers to continue the task from the failure row of the newest turn', () => {
+    const h = makeHarness({ nodes: [user(1, 'try'), turnError(2, 'TRANSPORT')] })
+    const continueTask = vi.fn()
+    const view = render(<h.ChatView {...h.props} continueTask={continueTask} />)
+    fireEvent.click(view.getByRole('button', { name: 'Continue' }))
+    expect(continueTask).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows no continue action without a sender', () => {
+    const h = makeHarness({ nodes: [user(1, 'try'), turnError(2, 'TRANSPORT')] })
+    const view = render(<h.ChatView {...h.props} />)
+    expect(view.queryByRole('button', { name: 'Continue' })).toBeNull()
+  })
+
   it('renders the max-tokens notice with localized guidance, distinct from turn errors', () => {
     const h = makeHarness({ nodes: [user(1, 'try'), assistant(2, 'truncated'), turnMaxTokens(3)] })
     const view = render(<h.ChatView {...h.props} />)

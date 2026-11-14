@@ -32,6 +32,12 @@ export interface ToolWorkflowAgentEndData {
   readonly outcome: WorkflowAgentOutcome
 }
 
+/** One line the run's script logged: its narration, such as a swarm's board posts. */
+export interface ToolWorkflowLogData {
+  readonly runId: WorkflowRunId
+  readonly message: string
+}
+
 /** Settles one workflow run after its live resources reach quiescence. */
 export interface ToolWorkflowRunEndData {
   readonly runId: WorkflowRunId
@@ -55,6 +61,11 @@ declare module '@hackdevcode/dsh-session/types' {
      * @param data - run identity, paired member sequence, and outcome.
      */
     'tool-workflow/agent-end': ToolWorkflowAgentEndData
+    /**
+     * Records one line the run's script logged, so its narration shows while it runs.
+     * @param data - run identity and the line, bounded.
+     */
+    'tool-workflow/log': ToolWorkflowLogData
     /**
      * Closes one workflow record after cleanup.
      * @param data - stable run identity and terminal reason.

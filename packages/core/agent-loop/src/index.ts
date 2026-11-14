@@ -361,23 +361,24 @@ export class AgentLoop extends Service implements AgentFactory {
     ctx.effect(() => ctx.agents.setFactory(this), 'agentLoop.setFactory()')
     ctx.systemPrompt.variable('provider', context => context.modelSelection?.provider ?? context.agent?.options.provider)
     ctx.systemPrompt.variable('model', context => context.modelSelection?.model ?? context.agent?.options.model)
-    // Numbered rules late in the system prompt, where models weigh them more, read afresh for each request.
+    // The person's custom instructions, late in the system prompt where models weigh text more, read afresh for
+    // each request and worded as the model's own way of working rather than as rules to consider.
     ctx.systemPrompt.section({
       name: 'policy:custom-instructions',
       order: ctx.systemPrompt.getSectionOrder('CUSTOM_INSTRUCTIONS'),
       interpolate: false,
       text: () => renderCustomInstructions(this.config.customInstructions.get()),
     })
-    // A one-line note just before the newest message at the start of each turn keeps the rules in view in long
-    // conversations; it names how many rules apply, not their text, so it costs a few tokens. It goes before the
-    // person's message, never after: a model answers the last message, and must answer the person, not the note.
+    // A short note just before the newest message at the start of each turn keeps the habits in view in long
+    // conversations; it repeats them when they are short, so the model has nothing to look up or deliberate. It goes
+    // before the person's message, never after: a model answers the last message, and must answer the person.
     ctx.on('agent/pre-step', async ({ step, signal }, next): Promise<PreStepDecision> => {
       const decision = await next()
       if (decision.kind === 'reject' || step !== 1 || signal.aborted) return decision
       const text = this.config.customInstructions.get().trim()
-      const count = text.length === 0 ? 0 : parseCustomRules(text.slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS)).length
-      if (count === 0) return decision
-      const reminder = customInstructionsReminder(count)
+      const rules = text.length === 0 ? [] : parseCustomRules(text.slice(0, MAX_CUSTOM_INSTRUCTIONS_CHARS))
+      if (rules.length === 0) return decision
+      const reminder = customInstructionsReminder(rules)
       return {
         ...decision,
         messages: [

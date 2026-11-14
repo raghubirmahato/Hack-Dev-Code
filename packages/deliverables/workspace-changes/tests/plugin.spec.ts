@@ -26,7 +26,9 @@ async function boot(config: Partial<WorkspaceChanges.Config> = {}) {
   await ctx.plugin(SessionStore)
   await ctx.plugin(LocalSubprocessRuntime)
   await ctx.plugin(LocalFileSystem)
-  const fiber = await ctx.plugin(WorkspaceChanges, config as WorkspaceChanges.Config)
+  // Checkpoints go to a scratch directory, never to the Hack Dev Code home.
+  const checkpointDir = await scratchDir('dsh-workspace-checkpoints-', cleanups)
+  const fiber = await ctx.plugin(WorkspaceChanges, { checkpointDir, ...config } as WorkspaceChanges.Config)
   return { ctx, fiber }
 }
 
@@ -532,3 +534,47 @@ describe('workspace-changes without git', () => {
     }
   })
 })
+
+describe('rewinding the workspace', () => {
+  it('puts files back to how they were after a turn, from durable checkpoints, even after the Session ends', async () => {
+    const cwd = await repository()
+    const { ctx } = await boot()
+    const session = ctx.sessions.create(SessionId('rewind'), { meta: { cwd } })
+    // Turn 1 changes a.txt; turn 2 changes it again, creates new.txt and deletes b.txt.
+    startTurn(session, 1)
+    await settle(ctx, session)
+    await mutate(ctx, session, 1, 'write', { file_path: 'a.txt', content: 'turn one\n' }, 'a.txt', () => writeFile(join(cwd, 'a.txt'), 'turn one\n'))
+    endTurn(session, 1)
+    await settle(ctx, session)
+    startTurn(session, 2)
+    await settle(ctx, session)
+    await mutate(ctx, session, 2, 'write', { file_path: 'a.txt', content: 'turn two\n' }, 'a.txt', () => writeFile(join(cwd, 'a.txt'), 'turn two\n'))
+    await writeFile(join(cwd, 'new.txt'), 'created in turn two\n')
+    await rm(join(cwd, 'b.txt'))
+    toolCall(session, 2, 'bash', { command: 'edit files' })
+    endTurn(session, 2)
+    await settle(ctx, session)
+    ctx.emit('session/disposed', session)
+
+    const signal = new AbortController().signal
+    const kept = await ctx.workspaceChanges.restore(session.id, cwd, 1, signal)
+    expect(kept.restored.sort()).toEqual(['a.txt', 'b.txt'])
+    expect(kept.removed).toEqual(['new.txt'])
+    expect(kept.backup).toMatch(/^[0-9a-f]{40,64}$/)
+    expect(await readText(join(cwd, 'a.txt'))).toBe('turn one\n')
+    expect(await readText(join(cwd, 'b.txt'))).toBe('x\n')
+    await expect(stat(join(cwd, 'new.txt'))).rejects.toThrow()
+
+    // Rewinding to before every turn restores the committed content; nothing after the last turn is a no-op.
+    await ctx.workspaceChanges.restore(session.id, cwd, 0, signal)
+    expect(await readText(join(cwd, 'a.txt'))).toBe('l1\nl2\nl3\n')
+    expect(await ctx.workspaceChanges.restore(session.id, cwd, 2, signal)).toEqual({ restored: [], removed: [] })
+    // The work tree's content now matches the commit again (the listing ignores line-ending conversion).
+    expect(git(cwd, 'diff', '--stat')).toBe('')
+  })
+})
+
+async function readText(path: string): Promise<string> {
+  const { readFile } = await import('node:fs/promises')
+  return (await readFile(path, 'utf8')).replace(/\r\n/gu, '\n')
+}

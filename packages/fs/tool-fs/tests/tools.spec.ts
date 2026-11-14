@@ -10,6 +10,7 @@ import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import * as PtcToolExecutor from '@hackdevcode/dsh-tool-executor-ptc'
 import { provideWorkingDirectoryFixture } from '@hackdevcode/dsh-agent-loop-testkit'
 import { describe, expect, it, vi } from 'vitest'
+import { stripReadLineNumbers } from '../src/write.ts'
 import { Context } from '@hackdevcode/cordis'
 import { PtcRuntime } from '@hackdevcode/dsh-ptc-runtime'
 import { createScope, type Scope } from '@hackdevcode/dsh-scope'
@@ -702,6 +703,16 @@ describe('result-time contextual diff (meta + presentResult)', () => {
     expect(view).toEqual({ card: 'diff', title: 'Write a.txt', diffs: [{ path: '/abs/a.txt', oldText: 'a\nb\nc\nOLD\nd\ne\nf', newText: 'a\nb\nc\nNEW\nd\ne\nf' }] })
   })
 
+  it('write drops line numbers a model copied from read output into the whole file', async () => {
+    const { ctx, fs } = await setup()
+    const session = { header: {} }
+    fs.files.set('key:a.txt', withContext)
+    await call(ctx, 'read', { file_path: 'a.txt' }, { session })
+    const result = await call(ctx, 'write', { file_path: 'a.txt', content: '1: a\n2: b\n3: c\n4: NEW\n5: d\n6: e\n7: f\n' }, { session })
+    expect(result.isError).toBe(false)
+    expect(fs.files.get('key:a.txt')).toBe('a\nb\nc\nNEW\nd\ne\nf\n')
+  })
+
   it('write CREATE: an empty applied-diff projection still falls back to the whole-file diff card', async () => {
     // A create has no prior content, yet the completed replacement view must
     // remain a diff instead of clobbering the pending new-file diff with text.
@@ -1121,14 +1132,14 @@ describe('sandbox escalation API (write/edit)', () => {
     expect(text(result)).toContain('no agent to route it through')
   })
 
-  it('rejects the escalation argument pairing (one field without the other)', async () => {
+  it('rejects a sandbox request without its reason and ignores a reason without a request', async () => {
     const { ctx } = await setupConfining()
     const missing = await call(ctx, 'write', { file_path: 'a.txt', content: 'x', sandbox_permissions: 'danger-full-access' }, escalationAgent())
     expect(missing.isError).toBe(true)
     expect(text(missing)).toContain('sandbox_permissions requires a justification')
     const orphan = await call(ctx, 'write', { file_path: 'a.txt', content: 'x', justification: 'why' }, escalationAgent())
-    expect(orphan.isError).toBe(true)
-    expect(text(orphan)).toContain('justification is only valid together with sandbox_permissions')
+    // A reason that asks for nothing does not cost the call: the write happens in the session's own mode.
+    expect(orphan.isError).toBe(false)
   })
 
   it('sandbox_permissions under a non-confining backend fails closed (unadvertised field still reaches execute)', async () => {
@@ -1239,6 +1250,19 @@ describe('scope-aware PTC guidance', () => {
       expect(renderPrompt(await ctx.systemPrompt.assemble({ scope: key }))).toBe(baseline)
     } finally {
       await scope.dispose()
+    }
+  })
+})
+
+describe('stripReadLineNumbers', () => {
+  it('strips numbers counting from 1 on every line, keeping the final newline and indentation', () => {
+    expect(stripReadLineNumbers('1: a\n2:   b\n3: \n4: c\n')).toBe('a\n  b\n\nc\n')
+    expect(stripReadLineNumbers('1: a\n2: b')).toBe('a\nb')
+  })
+
+  it('leaves content alone unless every line is numbered without a gap from 1', () => {
+    for (const text of ['1: only one line', '1: a\n3: b', '2: a\n3: b', '1: a\nb\n', 'a\nb', '1. a\n2. b']) {
+      expect(stripReadLineNumbers(text)).toBe(text)
     }
   })
 })

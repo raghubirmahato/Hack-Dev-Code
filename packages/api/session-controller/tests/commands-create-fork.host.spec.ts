@@ -295,3 +295,36 @@ describe('Session fork failures', () => {
     await ctx.fiber.dispose()
   })
 })
+
+describe('Session rewind', () => {
+  it('restores the files after the forked turn before creating the branch, and reports the counts', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const source = completedSession(ctx, 'rewind-source', '/workspace')
+    const restore = vi.fn((_sessionId: SessionId, _cwd: string, _afterTurn: number, _signal: AbortSignal) =>
+      Promise.resolve({ restored: ['a.txt', 'b.txt'], removed: ['new.txt'] }))
+    ctx.provide('workspaceChanges', { restore } as never)
+    vi.spyOn(ctx.agents, 'create').mockImplementation((options: CreateAgentOptions) => Promise.resolve(resolvedHandle(ctx, options.sessionId)))
+    const controller = new SessionCommandController(ctx, controllerAgents(ctx), '/default')
+
+    const end = source.snapshotEvents().findLast(event => event.type === 'turn/end')!
+    const forked = await controller.fork({ sessionId: source.id, atSeq: end.seq, restoreFiles: true })
+    expect(forked.restoredFiles).toEqual({ restored: 2, removed: 1 })
+    expect(restore.mock.calls[0]?.slice(0, 3)).toEqual([source.id, '/workspace', 1])
+    // A plain branch leaves the files alone.
+    await controller.fork({ sessionId: source.id, atSeq: end.seq })
+    expect(restore).toHaveBeenCalledTimes(1)
+    await ctx.fiber.dispose()
+  })
+
+  it('refuses a rewind when the Host does not record workspace changes, and maps a failed restore', async () => {
+    const ctx = await baseContext()
+    ctx.provide('workspaceRegistry', { list: () => [] } as never)
+    const source = completedSession(ctx, 'rewind-refused', '/workspace')
+    const controller = new SessionCommandController(ctx, controllerAgents(ctx), '/default')
+    await expectFailure(controller.fork({ sessionId: source.id, restoreFiles: true }), 'session/rewind-failed')
+    ctx.provide('workspaceChanges', { restore: () => Promise.reject(new Error('not a repository')) } as never)
+    await expectFailure(controller.fork({ sessionId: source.id, restoreFiles: true }), 'session/rewind-failed')
+    await ctx.fiber.dispose()
+  })
+})

@@ -38,7 +38,7 @@ With the required services available, load the subagent service, a backend, the 
 - name: '@hackdevcode/dsh-tool-subagent-control'
 ```
 
-This package takes no configuration. Its main entry registers `send_message`, `interrupt_agent`, and `list_agents` together; existing tool restrictions can hide individual tools.
+This package takes no configuration. Its main entry registers `send_message`, `interrupt_agent`, `list_agents` and `team_board` together; existing tool restrictions can hide individual tools.
 
 ### send_message
 
@@ -47,6 +47,10 @@ Sends a message to an Agent named by `agent_id`: any exact live Agent may target
 ### interrupt_agent
 
 External executions stop permanently and cannot receive follow-ups. Local targets stop only their current turn: queued messages stay parked until a later `send_message`, descendants keep running, and the child stays available for follow-ups. The call returns when the stop request is accepted, not when the target is quiet; interrupting an already-finished agent is an accepted no-op, and self, sibling, stale, and non-ancestor callers get errored results.
+
+### team_board
+
+One board per family of agents: every agent descending from the same root conversation (the lead, its subagents, theirs, workflow members) reads and writes the same board, found by following `parentSession` up to the root. `post` adds a note, question, answer, warning or done notice addressed to `all`, `parent`, an agent id or a name a member used on the board. Unread posts addressed to an agent are delivered to it before its next step as a context message, so a running one-shot child hears from its parent without polling, which `send_message` cannot do. Posts from an agent that has since finished are not delivered, since its result already reached its caller and a late batch of them reads like new instructions; they stay readable with `read`. `claim` records paths an agent is about to edit and refuses a path that overlaps another member's claim, naming the holder; `release` gives a claim up; `read` lists the newest posts and the claims. Each board is kept as a small JSON file under `team-boards` in the Hack Dev Code home (`boardDir` changes the folder), so a conversation resumed after a restart finds its posts, claims and read positions as they were; at most the newest 200 posts are kept, and 64 boards stay in memory at once.
 
 ### list_agents
 

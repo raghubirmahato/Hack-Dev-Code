@@ -49,6 +49,7 @@ export class ToolGroups {
    * Whether an agent has loaded a group.
    * @param agent - the agent preparing a step.
    * @param name - group name.
+   * @returns true once the agent loaded the group.
    */
   isLoaded(agent: object, name: string): boolean {
     return this.loaded.get(agent)?.has(name) === true
