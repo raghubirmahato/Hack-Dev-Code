@@ -7,9 +7,10 @@ import type { Session, SessionSeq } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import TokenMeter from '@hackdevcode/dsh-token-meter'
 import type { ContextPressureProjection, TokenUsageProjection } from '@hackdevcode/dsh-token-meter/client'
-import { RetryId } from '@hackdevcode/dsh-llm-retry'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { RetryId } from '@hackdevcode/dsh-llm-retry/types'
 import type { ContextFormed } from '@hackdevcode/dsh-llm'
-import { CompactionId } from '@hackdevcode/dsh-compaction'
+import type { CompactionId } from '@hackdevcode/dsh-compaction/types'
 
 declare module '@hackdevcode/dsh-llm' {
   interface MessageSourceMap {
@@ -90,7 +91,7 @@ function appendSummaryMeter(ctx: Context, session: Session, start: SessionSeq, e
   const endIdx = nodes.findIndex(node => node.seq === end)
   const shadowed = nodes.slice(startIdx, endIdx + 1)
   session.append('compaction/summary', {
-    compactionId: CompactionId('token-usage-summary'),
+    compactionId: brandString<CompactionId>('token-usage-summary'),
     summary: [{ type: 'text', text: 'summary' }],
     shadowedRange: { start, end },
     shadowedSeqs: shadowed.map(node => node.seq),
@@ -105,7 +106,7 @@ describe('tokenUsage session projection', () => {
     const { ctx, session } = await harness()
     expect(projected(ctx, session)).toEqual(ZERO)
     session.append('llm/retry-started', {
-      retryId: RetryId('token-meter-no-usage-retry'),
+      retryId: brandString<RetryId>('token-meter-no-usage-retry'),
       turn: 1,
       step: 1,
       retry: 1,
@@ -164,7 +165,7 @@ describe('tokenUsage session projection', () => {
 
   it('accumulates retried attempts while replacing samples within each attempt', async () => {
     const { ctx, session } = await harness()
-    const retryId = RetryId('token-meter-retry')
+    const retryId = brandString<RetryId>('token-meter-retry')
     session.append('turn/start', { turn: 1 })
     startStep(session, 1, 1)
     usageChunk(session, {

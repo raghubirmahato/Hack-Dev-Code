@@ -2,7 +2,7 @@
 
 import type { Scoped } from '@hackdevcode/dsh-scope'
 import type { Agent } from '@hackdevcode/dsh-agent/types'
-import type { ToolCallId } from '@hackdevcode/dsh-llm/brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import type {} from '@hackdevcode/dsh-session/types'
 import type {} from '@hackdevcode/dsh-session-projection/types'
 

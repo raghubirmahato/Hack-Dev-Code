@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-open-in-app",
-  "description": "Web \"Open In...\" controls: the Session-header split button opening the workspace directory in an installed application, and the document preview's default-application controls for one file",
-  "version": "0.2.2-alpha.2",
+  "description": "Session application submenus and native opening controls for directories and previewed files",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +30,10 @@
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "scripts": {
     "bundle": "tsdown",
@@ -49,7 +52,11 @@
         "@hackdevcode/dsh-client-ui-layout",
         "@hackdevcode/dsh-client-ui-renderer",
         "@hackdevcode/dsh-client-ui-session",
-        "@hackdevcode/dsh-client-ui-sidebar-documentpreview"
+        "@hackdevcode/dsh-client-ui-sidebar-documentpreview",
+        "@hackdevcode/dsh-client-ui-context-menu",
+        "@hackdevcode/dsh-client-ui-sidebar-right",
+        "@hackdevcode/dsh-api-workspace-files",
+        "@hackdevcode/dsh-client-ui-workspace"
       ],
       "platform": "web"
     }
@@ -58,6 +65,7 @@
     "@hackdevcode/cordis": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-api-gateway": "workspace:*",
     "@hackdevcode/dsh-api-remotes": "workspace:*",
@@ -78,6 +86,13 @@
     "react": "^18.2.0",
     "@hackdevcode/dsh-client-ui-deliverables": "workspace:*",
     "@hackdevcode/dsh-native-command": "workspace:*",
-    "@hackdevcode/dsh-client-shortcuts": "workspace:*"
+    "@hackdevcode/dsh-client-shortcuts": "workspace:*",
+    "@hackdevcode/dsh-client-ui-context-menu": "workspace:*",
+    "@hackdevcode/dsh-client-ui-file-actions": "workspace:*",
+    "@hackdevcode/dsh-util-workspace-path": "workspace:*",
+    "@hackdevcode/dsh-client-ui-sidebar-right": "workspace:*",
+    "@hackdevcode/dsh-api-workspace-files": "workspace:*",
+    "@hackdevcode/dsh-client-ui-sidebar-browser": "workspace:*",
+    "@hackdevcode/dsh-client-ui-workspace": "workspace:*"
   }
 }

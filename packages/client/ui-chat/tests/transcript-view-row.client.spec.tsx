@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
+import { contextMenuHook } from '@hackdevcode/dsh-client-test-runtime'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { SessionListState } from '@hackdevcode/dsh-api-session-controller/client'
 import type { WorkspaceSnapshot } from '@hackdevcode/dsh-api-workspace-controller/client'
-import type { SessionStatusSnapshot } from '@hackdevcode/dsh-client-ui-session/client'
+import type { SessionStatusSnapshot } from '@hackdevcode/dsh-client-ui-session-status/client'
 import type { GlobalStandardProps } from '@hackdevcode/dsh-client-ui-slots'
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
 import { allowAllAccess, bindSnapshotSelector, makeTranslate } from '@hackdevcode/dsh-client-test-runtime'
@@ -50,6 +51,7 @@ function mount(mode: TranscriptViewMode = 'standard', dictionary: typeof en | ty
     useSessionRetainInfo: () => undefined,
     useResource,
     ...allowAllAccess,
+    useContextMenu: contextMenuHook(),
     useTranscriptView: bindSnapshotSelector(source),
     useCollapseTiming: bindSnapshotSelector(collapseTiming),
     useFoldedReplies: bindSnapshotSelector(foldedReplies),

@@ -4,7 +4,7 @@
  */
 
 import { Context, Service } from '@hackdevcode/cordis'
-import type { BrowserUseProviderName } from './brand.ts'
+import type { BrowserUseProviderName } from './types.ts'
 
 declare module '@hackdevcode/cordis' {
   interface Context {

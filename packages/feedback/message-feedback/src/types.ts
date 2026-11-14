@@ -6,7 +6,7 @@
  */
 
 import type { Branded } from '@hackdevcode/dsh-brand'
-import type { MessageId } from '@hackdevcode/dsh-llm/brand'
+import type { MessageId } from '@hackdevcode/dsh-llm/types'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 import type { FeedbackCategory } from '@hackdevcode/dsh-command-feedback/types'
 

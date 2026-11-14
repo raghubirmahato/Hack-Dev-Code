@@ -15,12 +15,13 @@ import { mountAgentLoopTestDependencies } from '@hackdevcode/dsh-agent-loop-test
 import SandboxedFileSystem from '@hackdevcode/dsh-fs-sandbox'
 import type { ContentBlock } from '@hackdevcode/dsh-llm'
 import SandboxPolicyService, { setSandboxMode } from '@hackdevcode/dsh-sandbox-policy'
-import { Session, SessionId, type SessionEvent } from '@hackdevcode/dsh-session'
+import { Session, type SessionId, type SessionEvent } from '@hackdevcode/dsh-session'
 import * as ToolFs from '@hackdevcode/dsh-tool-fs'
 import ApprovalService from '@hackdevcode/dsh-user-approval'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import SubagentRuntime from '@hackdevcode/dsh-subagent'
 import { mountLocalActivations, startPreparedActivation } from './local-activation.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
@@ -50,7 +51,7 @@ async function setupWalled(script: Script): Promise<{ ctx: Context; parent: Agen
   await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['mock'], new MockAdapter(script))
   const parent = await ctx.agentLoop.create(
-    SessionId('parent'),
+    brandString<SessionId>('parent'),
     { provider: 'mock', model: 'mock' },
     { cwd: workspace },
   )

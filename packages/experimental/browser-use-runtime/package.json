@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-experimental-browser-use-runtime",
   "description": "Session-owned browser resource lifecycles and MCP integration for experimental providers",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -28,7 +28,10 @@
   "files": [
     "lib/index.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
@@ -39,9 +42,11 @@
     "@hackdevcode/dsh-scope": "workspace:*",
     "@hackdevcode/dsh-tools": "workspace:*",
     "@hackdevcode/dsh-system-prompt": "workspace:*",
-    "@hackdevcode/dsh-working-directory": "workspace:*"
+    "@hackdevcode/dsh-working-directory": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   },
   "dependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~"
   },
   "devDependencies": {
@@ -67,6 +72,7 @@
     "@hackdevcode/dsh-attachment-local": "workspace:*",
     "@hackdevcode/dsh-session-persistence-jsonl": "workspace:*",
     "@hackdevcode/dsh-working-directory": "workspace:*",
-    "@hackdevcode/dsh-fs-local": "workspace:*"
+    "@hackdevcode/dsh-fs-local": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   }
 }

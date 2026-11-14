@@ -23,8 +23,9 @@ import { provideWorkingDirectoryFixture } from '@hackdevcode/dsh-agent-loop-test
 import { Context } from '@hackdevcode/cordis'
 import { createScope, type Scope } from '@hackdevcode/dsh-scope'
 import type { Agent } from '@hackdevcode/dsh-agent'
-import { SESSION_FORMAT_VERSION, Session, SessionId } from '@hackdevcode/dsh-session'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { SESSION_FORMAT_VERSION, Session, type SessionId } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime, { type ToolExecutionToken, type ToolRunContext } from '@hackdevcode/dsh-tools'
 import LocalFileSystem from '@hackdevcode/dsh-fs-local'
@@ -106,7 +107,7 @@ beforeEach(async () => {
   await ctx.plugin(FsPolicy)
   await ctx.plugin(ToolFs)
 
-  const key = standInAgent(SessionId(session), root)
+  const key = standInAgent(brandString<SessionId>(session), root)
   let minted: Scope | undefined
   await ctx.plugin(Object.assign(
     (inner: Context) => { minted = createScope(inner, key) },
@@ -151,7 +152,7 @@ function call(name: string, args: unknown) {
   calls += 1
   return executeOneTool(ctx, {
     signal: testToolSignal,
-    callId: ToolCallId(`observe-${String(calls)}`),
+    callId: brandString<ToolCallId>(`observe-${String(calls)}`),
     name,
     arguments: args,
     agent: shared,
@@ -297,7 +298,7 @@ describe('bounded write under the observation policy', () => {
   it('refuses an outside target with an error identified by the FS_SANDBOX_DENIED code', async () => {
     const outside = join(dirname(root), 'outside.txt')
     writeFileSync(outside, 'owner\n')
-    const callId = ToolCallId('observe-direct')
+    const callId = brandString<ToolCallId>('observe-direct')
     const run = (name: string, args: Record<string, string>): Promise<unknown> => {
       const replacement = scope.ctx.tools.get(name, scopeKey)
       if (replacement === undefined) throw new Error(`the shared Session has no ${name} tool`)

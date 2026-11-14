@@ -1,14 +1,4 @@
-/**
- * dsh-jobs' owned branded id, carried across the registry, the model-facing
- * control surface, and the client wire.
- *
- * It lives in its own leaf because the package root and `./types` both reach
- * `dsh-agent` through the owner and listener signatures, which a Client program
- * cannot resolve even as a type. A browser-safe consumer imports the id here;
- * `Branded<B>` itself comes from the zero-dependency `@hackdevcode/dsh-brand`.
- *
- * @module @hackdevcode/dsh-jobs/brand
- */
+/** Job identities and compatibility constructors, independent of the registry implementation. */
 
 import type { Branded } from '@hackdevcode/dsh-brand'
 

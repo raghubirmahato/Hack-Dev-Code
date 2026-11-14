@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-workspace",
   "description": "Workspace picker plugin: one WorkspacePicker registered into the sidebar and empty-state workspace slots",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -40,7 +40,9 @@
         "@hackdevcode/dsh-client-ui-layout",
         "@hackdevcode/dsh-client-ui-renderer",
         "@hackdevcode/dsh-client-ui-session",
-        "@hackdevcode/dsh-client-ui-sidebar"
+        "@hackdevcode/dsh-client-ui-session-status",
+        "@hackdevcode/dsh-client-ui-sidebar",
+        "@hackdevcode/dsh-client-ui-context-menu"
       ],
       "platform": "web"
     }
@@ -54,6 +56,7 @@
     "@hackdevcode/cordis": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-api-remote-access": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-api-remotes": "workspace:*",
@@ -70,6 +73,7 @@
     "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
     "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
     "@hackdevcode/dsh-client-ui-session": "workspace:*",
+    "@hackdevcode/dsh-client-ui-session-status": "workspace:*",
     "@hackdevcode/dsh-client-ui-sidebar": "workspace:*",
     "@hackdevcode/dsh-client-ui-slots": "workspace:*",
     "@hackdevcode/dsh-jobs": "workspace:*",
@@ -82,12 +86,17 @@
     "clsx": "^2.0.0",
     "react": "^18.2.0",
     "@hackdevcode/dsh-client-shortcuts": "workspace:*",
-    "@hackdevcode/dsh-client-product-analytics": "workspace:*"
+    "@hackdevcode/dsh-client-product-analytics": "workspace:*",
+    "@hackdevcode/dsh-client-ui-context-menu": "workspace:*",
+    "@hackdevcode/dsh-util-text-search": "workspace:*"
   },
   "files": [
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ]
 }

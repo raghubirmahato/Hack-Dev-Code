@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 
 import AgentLoop from '@hackdevcode/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@hackdevcode/dsh-agent-loop-testkit'
@@ -9,6 +9,7 @@ import SubagentRuntime from '@hackdevcode/dsh-subagent'
 import * as Spawn from '@hackdevcode/dsh-subagent-spawn-in-process'
 import PtcWorkflowEngine from '../src/index.ts'
 import { mountPtcRuntime } from './setup.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 let ctx: Context | undefined
 
@@ -81,7 +82,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('PTC workflow engine with-key e2e
     expect(childIds.length).toBe(2)
     // The children were disposed to quiescence after collection.
     for (const childId of childIds) {
-      expect(ctx.agents.get(SessionId(childId))).toBeUndefined()
+      expect(ctx.agents.get(brandString<SessionId>(childId))).toBeUndefined()
     }
     await parentHandle.dispose()
   }, 240_000)

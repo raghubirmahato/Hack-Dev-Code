@@ -4,7 +4,7 @@
  */
 
 import type { Context } from '@hackdevcode/cordis'
-import { defineTool } from '@hackdevcode/dsh-tools'
+import { defineTool, ToolArgsError, ToolContextUnavailableError } from '@hackdevcode/dsh-tools'
 import type {} from '@hackdevcode/dsh-working-directory'
 
 /** Cordis plugin name. */
@@ -32,7 +32,8 @@ export function apply(ctx: Context): void {
       render: (_args, value) => [{ type: 'text', text: value.cwd }],
     },
     async execute(args, exec) {
-      if (exec.agent === undefined) throw new Error('working_directory requires an agent Session')
+      if (exec.agent === undefined) throw new ToolContextUnavailableError('working_directory requires an agent Session')
+      if (args.cd === '') throw new ToolArgsError(['cd must not be empty; omit it to read the current directory'])
       const cwd = args.cd === undefined
         ? await ctx.workingDirectory.ensure(exec.agent, exec.signal)
         : await ctx.workingDirectory.set(exec.agent, args.cd, exec.signal)

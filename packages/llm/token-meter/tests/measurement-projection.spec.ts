@@ -1,13 +1,14 @@
 /** Recovery facts survive JSON checkpoints while positional prices are rebuilt independently. */
 import { Context } from '@hackdevcode/cordis'
 import { createAssistantMessage, createUserMessage } from '@hackdevcode/dsh-llm'
-import SessionStore, { Session, SessionId, SessionLogOffset } from '@hackdevcode/dsh-session'
+import SessionStore, { Session, type SessionId, SessionLogOffset } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import type { SessionEvent } from '@hackdevcode/dsh-session'
 import type { ProjectionCheckpoint } from '@hackdevcode/dsh-session-projection'
 import TokenMeter from '@hackdevcode/dsh-token-meter'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { measurementProjectionDefinition } from '../src/measurement-projection.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 async function harness() {
   const ctx = new Context()
@@ -19,7 +20,7 @@ async function harness() {
 }
 
 function prefix() {
-  const session = Session.create(SessionId('measurement-checkpoint'))
+  const session = Session.create(brandString<SessionId>('measurement-checkpoint'))
   session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'question' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
   session.append('step/start', { turn: 1, step: 1 })
   session.append('request/header', { reason: 'initial', header: { config: { provider: 'test', model: 'test' } } })
@@ -117,7 +118,7 @@ describe('measurement recovery facts', () => {
   })
 
   it('retains only the step coordinates from diagnostic event fields', () => {
-    const session = Session.create(SessionId('measurement-step-diagnostics'))
+    const session = Session.create(brandString<SessionId>('measurement-step-diagnostics'))
     const data = { turn: -1.5, step: 0.5, diagnostic: 'not measurement state' }
     session.append('step/start', data)
     const state = measurementProjectionDefinition.apply(measurementProjectionDefinition.init(), session.snapshotEvents()[0]!)

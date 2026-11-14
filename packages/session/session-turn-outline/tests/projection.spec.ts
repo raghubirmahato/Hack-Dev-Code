@@ -13,12 +13,13 @@ import { describe, expect, expectTypeOf, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import { createAssistantMessage, createUserMessage } from '@hackdevcode/dsh-llm'
 import type { ContextFormed } from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId, SessionLogOffset, SessionSeq } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId, SessionLogOffset, SessionSeq } from '@hackdevcode/dsh-session'
 import type { Session, SessionEvent } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import * as SessionTurnOutlinePlugin from '@hackdevcode/dsh-session-turn-outline'
 import { turnOutlineProjectionDefinition } from '@hackdevcode/dsh-session-turn-outline/src/projection.ts'
 import type { TurnOutlineEntry, TurnOutlineState } from '@hackdevcode/dsh-session-turn-outline/types'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 declare module '@hackdevcode/dsh-llm' {
   interface MessageSourceMap {
@@ -31,7 +32,7 @@ async function harness(withOutlinePlugin: boolean): Promise<{ ctx: Context; sess
   await ctx.plugin(SessionStore)
   await ctx.plugin(SessionProjectionRegistry)
   if (withOutlinePlugin) await ctx.plugin(SessionTurnOutlinePlugin)
-  return { ctx, session: ctx.sessions.create(SessionId('outlined')) }
+  return { ctx, session: ctx.sessions.create(brandString<SessionId>('outlined')) }
 }
 
 /** Append one human prompt; returns its seq. */

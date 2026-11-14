@@ -1,16 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
-import { Session, SessionId } from '@hackdevcode/dsh-session'
+import { Session, type SessionId } from '@hackdevcode/dsh-session'
 import { unsupportedModel, unsupportedInbox } from '@hackdevcode/dsh-agent-loop-testkit'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import { ScopedLayers, bindScopeParent, createScope, scopeOf } from '@hackdevcode/dsh-scope'
 import type { ScopeKey } from '@hackdevcode/dsh-scope'
-import { JobId } from '@hackdevcode/dsh-jobs'
+import type { JobId } from '@hackdevcode/dsh-jobs'
+import { brandString } from '@hackdevcode/dsh-brand'
 import type { JobEvent, JobView } from '@hackdevcode/dsh-jobs'
 import { JobEventHub, JobLayer } from '../src/events.ts'
 
 function agentIn(ctx: Context, rawId: string, presetScope?: ScopeKey): Agent {
-  const id = SessionId(rawId)
+  const id = brandString<SessionId>(rawId)
   let agentCtx = ctx.plugin(() => {}).ctx
   if (presetScope !== undefined) {
     const key = {}
@@ -38,7 +39,7 @@ function agentIn(ctx: Context, rawId: string, presetScope?: ScopeKey): Agent {
 
 function view(owner: Agent | undefined): JobView {
   return {
-    id: JobId('bash-1'),
+    id: brandString<JobId>('bash-1'),
     kind: 'bash',
     label: 'x',
     ...owner !== undefined ? { owner: owner.id } : {},
@@ -67,8 +68,8 @@ describe('JobEventHub', () => {
     hub.emit({ type: 'registered', job: view(alice) }, alice)
     hub.emit({ type: 'registered', job: view(bob) }, bob)
     hub.emit({ type: 'registered', job: view(undefined) }, undefined)
-    hub.emit({ type: 'output', id: JobId('bash-1'), owner: bob.id, total: 1 }, bob)
-    hub.emit({ type: 'output', id: JobId('bash-1'), total: 1 }, undefined)
+    hub.emit({ type: 'output', id: brandString<JobId>('bash-1'), owner: bob.id, total: 1 }, bob)
+    hub.emit({ type: 'output', id: brandString<JobId>('bash-1'), total: 1 }, undefined)
     expect(seen).toEqual(['alice', undefined, undefined])
   })
 
@@ -114,7 +115,7 @@ describe('JobEventHub', () => {
     const detach = hub.subscribe(ctx, { owners: 'all' }, () => { seen.push(1) })
     const fiber = await ctx.plugin((pluginCtx: Context) => {
       hub.subscribe(pluginCtx, { owners: 'scope' }, () => { seen.push(2) })
-      hub.subscribe(pluginCtx, { owner: SessionId('nobody') }, () => { seen.push(3) })
+      hub.subscribe(pluginCtx, { owner: brandString<SessionId>('nobody') }, () => { seen.push(3) })
     })
 
     // Filter-kind order is not a contract; the assertion only fixes it for determinism.

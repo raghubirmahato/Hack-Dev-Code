@@ -6,6 +6,12 @@
  * @module @hackdevcode/dsh-session-title-llm
  */
 
+declare module '@hackdevcode/dsh-llm/types' {
+  interface LlmRequestPurposeMap {
+    'session-title': true
+  }
+}
+
 import type { Context } from '@hackdevcode/cordis'
 import z from '@hackdevcode/schemastery'
 import { createUserMessage, BlockAssembler } from '@hackdevcode/dsh-llm'
@@ -27,7 +33,7 @@ import type {
 import { deadline, MAX_TIMER_DELAY_MS } from '@hackdevcode/dsh-timeout'
 import { assertNever, deepFreeze } from '@hackdevcode/dsh-util-values'
 import type { SessionSeq } from '@hackdevcode/dsh-session'
-import { SessionTitleProviderId } from '@hackdevcode/dsh-session-title'
+import type { SessionTitleProviderId } from '@hackdevcode/dsh-session-title/types'
 import type {
   SessionTitleModelIdentity,
   SessionTitleProviderRequest,

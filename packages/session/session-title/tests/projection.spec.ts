@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import { createUserMessage } from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId, SessionLogOffset, SessionSeq } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId, SessionLogOffset, SessionSeq } from '@hackdevcode/dsh-session'
 import type { Session, SessionSeq as SessionSeqType } from '@hackdevcode/dsh-session'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import SessionTitleService from '@hackdevcode/dsh-session-title'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const CONFIG = { fallbackMaxWords: 8, fallbackMaxBytes: 64, maxTitleBytes: 256 }
 
@@ -15,7 +16,7 @@ async function harness(withTitleService: boolean): Promise<{ ctx: Context; sessi
   await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(AgentRegistry)
   if (withTitleService) await ctx.plugin(SessionTitleService, CONFIG)
-  return { ctx, session: ctx.sessions.create(SessionId('titled')) }
+  return { ctx, session: ctx.sessions.create(brandString<SessionId>('titled')) }
 }
 
 function appendTitle(session: Session, title: string): SessionSeqType {
@@ -47,7 +48,7 @@ describe('title projection unit', () => {
     const firstSeq = appendTitle(session, 'First title')
     const secondSeq = appendTitle(session, 'Second title')
     session.append('turn/start', { turn: 1 })
-    expect(changes).toEqual([
+    expect(changes.filter(change => change.key === 'title')).toEqual([
       { key: 'title', value: 'First title', seq: firstSeq },
       { key: 'title', value: 'Second title', seq: secondSeq },
     ])

@@ -19,6 +19,8 @@
         id: parent
         plugins:
           - name: '@hackdevcode/dsh-tool-fs'
+            config:
+              applyPatch: true
           - name: '@hackdevcode/dsh-tool-fs-search'
             config:
               sampleOverCapGlobResults: false

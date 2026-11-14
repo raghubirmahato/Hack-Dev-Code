@@ -9,8 +9,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import Include from '@hackdevcode/cordis-plugin-include'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
-import { SESSION_FORMAT_VERSION, Session, SessionId } from '@hackdevcode/dsh-session'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import { SESSION_FORMAT_VERSION, Session, type SessionId } from '@hackdevcode/dsh-session'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import TerminalSessionService from '@hackdevcode/dsh-terminal'
@@ -41,7 +42,7 @@ class PassthroughSandbox extends SandboxProvider {
 }
 
 async function agent(ctx: Context, cwd: string): Promise<Agent> {
-  const id = SessionId('persistent-bash-loader-agent')
+  const id = brandString<SessionId>('persistent-bash-loader-agent')
   const scope = ctx.plugin(() => {})
   const session = Session.create(id, [], {
     version: SESSION_FORMAT_VERSION, id, createdAt: 0, cwd, isSeeded: false,
@@ -140,7 +141,7 @@ suite('persistent Bash through a real cordis.yml Loader composition', () => {
     const signal = new AbortController().signal
     const execute = (id: string, command: string) => executeToolFixture(context!, {
       signal,
-      callId: ToolCallId(id),
+      callId: brandString<ToolCallId>(id),
       name: 'bash',
       arguments: { command },
       agent: owner,

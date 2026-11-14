@@ -3,7 +3,7 @@ import { Context } from '@hackdevcode/cordis'
 import { Peer } from '@hackdevcode/dsh-client-connection'
 import { randomUUID } from 'node:crypto'
 import { createScope } from '@hackdevcode/dsh-scope'
-import { Session, SessionId, SESSION_FORMAT_VERSION } from '@hackdevcode/dsh-session'
+import { Session, type SessionId, SESSION_FORMAT_VERSION } from '@hackdevcode/dsh-session'
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,6 +13,7 @@ import { apply } from '../src/host/share-host.ts'
 import { SHARED_TOOL_PROFILES } from '../src/host/shared-tools.ts'
 import type { TunnelRegistrationToken, TunnelWorkerEvent } from '@hackdevcode/dsh-experimental-liveshare-protocol'
 import type { TunnelWorkerInput } from '../src/host/tunnel-worker.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const worker = vi.hoisted(() => ({ event: undefined as ((event: TunnelWorkerEvent) => void) | undefined }))
 vi.mock('../src/host/tunnel-worker.ts', () => ({ TunnelWorker: class {
@@ -41,8 +42,8 @@ describe('source access lifetime', () => {
     const ctx = new Context()
     onTestFinished(() => ctx.fiber.dispose())
     const routes = new Map<string, (request: Request) => Promise<Response>>()
-    const session = Session.create(SessionId('source'), [], {
-      version: SESSION_FORMAT_VERSION, id: SessionId('source'), cwd: root, createdAt: 0, isSeeded: false,
+    const session = Session.create(brandString<SessionId>('source'), [], {
+      version: SESSION_FORMAT_VERSION, id: brandString<SessionId>('source'), cwd: root, createdAt: 0, isSeeded: false,
     })
     let registrations = 0
     const dispatchEntered = Promise.withResolvers<undefined>()

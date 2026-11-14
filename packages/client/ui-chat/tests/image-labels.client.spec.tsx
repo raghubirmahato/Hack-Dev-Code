@@ -2,8 +2,9 @@
 
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { cleanup, render } from '@testing-library/react'
-import { AttachmentId } from '@hackdevcode/dsh-attachment'
-import { SessionId } from '@hackdevcode/dsh-session/types'
+import type { AttachmentId } from '@hackdevcode/dsh-attachment/types'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { SessionId } from '@hackdevcode/dsh-session/types'
 import { makeTranslate, SlotTestRuntime } from '@hackdevcode/dsh-client-test-runtime'
 import { zh as commonZh } from '@hackdevcode/dsh-client-locale/src/locales/zh.ts'
 import type { MessageImagesOwnerProps } from '@hackdevcode/dsh-client-ui-conversation/client'
@@ -18,7 +19,7 @@ afterEach(cleanup)
 const t = makeTranslate(zh, commonZh)
 
 const attachment = {
-  attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
+  attachmentId: brandString<AttachmentId>(`sha256:${'a'.repeat(64)}`),
   mediaType: 'image/png' as const,
   bytes: 68,
   width: 640,
@@ -43,7 +44,7 @@ async function renderImages(blocks: AssistantMarkdownProps['blocks'], calls: Mes
     )
   }))
   await runtime.sessions.add({ id: 'image-labels' })
-  const session = runtime.sessions.retainFor(runtime.ctx, SessionId('image-labels'))
+  const session = runtime.sessions.retainFor(runtime.ctx, brandString<SessionId>('image-labels'))
   await runtime.root.declare({
     'conversation.chat.reasoning.body': { kind: 'single', scope: 'session' },
     'conversation.chat.message.images': { kind: 'single', scope: 'session' },

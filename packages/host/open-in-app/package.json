@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-host-open-in-app",
   "description": "Host half of open-in-app: resolved application catalog, icons, and the launch endpoint as three webServer routes",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +30,10 @@
     "locale/*.json",
     "lib/index.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "scripts": {
     "bundle": "tsdown",
@@ -49,6 +52,7 @@
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/cordis-plugin-loader": "workspace:~",
-    "@hackdevcode/dsh-host-webserver": "workspace:*"
+    "@hackdevcode/dsh-host-webserver": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*"
   }
 }

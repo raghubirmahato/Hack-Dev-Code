@@ -47,7 +47,7 @@
     "@hackdevcode/dsh-token-meter": "workspace:*",
     "@hackdevcode/dsh-typert-protocol": "workspace:*",
     "@hackdevcode/dsh-util-values": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "4.6.6"
   },
   "peerDependencies": {
     "@hackdevcode/cordis": "workspace:~"

@@ -25,9 +25,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@hackdevcode/dsh-agent-loop-testkit'
 import BrowserUse from '@hackdevcode/dsh-browser-use'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import { mountSessionMcp } from '../src/mcp.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const FIXTURE = fileURLToPath(new URL('./mcp-fixture.mjs', import.meta.url))
 const TOOL = 'mcp__browser-fixture__visit'
@@ -77,9 +78,9 @@ it('reproduces the second-Agent failure a profile install causes', async () => {
     }))
   }, { prepend: true })
 
-  await ctx.agents.create({ sessionId: SessionId('first'), meta: { cwd: root } })
+  await ctx.agents.create({ sessionId: brandString<SessionId>('first'), meta: { cwd: root } })
   expect(toolNames(ctx)).toContain(TOOL)
-  await expect(ctx.agents.create({ sessionId: SessionId('second'), meta: { cwd: root } }))
+  await expect(ctx.agents.create({ sessionId: brandString<SessionId>('second'), meta: { cwd: root } }))
     .rejects.toThrow('mcp-client(browser-fixture): initial connection or tool synchronization failed')
 })
 
@@ -94,8 +95,8 @@ it('keeps every Agent browser tool in that Agent scope under the shipped layout'
     },
   })
 
-  const first = await ctx.agents.create({ sessionId: SessionId('first'), meta: { cwd: root } })
-  const second = await ctx.agents.create({ sessionId: SessionId('second'), meta: { cwd: root } })
+  const first = await ctx.agents.create({ sessionId: brandString<SessionId>('first'), meta: { cwd: root } })
+  const second = await ctx.agents.create({ sessionId: brandString<SessionId>('second'), meta: { cwd: root } })
   expect(toolNames(ctx)).toEqual([])
   for (const agent of [first.agent, second.agent]) {
     expect(toolNames(ctx, agent)).toContain(TOOL)

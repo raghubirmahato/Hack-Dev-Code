@@ -4,12 +4,13 @@ import { Context } from '@hackdevcode/cordis'
 import LlmRuntime, { createUserMessage } from '@hackdevcode/dsh-llm'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import AgentLoop from '@hackdevcode/dsh-agent-loop'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
 import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import * as DeepSeek from '@hackdevcode/dsh-llm-deepseek-api-key'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const contexts: Context[] = []
 afterEach(async () => {
@@ -29,7 +30,7 @@ it('records the prompt and fails the request when the official endpoint has a ma
   await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(DeepSeek, {})
-  const agent = await ctx.agentLoop.create(SessionId('malformed-official-key'), { provider: 'deepseek-official', model: 'deepseek-flash' })
+  const agent = await ctx.agentLoop.create(brandString<SessionId>('malformed-official-key'), { provider: 'deepseek-official', model: 'deepseek-flash' })
   agent.followup(createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } }))
   await agent.whenIdle()
   const events = agent.session.snapshotEvents()

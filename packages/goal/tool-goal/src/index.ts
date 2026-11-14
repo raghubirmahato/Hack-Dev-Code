@@ -6,8 +6,8 @@
 
 import type { Context } from '@hackdevcode/cordis'
 import z from '@hackdevcode/schemastery'
-import { GoalId } from '@hackdevcode/dsh-goal'
-import type { GoalRef, GoalView } from '@hackdevcode/dsh-goal'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { GoalId, GoalRef, GoalView } from '@hackdevcode/dsh-goal/types'
 import { boundContextSummary, createUserMessage, HarnessError } from '@hackdevcode/dsh-llm'
 import type { ContextFormed } from '@hackdevcode/dsh-llm'
 declare module '@hackdevcode/dsh-llm' {
@@ -150,7 +150,7 @@ function goalRef(goalId: string, revision: number): GoalRef {
       'GOAL_TOOL_INVALID_UPDATE',
     )
   }
-  return { id: GoalId(goalId), revision }
+  return { id: brandString<GoalId>(goalId), revision }
 }
 
 /** Stable compact model result; activation is an observation, not replay state. */

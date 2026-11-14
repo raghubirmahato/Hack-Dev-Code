@@ -10,7 +10,8 @@ import type { Volatile } from '@hackdevcode/cordis'
 import { Context, Service } from '@hackdevcode/cordis'
 import z from '@hackdevcode/schemastery'
 import type { ModelSelection } from '@hackdevcode/dsh-agent'
-import { ReasoningEffortId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ReasoningEffortId } from '@hackdevcode/dsh-llm'
 import type {} from '@hackdevcode/dsh-config-editor'
 
 declare module '@hackdevcode/cordis' {
@@ -37,7 +38,7 @@ function selection(settings: { provider: string; model: string; reasoningEffort?
     model: settings.model,
     ...settings.reasoningEffort === undefined
       ? {}
-      : { reasoningEffort: ReasoningEffortId(settings.reasoningEffort) },
+      : { reasoningEffort: brandString<ReasoningEffortId>(settings.reasoningEffort) },
   }
 }
 

@@ -7,12 +7,13 @@ import { LocaleRuntime } from '@hackdevcode/dsh-client-locale/client'
 import { en as commonEn } from '@hackdevcode/dsh-client-locale/src/locales/en.ts'
 import { zh as commonZh } from '@hackdevcode/dsh-client-locale/src/locales/zh.ts'
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
-import { SessionId } from '@hackdevcode/dsh-session/types'
+import type { SessionId } from '@hackdevcode/dsh-session/types'
 import type { PropsRenderFactories, PropsRenderSlots } from '@hackdevcode/dsh-client-ui-slots'
 import { en, NS, zh } from '../src/client/locale.ts'
 import { derivePresentationPolicy, type CollapseTiming, type FoldedReplies } from '../src/client/presentation-policy.ts'
 import { registerChatNodeRenderers } from '../src/client/chat/register-node-renderers.ts'
 import type { PerformanceUsageMode, TranscriptViewMode } from '../src/chat-settings.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 type RenderSeats = PropsRenderSlots<'conversation.chat.reasoning.body'> & PropsRenderFactories
 
@@ -52,7 +53,7 @@ export async function createReasoningRenderFixture(language = 'zh') {
     },
   })
   await runtime.sessions.add({ id: 'reasoning-fixture' })
-  const session = runtime.sessions.retainFor(runtime.ctx, SessionId('reasoning-fixture'))
+  const session = runtime.sessions.retainFor(runtime.ctx, brandString<SessionId>('reasoning-fixture'))
   const view = runtime.renderRoot()
   const { seats, setContent } = captured
   if (seats === undefined || setContent === undefined) throw new Error('reasoning fixture root did not render')

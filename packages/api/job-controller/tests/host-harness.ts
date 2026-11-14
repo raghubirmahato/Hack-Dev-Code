@@ -5,7 +5,8 @@ import { unsupportedModel, unsupportedInbox } from '@hackdevcode/dsh-agent-loop-
 import type { Agent } from '@hackdevcode/dsh-agent'
 import type { JobAppendOptions, JobHandle, JobOutcome } from '@hackdevcode/dsh-jobs'
 import LocalJobRegistry from '@hackdevcode/dsh-jobs-local'
-import { Session, SessionId } from '@hackdevcode/dsh-session'
+import { Session, type SessionId } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 /** A registry with a tiny ring so eviction is cheap to reach. */
 export async function harness(): Promise<Context> {
@@ -20,7 +21,7 @@ export async function harness(): Promise<Context> {
 /** Register a live agent for `rawId` under its own lifecycle scope. */
 export async function registerAgent(ctx: Context, rawId: string): Promise<Agent & { disposeScope: () => Promise<void> }> {
   const scopeFiber = ctx.plugin(() => {})
-  const id = SessionId(rawId)
+  const id = brandString<SessionId>(rawId)
   const session = Session.create(id)
   const agent: Agent & { disposeScope: () => Promise<void> } = {
     id,

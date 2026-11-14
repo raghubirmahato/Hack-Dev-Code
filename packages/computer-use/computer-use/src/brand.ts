@@ -1,4 +1,4 @@
-/** Computer-use provider identities. @module @hackdevcode/dsh-computer-use/brand */
+/** Computer-use provider identities. @module @hackdevcode/dsh-computer-use/src/brand.ts */
 
 import type { Branded } from '@hackdevcode/dsh-brand'
 

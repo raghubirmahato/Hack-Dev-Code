@@ -18,7 +18,8 @@ import { mkdir, mkdtemp, rm, symlink, utimes, writeFile } from 'node:fs/promises
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { Context } from '@hackdevcode/cordis'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED_BEFORE_DISPATCH } from '@hackdevcode/dsh-tools'
 import LocalSubprocessRuntime from '@hackdevcode/dsh-subprocess-local'
@@ -33,7 +34,7 @@ let callCounter = 0
 function call(name: string, args: unknown, agentObj?: object) {
   return executeToolFixture(ctx, {
     signal: testToolSignal,
-    callId: ToolCallId(`it-${++callCounter}`),
+    callId: brandString<ToolCallId>(`it-${++callCounter}`),
     name,
     arguments: args,
     ...agentObj ? { agent: agentObj as never } : {},
@@ -125,7 +126,7 @@ describe('search tools over the real subprocess service + the packaged rg', () =
       const spawn = vi.spyOn(ctx.subprocess, 'spawn')
       const result = await executeModelToolFixture(ctx, {
         signal: testToolSignal,
-        callId: ToolCallId(`deep-glob-${++callCounter}`),
+        callId: brandString<ToolCallId>(`deep-glob-${++callCounter}`),
         name: 'glob',
         arguments: { pattern },
         agent: agent() as never,
@@ -281,7 +282,7 @@ describe('search tools over the real subprocess service + the packaged rg', () =
       const controller = new AbortController()
       controller.abort()
       const result = await executeToolFixture(ctx, {
-        callId: ToolCallId(`it-${++callCounter}`),
+        callId: brandString<ToolCallId>(`it-${++callCounter}`),
         name: 'grep',
         arguments: { pattern: 'x' },
         signal: controller.signal,

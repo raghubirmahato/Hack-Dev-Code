@@ -1,6 +1,6 @@
 /** Card proposals, recorded decisions and user-action results shared by every action kind. */
 import type { ContextFormed } from '@hackdevcode/dsh-llm'
-import type { ToolCallId } from '@hackdevcode/dsh-llm/brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import type { SessionSeq } from '@hackdevcode/dsh-session/types'
 import type { SessionProjectionSummaryExcluded } from '@hackdevcode/dsh-session-projection/types'
 import type { JsonValue } from '@hackdevcode/dsh-util-values'

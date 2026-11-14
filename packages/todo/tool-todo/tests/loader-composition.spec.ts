@@ -11,8 +11,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import Include from '@hackdevcode/cordis-plugin-include'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
-import { Session, SessionId } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
+import { Session, type SessionId } from '@hackdevcode/dsh-session'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
@@ -33,7 +34,7 @@ afterEach(async () => {
 
 async function agent(ctx: Context): Promise<Agent> {
   const scope = ctx.plugin(() => {})
-  const id = SessionId('todo-loader-agent')
+  const id = brandString<SessionId>('todo-loader-agent')
   const session = Session.create(id)
   const value: Agent = {
     id, options: {}, session, model: unsupportedModel(),
@@ -111,13 +112,14 @@ describe('tool-todo real Loader composition through cordis.yml', () => {
     const owner = await agent(ctx)
     const result = await executeToolFixture(ctx, {
       signal: new AbortController().signal,
-      callId: ToolCallId('parallel'),
+      callId: brandString<ToolCallId>('parallel'),
       name: 'todo_write',
       arguments: { todos: PARALLEL_TODOS },
       agent: owner,
     })
     expect(result.isError).toBe(true)
     expect(resultText(result)).toContain('at most one task may be in_progress')
+    expect(result.error?.info).toEqual({ name: 'ToolArgsError', code: 'INVALID_ARGS' })
     expect(owner.session.snapshotEvents().some(e => e.type === 'todo/write')).toBe(false)
   }, 30_000)
 
@@ -129,7 +131,7 @@ describe('tool-todo real Loader composition through cordis.yml', () => {
     const owner = await agent(ctx)
     const result = await executeToolFixture(ctx, {
       signal: new AbortController().signal,
-      callId: ToolCallId('parallel-enabled'),
+      callId: brandString<ToolCallId>('parallel-enabled'),
       name: 'todo_write',
       arguments: { todos: PARALLEL_TODOS },
       agent: owner,

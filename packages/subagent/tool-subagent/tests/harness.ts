@@ -2,12 +2,13 @@ import { executeToolFixture } from '@hackdevcode/dsh-tool-testkit'
 import { mountWorkingDirectoryFixture } from '../../subagent/tests/working-directory-fixture.ts'
 import { afterEach } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import type { Agent, AgentOptions } from '@hackdevcode/dsh-agent'
 import AgentLoop from '@hackdevcode/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@hackdevcode/dsh-agent-loop-testkit'
 import SubagentRuntime from '@hackdevcode/dsh-subagent'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import * as mock from './scripted-provider.ts'
 import type { Config as toolConfig } from '../src/index.ts'
 import * as tool from '../src/index.ts'
@@ -65,7 +66,7 @@ export async function setup(toolConfig: SetupConfig, mockConfig: Partial<mock.Co
     const provider = await mock.mountScriptedProvider(ctx, { name: 'mock', ...mockConfig })
     setupProviders.set(ctx, provider)
     const handle = await ctx.agents.create({
-      sessionId: SessionId(`model-selection-setup-${++setupAgentCounter}`),
+      sessionId: brandString<SessionId>(`model-selection-setup-${++setupAgentCounter}`),
       ...parentAgentOptions !== undefined ? { agentOptions: parentAgentOptions } : {},
       setup: async (agentCtx) => {
         const fiber = agentCtx.inject(tool.inject, (runtimeCtx) => {
@@ -83,7 +84,7 @@ export async function setup(toolConfig: SetupConfig, mockConfig: Partial<mock.Co
   const provider = await mock.mountScriptedProvider(ctx, { name: 'mock', ...mockConfig })
   setupProviders.set(ctx, provider)
   await ctx.plugin(tool, config)
-  const handle = await ctx.agents.create({ sessionId: SessionId(`tool-setup-${++setupAgentCounter}`), ...parentAgentOptions === undefined ? {} : { agentOptions: parentAgentOptions } })
+  const handle = await ctx.agents.create({ sessionId: brandString<SessionId>(`tool-setup-${++setupAgentCounter}`), ...parentAgentOptions === undefined ? {} : { agentOptions: parentAgentOptions } })
   setupAgents.set(ctx, handle.agent)
   return ctx
 }
@@ -115,10 +116,10 @@ export async function callSubagent(
   // `{ agent: undefined }` (test the no-agent path). Under
   // exactOptionalPropertyTypes the key is omitted rather than set to undefined.
   const agent = 'agent' in over ? over.agent : setupAgents.get(ctx)
-    ?? (await ctx.agents.create({ sessionId: SessionId(`tool-call-parent-${++setupAgentCounter}`) })).agent
+    ?? (await ctx.agents.create({ sessionId: brandString<SessionId>(`tool-call-parent-${++setupAgentCounter}`) })).agent
   return executeToolFixture(ctx, {
     signal: testToolSignal,
-    callId: ToolCallId(`call-${++callCounter}`),
+    callId: brandString<ToolCallId>(`call-${++callCounter}`),
     name: 'subagent',
     arguments: args,
     ...agent ? { agent } : {},

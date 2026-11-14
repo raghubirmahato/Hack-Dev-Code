@@ -8,7 +8,7 @@
 import type { Context } from '@hackdevcode/cordis'
 import TurndownService from 'turndown'
 import { gfm } from '@joplin/turndown-plugin-gfm'
-import { defineTool } from '@hackdevcode/dsh-tools'
+import { defineTool, ToolArgsError } from '@hackdevcode/dsh-tools'
 import type { GenericCallView, ToolResult, WebFetchResultView } from '@hackdevcode/dsh-tools'
 import type { WebFetchBody, WebFetchResult } from '@hackdevcode/dsh-web'
 import { assertNever, type JsonValue } from '@hackdevcode/dsh-util-values'
@@ -96,7 +96,7 @@ turndown.addRule('tableRowWithoutSpanExpansion', {
 
 /**
  * Validate value constraints the schema DSL can't express: a non-blank `url`.
- * Throws a plain `Error` otherwise. No timeout parameter — the tool-call budget
+ * Throws `ToolArgsError` otherwise. No timeout parameter — the tool-call budget
  * is deployment policy declared via `fetchTimeoutMs` config and enforced by
  * `@hackdevcode/dsh-tool-call-timeout-policy`, not a model argument.
  *
@@ -104,7 +104,7 @@ turndown.addRule('tableRowWithoutSpanExpansion', {
  * @returns the arguments as the seam's request fields.
  */
 export function parseFetchArgs(args: { url: string }): { url: string } {
-  if (args.url.trim().length === 0) throw new Error('url must be a non-empty string')
+  if (args.url.trim().length === 0) throw new ToolArgsError(['url must be a non-empty string'])
   return { url: args.url }
 }
 

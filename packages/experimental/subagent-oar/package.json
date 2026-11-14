@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-experimental-subagent-oar",
   "description": "Experimental one-shot subagents through OAR runtimes",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -27,7 +27,10 @@
     "locale/*.json",
     "lib/index.js",
     "LICENSE-OAR",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "icon": "./icon.svg",
@@ -36,7 +39,8 @@
     "@hackdevcode/dsh-llm": "workspace:*",
     "@hackdevcode/dsh-session": "workspace:*",
     "@hackdevcode/dsh-subagent": "workspace:*",
-    "@hackdevcode/dsh-subprocess": "workspace:*"
+    "@hackdevcode/dsh-subprocess": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^1.4.0",
@@ -67,6 +71,7 @@
     "@hackdevcode/dsh-tool-jobs": "workspace:*",
     "@hackdevcode/dsh-tools": "workspace:*",
     "@hackdevcode/dsh-agent-loop-testkit": "workspace:*",
-    "@hackdevcode/dsh-experimental-tool-subagent-oar": "workspace:*"
+    "@hackdevcode/dsh-experimental-tool-subagent-oar": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   }
 }

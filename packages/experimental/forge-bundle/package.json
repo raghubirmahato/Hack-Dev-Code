@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-experimental-forge-bundle",
   "description": "Experimental change request panel and worktree option for Sessions in Git repositories",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "icon": "./icon.svg",
   "publishConfig": {
     "access": "public"
@@ -27,9 +27,13 @@
   "files": [
     "icon.svg",
     "locale/*.json",
+    "docs",
     "lib/index.js",
     "cordis.patch.yml",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "dependencies": {
@@ -37,6 +41,7 @@
     "@hackdevcode/dsh-experimental-forge": "workspace:*",
     "@hackdevcode/dsh-experimental-forge-github": "workspace:*",
     "@hackdevcode/dsh-experimental-forge-session": "workspace:*",
+    "@hackdevcode/dsh-experimental-tool-worktree": "workspace:*",
     "@hackdevcode/dsh-experimental-worktree": "workspace:*"
   },
   "peerDependencies": {

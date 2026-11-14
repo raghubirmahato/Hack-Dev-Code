@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import AgentRegistry from '@hackdevcode/dsh-agent'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import AgentLoop from '@hackdevcode/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@hackdevcode/dsh-agent-loop-testkit'
 import SubagentRuntime from '@hackdevcode/dsh-subagent'
@@ -14,6 +14,7 @@ import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent
 import type { StreamChunk } from '@hackdevcode/dsh-llm'
 import * as fork from '../src/index.ts'
 import { STRUCTURED_OUTPUT_TOOL } from '@hackdevcode/dsh-subagent'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 type Script = ConstructorParameters<typeof MockAdapter>[0]
 
@@ -33,7 +34,7 @@ async function setup(script: Script) {
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(fork, { providerName: 'fork' })
   ctx.llm.registerAdapter(['mock'], new MockAdapter(script))
-  const parent = await ctx.agentLoop.create(SessionId('parent'), { provider: 'mock', model: 'mock' })
+  const parent = await ctx.agentLoop.create(brandString<SessionId>('parent'), { provider: 'mock', model: 'mock' })
   return { ctx, parent }
 }
 
@@ -199,9 +200,9 @@ describe('dsh-subagent-fork-in-process', () => {
     await ctx.plugin(SubagentRuntime)
     await ctx.plugin(AgentRegistry)
     const fiber = await ctx.plugin(fork, { providerName: 'fork' })
-    expect(ctx.subagents.list()).toEqual(['fork'])
+    expect(ctx.subagents.getProvider('fork')).toBeDefined()
     await fiber.dispose()
-    expect(ctx.subagents.list()).toEqual([])
+    expect(ctx.subagents.getProvider('fork')).toBeUndefined()
   })
 
   it('contributes the completed-turn prefix as a continuable child\'s seed', async () => {
@@ -213,7 +214,7 @@ describe('dsh-subagent-fork-in-process', () => {
     // child starts fresh rather than carrying an empty seed.
     const fresh = await provider.prepareContinuable!({
       cwd: process.cwd(),
-      sessionId: SessionId('continuable-fresh'),
+      sessionId: brandString<SessionId>('continuable-fresh'),
       parent,
       signal,
     })
@@ -224,7 +225,7 @@ describe('dsh-subagent-fork-in-process', () => {
     await parent.whenIdle()
     const seeded = await provider.prepareContinuable!({
       cwd: process.cwd(),
-      sessionId: SessionId('continuable-seeded'),
+      sessionId: brandString<SessionId>('continuable-seeded'),
       parent,
       signal,
     })

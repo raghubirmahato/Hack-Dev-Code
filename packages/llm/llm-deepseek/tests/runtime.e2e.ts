@@ -9,9 +9,11 @@ import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
-import LlmRuntime, { createToolResultMessage, createUserMessage, ToolCallId, ReasoningEffortId, createMessage, createSystemMessage } from '@hackdevcode/dsh-llm'
+import LlmRuntime, { createToolResultMessage, createUserMessage, type ToolCallId, type ReasoningEffortId, createMessage, createSystemMessage } from '@hackdevcode/dsh-llm'
 import type { Message, ToolSchema } from '@hackdevcode/dsh-llm'
-import AttachmentStore, { AttachmentId, ImageVariantId } from '@hackdevcode/dsh-attachment'
+import { brandString } from '@hackdevcode/dsh-brand'
+import AttachmentStore from '@hackdevcode/dsh-attachment'
+import type { AttachmentId, ImageVariantId } from '@hackdevcode/dsh-attachment/types'
 import LocalAttachments from '@hackdevcode/dsh-attachment-local'
 import type {
   ImageAttachmentLimits,
@@ -22,7 +24,7 @@ import type {
   StoredImageAttachment,
 } from '@hackdevcode/dsh-attachment'
 import { LocalCredentialProvider } from '@hackdevcode/dsh-credentials-local'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import DeepSeekLlmApiExtensionRegistry from '@hackdevcode/dsh-deepseek-llm-api-extensions'
 import * as PluginPackageInventoryDeepSeek from '@hackdevcode/dsh-plugin-package-inventory-deepseek'
 import * as SessionLogDeepSeek from '@hackdevcode/dsh-session-log-deepseek'
@@ -60,7 +62,7 @@ class E2eAttachmentStore extends AttachmentStore {
     mediaTypes: ['image/png'],
   }
   readonly ref: ImageAttachmentRef = {
-    attachmentId: AttachmentId(`sha256:${randomBytes(32).toString('hex')}`),
+    attachmentId: brandString<AttachmentId>(`sha256:${randomBytes(32).toString('hex')}`),
     mediaType: 'image/png',
     bytes: TEST_PNG.byteLength,
     width: 256,
@@ -68,7 +70,7 @@ class E2eAttachmentStore extends AttachmentStore {
     name: 'files-api-e2e.png',
   }
   readonly version: RequestImageAttachment = {
-    variantId: ImageVariantId(`sha256:${randomBytes(32).toString('hex')}`),
+    variantId: brandString<ImageVariantId>(`sha256:${randomBytes(32).toString('hex')}`),
     attachment: this.ref,
     data: TEST_PNG,
     mediaType: 'image/png',
@@ -168,7 +170,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
       { ...message, content: [...message.content, { type: 'image', attachment }] },
     ]
     const reply = async () => {
-      const response = await assemble(ctx, { model, messages: history, reasoningEffort: ReasoningEffortId('high') })
+      const response = await assemble(ctx, { model, messages: history, reasoningEffort: brandString<ReasoningEffortId>('high') })
       expect(response.finish.kind, JSON.stringify(response.finish)).toBe('stop')
       history.push(response.message)
       return textOf(response).trim().toLowerCase()
@@ -195,7 +197,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
       const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
       if (method === 'POST' && url.pathname.endsWith('/files') && response.ok) {
         const value = await response.clone().json() as { id?: unknown }
-        if (typeof value.id === 'string') uploadedFile = Protocol.DeepSeekFileId(value.id)
+        if (typeof value.id === 'string') uploadedFile = brandString<Protocol.DeepSeekFileId>(value.id)
       }
       return response
     }
@@ -237,7 +239,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
     await ctx.plugin(SessionLogDeepSeek, { enabled: true })
     await ctx.plugin(PluginPackageInventoryDeepSeek)
     await ctx.plugin(LlmDeepSeek, { baseURL: Protocol.PUBLIC_BASE_URL, thinking: 'disabled' })
-    const session = ctx.sessions.create(SessionId('real-extension-fields'))
+    const session = ctx.sessions.create(brandString<SessionId>('real-extension-fields'))
     session.append('turn/start', { turn: 1 })
 
     const result = await assemble(ctx, {
@@ -296,7 +298,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
 
     const withThinking = await assemble(ctx,{
       model: FLASH,
-      reasoningEffort: ReasoningEffortId('low'),
+      reasoningEffort: brandString<ReasoningEffortId>('low'),
       messages: ask('Which is larger, 9.11 or 9.8? Answer with just the number.'),
       maxTokens: 2000,
     })
@@ -314,7 +316,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
       // Turn 1: the model must call the tool (and think before it).
       const first = await assemble(ctx,{
         model: FLASH,
-        reasoningEffort: ReasoningEffortId('max'),
+        reasoningEffort: brandString<ReasoningEffortId>('max'),
         messages: ask('What is the weather in Paris right now? Use the get_weather tool.'),
         tools: [weatherTool],
         maxTokens: 2000,
@@ -332,7 +334,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
       // block in history (the official thinking+tools passback rule).
       const second = await assemble(ctx,{
         model: FLASH,
-        reasoningEffort: ReasoningEffortId('max'),
+        reasoningEffort: brandString<ReasoningEffortId>('max'),
         messages: [
           ...ask('What is the weather in Paris right now? Use the get_weather tool.'),
           createMessage({
@@ -340,7 +342,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('llm-deepseek e2e (real API)', ()
             source: { kind: 'model', provider: 'deepseek-official', model: 'deepseek-v4-flash' },
           }),
           createToolResultMessage({
-            callId: ToolCallId(call!.id),
+            callId: brandString<ToolCallId>(call!.id),
             content: [{ type: 'text', text: 'Sunny, 22°C' }],
             isError: false,
           }),

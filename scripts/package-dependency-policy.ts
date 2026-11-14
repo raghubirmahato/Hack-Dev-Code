@@ -41,6 +41,7 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
   '@hackdevcode/dsh-typert-protocol',
   '@hackdevcode/dsh-util-code-language',
   '@hackdevcode/dsh-util-crypto',
+  '@hackdevcode/dsh-util-text-search',
   '@hackdevcode/dsh-util-values',
 ]
 
@@ -52,20 +53,24 @@ const DUPLICATE_SAFE_PACKAGES: readonly string[] = [
  */
 const SAFE_HOST_DEPENDENCY_EXPORTS = {
   '@hackdevcode/dsh-atomic-write': ['withFileLock', 'writeFileAtomic'],
-  '@hackdevcode/dsh-computer-use/brand': ['ComputerUseProviderName'],
-  '@hackdevcode/dsh-credentials': ['credentialKey'],
   '@hackdevcode/dsh-deque': ['Deque'],
+  // Builds a dispatcher from the resolved proxy policy; the caller owns and closes it.
+  '@hackdevcode/dsh-http-proxy': ['createRouteDispatcher'],
   // The Liveshare wire codec and identity helpers are stateless functions over caller-owned values.
   '@hackdevcode/dsh-experimental-liveshare-protocol': [
     'LIVESHARE_CAPABILITIES', 'LIVESHARE_PROTOCOL_VERSION', 'parseRelayFrame', 'parseShareAccessState',
     'parseTunnelWorkerCommand', 'parseTunnelWorkerEvent', 'rawText', 'sendFrame', 'unsupportedFrameRefusal',
     'viewerRequestFields', 'identityFromKey', 'identityKeyOf',
   ],
-  '@hackdevcode/dsh-llm': ['callConfigEquals'],
-  '@hackdevcode/dsh-session': ['SessionId'],
+  // The shipped profile templates are plain data; a consumer reads their bundle names only.
+  '@hackdevcode/dsh-official-bundles': ['PROFILE_TEMPLATES'],
+  // Messages and assembled blocks are plain data. Each caller owns its assembler.
+  '@hackdevcode/dsh-llm': ['BlockAssembler', 'callConfigEquals', 'createUserMessage'],
   '@hackdevcode/dsh-session-format': ['sessionFormatLogFilename'],
   '@hackdevcode/dsh-storage-domain': ['defineDomain'],
   '@hackdevcode/dsh-timeout': ['MAX_TIMER_DELAY_MS'],
+  // Both operate only on the caller's subprocess service and handle; the module memoizes only the binary path.
+  '@hackdevcode/dsh-util-ripgrep': ['readRipgrepLines', 'spawnRipgrep'],
   '@hackdevcode/schemastery': ['default'],
 } as const satisfies HostDependencyExports
 
@@ -73,22 +78,35 @@ const SAFE_HOST_DEPENDENCY_EXPORTS = {
 const PEER_REQUIRED_HOST_EXPORTS = {
   // Profile settings must match the installed Node provider's configuration schema.
   '@hackdevcode/dsh-ptc-runtime-node/configuration': ['resolvePersistentExecution'],
-  // CUA checks UserQuestionError and preserves AttachmentError from image admission.
-  '@hackdevcode/dsh-attachment': ['admitEncodedImages'],
+  // CUA mounts the installed provider and shares executor error classes with PTC.
+  '@hackdevcode/dsh-ptc-runtime-node': ['default'],
+  '@hackdevcode/dsh-tool-executor-ptc/run-code': ['RunCodeConfig', 'createRunCodeTool'],
+  // CUA checks UserQuestionError and preserves AttachmentError from image admission; longEdgeDimensions is pure
+  // arithmetic that rides the same peer.
+  '@hackdevcode/dsh-attachment': ['admitEncodedImages', 'longEdgeDimensions'],
   '@hackdevcode/dsh-user-questions': ['UserQuestionError'],
+  // The tool registry and every subclass rely on `instanceof` against one HarnessError class.
+  '@hackdevcode/dsh-error': ['HarnessError'],
   // `instanceof` checks need the translator's own class instance.
   '@hackdevcode/dsh-experimental-translator': ['TranslationError'],
   // Stateless; a safe classification would turn the forge panel's forge and worktree peers into dependencies.
   '@hackdevcode/dsh-experimental-forge': ['changeRequestKey'],
-  '@hackdevcode/dsh-experimental-worktree': ['generatedWorktreeName'],
+  '@hackdevcode/dsh-experimental-worktree': ['generatedWorktreeName', 'CREATED_RECORD', 'createdWorktreeSchema'],
   // The forge panel matches ctx.fs failures with `instanceof FsError`.
   '@hackdevcode/dsh-fs': ['FsError'],
-  '@hackdevcode/dsh-scope': ['carrierKeyOf', 'createScope', 'scopeOf', 'scopeTarget'],
+  '@hackdevcode/dsh-scope': ['carrierKeyOf', 'createScope', 'scopeOf', 'scopeParentOf', 'scopeTarget'],
   // appendPluginRecord writes through the Session class's private log; pluginRecordOf is stateless.
-  '@hackdevcode/dsh-session': ['SESSION_FORMAT_VERSION', 'appendPluginRecord', 'pluginRecordOf'],
+  // The DeepSeek chat importer validates its seed with the installed Session class before storing it.
+  '@hackdevcode/dsh-session': ['SESSION_FORMAT_VERSION', 'Session', 'appendPluginRecord', 'pluginRecordOf'],
   '@hackdevcode/dsh-session-persistence': ['SessionPersistenceNotFoundError'],
+  // Imported titles follow the installed title service's normalization.
+  '@hackdevcode/dsh-session-title': ['normalizeSessionTitle'],
+  // Error classes have instance identity; CUA and Liveshare throw the registry's own copy so `instanceof` against it matches.
+  '@hackdevcode/dsh-tools': ['defineTool', 'ToolArgsError', 'ToolContextUnavailableError'],
   // Readers recognize a deadline's TimeoutReason only by `instanceof` against their own copy.
-  '@hackdevcode/dsh-timeout': ['deadline'],
+  '@hackdevcode/dsh-timeout': ['deadline', 'timeoutOf'],
+  // Imported web tool results must render exactly like the installed web tools' results and cards.
+  '@hackdevcode/dsh-tool-web': ['fetchMetaFromValue', 'formatFetchOutput', 'formatSearchOutput', 'searchMetaFromValue'],
 } as const satisfies HostDependencyExports
 
 /** Exact import specifier to reviewed runtime exports. */

@@ -50,8 +50,6 @@ describe('release families', () => {
       .filter(member => member.directory.startsWith('packages/experimental/'))
       .map(member => member.name)).toEqual([
       '@hackdevcode/dsh-action-cards',
-      '@hackdevcode/dsh-experimental-agent-team-profile',
-      '@hackdevcode/dsh-experimental-agent-team',
       '@hackdevcode/dsh-experimental-api-speech-to-text',
       '@hackdevcode/dsh-experimental-auto-review',
       '@hackdevcode/dsh-experimental-badge-skill-bundle',
@@ -61,7 +59,6 @@ describe('release families', () => {
       '@hackdevcode/dsh-experimental-browser-use-stagehand-native',
       '@hackdevcode/dsh-experimental-claude-code-mods',
       '@hackdevcode/dsh-client-ui-action-cards',
-      '@hackdevcode/dsh-experimental-client-ui-agent-team',
       '@hackdevcode/dsh-experimental-client-ui-claude-code-mods',
       '@hackdevcode/dsh-experimental-client-ui-cot-translation',
       '@hackdevcode/dsh-client-ui-creation-recommendations',
@@ -74,8 +71,11 @@ describe('release families', () => {
       '@hackdevcode/dsh-experimental-cot-translation-bundle',
       '@hackdevcode/dsh-creation-recommendations',
       '@hackdevcode/dsh-cua-bundle',
-      '@hackdevcode/dsh-experimental-cua-macos',
+      '@hackdevcode/dsh-cua-macos',
+      '@hackdevcode/dsh-cua-mcp',
+      '@hackdevcode/dsh-cua-windows',
       '@hackdevcode/dsh-cua',
+      '@hackdevcode/dsh-deepseek-chat-import',
       '@hackdevcode/dsh-experimental-forge-bundle',
       '@hackdevcode/dsh-experimental-forge-github',
       '@hackdevcode/dsh-experimental-forge-session',
@@ -90,7 +90,6 @@ describe('release families', () => {
       '@hackdevcode/dsh-personalized-recommendations',
       '@hackdevcode/dsh-experimental-plugin-market-bundle',
       '@hackdevcode/dsh-plugin-recommendations',
-      '@hackdevcode/dsh-experimental-ptc-runtime-python',
       '@hackdevcode/dsh-experimental-ralph-bundle',
       '@hackdevcode/dsh-experimental-session-inspector',
       '@hackdevcode/dsh-experimental-session-search',
@@ -101,7 +100,8 @@ describe('release families', () => {
       '@hackdevcode/dsh-experimental-speech-to-text',
       '@hackdevcode/dsh-experimental-subagent-oar',
       '@hackdevcode/dsh-experimental-terminal-bundle',
-      '@hackdevcode/dsh-experimental-tool-agent-team',
+      '@hackdevcode/dsh-terminal-panel',
+      '@hackdevcode/dsh-timeline',
       '@hackdevcode/dsh-tool-ralph',
       '@hackdevcode/dsh-tool-session-query',
       '@hackdevcode/dsh-experimental-tool-subagent-oar',
@@ -264,7 +264,7 @@ describe('release families', () => {
     const dsh = member('apps/cli', '@hackdevcode/dsh')
     const providers = ON_DEMAND_BUNDLES.map(name => member(`packages/subagent/${name}`, name))
     const plan = releaseFamily('dsh').publishOrder([dsh, ...providers])
-    expect(plan.order.map(entry => entry.name)).toEqual([...ON_DEMAND_BUNDLES, dsh.name])
+    expect(plan.order.map(entry => entry.name)).toEqual([...ON_DEMAND_BUNDLES.toSorted(), dsh.name])
     expect(dsh.manifest).toEqual({})
     expect(plan.droppedPeerEdges).toEqual([])
   })
@@ -280,8 +280,8 @@ describe('release families', () => {
       peerDependencies: { '@hackdevcode/dsh': 'workspace:*' },
     }))
     const plan = releaseFamily('dsh').publishOrder([dsh, ...providers])
-    expect(plan.order.map(entry => entry.name)).toEqual([...ON_DEMAND_BUNDLES, dsh.name])
-    expect(plan.droppedPeerEdges).toEqual(ON_DEMAND_BUNDLES.map(name => ({ consumer: name, peer: dsh.name })))
+    expect(plan.order.map(entry => entry.name)).toEqual([...ON_DEMAND_BUNDLES.toSorted(), dsh.name])
+    expect(plan.droppedPeerEdges).toEqual(ON_DEMAND_BUNDLES.toSorted().map(name => ({ consumer: name, peer: dsh.name })))
   })
 
   it.each(['dependencies', 'optionalDependencies', 'peerDependencies'])(
@@ -402,16 +402,30 @@ describe('release families', () => {
     ])
   })
 
-  it('applies the harness payload policy to dsh and keeps upstream payloads for vendored packages', () => {
+  it('accepts the harness payload and keeps upstream payloads for vendored packages', () => {
     const dsh = releaseFamily('dsh')
     const vendor = releaseFamily('vendor')
     const harness = member('packages/a/library', '@hackdevcode/dsh-library')
     const vendored = member('vendor/cordis', '@hackdevcode/cordis')
 
-    expect(() => { dsh.validatePayload(harness, ['package/lib/index.js', 'package/src/index.ts']) })
-      .toThrow(/publishes source file/)
+    expect(() => { dsh.validatePayload(harness, ['package/lib/index.js', 'package/lib/index.js.map', 'package/src/index.ts']) }).not.toThrow()
     expect(() => { vendor.validatePayload(vendored, ['package/lib/index.js', 'package/src/index.ts']) }).not.toThrow()
     expect(() => { vendor.validatePayload(vendored, []) }).toThrow(/empty tarball/)
+  })
+
+  it('requires the installed package payload the staging hook supplies', () => {
+    const dsh = releaseFamily('dsh')
+    const installed = member('apps/cli', '@hackdevcode/dsh')
+
+    expect(() => { dsh.validatePayload(installed, ['package/lib/index.js', 'package/src/bin.ts']) })
+      .toThrow(/@hackdevcode\/dsh packed no documentation/)
+    expect(() => { dsh.validatePayload(installed, ['package/lib/index.js', 'package/docs/guide.md', 'package/src/bin.ts']) })
+      .toThrow(/@hackdevcode\/dsh packed no upgrade guide index/)
+    const docs = ['package/docs/guide.md', 'package/docs/upgrade-guide/README.md']
+    expect(() => { dsh.validatePayload(installed, ['package/lib/index.js', ...docs]) })
+      .toThrow(/@hackdevcode\/dsh packed no source/)
+    expect(() => { dsh.validatePayload(installed, ['package/lib/index.js', ...docs, 'package/src/bin.ts']) })
+      .not.toThrow()
   })
 
   it('drives the installed entry only for the family that publishes one', () => {

@@ -10,10 +10,11 @@ import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import type { Agent, AgentStatus } from '@hackdevcode/dsh-agent'
 import CommandRuntime from '@hackdevcode/dsh-commands'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import * as CommandFeedback from '@hackdevcode/dsh-command-feedback'
 import { getOrCreateAnonymousUserId } from '@hackdevcode/dsh-anonymous-user-id'
 import { unsupportedModel, unsupportedInbox } from '@hackdevcode/dsh-agent-loop-testkit'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 let root: string | undefined
 let context: Context | undefined
@@ -29,7 +30,7 @@ afterEach(async () => {
 /** Register one idle agent over a store-owned session, as an app's spine does. */
 async function agent(ctx: Context): Promise<Agent> {
   const scope = ctx.plugin(() => {})
-  const id = SessionId('feedback-loader-agent')
+  const id = brandString<SessionId>('feedback-loader-agent')
   const session = ctx.sessions.create(id)
   let status: AgentStatus = 'idle'
   const value: Agent = {

@@ -10,7 +10,7 @@ import { createMessage, createUserMessage } from '@hackdevcode/dsh-llm'
 import {
   SESSION_FORMAT_VERSION,
   Session,
-  SessionId,
+  type SessionId,
 } from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-session-title'
 import {
@@ -24,6 +24,7 @@ import {
   type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, pinBrowserClock, saveFailureShot, WEB_FIXTURE_TIME } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/markdown-images', import.meta.url))
 const UI_EXPECTED = fileURLToPath(new URL('./expected/markdown-images/ui.expected.md', import.meta.url))
@@ -82,7 +83,7 @@ async function stopServer(server: Server): Promise<void> {
 
 /** Build one closed session fixture with remote and local image Markdown. */
 function markdownImageFixture(remoteUrl: string, outsidePath: string): string {
-  const session = Session.create(SessionId('markdown-image-source'))
+  const session = Session.create(brandString<SessionId>('markdown-image-source'))
   const eventTimeOrigin = new Date().setHours(12, 0, 0, 0)
   session.append('turn/start', { turn: 1 })
   const user = session.append('user/message', createUserMessage({

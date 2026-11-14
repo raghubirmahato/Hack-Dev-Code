@@ -124,7 +124,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
 // re-exported here so every surface in this plugin reads one path; the
 // Settings plugin list inlines the same fold over this plugin's dictionaries.
 export { isBuiltInPreset, presetDisplayText } from '@hackdevcode/dsh-agent-preset-registry/display'
-export type { PresetDisplaySource, PresetDisplayText } from '@hackdevcode/dsh-agent-preset-registry/display'
+export type { PresetDisplaySource, PresetDisplayText } from '@hackdevcode/dsh-agent-preset-registry/types'
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {

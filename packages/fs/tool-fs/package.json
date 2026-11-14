@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-tool-fs",
   "description": "Model-facing filesystem tools (read, write, edit) over the Hack Dev Code filesystem seam (ctx.fs)",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -25,16 +25,23 @@
   "files": [
     "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "dependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "diff": "^9.0.0",
     "@hackdevcode/schemastery": "workspace:~",
-    "@hackdevcode/dsh-util-code-language": "workspace:*"
+    "@hackdevcode/dsh-util-code-language": "workspace:*",
+    "@hackdevcode/dsh-fs-patch": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*"
   },
   "peerDependencies": {
     "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*",
     "@hackdevcode/dsh-fs": "workspace:*",
     "@hackdevcode/dsh-llm": "workspace:*",
     "@hackdevcode/dsh-sandbox": "workspace:*",
@@ -51,6 +58,7 @@
     "@hackdevcode/dsh-agent-loop": "workspace:*",
     "@hackdevcode/dsh-agent-loop-testkit": "workspace:*",
     "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*",
     "@hackdevcode/dsh-fs": "workspace:*",
     "@hackdevcode/dsh-fs-local": "workspace:*",
     "@hackdevcode/dsh-fs-observation-policy": "workspace:*",
@@ -70,6 +78,7 @@
     "@hackdevcode/dsh-session-projection": "workspace:*",
     "@hackdevcode/dsh-scope": "workspace:*",
     "@hackdevcode/dsh-ptc-runtime": "workspace:*",
+    "@hackdevcode/dsh-fs-sandbox": "workspace:*",
     "@hackdevcode/dsh-working-directory": "workspace:*"
   }
 }

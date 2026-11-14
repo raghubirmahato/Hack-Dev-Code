@@ -6,11 +6,12 @@ import LlmRuntime, { BlockAssembler, createUserMessage } from '@hackdevcode/dsh-
 import type { StreamChunk } from '@hackdevcode/dsh-llm'
 import { PiAiAdapter } from '@hackdevcode/dsh-llm-pi-ai'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@hackdevcode/dsh-agent-loop-testkit'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import { defineContentToolFixture } from '@hackdevcode/dsh-tool-testkit'
 import { resolveProfiles } from '../src/config.ts'
 import { memoryAuth } from './auth-double.ts'
 import { anthropicFrame, anthropicMessageStart, closeMockServers, mockServer } from './mock-server.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 afterEach(closeMockServers)
 
@@ -175,7 +176,7 @@ describe('completed tool-call arguments through the public runtime', () => {
       isConcurrencySafe: () => true,
       async execute() { executions++; return [{ type: 'text', text: 'counted' }] },
     })))
-    const agent = await loop.create(SessionId('malformed-parallel'), { provider: 'fixture', model: 'm' })
+    const agent = await loop.create(brandString<SessionId>('malformed-parallel'), { provider: 'fixture', model: 'm' })
     const idle = new Promise<void>((resolve) => {
       const dispose = ctx.on('agent/status', ({ agent: subject, status }) => {
         if (subject === agent && status === 'idle') { dispose(); resolve() }

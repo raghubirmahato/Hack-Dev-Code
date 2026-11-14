@@ -38,6 +38,7 @@ export const RETIRED_BUNDLES: ReadonlySet<string> = new Set([
   // The Web composition mounts Schedule itself
   // ([upgrade guide](../../../../docs/upgrade-guide/v0.2.0-rc.2/schedule-bundle-retired/guide.md)).
   '@hackdevcode/dsh-experimental-schedule-bundle',
+  '@hackdevcode/dsh-experimental-agent-team-profile',
 ])
 
 /** The bundle list a `dsh plugin` init uses for a name with no shipped template. */
@@ -55,12 +56,13 @@ export const DEFAULT_PROFILE_BUNDLES: readonly string[] = ['@hackdevcode/dsh-bas
 export const OPTIONAL_BUNDLES: readonly string[] = [
   '@hackdevcode/dsh-personalized-recommendations',
   '@hackdevcode/dsh-cua-bundle',
+  '@hackdevcode/dsh-cua-mcp',
+  '@hackdevcode/dsh-timeline',
   '@hackdevcode/dsh-experimental-session-search',
   '@hackdevcode/dsh-experimental-ralph-bundle',
   '@hackdevcode/dsh-experimental-terminal-bundle',
   '@hackdevcode/dsh-experimental-badge-skill-bundle',
   '@hackdevcode/dsh-experimental-session-titles-bundle',
-  '@hackdevcode/dsh-experimental-agent-team-profile',
   '@hackdevcode/dsh-experimental-voice-input-bundle',
   '@hackdevcode/dsh-experimental-cot-translation-bundle',
   '@hackdevcode/dsh-experimental-auto-review',
@@ -69,6 +71,7 @@ export const OPTIONAL_BUNDLES: readonly string[] = [
   '@hackdevcode/dsh-experimental-plugin-market-bundle',
   '@hackdevcode/dsh-experimental-tool-worktree',
   '@hackdevcode/dsh-experimental-forge-bundle',
+  '@hackdevcode/dsh-deepseek-chat-import',
 ]
 
 /** Public DSH release members available through the ordinary on-demand bundle installer. */

@@ -9,7 +9,8 @@ import { Context } from '@hackdevcode/cordis'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import RemoteAccessService from '@hackdevcode/dsh-api-remote-access'
 import type SessionController from '@hackdevcode/dsh-api-session-controller'
-import SessionStore, { SESSION_FORMAT_VERSION, SessionId, SessionLogOffset, type SessionHeader } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
+import SessionStore, { SESSION_FORMAT_VERSION, type SessionId, SessionLogOffset, type SessionHeader } from '@hackdevcode/dsh-session'
 import * as JsonlSessionPersistence from '@hackdevcode/dsh-session-persistence-jsonl'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import SessionProjectionCache, { projectionCacheDomainSpec } from '@hackdevcode/dsh-session-projection-cache'
@@ -96,7 +97,7 @@ interface ViewObservation {
 }
 
 function headerOf(ordinal: number): SessionHeader {
-  return { version: SESSION_FORMAT_VERSION, id: SessionId(`projection-bench-${ordinal}`),
+  return { version: SESSION_FORMAT_VERSION, id: brandString<SessionId>(`projection-bench-${ordinal}`),
     createdAt: BASE_TIME + ordinal, cwd: CWD, isSeeded: false, delegationDepth: 0 }
 }
 

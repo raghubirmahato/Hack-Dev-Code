@@ -16,8 +16,9 @@ import { provideWorkingDirectoryFixture } from '@hackdevcode/dsh-agent-loop-test
 import { Context } from '@hackdevcode/cordis'
 import { createScope, type Scope } from '@hackdevcode/dsh-scope'
 import type { Agent } from '@hackdevcode/dsh-agent'
-import { SESSION_FORMAT_VERSION, Session, SessionId } from '@hackdevcode/dsh-session'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { SESSION_FORMAT_VERSION, Session, type SessionId } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
 import LocalFileSystem from '@hackdevcode/dsh-fs-local'
@@ -120,7 +121,7 @@ beforeEach(async () => {
   await ctx.plugin(LocalFileSystem, { cwd: root })
   await ctx.plugin(ToolFs)
 
-  const key = standInAgent(SessionId(session), root)
+  const key = standInAgent(brandString<SessionId>(session), root)
   let minted: Scope | undefined
   await ctx.plugin(Object.assign(
     (inner: Context) => { minted = createScope(inner, key) },
@@ -146,7 +147,7 @@ function call(name: string, args: unknown) {
   calls += 1
   return executeOneTool(ctx, {
     signal: testToolSignal,
-    callId: ToolCallId(`tier-${String(calls)}`),
+    callId: brandString<ToolCallId>(`tier-${String(calls)}`),
     name,
     arguments: args,
     agent: shared,

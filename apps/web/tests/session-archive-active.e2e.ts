@@ -13,7 +13,8 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Locator, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { ToolCallId, type StreamChunk } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId, StreamChunk } from '@hackdevcode/dsh-llm'
 import type { ReplayEntry } from '@hackdevcode/dsh-llm-replay'
 import type { SessionEvent, SessionId } from '@hackdevcode/dsh-session'
 import {
@@ -43,7 +44,7 @@ const WAIT_COMMAND = `node -e "const fs=require('node:fs'); fs.writeFileSync('st
  */
 function script(): ReplayEntry[] {
   const args = JSON.stringify({ command: WAIT_COMMAND, description: 'Wait a long time' })
-  const callId = ToolCallId('call_wait')
+  const callId = brandString<ToolCallId>('call_wait')
   const first: StreamChunk[] = [
     { type: 'block-start', index: 0, blockType: 'tool-call' },
     { type: 'tool-call-delta', index: 0, id: callId, name: 'bash', argumentsDelta: args },

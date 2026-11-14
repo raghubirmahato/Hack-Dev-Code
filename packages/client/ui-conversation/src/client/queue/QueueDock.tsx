@@ -10,7 +10,7 @@ import {
 } from '@hackdevcode/dsh-client-ui-primitives'
 import type { InboxState } from '@hackdevcode/dsh-agent/types'
 import type { QueueAction } from '@hackdevcode/dsh-api-session-controller/types'
-import type { MessageId } from '@hackdevcode/dsh-llm/brand'
+import type { MessageId } from '@hackdevcode/dsh-llm/types'
 import type { UserTextFacts } from '../index.ts'
 import { NS } from '../locales.ts'
 import css from './QueueDock.module.css'

@@ -4,7 +4,9 @@ import AgentRegistry from '@hackdevcode/dsh-agent'
 import LlmRuntime, { createUserMessage, markAgentLoopRequest } from '@hackdevcode/dsh-llm'
 import SessionStore, { type Session } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
-import SessionTitleService, { SessionTitleProviderId, type SessionTitleProviderRequest } from '@hackdevcode/dsh-session-title'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { SessionTitleProviderId } from '@hackdevcode/dsh-session-title/types'
+import SessionTitleService, { type SessionTitleProviderRequest } from '@hackdevcode/dsh-session-title'
 import { deepFreeze } from '@hackdevcode/dsh-util-values'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 
@@ -75,7 +77,7 @@ describe('SessionTitleService activation', () => {
     const requests: SessionTitleProviderRequest[] = []
     const provider = ctx.inject(['sessionTitle'], (owner) => {
       owner.sessionTitle.register({
-        id: SessionTitleProviderId('activation'), automatic: 'all-prompts',
+        id: brandString<SessionTitleProviderId>('activation'), automatic: 'all-prompts',
         async generate(request) {
           requests.push(request)
           return { title: 'Generated after activation', messageSeqs: request.messages.map(item => item.seq) }

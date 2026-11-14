@@ -10,6 +10,7 @@
  */
 
 import type { Context } from '@hackdevcode/cordis'
+import { brandString } from '@hackdevcode/dsh-brand'
 import { errorChain } from '@hackdevcode/dsh-llm'
 import type { Session, SessionEvent, SessionHeader, SessionId, SessionLogOffset } from '@hackdevcode/dsh-session'
 import {
@@ -19,7 +20,7 @@ import {
   SessionAlreadyOwnedError,
   SessionHandleClosedError,
   SessionPersistenceNotFoundError,
-  SessionPersistenceRevision,
+  type SessionPersistenceRevision,
   SessionReadOnlyError,
 } from '@hackdevcode/dsh-session-persistence'
 import type {
@@ -416,7 +417,7 @@ export class JsonlBackendTracker {
     this.writers.set(header.id, null)
     this.pending.set(header.id, {
       header,
-      revision: SessionPersistenceRevision(`memory:${this.name}:${++this.counter}`),
+      revision: brandString<SessionPersistenceRevision>(`memory:${this.name}:${++this.counter}`),
       inheritedEventCount,
     })
   }

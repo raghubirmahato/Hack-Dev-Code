@@ -25,7 +25,7 @@ import type {
   ComposerAttachment, ComposerFileAttachment, ComposerImageAttachment, DraftFileUpload,
 } from './contract/slots.ts'
 import type { QueueAction } from '@hackdevcode/dsh-api-session-controller/types'
-import type { MessageId } from '@hackdevcode/dsh-llm/brand'
+import type { MessageId } from '@hackdevcode/dsh-llm/types'
 import type { ComposerBlocks } from './contract/composer-blocks.ts'
 import type {
   DraftAttachmentId, DraftAttachmentSerializationResult, SessionInputResolver, SubmitAttachment, SubmitOutcome,

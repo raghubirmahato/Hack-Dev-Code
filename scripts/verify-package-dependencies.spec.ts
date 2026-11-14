@@ -235,6 +235,7 @@ describe('package dependency scope', () => {
       '@hackdevcode/dsh-typert-protocol',
       '@hackdevcode/dsh-util-code-language',
       '@hackdevcode/dsh-util-crypto',
+      '@hackdevcode/dsh-util-text-search',
       '@hackdevcode/dsh-util-values',
     ])
     expect(PACKAGE_DEPENDENCY_POLICY.safeHostDependencyExports['@hackdevcode/dsh-deque']).toEqual(['Deque'])
@@ -242,7 +243,7 @@ describe('package dependency scope', () => {
     expect(PACKAGE_DEPENDENCY_POLICY.safeHostDependencyExports['@hackdevcode/dsh-session/types']).toBeUndefined()
     expect(PACKAGE_DEPENDENCY_POLICY.safeHostDependencyExports['@hackdevcode/dsh-typert-protocol']).toBeUndefined()
     expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-scope']).toEqual([
-      'carrierKeyOf', 'createScope', 'scopeOf', 'scopeTarget',
+      'carrierKeyOf', 'createScope', 'scopeOf', 'scopeParentOf', 'scopeTarget',
     ])
     expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-typert-protocol']).toBeUndefined()
     expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-experimental-translator'])
@@ -250,11 +251,12 @@ describe('package dependency scope', () => {
     expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-experimental-forge'])
       .toEqual(['changeRequestKey'])
     expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-experimental-worktree'])
-      .toEqual(['generatedWorktreeName'])
+      .toEqual(['generatedWorktreeName', 'CREATED_RECORD', 'createdWorktreeSchema'])
     expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-fs']).toEqual(['FsError'])
     expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-session'])
-      .toEqual(['SESSION_FORMAT_VERSION', 'appendPluginRecord', 'pluginRecordOf'])
-    expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-timeout']).toEqual(['deadline'])
+      .toEqual(['SESSION_FORMAT_VERSION', 'Session', 'appendPluginRecord', 'pluginRecordOf'])
+    expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-session-title']).toEqual(['normalizeSessionTitle'])
+    expect(PACKAGE_DEPENDENCY_POLICY.peerRequiredHostExports['@hackdevcode/dsh-timeout']).toEqual(['deadline', 'timeoutOf'])
   })
 
   it('discovers the Client directory, dsh.client declarations, and configured Host packages', () => {

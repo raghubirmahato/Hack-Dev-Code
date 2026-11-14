@@ -5,11 +5,11 @@
  * @module @hackdevcode/dsh-jobs/types
  */
 
-import type { SessionEventMap, SessionId } from '@hackdevcode/dsh-session'
+import type { SessionEventMap, SessionId } from '@hackdevcode/dsh-session/types'
 import type { JobId } from './brand.ts'
 import type { JobChannel, JobChunk, JobKind, JobView } from './view.ts'
 
-export { JobId } from './brand.ts'
+export type { JobId } from './brand.ts'
 export type { JobChannel, JobChunk, JobKind, JobKindMap, JobStatus, JobView } from './view.ts'
 
 /** Tool dispatch that created a job; nested calls retain their root invocation. */

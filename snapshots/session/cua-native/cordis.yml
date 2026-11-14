@@ -31,7 +31,7 @@
     - id: computer-use
       name: '@hackdevcode/dsh-computer-use'
     - id: cua-native
-      name: '@hackdevcode/dsh-experimental-cua-macos'
+      name: '@hackdevcode/dsh-cua-macos'
       config:
         agentPreset: false
         helperPath: !!js process.cwd() + '/native-helper.mjs'

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { Session, SessionId, SessionLogOffset, type SessionEvent, type SessionHeader } from '@hackdevcode/dsh-session'
+import { Session, type SessionId, SessionLogOffset, type SessionEvent, type SessionHeader } from '@hackdevcode/dsh-session'
 import { sessionFormatCatalog } from '@hackdevcode/dsh-session-format-catalog'
 import type { SessionFormatEvent } from '@hackdevcode/dsh-session-format'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 type Row = { type: string; data: Record<string, unknown>; surfaceOp?: unknown; sourceEventSeqs?: number[]; ignorable?: true }
 const row = (type: string, data: Record<string, unknown>): Row => ({ type, data })
@@ -31,7 +32,7 @@ function reopen(rows: readonly Row[], inherited = 0, seeded = false) {
   }
   const artifact = restore.finish()
   expect(artifact.inheritedEventCount).toBe(inherited)
-  const session = Session.fromRestore(SessionId(artifact.header.id), artifact.events as SessionEvent[], artifact.header as unknown as SessionHeader, SessionLogOffset(inherited), 'detached')
+  const session = Session.fromRestore(brandString<SessionId>(artifact.header.id), artifact.events as SessionEvent[], artifact.header as unknown as SessionHeader, SessionLogOffset(inherited), 'detached')
   return { artifact, messages: session.deriveMessages() }
 }
 

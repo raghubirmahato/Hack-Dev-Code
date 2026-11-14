@@ -3,7 +3,7 @@ import { useCallback, useId, useMemo, useState, type ReactNode } from 'react'
 import { Button } from '@hackdevcode/dsh-client-ui-primitives'
 import type { HostObservable, InjectFace, PropsLocale, PropsRuntime, Translate } from '@hackdevcode/dsh-client-ui-slots'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
-import type { ToolCallId } from '@hackdevcode/dsh-llm/brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import type {
   ActionCardDecision, ActionCardFields, ActionCardProposal, ActionCardResult, ActionCardView,
 } from '@hackdevcode/dsh-action-cards/types'

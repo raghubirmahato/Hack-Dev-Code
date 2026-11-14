@@ -14,9 +14,10 @@ import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import Include from '@hackdevcode/cordis-plugin-include'
 import { createAssistantMessage, createUserMessage } from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import * as SessionTurnOutlinePlugin from '@hackdevcode/dsh-session-turn-outline'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 let root: string | undefined
 let context: Context | undefined
@@ -70,7 +71,7 @@ describe('real Loader composition', () => {
       .map(entry => entry.options.name)
     expect(unloaded).toEqual([])
 
-    const session = loaded.sessions.create(SessionId('composed'))
+    const session = loaded.sessions.create(brandString<SessionId>('composed'))
     const boundary = session.append('turn/start', { turn: 1 }).seq
     session.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'composed prompt' }],

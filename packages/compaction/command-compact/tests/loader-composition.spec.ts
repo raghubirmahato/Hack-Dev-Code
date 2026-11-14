@@ -8,8 +8,9 @@ import Loader from '@hackdevcode/cordis-plugin-loader'
 import Include from '@hackdevcode/cordis-plugin-include'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import CommandRuntime from '@hackdevcode/dsh-commands'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { CompactionId } from '@hackdevcode/dsh-compaction/types'
 import {
-  CompactionId,
   CompactionEngine,
   type CompactionAgentContext,
   type CompactionResult,
@@ -17,9 +18,9 @@ import {
   type ManualCompactAgentContext,
 } from '@hackdevcode/dsh-compaction'
 import * as commandCompact from '@hackdevcode/dsh-command-compact'
-import { Session, SessionId, SessionSeq } from '@hackdevcode/dsh-session'
+import { Session, type SessionId, SessionSeq } from '@hackdevcode/dsh-session'
 
-const COMPACTION_ID = CompactionId('loader-command-compact-test')
+const COMPACTION_ID = brandString<CompactionId>('loader-command-compact-test')
 
 const RESULT: CompactionResult = {
   compactionId: COMPACTION_ID,
@@ -112,7 +113,7 @@ describe('command-compact real Loader composition', () => {
     })
     await context.loader.await()
 
-    const session = Session.create(SessionId('loader-command-compact'))
+    const session = Session.create(brandString<SessionId>('loader-command-compact'))
     const agent = {
       session,
       status: 'idle',

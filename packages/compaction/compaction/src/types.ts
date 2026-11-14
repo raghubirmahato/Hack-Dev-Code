@@ -8,7 +8,7 @@
  */
 
 import type { ContentBlock, TokenUsage } from '@hackdevcode/dsh-llm'
-import type { CommandId } from '@hackdevcode/dsh-commands/brand'
+import type { CommandId } from '@hackdevcode/dsh-commands/types'
 import type { SessionSeq } from '@hackdevcode/dsh-session/types'
 import type { CompactionId } from './brand.ts'
 
