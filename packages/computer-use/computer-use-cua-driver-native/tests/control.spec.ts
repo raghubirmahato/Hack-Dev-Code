@@ -105,6 +105,17 @@ describe('waiting for the screen to settle', () => {
   })
 })
 
+describe('moving a window', () => {
+  it('says where the window manager put a window that did not land where it was asked', async () => {
+    const { backend } = fakeDesktop()
+    await mount(backend)
+    // The fake window manager leaves windows where they are, like a top bar or work area pushing them back.
+    expect(text(await call('desktop_window', { action: 'move', handle: 2, x: 1000, y: 0 }))).not.toContain('placed it')
+    expect(text(await call('desktop_window', { action: 'move', handle: 2, x: 50, y: 60 })))
+      .toContain('The window manager placed it at (1000, 0) instead of (50, 60), for example below a top bar; use the position above.')
+  })
+})
+
 describe('window under a point', () => {
   it('reads the X11 stacking order and picks the topmost window containing the point', () => {
     expect(parseStacking('_NET_CLIENT_LIST_STACKING: window id # 0x1e00003, 0x2200007\n')).toEqual([0x1e00003, 0x2200007])

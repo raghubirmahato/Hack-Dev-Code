@@ -64,7 +64,7 @@ describe.runIf(process.platform === 'linux' && process.env['HACKDEV_LIVE_DESKTOP
       expect.soft(typed.text).toContain('Verified')
 
       const found = await call('desktop_element', { action: 'find', role: 'Edit', window: handle })
-      expect.soft(found.text).toMatch(/=\[\d+\] Edit/u)
+      expect.soft(found.text).toMatch(/\[\d+\] Edit = "hackdev live check"/u)
 
       const settled = await call('desktop_window', { action: 'wait', stable: true, handle, quiet_ms: 600, timeout_ms: 10_000 })
       expect.soft(settled.text).toContain('stayed the same')
@@ -85,7 +85,7 @@ describe.runIf(process.platform === 'linux' && process.env['HACKDEV_LIVE_DESKTOP
       if (handle !== undefined && Number.isFinite(handle)) {
         await call('desktop_sequence', { steps: [
           { action: 'close', handle },
-          { action: 'element', element_action: 'click', name: 'Don\'t Save', optional: true, timeout_ms: 3000 },
+          { action: 'element', element_action: 'click', name: 'Don\'t Save', title: 'Save Changes', optional: true, timeout_ms: 3000 },
           { action: 'wait', title: TITLE, gone: true, timeout_ms: 5000, optional: true },
         ] }).catch(() => undefined)
       }

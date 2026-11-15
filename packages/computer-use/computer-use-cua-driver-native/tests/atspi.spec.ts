@@ -84,8 +84,29 @@ describe.skipIf(PYTHON === undefined)('AT-SPI controls script', () => {
       '    [6] ListItem "Red" @(110,110)',
       '    [7] ListItem "Blue" @(110,130) (selected)',
       '  [8] Button "Apply" @(640,565)',
-      '  [9] Button "Advanced"',
+      '(1 more controls are hidden, such as the items of closed menus; open the menu, or find them by name)',
     ])
+  })
+
+  it('keeps the items of closed menus out of a read, so the editor after a long menu bar is still listed', async () => {
+    // Like Mousepad on GNOME: a menu bar whose closed menus hold hundreds of items, then the text area. Each element
+    // lists up to 300 children, so the menu stays under that.
+    const shown = ['sensitive', 'showing']
+    const items = Array.from({ length: 250 }, (_, index) => ({ name: `Filetype ${String(index)}`, role: 'menu item', states: ['sensitive'] }))
+    writeFileSync(treeFile, JSON.stringify([{ pid: 50, children: [{ name: 'Untitled 1 - Mousepad', role: 'frame', states: shown, box: [0, 0, 700, 480], children: [
+      { name: 'File', role: 'menu', states: shown, box: [0, 30, 40, 20], children: items },
+      { role: 'text', text: 'hackdev live check', states: [...shown, 'editable', 'focused'], box: [0, 60, 700, 400], editable: true },
+    ] }] }]))
+    const out = (await python(atspiArgs('read', 50, 'Untitled 1 - Mousepad'))).trimEnd().split('\n')
+    expect(out).toEqual([
+      '  [1] MenuItem "File" @(20,40)',
+      '  [252] Edit = "hackdev live check" @(350,260) (focused)',
+      '(250 more controls are hidden, such as the items of closed menus; open the menu, or find them by name)',
+    ])
+    // The hidden items keep their numbers for find and act.
+    const found = (await python(atspiArgs('find', 50, 'Untitled 1 - Mousepad', 'filetype 7', '', '', '15'))).trim().split('\n')
+    expect(found[0]).toBe('=[9] MenuItem "Filetype 7"')
+    expect(found[1]).toBe('~[72] MenuItem "Filetype 70"')
   })
 
   it('finds controls by name, type and accessible id, exact matches first', async () => {

@@ -81,6 +81,12 @@ def states(node):
         pass
     return ' (' + ', '.join(out) + ')' if out else ''
 
+def showing(node):
+    try:
+        return node.get_state_set().contains(Atspi.StateType.SHOWING)
+    except Exception:
+        return False
+
 def centre(node):
     try:
         s = node.get_state_set()
@@ -169,8 +175,15 @@ def main():
         sys.exit('no accessible window for this process; the app may not expose accessibility')
     numbered, more = walk(frame)
     if mode == 'read':
+        # Toolkits such as GTK expose every closed menu's items too; a read lists what is on screen (keeping the
+        # shared numbers) so the window's own controls are not crowded out. A tree that marks nothing as showing
+        # is listed whole.
+        visible = set(index for index, (node, depth, line) in enumerate(numbered, 1) if showing(node))
+        hidden = len(numbered) - len(visible) if visible else 0
         out, seen, size = [], set(), 0
         for index, (node, depth, line) in enumerate(numbered, 1):
+            if visible and index not in visible:
+                continue
             if line in seen:
                 continue
             seen.add(line)
@@ -182,6 +195,8 @@ def main():
             size += len(row) + 1
         if more:
             out.append('... more elements were not read')
+        if hidden:
+            out.append('(' + str(hidden) + ' more controls are hidden, such as the items of closed menus; open the menu, or find them by name)')
         print('\n'.join(out))
     elif mode == 'find':
         name, role, wanted_id, limit = clean(sys.argv[4]).lower(), sys.argv[5].strip().lower(), sys.argv[6].strip(), int(sys.argv[7])

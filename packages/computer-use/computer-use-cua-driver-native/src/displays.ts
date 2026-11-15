@@ -2259,7 +2259,10 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     const kept = Math.abs(now.width - width) > 24 || Math.abs(now.height - height) > 24
       ? ` The app kept ${String(now.width)}x${String(now.height)} instead of ${String(width)}x${String(height)}; it may have a minimum or fixed size.`
       : ''
-    return `Moved; now ${describeWindow(now)}.${kept}`
+    const placed = Math.abs(now.x - x) > 24 || Math.abs(now.y - y) > 24
+      ? ` The window manager placed it at (${String(now.x)}, ${String(now.y)}) instead of (${String(x)}, ${String(y)}), for example below a top bar; use the position above.`
+      : ''
+    return `Moved; now ${describeWindow(now)}.${kept}${placed}`
   }
   /** Start an app by name and report the window it opened. */
   const launchApp = async (app: string, signal?: AbortSignal): Promise<string> => {
