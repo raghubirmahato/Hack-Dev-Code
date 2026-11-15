@@ -1233,11 +1233,11 @@ export const X11_GEOMETRY = 'for id in "$@"; do '
  * borders), and its content area is kept for captures.
  * @param windows - windows from wmctrl.
  * @param geometry - X11_GEOMETRY output; a window it does not cover keeps wmctrl's numbers.
- * @returns the windows, and the content area of each corrected one.
+ * @returns the windows, and the content area and frame extents of each corrected one.
  */
 export function applyX11Geometry(
   windows: readonly WindowInfo[], geometry: string,
-): { windows: WindowInfo[]; clients: Map<number, CaptureArea> } {
+): { windows: WindowInfo[]; clients: Map<number, CaptureArea>; frames: Map<number, FrameExtents> } {
   const found = new Map<number, number[]>()
   for (const line of geometry.split(/\r?\n/u)) {
     const [id, ...numbers] = line.trim().split(/\s+/u)
@@ -1247,14 +1247,24 @@ export function applyX11Geometry(
     found.set(Number.parseInt(id, 16), values)
   }
   const clients = new Map<number, CaptureArea>()
+  const frames = new Map<number, FrameExtents>()
   const placed = windows.map((window) => {
     const values = found.get(window.handle)
     if (values === undefined) return window
     const [x = 0, y = 0, left = 0, right = 0, top = 0, bottom = 0] = values.map(value => Number.isFinite(value) ? value : 0)
     clients.set(window.handle, { x, y, width: window.width, height: window.height })
+    frames.set(window.handle, { left, right, top, bottom })
     return { ...window, x: x - left, y: y - top, width: window.width + left + right, height: window.height + top + bottom }
   })
-  return { windows: placed, clients }
+  return { windows: placed, clients, frames }
+}
+
+/** The title bar and borders a window manager draws around a window's content, in pixels. */
+export interface FrameExtents {
+  left: number
+  right: number
+  top: number
+  bottom: number
 }
 
 /**
@@ -1528,10 +1538,13 @@ export function linuxBackend(
     const geometry = await run('sh', ['-c', X11_GEOMETRY, 'sh', ...listed.map(window => hex(window.handle))]).catch(() => '')
     const placed = applyX11Geometry(listed, geometry)
     clients = placed.clients
+    frames = placed.frames
     return placed.windows
   }
   /** The content area of each X11 window as last listed, which captures and text recognition of a window cover. */
   let clients: ReadonlyMap<number, CaptureArea> = new Map()
+  /** The frame each X11 window had as last listed; a move asks for the outer size, wmctrl sets the content size. */
+  let frames: ReadonlyMap<number, FrameExtents> = new Map()
   /** Read or operate the controls of one window through AT-SPI; see ATSPI_CONTROLS. */
   const accessible = async (handle: number, mode: 'read' | 'find' | 'point' | 'act', ...rest: string[]): Promise<string> => {
     const window = (await windows()).find(candidate => candidate.handle === handle)
@@ -1716,7 +1729,9 @@ export function linuxBackend(
         ['setfloating $W', `movewindowpixel exact ${int(x)} ${int(y)},$W`, `resizewindowpixel exact ${int(width)} ${int(height)},$W`],
         async () => {
           await helper('wmctrl', ['-ir', id, '-b', 'remove,maximized_vert,maximized_horz'], signal)
-          await helper('wmctrl', ['-ir', id, '-e', `0,${int(x)},${int(y)},${int(width)},${int(height)}`], signal)
+          const frame = frames.get(handle) ?? { left: 0, right: 0, top: 0, bottom: 0 }
+          const inner = `${int(Math.max(1, width - frame.left - frame.right))},${int(Math.max(1, height - frame.top - frame.bottom))}`
+          await helper('wmctrl', ['-ir', id, '-e', `0,${int(x)},${int(y)},${inner}`], signal)
         }, signal)
     },
     async launch(app) {
@@ -2007,6 +2022,7 @@ export const DISPLAY_GUIDANCE = `Whole-desktop tools use the real mouse and keyb
 - Act and check in one call: pass then_read: true to desktop_element, desktop_keys, desktop_type or a desktop_pointer click and the result includes what the window in front shows afterwards (the new dialog, the changed value, the error). Use it on every action whose outcome you need to know, instead of a separate read or screenshot.
 - When you know what success looks like, pass expect so the tool checks it: {"text":"Saved"} (text the window then shows), {"window_title":"Save As"} (a window that opens; add gone for one that closes) or {"changed":true}. The call waits for it (5 s by default) and fails with what is in front instead when it does not show, so a sequence stops before acting on the wrong window. Add retries (up to 3) to repeat a click, key press, scroll or drag that did not take; typing, launching, opening and toggling are never repeated. A failed or cancelled input action releases the modifier keys and mouse button it may have left pressed.
 - Wait for the screen, not a fixed time: desktop_window wait with stable: true returns once the window stops changing (a page loaded, an animation ended). Before long work in one window, reserve it with desktop_window reserve: until you release it, input that would land in another app is refused before it is sent, and other tasks cannot act in it. Pass onto to desktop_drag to name the window that must be under the drop point; the result names the windows at both ends and any the pointer crossed.
+- On Linux, press buttons and menu items with desktop_element invoke rather than click: it goes through accessibility, so it works even where the desktop keeps a dialog from taking focus.
 - If a desktop tool reports a missing helper, run desktop_setup: it lists what works here and the one command that installs the rest. Tell the person the command; installing needs their approval.
 - When something unexpected is in front (a dialog you did not open, a prompt, a different app), deal with it and continue: read it, choose the option that lets the task go on, and only stop for the person when it asks for a password, a payment or a permission that is theirs to give.
 - Things that may or may not be there (a "Don't save" prompt, a cookie banner, a first-run tip, an update dialog) should not stop the work: mark that desktop_sequence step optional and the sequence carries on when it is absent.`
@@ -2363,8 +2379,18 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
       signal?.throwIfAborted()
       await new Promise(resolve => setTimeout(resolve, 400))
       const fresh = (await backend.windows()).filter(window => !before.has(window.handle))
-      const likely = fresh.find(window => words.some(word => `${window.title} ${window.process}`.toLowerCase().includes(word))) ?? fresh[0]
-      if (likely !== undefined) return `${started}. New window: ${describeWindow(likely)}`
+      if (fresh.length === 0) continue
+      // Apps often show a prompt or splash first (a restore-session question, a start screen) and their main window a
+      // moment later: let the windows settle, report the largest new one as the app's window, and name the others.
+      await new Promise(resolve => setTimeout(resolve, LAUNCH_SETTLE_MS))
+      signal?.throwIfAborted()
+      const settled = (await backend.windows()).filter(window => !before.has(window.handle))
+      const pool = settled.length > 0 ? settled : fresh
+      const matching = pool.filter(window => words.some(word => `${window.title} ${window.process}`.toLowerCase().includes(word)))
+      const main = (matching.length > 0 ? matching : pool).toSorted((a, b) => b.width * b.height - a.width * a.height)[0] as WindowInfo
+      const others = pool.filter(window => window.handle !== main.handle)
+      return `${started}. New window: ${describeWindow(main)}`
+        + (others.length > 0 ? `. It also opened ${others.map(describeWindow).join('; ')}: a prompt there may need an answer first` : '')
     }
     const existing = (await backend.windows()).filter(window => words.some(word => `${window.title} ${window.process}`.toLowerCase().includes(word)))
     return `${started}, but no new window appeared within 10 s; it may still be loading, or it reused an open window.`
@@ -3196,6 +3222,9 @@ export interface ElementArgs {
   window?: number | undefined
   title?: string | undefined
 }
+
+/** How long a launch waits, once a new window appears, for the app to open its main window. */
+const LAUNCH_SETTLE_MS = 1200
 
 /** How long a window reservation lasts without input unless told otherwise. */
 const RESERVE_MS = 120_000

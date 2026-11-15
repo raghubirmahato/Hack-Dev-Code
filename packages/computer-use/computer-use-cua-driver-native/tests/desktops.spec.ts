@@ -105,7 +105,7 @@ describe('GNOME on Wayland without the extension or ydotoold', () => {
       if (file === 'gdbus') throw new Error('GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod')
       // As measured on Kali: the content at (80, 118) under a 38-pixel title bar, while wmctrl says (105, 181).
       if (file === 'sh' && args[1] === X11_GEOMETRY) return '0x2a00004 80 118 0 0 38 0\n'
-      if (file === 'wmctrl') return '0x02a00004  0 4100   105 181  700 480  kali  Untitled 1 - Mousepad\n'
+      if (file === 'wmctrl' && args[0] === '-lpG') return '0x02a00004  0 4100   105 181  700 480  kali  Untitled 1 - Mousepad\n'
       if (file === 'xprop') return '_NET_CLIENT_LIST_STACKING: window id # 0x2a00004\n'
       if (file === 'xdotool' && args[0] === 'getactivewindow') return String(0x2a00004)
       sent.push(`${file} ${file === 'sh' ? args.slice(3).join(' ') : args.join(' ')}`)
@@ -124,10 +124,14 @@ describe('GNOME on Wayland without the extension or ydotoold', () => {
     expect((await backend.windows())[0]).toMatchObject({ x: 80, y: 80, width: 700, height: 518 })
     expect(await backend.windowAt?.(100, 90)).toBe(0x2a00004)
     expect(await backend.windowAt?.(1500, 800)).toBe(0)
+    // A move asks for the outer size, title bar included; wmctrl sets the content size.
+    await backend.place(0x2a00004, 80, 80, 700, 480)
     expect(sent).toEqual([
       `sh mousepad --disable-server ${X11_APP_ENV.join(' ')}`,
       'xdotool key --clearmodifiers ctrl+s',
       'xdotool mousemove --sync 100 120 click --repeat 1 1',
+      'wmctrl -ir 0x2a00004 -b remove,maximized_vert,maximized_horz',
+      'wmctrl -ir 0x2a00004 -e 0,80,80,700,442',
     ])
   })
 

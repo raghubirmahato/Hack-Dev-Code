@@ -105,6 +105,23 @@ describe('waiting for the screen to settle', () => {
   })
 })
 
+describe('starting an app', () => {
+  it('reports the main window that follows a first prompt, and names a prompt that stays', async () => {
+    const { backend, windows } = fakeDesktop()
+    // Like Mousepad after a crash: a small restore prompt first, the editor a moment later.
+    backend.launch = async (app) => {
+      setTimeout(() => { windows.push({ handle: 9, pid: 90, process: 'mousepad', title: 'Mousepad', x: 600, y: 300, width: 570, height: 177, minimized: false, foreground: true }) }, 50)
+      setTimeout(() => { windows.push({ handle: 10, pid: 90, process: 'mousepad', title: 'Untitled 1 - Mousepad', x: 25, y: 92, width: 700, height: 518, minimized: false, foreground: false }) }, 500)
+      return `Started ${app}`
+    }
+    await mount(backend)
+    const opened = text(await call('desktop_open', { app: 'mousepad' }))
+    expect(opened).toContain('New window: handle 10 pid 90 mousepad \\"Untitled 1 - Mousepad\\"')
+    expect(opened).toContain('It also opened handle 9 pid 90 mousepad \\"Mousepad\\" 570x177')
+    expect(opened).toContain('a prompt there may need an answer first')
+  })
+})
+
 describe('moving a window', () => {
   it('says where the window manager put a window that did not land where it was asked', async () => {
     const { backend } = fakeDesktop()

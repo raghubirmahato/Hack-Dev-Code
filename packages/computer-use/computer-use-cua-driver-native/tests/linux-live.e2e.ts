@@ -91,7 +91,7 @@ describe.runIf(process.platform === 'linux' && process.env['HACKDEV_LIVE_DESKTOP
       if (handle !== undefined && Number.isFinite(handle)) {
         await call('desktop_sequence', { steps: [
           { action: 'close', handle },
-          { action: 'element', element_action: 'click', name: 'Don\'t Save', title: 'Save Changes', optional: true, timeout_ms: 3000 },
+          { action: 'element', element_action: 'invoke', name: 'Don\'t Save', title: 'Save Changes', optional: true, timeout_ms: 3000 },
           { action: 'wait', title: TITLE, gone: true, timeout_ms: 5000, optional: true },
         ] }).catch(() => undefined)
       }

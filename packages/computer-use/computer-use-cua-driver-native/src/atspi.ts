@@ -162,7 +162,9 @@ def run_action(node, names):
         if action is None:
             return False
         for i in range(Atspi.Action.get_n_actions(action)):
-            if (Atspi.Action.get_action_name(action, i) or '').lower() in names:
+            # get_name gives the untranslated name; older AT-SPI has only the deprecated get_action_name.
+            label = getattr(Atspi.Action, 'get_name', None) or Atspi.Action.get_action_name
+            if (label(action, i) or '').lower() in names:
                 return Atspi.Action.do_action(action, i)
     except Exception:
         return False
