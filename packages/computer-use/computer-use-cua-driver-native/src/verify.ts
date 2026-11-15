@@ -105,3 +105,36 @@ export function describeExpectation(expectation: CheckedExpectation): string {
       return `the text of ${expectation.in === undefined ? 'the window in front' : `"${expectation.in}"`} changed`
   }
 }
+
+/**
+ * Poll a window until what it shows stops changing for `quietMs`: a page finished loading, an animation ended, a
+ * list stopped filling. White space differences do not count as change.
+ * @param read - reads what the window shows now: its text, or a fingerprint of its pixels when it has no text.
+ * @param quietMs - how long it must stay the same.
+ * @param timeoutMs - limit, 500 to 60000 milliseconds.
+ * @param signal - cancels the wait.
+ * @param intervalMs - polling interval.
+ * @returns a description of when it settled.
+ * @throws when the limit passes while it is still changing.
+ */
+export async function waitForStable(
+  read: () => Promise<string>, quietMs: number, timeoutMs: number, signal?: AbortSignal, intervalMs = 300,
+): Promise<string> {
+  if (!Number.isFinite(quietMs) || quietMs < 200 || quietMs > 10_000) throw new Error('quiet_ms must be between 200 and 10000')
+  if (!Number.isFinite(timeoutMs) || timeoutMs < 500 || timeoutMs > 60_000) throw new Error('timeout_ms must be between 500 and 60000')
+  const squash = (value: string): string => value.replace(/\s+/gu, ' ').trim()
+  const started = Date.now()
+  let last = squash(await read())
+  let since = Date.now()
+  for (;;) {
+    signal?.throwIfAborted()
+    if (Date.now() - since >= quietMs) return `The window stayed the same for ${String(quietMs)} ms, ${String(Date.now() - started)} ms after the wait began.`
+    if (Date.now() - started >= timeoutMs) throw new Error(`the window was still changing after ${String(timeoutMs)} ms`)
+    await new Promise(resolve => setTimeout(resolve, Math.min(intervalMs, Math.max(1, quietMs - (Date.now() - since)))))
+    const now = squash(await read())
+    if (now !== last) {
+      last = now
+      since = Date.now()
+    }
+  }
+}

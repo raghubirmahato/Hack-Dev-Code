@@ -114,11 +114,12 @@ The desktop tools work on Windows and on Linux with X11 or Wayland; macOS uses i
 | Tool | Does |
 |---|---|
 | `desktop_screenshot` | Captures one window, a display, a region or the whole desktop and returns the image with its coordinate mapping. On Windows a window behind others is captured without bringing it forward. Optional OCR. |
-| `desktop_window` | Lists windows, including the taskbar and hidden tray icons; reads a window's controls as numbered `[n]` entries with their centre points; focuses, moves, resizes, minimizes or closes; waits for a window or for text to appear. |
-| `desktop_element` | Clicks, invokes, toggles, expands, selects, sets values or focuses a control by number, name or automation id (Windows). It waits for a control that has not appeared yet (1.5 seconds by default, `timeout_ms` for slow apps). |
-| `desktop_pointer`, `desktop_drag`, `desktop_scroll` | Real mouse input on any monitor, with modifier keys. `press: down|up` holds a button over several steps. |
+| `desktop_window` | Lists windows, including the taskbar and hidden tray icons; reads a window's controls as numbered `[n]` entries with their centre points; focuses, moves, resizes, minimizes or closes; waits for a window, for text to appear, or (`stable`) for the window to stop changing; `reserve` keeps a window for one task, so input about to land in another app is refused before it is sent. |
+| `desktop_element` | Clicks, invokes, toggles, expands, selects, sets values or focuses a control by number, name or automation id (UI Automation on Windows, AT-SPI on Linux). It waits for a control that has not appeared yet (1.5 seconds by default, `timeout_ms` for slow apps). |
+| `desktop_pointer`, `desktop_drag`, `desktop_scroll` | Real mouse input on any monitor, with modifier keys. `press: down|up` holds a button over several steps. A drag names the windows at both ends and any it crosses; with `onto` it refuses before starting when that window is not under the drop point. |
 | `desktop_keys`, `desktop_type` | Key chords and text into the window in front. Long text is pasted through the clipboard, which is restored afterwards. `hold: down|up` keeps a chord pressed. |
 | `desktop_ocr` | The text on screen with the centre point of each line. |
+| `desktop_setup` | What works in this session and what is missing, with one install command (apt, dnf, pacman or zypper) and the other steps, such as starting `ydotoold`. |
 | `desktop_sequence` | Up to 30 of these steps in one call, stopping at the first failure. A step marked `optional` (a save prompt or a cookie banner that may not be there) is skipped when it fails. |
 
 Pass `then_read: true` to `desktop_element`, `desktop_keys`, `desktop_type` or a `desktop_pointer` click and the result also says what the window in front shows afterwards, so an action and its check take one call instead of two.

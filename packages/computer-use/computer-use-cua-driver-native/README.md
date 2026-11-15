@@ -44,21 +44,26 @@ Use an attachment store and a model route that explicitly declares image input t
 
 ### Whole-desktop tools
 
-On Windows and Linux (X11) the provider adds tools that act on the whole desktop with real input, beside the window-targeted driver tools:
+On Windows and Linux the provider adds tools that act on the whole desktop with real input, beside the window-targeted driver tools:
 
 | Tool | Does |
 |---|---|
 | `desktop_list_displays` | Lists every monitor with its position on the virtual desktop. |
 | `desktop_screenshot` | Captures one window, one display, a region or all of them, scaled to `max_dimension` (default 1280), and returns the image itself (through the MCP result adapter's durable attachments) with how image points map to desktop coordinates; with `ocr`, also the text recognized in it. On Windows a window behind others is captured without bringing it to the front. |
-| `desktop_pointer`, `desktop_drag`, `desktop_scroll` | Move, click (optionally holding ctrl, shift or alt), drag and turn the wheel at virtual-desktop coordinates on any display. `desktop_pointer` also takes `image_x`/`image_y`, a point in the latest screenshot, and converts it, and `press: down|up` to hold a button over several steps. Linux drags move in steps so drop targets see the pointer travel. |
+| `desktop_pointer`, `desktop_drag`, `desktop_scroll` | Move, click (optionally holding ctrl, shift or alt), drag and turn the wheel at virtual-desktop coordinates on any display. `desktop_pointer` also takes `image_x`/`image_y`, a point in the latest screenshot, and converts it, and `press: down|up` to hold a button over several steps. Linux drags move in steps so drop targets see the pointer travel. Before a drag, `desktop_drag` names the windows under its start and drop points and any other app's window the path crosses (Windows, and X11 through `xprop`); with `onto`, it refuses before pressing anything when that window is not under the drop point. |
 | `desktop_keys`, `desktop_type` | Press key chords (`win+r`, `ctrl+shift+esc`, `alt+tab enter`) and type any text into the foreground window, optionally focusing a window first; the result names the window that received the input. Text over 500 characters is pasted through the clipboard, whose every format is saved and restored (on Linux through xclip, falling back to typing). `desktop_keys` takes `hold: down|up` to keep one chord pressed, such as shift for a series of clicks. Anything still held is released when the tools unload. |
-| `desktop_window` | Lists top-level windows and dialogs; reads a window through UI Automation on Windows or AT-SPI on Linux (bounded to 300 elements, 8000 characters and 4 seconds), numbering each control `[n]` with its centre point and state (the taskbar, secondary taskbars and hidden tray icons are listed by name), and adding OCR text when the window exposes few controls; focuses, minimizes, maximizes, restores, closes or moves and resizes one by handle, title or process name; waits for a window to appear or close, or until a window shows a text. |
-| `desktop_element` | Acts on one control by its `[n]` number or by its visible name, type or automation id: find, click, double or right click at the point the app reports, or invoke, toggle, expand, collapse, select, set_value and focus through UI Automation patterns (falling back to a real click, or click, select all and type). A name no control has is looked for in the OCR text for click actions. Windows only; elsewhere it explains what to use instead. |
+| `desktop_window` | Lists top-level windows and dialogs; reads a window through UI Automation on Windows or AT-SPI on Linux (bounded to 300 elements, 8000 characters and 4 seconds), numbering each control `[n]` with its centre point and state (the taskbar, secondary taskbars and hidden tray icons are listed by name), and adding OCR text when the window exposes few controls; focuses, minimizes, maximizes, restores, closes or moves and resizes one by handle, title or process name; waits for a window to appear or close, until a window shows a text, or with `stable` until it stops changing for `quiet_ms` (its text, or a fingerprint of a small capture when it has none); and `reserve`s a window for one task or `release`s it (see [Reserve a window](#reserve-a-window)). |
+| `desktop_element` | Acts on one control by its `[n]` number or by its visible name, type or automation id: find, click, double or right click at the point the app reports, or invoke, toggle, expand, collapse, select, set_value and focus through UI Automation patterns on Windows or AT-SPI actions and interfaces on Linux (falling back to a real click, or click, select all and type). A name no control has is looked for in the OCR text for click actions. |
 | `desktop_ocr` | Reads the text on screen in one window, one display, a region or every display with the OCR engine built into Windows 10 and 11 (or tesseract on Linux), each line with its centre point. |
 | `desktop_open` | Starts an installed app by name (`app`: the Start-menu entry, else a command) and reports the window it opened; or opens a file, folder, URL or settings URI (`ms-settings:display`) with its default handler. |
-| `desktop_sequence` | Runs up to 30 of these actions (launch, open, keys, type, wait, read, ocr, element, window actions, move, click, drag, scroll, sleep) in order in one call, stopping at the first failure. |
+| `desktop_sequence` | Runs up to 30 of these actions (launch, open, keys, type, wait, read, ocr, element, window actions, move, click, drag, scroll, sleep, reserve, release) in order in one call, stopping at the first failure. |
+| `desktop_setup` | Lists every desktop feature as ready or missing in this session, with what provides it, the steps that are not packages (starting `ydotoold`, turning on assistive technologies, a GNOME extension) and one command that installs every missing package with the apt, dnf, pacman or zypper names. |
 
 Numbered controls and OCR give exact points, so a model that cannot see images (DeepSeek, most local models) never has to guess coordinates.
+
+#### Reserve a window
+
+`desktop_window` with `reserve` keeps one window for the calling task (the agent's session) for `seconds` (default 120, 10 to 600), renewed by each admitted action. Until it is released or the lease runs out, every input tool checks where its input would land before sending anything: the window under the point (Windows, X11) or the window in front. Input from another task into a reserved window is refused, and while a task holds reservations its own input into any other app's window is refused too, which catches a click about to land in a notification or a window that came to the front. Windows of the same process, such as its dialogs, count as the reserved window.
 
 #### Verify and retry
 
@@ -113,7 +118,9 @@ The provider reserves the shared computer-use registration before loading native
 | [src/index.ts](src/index.ts) | Native runtime ownership, catalog validation, tool registration, and provider guidance |
 | [src/displays.ts](src/displays.ts) | Whole-desktop tools and their Windows and Linux backends |
 | [src/keys.ts](src/keys.ts) | Key names to Windows virtual keys and X11 keysyms |
-| [src/verify.ts](src/verify.ts) | The `expect` argument: validation, the change wait, and its description in results |
+| [src/verify.ts](src/verify.ts) | The `expect` argument (validation, the change wait, its description in results) and the wait for a window to stop changing |
+| [src/atspi.ts](src/atspi.ts) | The AT-SPI script that reads, finds and operates Linux window controls in the Windows line format |
+| [src/setup.ts](src/setup.ts) | The setup probes for Linux and Windows and the report with its install command |
 | [src/powershell.ts](src/powershell.ts) | The reused PowerShell session with a line protocol and timeout restart |
 | [src/elevated.ts](src/elevated.ts) | Input operations and the administrator helper: its command table, launch and pipe client |
 | [src/snapshot.ts](src/snapshot.ts) | Bounded window snapshots and snapshot identity in result text |
@@ -173,7 +180,7 @@ On Windows and Linux a second guidance section explains when to use real input i
 
 #### Token effect
 
-The section and twelve tool definitions add request tokens while the `desktop` group is loaded; with `onDemand` they cost nothing until then. A window read now carries an index, a centre point and states per control, which makes it somewhat longer than before but replaces screenshots for most checks. The driver's full essential catalog is about 21K tokens per request, so only the core window tools join `desktop` and the rest wait in `desktop-more`. `desktop_sequence` replaces several model round trips with one call. The `expect` argument adds about 900 characters to each of seven tool definitions (about 1.5K tokens while the group is loaded) and one guidance line; a verified action saves the separate read or screenshot that checking it would otherwise take. Window lists grow with the number of open windows.
+The section and thirteen tool definitions add request tokens while the `desktop` group is loaded; with `onDemand` they cost nothing until then. A window read now carries an index, a centre point and states per control, which makes it somewhat longer than before but replaces screenshots for most checks. The driver's full essential catalog is about 21K tokens per request, so only the core window tools join `desktop` and the rest wait in `desktop-more`. `desktop_sequence` replaces several model round trips with one call. The `expect` argument adds about 900 characters to each of seven tool definitions (about 1.5K tokens while the group is loaded) and one guidance line; a verified action saves the separate read or screenshot that checking it would otherwise take. Window lists grow with the number of open windows.
 
 #### KV Cache effect
 
@@ -208,10 +215,12 @@ The package preserves the upstream driver's platform and application limits.
 - **Failed shutdown** — if native shutdown fails, the registration remains occupied. Restart the host before mounting another computer-use provider.
 - **Pinned upstream tools** — the driver's own tool schemas follow the pinned upstream SDK; the whole-desktop tools this package adds (`desktop_*`) are covered by its tests.
 - **Secure desktop** — no process can operate UAC prompts or the lock screen; the tools tell the agent to ask the person. Apps running as administrator are reachable through the approved administrator helper.
-- **Wayland windows** — GNOME and KDE do not let programs list or move their native windows, so there only X11 apps (through XWayland) are listed; input, screenshots, OCR and clipboard work on every compositor. Sway and Hyprland expose all windows.
-- **Linux window text** — needs the AT-SPI accessibility bus (`python3-gi gir1.2-atspi-2.0 at-spi2-core`) and apps that expose accessibility; the error names the packages.
+- **Wayland windows** — Sway and Hyprland expose all windows. GNOME does through the [Window Calls](https://extensions.gnome.org/extension/4724/window-calls/) extension and KDE through `kdotool`; without them only X11 apps (through XWayland) are listed. The desktop portals do not help here: they share a screen or window the person picks and pass input, but list no windows. Input, screenshots, OCR and clipboard work on every compositor. The GNOME and KDE paths follow those tools' documented output and are tested against it, not yet on a running GNOME or KDE desktop.
+- **Linux window text and controls** — need the AT-SPI accessibility bus (`python3-gi gir1.2-atspi-2.0 at-spi2-core`) and apps that expose accessibility; the error names the packages. Each call starts its own Python process, so a control's number is its place in one fixed walk of the window rather than a remembered element: numbers from a read stay valid while the window keeps the same controls, and a window whose controls changed must be read again. The script is tested against a stand-in for the bus, not yet on a running Linux desktop.
 - **macOS** — the whole-desktop tools are not registered; the driver's own tools cover macOS.
-- **Linux controls** — `desktop_element` needs UI Automation and is Windows-only; on Linux use the read text, `desktop_ocr` (tesseract, `sudo apt-get install -y tesseract-ocr`) and `desktop_pointer`. Linux paste needs `xclip`; without it long text is typed.
+- **Linux paste** — needs `xclip` (X11) or `wl-clipboard` (Wayland); without it long text is typed.
+- **Reservations** — they bind these tools only: the person, other programs and other computer-use providers can still change the window. Without a way to tell which window is under a point (Wayland), pointer input is checked against the window in front.
+- **Drag checks** — the path is sampled at seven points between the ends, so a narrow window the pointer only clips can go unnoticed; the drag itself is still sent as one gesture.
 - **OCR languages** — Windows OCR uses the languages installed for the person's profile; one without the optical character recognition feature reports how to add it.
 - **Elevated windows** — controls of an app running as administrator are read from the normal session, where Windows may hide some of them; clicks still go through the administrator helper.
 

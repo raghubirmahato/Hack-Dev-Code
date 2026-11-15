@@ -17,13 +17,17 @@ import { createMcpToolDefinition } from '@hackdevcode/dsh-mcp-client'
 import { defineTool } from '@hackdevcode/dsh-tools'
 import { parseKeys } from './keys.ts'
 import type { Chord } from './keys.ts'
-import { checkedExpectation, describeExpectation, waitForChange } from './verify.ts'
+import { checkedExpectation, describeExpectation, waitForChange, waitForStable } from './verify.ts'
+import { ATSPI_HELPERS, atspiArgs } from './atspi.ts'
+import { formatSetup, LINUX_PROBE, linuxSetup, parseProbe, WINDOWS_PROBE, windowsSetup } from './setup.ts'
+import type { SetupReport } from './setup.ts'
 import type { CheckedExpectation, Expectation } from './verify.ts'
 import { PowerShellHost } from './powershell.ts'
 import type { ScriptRunner } from './powershell.ts'
 import { ElevatedInput, opScript } from './elevated.ts'
 import type { HelperLauncher, InputOp } from './elevated.ts'
 import {
+  gvariantString, parseKdotoolGeometry, parseWindowCalls,
   WAYLAND_HELPERS, WAYLAND_PASTE, WAYLAND_SCREENSHOT, isWaylandSession, parseHyprClients, parseSwayTree, parseWlrRandr,
   ydotoolClickCode, ydotoolHoldArgs, ydotoolKeyArgs, ydotoolMoveArgs,
 } from './wayland.ts'
@@ -137,6 +141,10 @@ export interface DisplayBackend {
   ocrWindow?(window: WindowInfo): Promise<OcrLine[] | undefined>
   /** Capture one window as it draws itself, even behind others; undefined when it cannot draw itself so. */
   captureWindow?(path: string, window: WindowInfo, maxDimension: number): Promise<CaptureResult | undefined>
+  /** The handle of the top-level window under a desktop point (0 for none), where the platform can tell. */
+  windowAt?(x: number, y: number): Promise<number>
+  /** Which desktop features work in this session and what is missing for the rest. */
+  setup?(): Promise<SetupReport>
   /** Stop helper processes. */
   close(): void
 }
@@ -322,6 +330,11 @@ public static class Desk {
     if (ForegroundNeedsElevation()) return true;
     POINT p = new POINT(); p.X = x; p.Y = y;
     return NeedsElevation(GetAncestor(WindowFromPoint(p), 2));
+  }
+  /** The top-level window under a desktop point, or 0 when there is none. */
+  public static long TopAt(int x, int y) {
+    POINT p = new POINT(); p.X = x; p.Y = y;
+    return GetAncestor(WindowFromPoint(p), 2).ToInt64();
   }
   /** Press keys and keep them down (a held modifier, a held game key) until KeysUp. */
   public static void KeysDown(ushort[] keys) {
@@ -1094,6 +1107,12 @@ export function windowsBackend(run?: ScriptRunner, options: WindowsBackendOption
     async windows() {
       return jsonList<WindowInfo>(await ps('@([HackDev.Desk]::Windows()) | ConvertTo-Json -Compress'))
     },
+    async windowAt(x, y) {
+      return Number((await ps(`[HackDev.Desk]::TopAt(${int(x)}, ${int(y)})`)).trim()) || 0
+    },
+    async setup() {
+      return windowsSetup(parseProbe(await ps(WINDOWS_PROBE, 30_000)))
+    },
     async window(handle, action, signal) {
       await input([{ op: 'act', handle, action }], { handle }, signal)
     },
@@ -1191,6 +1210,33 @@ export function parseWmctrl(text: string, active?: number): WindowInfo[] {
 }
 
 /**
+ * Parse `xprop -root -notype _NET_CLIENT_LIST_STACKING`: the X11 window ids from bottom to top.
+ * @param text - xprop output, such as `_NET_CLIENT_LIST_STACKING: window id # 0x1e00003, 0x2200007`.
+ * @returns the ids, bottom first.
+ */
+export function parseStacking(text: string): number[] {
+  const list = /#\s*(.*)$/mu.exec(text)?.[1] ?? ''
+  return [...list.matchAll(/0x[0-9a-f]+/giu)].map(match => Number.parseInt(match[0], 16))
+}
+
+/**
+ * The topmost window containing a point, from the windows and their stacking order.
+ * @param windows - the windows with their geometry.
+ * @param stacking - window ids from bottom to top.
+ * @param x - desktop x.
+ * @param y - desktop y.
+ * @returns the handle, or 0 when no window contains the point.
+ */
+export function topWindowAt(windows: readonly WindowInfo[], stacking: readonly number[], x: number, y: number): number {
+  for (const id of stacking.toReversed()) {
+    const window = windows.find(candidate => candidate.handle === id)
+    const inside = window !== undefined && x >= window.x && x < window.x + window.width && y >= window.y && y < window.y + window.height
+    if (inside && !window.minimized) return id
+  }
+  return 0
+}
+
+/**
  * Wait for an operation, but let the caller stop waiting when its signal aborts; the operation itself goes on.
  * @param operation - the operation.
  * @param signal - the caller's signal.
@@ -1212,61 +1258,7 @@ function untilCancelled<T>(operation: Promise<T>, signal?: AbortSignal): Promise
 /** Packages that provide the Linux helpers on Debian and Ubuntu. */
 export const LINUX_HELPERS = 'sudo apt-get install -y x11-xserver-utils xdotool imagemagick wmctrl xdg-utils'
 
-/** Packages for reading window text through AT-SPI on Debian and Ubuntu. */
-export const ATSPI_HELPERS = 'sudo apt-get install -y python3-gi gir1.2-atspi-2.0 at-spi2-core'
-
-/**
- * Python that prints the accessible text of one window: the application with the given process id, its frame with
- * the given title (or its first frame), walked depth first within 300 elements, 8000 characters and 4 seconds, in
- * the same `Role: name = value` form as on Windows.
- */
-export const ATSPI_READER = String.raw`
-import sys, time
-import gi
-gi.require_version('Atspi', '2.0')
-from gi.repository import Atspi
-pid, title = int(sys.argv[1]), sys.argv[2]
-desktop = Atspi.get_desktop(0)
-frame = None
-for i in range(desktop.get_child_count()):
-    app = desktop.get_child_at_index(i)
-    try:
-        if app is None or app.get_process_id() != pid:
-            continue
-    except Exception:
-        continue
-    frames = [app.get_child_at_index(j) for j in range(app.get_child_count())]
-    frames = [f for f in frames if f is not None]
-    named = [f for f in frames if (f.get_name() or '') == title]
-    frame = (named or frames or [None])[0]
-    break
-if frame is None:
-    sys.exit('no accessible window for this process; the app may not expose accessibility')
-start, out, seen, count = time.time(), [], set(), 0
-stack = [(frame, 0)]
-while stack and count < 300 and sum(len(l) + 1 for l in out) < 8000 and time.time() - start < 4:
-    node, depth = stack.pop()
-    try:
-        role = (node.get_role_name() or '').title().replace(' ', '')
-        name = node.get_name() or ''
-        value = ''
-        text = node.get_text_iface() if hasattr(node, 'get_text_iface') else None
-        if text is not None:
-            value = Atspi.Text.get_text(text, 0, min(Atspi.Text.get_character_count(text), 2000)) or ''
-        line = role + ': ' + name + (' = ' + value if value and value != name else '')
-        if (name.strip() or value.strip()) and line not in seen:
-            seen.add(line)
-            out.append('  ' * min(depth, 8) + (line[:300] + '...' if len(line) > 300 else line))
-            count += 1
-        children = [node.get_child_at_index(k) for k in range(min(node.get_child_count(), 200))]
-        for child in reversed([c for c in children if c is not None]):
-            stack.append((child, depth + 1))
-    except Exception:
-        continue
-if stack:
-    out.append('... more elements were not read')
-print('\n'.join(out))
-`
+export { ATSPI_HELPERS } from './atspi.ts'
 
 const X11_BUTTONS: Readonly<Record<PointerButton, string>> = { left: '1', middle: '2', right: '3' }
 
@@ -1322,15 +1314,66 @@ export function linuxBackend(
   const offset = (value: number): string => (Math.round(value) < 0 ? '' : '+') + int(value)
   const has = (command: string): Promise<boolean> =>
     run('sh', ['-c', 'command -v "$1" >/dev/null 2>&1 && echo yes', 'sh', command]).then(out => out.trim() === 'yes', () => false)
-  /** The Wayland compositor whose own commands list and move windows, if any. */
-  let compositor: Promise<'sway' | 'hyprland' | 'xwayland'> | undefined
-  const whichCompositor = (): Promise<'sway' | 'hyprland' | 'xwayland'> => {
+  /**
+   * The Wayland compositor whose own commands list and move windows, if any: Sway, Hyprland, GNOME Shell with the
+   * Window Calls extension, or KWin through kdotool; otherwise only XWayland windows are reachable.
+   */
+  let compositor: Promise<'sway' | 'hyprland' | 'gnome' | 'kde' | 'xwayland'> | undefined
+  const whichCompositor = (): Promise<'sway' | 'hyprland' | 'gnome' | 'kde' | 'xwayland'> => {
     compositor ??= (async () => {
+      const desktop = (env['XDG_CURRENT_DESKTOP'] ?? '').toLowerCase()
       if ((env['SWAYSOCK'] ?? '').length > 0 && await has('swaymsg')) return 'sway'
       if ((env['HYPRLAND_INSTANCE_SIGNATURE'] ?? '').length > 0 && await has('hyprctl')) return 'hyprland'
+      if (desktop.includes('gnome') && await gnome('List').then(() => true, () => false)) return 'gnome'
+      if (desktop.includes('kde') && await has('kdotool')) return 'kde'
       return 'xwayland'
     })()
     return compositor
+  }
+  /**
+   * Call one method of the GNOME Window Calls extension and return the string it replies with; the actions reply
+   * with nothing, which gdbus prints as `()`.
+   */
+  const gnome = async (method: string, args: readonly string[] = [], signal?: AbortSignal): Promise<string> => {
+    const out = (await helper('gdbus', [
+      'call', '--session', '--dest', 'org.gnome.Shell', '--object-path', '/org/gnome/Shell/Extensions/Windows',
+      '--method', `org.gnome.Shell.Extensions.Windows.${method}`, ...args,
+    ], signal)).trim()
+    return out.length === 0 || out === '()' ? '' : gvariantString(out)
+  }
+  /** kdotool names windows by KWin's UUIDs; the tools need numbers, so each UUID gets one for this session. */
+  const kdeIds = new Map<number, string>()
+  const kdeHandles = new Map<string, number>()
+  const kdeHandle = (uuid: string): number => {
+    let handle = kdeHandles.get(uuid)
+    if (handle === undefined) {
+      handle = kdeHandles.size + 1
+      kdeHandles.set(uuid, handle)
+      kdeIds.set(handle, uuid)
+    }
+    return handle
+  }
+  const kdeId = (handle: number): string => {
+    const uuid = kdeIds.get(Math.trunc(handle))
+    if (uuid === undefined) throw new Error(`no window with handle ${String(handle)}; list the windows again`)
+    return uuid
+  }
+  /** Every KWin window kdotool finds, with its title, process and geometry. */
+  const kdeWindows = async (): Promise<WindowInfo[]> => {
+    const uuids = (await helper('kdotool', ['search', '--name', '.'])).split(/\s+/u).filter(uuid => uuid.length > 0)
+    const active = (await run('kdotool', ['getactivewindow']).catch(() => '')).trim()
+    return Promise.all(uuids.map(async (uuid): Promise<WindowInfo> => {
+      const [title, pid, geometry, process] = await Promise.all([
+        helper('kdotool', ['getwindowname', uuid]),
+        run('kdotool', ['getwindowpid', uuid]).catch(() => '0'),
+        helper('kdotool', ['getwindowgeometry', uuid]),
+        run('kdotool', ['getwindowclassname', uuid]).catch(() => ''),
+      ])
+      return {
+        handle: kdeHandle(uuid), pid: Number(pid.trim()) || 0, process: process.trim(), title: title.trim(),
+        ...parseKdotoolGeometry(geometry), minimized: false, foreground: uuid === active,
+      }
+    }))
   }
   const list = async (): Promise<DisplayInfo[]> => {
     if (wayland) {
@@ -1387,15 +1430,31 @@ export function linuxBackend(
         const active = await run('hyprctl', ['activewindow', '-j']).catch(() => '')
         return parseHyprClients(await helper('hyprctl', ['clients', '-j']), active)
       }
+      if (kind === 'gnome') return parseWindowCalls(await gnome('List'), id => gnome('Details', [String(id)]))
+      if (kind === 'kde') return kdeWindows()
       // Other compositors keep native windows private; XWayland windows are still listed through wmctrl.
       if ((env['DISPLAY'] ?? '').length === 0) {
-        throw new Error('this Wayland compositor does not let programs list its windows; Sway and Hyprland do, and on GNOME or KDE '
-          + 'windows of X11 apps are listed when XWayland runs. Use desktop_screenshot and desktop_ocr to see the screen, and '
-          + 'desktop_pointer and desktop_keys to act')
+        throw new Error('this Wayland compositor does not let programs list its windows; Sway and Hyprland do, GNOME does with the '
+          + 'Window Calls extension and KDE with kdotool (desktop_setup says how to add them), and otherwise windows of X11 apps are '
+          + 'listed when XWayland runs. Use desktop_screenshot and desktop_ocr to see the screen, and desktop_pointer and desktop_keys to act')
       }
     }
     const active = await run('xdotool', ['getactivewindow']).then(out => Number(out.trim()), () => undefined)
     return parseWmctrl(await helper('wmctrl', ['-lpG']), active)
+  }
+  /** Read or operate the controls of one window through AT-SPI; see ATSPI_CONTROLS. */
+  const accessible = async (handle: number, mode: 'read' | 'find' | 'point' | 'act', ...rest: string[]): Promise<string> => {
+    const window = (await windows()).find(candidate => candidate.handle === handle)
+    if (window === undefined) throw new Error(`no window with handle ${String(handle)}`)
+    try {
+      return await run('python3', atspiArgs(mode, window.pid, window.title, ...rest), 15_000)
+    } catch (error) {
+      const reason = String(error instanceof Error ? error.message : error)
+      // The script's own refusals (an unknown element, a control off screen) need no install hint.
+      if (/element \[\d+\]|unknown (?:element action|mode)/u.test(reason)) throw new Error(reason, { cause: error })
+      throw new Error(`${reason}. Window controls use the accessibility bus: install it with ${ATSPI_HELPERS} and make sure `
+        + 'assistive technologies are enabled in the desktop settings, or capture the window with desktop_screenshot.', { cause: error })
+    }
   }
   /** Run a window command through the compositor (Sway, Hyprland) or wmctrl. */
   const manage = async (
@@ -1494,7 +1553,30 @@ export function linuxBackend(
       await tool(['type', '--key-delay', '12', '--', text], ['type', '--clearmodifiers', '--delay', '12', '--', text], signal, 30_000 + text.length * 15)
     },
     windows,
+    // X11 keeps a stacking order; Wayland compositors do not tell clients which window is on top.
+    ...wayland ? {} : {
+      async windowAt(x: number, y: number): Promise<number> {
+        const stacking = parseStacking(await helper('xprop', ['-root', '-notype', '_NET_CLIENT_LIST_STACKING']))
+        return topWindowAt(await windows(), stacking, x, y)
+      },
+    },
     async window(handle, action, signal) {
+      const kind = wayland ? await whichCompositor() : 'xwayland'
+      if (kind === 'gnome') {
+        const method = { focus: 'Activate', restore: 'Activate', minimize: 'Minimize', maximize: 'Maximize', close: 'Close' }[action]
+        await gnome(method, [String(Math.trunc(handle))], signal)
+        return
+      }
+      if (kind === 'kde') {
+        const uuid = kdeId(handle)
+        if (action === 'maximize') {
+          await helper('kdotool', ['windowstate', '--add', 'MAXIMIZED_VERT', uuid], signal)
+          await helper('kdotool', ['windowstate', '--add', 'MAXIMIZED_HORZ', uuid], signal)
+        } else {
+          await helper('kdotool', [{ focus: 'windowactivate', restore: 'windowactivate', minimize: 'windowminimize', close: 'windowclose' }[action], uuid], signal)
+        }
+        return
+      }
       const id = hex(handle)
       if (action === 'focus' || action === 'restore') {
         await manage(handle, action === 'restore' ? 'scratchpad show, focus' : 'focus', ['focuswindow $W'], () => helper('wmctrl', ['-ia', id], signal).then(() => {}), signal)
@@ -1512,17 +1594,32 @@ export function linuxBackend(
       await helper('xdg-open', [target])
     },
     async readText(handle) {
-      const window = (await windows()).find(candidate => candidate.handle === handle)
-      if (window === undefined) throw new Error(`no window with handle ${String(handle)}`)
-      try {
-        return await run('python3', ['-c', ATSPI_READER, String(window.pid), window.title])
-      } catch (error) {
-        throw new Error(`${String(error instanceof Error ? error.message : error)}. Reading window text uses the accessibility bus: `
-          + `install it with ${ATSPI_HELPERS} and make sure assistive technologies are enabled in the desktop settings, `
-          + 'or capture the window with desktop_screenshot.', { cause: error })
-      }
+      return accessible(handle, 'read')
+    },
+    async findElements(handle, query) {
+      return accessible(handle, 'find', query.name ?? '', query.role ?? '', query.automationId ?? '', '15')
+    },
+    async elementPoint(handle, index) {
+      const [x, y] = (await accessible(handle, 'point', String(Math.trunc(index)))).trim().split(/\s+/u).map(Number)
+      if (x === undefined || y === undefined || !Number.isFinite(x) || !Number.isFinite(y)) throw new Error(`element [${String(index)}] has no position on screen`)
+      return { x, y }
+    },
+    async elementAction(handle, index, action, value) {
+      return accessible(handle, 'act', String(Math.trunc(index)), action, value ?? '')
     },
     async place(handle, x, y, width, height, signal) {
+      const kind = wayland ? await whichCompositor() : 'xwayland'
+      if (kind === 'gnome') {
+        await gnome('Unmaximize', [String(Math.trunc(handle))], signal).catch(() => '')
+        await gnome('MoveResize', [String(Math.trunc(handle)), int(x), int(y), int(width), int(height)], signal)
+        return
+      }
+      if (kind === 'kde') {
+        const uuid = kdeId(handle)
+        await helper('kdotool', ['windowmove', uuid, int(x), int(y)], signal)
+        await helper('kdotool', ['windowsize', uuid, int(width), int(height)], signal)
+        return
+      }
       const id = hex(handle)
       await manage(handle, `floating enable, move absolute position ${int(x)} ${int(y)}, resize set ${int(width)} ${int(height)}`,
         ['setfloating $W', `movewindowpixel exact ${int(x)} ${int(y)},$W`, `resizewindowpixel exact ${int(width)} ${int(height)},$W`],
@@ -1539,6 +1636,9 @@ export function linuxBackend(
           throw new Error(`could not start "${name}": ${String(error instanceof Error ? error.message : error)}. Pass the command name or the .desktop id of the app`, { cause: error })
         })
       return `Started ${name}`
+    },
+    async setup() {
+      return linuxSetup(parseProbe(await run('sh', ['-c', LINUX_PROBE], 30_000)), env, wayland)
     },
     async ocr(area) {
       const file = join(await mkdtemp(join(tmpdir(), 'hackdev-ocr-')), 'area.png')
@@ -1789,6 +1889,8 @@ export const DISPLAY_GUIDANCE = `Whole-desktop tools use the real mouse and keyb
 - Controls appear a moment after a window opens or a page loads. desktop_element waits for the control it was asked for (1.5 seconds by default; pass timeout_ms for slow apps, 0 to fail at once), so act on a control by name right after opening its window instead of sleeping or re-reading first.
 - Act and check in one call: pass then_read: true to desktop_element, desktop_keys, desktop_type or a desktop_pointer click and the result includes what the window in front shows afterwards (the new dialog, the changed value, the error). Use it on every action whose outcome you need to know, instead of a separate read or screenshot.
 - When you know what success looks like, pass expect so the tool checks it: {"text":"Saved"} (text the window then shows), {"window_title":"Save As"} (a window that opens; add gone for one that closes) or {"changed":true}. The call waits for it (5 s by default) and fails with what is in front instead when it does not show, so a sequence stops before acting on the wrong window. Add retries (up to 3) to repeat a click, key press, scroll or drag that did not take; typing, launching, opening and toggling are never repeated. A failed or cancelled input action releases the modifier keys and mouse button it may have left pressed.
+- Wait for the screen, not a fixed time: desktop_window wait with stable: true returns once the window stops changing (a page loaded, an animation ended). Before long work in one window, reserve it with desktop_window reserve: until you release it, input that would land in another app is refused before it is sent, and other tasks cannot act in it. Pass onto to desktop_drag to name the window that must be under the drop point; the result names the windows at both ends and any the pointer crossed.
+- If a desktop tool reports a missing helper, run desktop_setup: it lists what works here and the one command that installs the rest. Tell the person the command; installing needs their approval.
 - When something unexpected is in front (a dialog you did not open, a prompt, a different app), deal with it and continue: read it, choose the option that lets the task go on, and only stop for the person when it asks for a password, a payment or a permission that is theirs to give.
 - Things that may or may not be there (a "Don't save" prompt, a cookie banner, a first-run tip, an update dialog) should not stop the work: mark that desktop_sequence step optional and the sequence carries on when it is absent.`
 
@@ -1854,6 +1956,9 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     if (on === undefined) throw new Error(`(${String(x)}, ${String(y)}) is on no display; displays: ${displays.map(describe).join('; ')}`)
     return on
   }
+  /** The task a call belongs to: the session of the calling agent. */
+  const ownerOf = (execution: { readonly agent?: { readonly session: { readonly id: string } } | undefined }): string =>
+    execution.agent === undefined ? 'unattributed' : `session ${execution.agent.session.id}`
   const button = (value: string | undefined): PointerButton => {
     const chosen = value ?? 'left'
     if (chosen !== 'left' && chosen !== 'right' && chosen !== 'middle') throw new Error('button must be left, right or middle')
@@ -1903,6 +2008,46 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     heldChords.clear()
     heldButtons.clear()
   }, 'desktop.held-input')
+  /** Windows reserved by one task: handle → the owning session, the window as reserved, and when the lease ends. */
+  const reservations = new Map<number, { owner: string; window: WindowInfo; until: number }>()
+  /** Drop leases that ran out. */
+  const expire = (): void => {
+    const now = Date.now()
+    for (const [handle, held] of reservations) if (held.until <= now) reservations.delete(handle)
+  }
+  /**
+   * Refuse input that would land in the wrong window, before anything is sent: a window another task reserved, or,
+   * while this task holds reservations, any window of another app than the ones it reserved. Admitted input renews
+   * this task's leases.
+   * @param owner - the calling task.
+   * @param where - the point the input acts at, the window it acts on, or undefined for the window in front.
+   * @throws when the input would land in the wrong window.
+   */
+  const admit = async (owner: string, where: { x: number; y: number } | { handle: number } | undefined): Promise<void> => {
+    expire()
+    if (reservations.size === 0) return
+    const windows = await backend.windows()
+    let handle: number
+    if (where === undefined) handle = windows.find(window => window.foreground)?.handle ?? 0
+    else if ('handle' in where) handle = where.handle
+    else if (backend.windowAt === undefined) handle = windows.find(window => window.foreground)?.handle ?? 0
+    else handle = await backend.windowAt(Math.round(where.x), Math.round(where.y))
+    const receiving = windows.find(window => window.handle === handle)
+    const label = receiving === undefined ? (handle === 0 ? 'the desktop' : `an unlisted window (handle ${String(handle)})`) : describeWindow(receiving)
+    const other = reservations.get(handle)
+    if (other !== undefined && other.owner !== owner) {
+      throw new Error(`${label} is reserved by another task for ${String(Math.ceil((other.until - Date.now()) / 1000))} more seconds. Nothing was sent; wait for it, or work in another window.`)
+    }
+    const mine = [...reservations.values()].filter(held => held.owner === owner)
+    if (mine.length === 0) return
+    const allowed = mine.some(held => held.window.handle === handle || (receiving !== undefined && held.window.pid === receiving.pid))
+    if (!allowed) {
+      const names = mine.map(held => `"${held.window.title}" (handle ${String(held.window.handle)})`).join(', ')
+      throw new Error(`this task reserved ${names}, but the input would go to ${label}. Nothing was sent; bring the reserved window forward with desktop_window focus, or release it first.`)
+    }
+    const until = Date.now() + RESERVE_MS
+    for (const held of mine) held.until = until
+  }
   /**
    * Release what a failed or cancelled input action may have left pressed: the modifier keys and the action's mouse
    * buttons, except keys and buttons held on purpose with hold down or press down. Apps normally ignore the
@@ -2046,6 +2191,23 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     if (lines.length === 0) return text
     return `${text.length > 0 ? `${text}\n` : ''}The window exposes few controls; text recognized on screen (centre points for desktop_pointer):\n${formatOcr(lines)}`
   }
+  /**
+   * What one window shows, for telling whether it is still changing: its text, or a fingerprint of a small capture
+   * of it when it exposes no text (a canvas, a game, a video).
+   */
+  const fingerprint = async (handle: number | undefined, title: string | undefined, signal: AbortSignal): Promise<string> => {
+    const window = await chosenWindow(handle, title)
+    const text = await windowText(window, signal).catch(() => '')
+    if (text.trim().length > 0) return text
+    const directory = await mkdtemp(join(tmpdir(), 'hackdev-settle-'))
+    try {
+      const path = join(directory, 'window.png')
+      await backend.capture(path, window, 160)
+      return `pixels ${createHash('sha256').update(await readFile(path)).digest('hex')}`
+    } finally {
+      await rm(directory, { recursive: true, force: true }).catch(() => {})
+    }
+  }
   /** Move and resize a window, keeping its size or position where none is given, and report where it ended up. */
   const moveWindow = async (window: WindowInfo, to: Partial<CaptureArea>, signal?: AbortSignal): Promise<string> => {
     const width = Math.round(to.width ?? window.width)
@@ -2081,6 +2243,60 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     const existing = (await backend.windows()).filter(window => words.some(word => `${window.title} ${window.process}`.toLowerCase().includes(word)))
     return `${started}, but no new window appeared within 10 s; it may still be loading, or it reused an open window.`
       + (existing.length > 0 ? ` Matching windows: ${existing.slice(0, 5).map(describeWindow).join('; ')}` : ' Wait for it with desktop_window wait.')
+  }
+
+  /**
+   * Look at a drag before it is sent: name the windows under its start and drop points, refuse when `onto` names a
+   * drop target that is not under the drop point, and mention other apps' windows the pointer passes over.
+   * @returns a phrase for the result, or '' where the platform cannot tell which window is on top.
+   */
+  const dragPlan = async (fromX: number, fromY: number, toX: number, toY: number, onto: string | undefined): Promise<string> => {
+    const windowAt = backend.windowAt?.bind(backend)
+    if (windowAt === undefined) {
+      if (onto !== undefined) throw new Error('this session cannot tell which window is under a point, so onto cannot be checked; drag without it and check the result')
+      return ''
+    }
+    const windows = await backend.windows()
+    const under = async (x: number, y: number): Promise<{ handle: number; window: WindowInfo | undefined }> => {
+      const handle = await windowAt(Math.round(x), Math.round(y))
+      return { handle, window: windows.find(candidate => candidate.handle === handle) }
+    }
+    const name = (found: { handle: number; window: WindowInfo | undefined }): string => {
+      if (found.handle === 0) return 'the desktop'
+      if (found.window === undefined) return `an unlisted window (handle ${String(found.handle)}: the taskbar, a menu or an overlay)`
+      return `"${found.window.title}" (${found.window.process.length > 0 ? found.window.process : `pid ${String(found.window.pid)}`})`
+    }
+    const start = await under(fromX, fromY)
+    const drop = await under(toX, toY)
+    if (onto !== undefined) {
+      const wanted = onto.trim().toLowerCase()
+      const label = `${drop.window?.title ?? ''} ${drop.window?.process ?? ''}`.toLowerCase()
+      if (wanted.length === 0 || !label.includes(wanted)) {
+        throw new Error(`the drop point (${String(toX)}, ${String(toY)}) is over ${name(drop)}, not "${onto}"; bring that window forward or pick a point inside it. Nothing was dragged.`)
+      }
+    }
+    const ends = new Set([start.handle, drop.handle])
+    const apps = new Set([start.window?.pid, drop.window?.pid].filter(pid => pid !== undefined))
+    const crossed = new Map<number, string>()
+    for (let step = 1; step < 8; step++) {
+      const passed = await under(fromX + (toX - fromX) * step / 8, fromY + (toY - fromY) * step / 8)
+      if (ends.has(passed.handle) || (passed.window !== undefined && apps.has(passed.window.pid))) continue
+      crossed.set(passed.handle, name(passed))
+    }
+    return ` from ${name(start)} onto ${name(drop)}${crossed.size > 0 ? `; on the way it passed over ${[...crossed.values()].join(', ')}` : ''}`
+  }
+
+  const setup = backend.setup?.bind(backend)
+  if (setup !== undefined) {
+    ctx.tools.register(defineTool({
+      name: 'desktop_setup',
+      description: 'Check which desktop features work in this session (input, windows, screenshots, clipboard, text recognition, controls by name) and what is missing for the rest, with one command that installs it. Use it when a desktop tool reports a missing helper, or before long desktop work on a new machine.',
+      parameters: {},
+      output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
+      async execute() {
+        return { done: formatSetup(await setup()) }
+      },
+    }), options)
   }
 
   ctx.tools.register(defineTool({
@@ -2206,6 +2422,7 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
         const which = button(args.button)
         const at = point(args)
         await onDisplay(at.x, at.y)
+        if (args.press === 'down') await admit(ownerOf(execution), at)
         await backend.pressButton(at.x, at.y, which, args.press === 'down', execution.signal)
         if (args.press === 'down') heldButtons.add(which)
         else heldButtons.delete(which)
@@ -2221,7 +2438,9 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
       const held = heldKeys(args.modifiers)
       const expectation = checkedExpectation(args.expect, true)
       const how = pressed === 'none' ? 'Moved to' : `${held === undefined ? '' : `${held.names.join('+')}+`}${pressed} click x${String(count)} at`
+      const owner = ownerOf(execution)
       const done = await verified(expectation, pressed === 'none' ? [] : [pressed], execution.signal, async () => {
+        await admit(owner, { x, y })
         await backend.pointer(x, y, pressed, count, held, execution.signal)
         return `${how} (${String(x)}, ${String(y)}) on display ${describe(on)}`
       })
@@ -2238,17 +2457,24 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
       to_x: { type: 'number', required: true, description: 'End x in virtual-desktop pixels.' },
       to_y: { type: 'number', required: true, description: 'End y in virtual-desktop pixels.' },
       button: { type: 'string', description: 'left (default), right or middle.' },
+      onto: { type: 'string', description: 'Part of the title or process of the window that must be under the drop point; the drag is refused before it starts when another window is there.' },
       expect: EXPECT_SPEC,
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: { from_x: number; from_y: number; to_x: number; to_y: number; button?: string; expect?: Expectation }, execution) {
+    async execute(
+      args: { from_x: number; from_y: number; to_x: number; to_y: number; button?: string; onto?: string; expect?: Expectation },
+      execution,
+    ) {
       const pressed = button(args.button)
       await onDisplay(args.from_x, args.from_y)
       await onDisplay(args.to_x, args.to_y)
       const expectation = checkedExpectation(args.expect, true)
       return { done: await verified(expectation, [pressed], execution.signal, async () => {
+        await admit(ownerOf(execution), { x: args.from_x, y: args.from_y })
+        await admit(ownerOf(execution), { x: args.to_x, y: args.to_y })
+        const plan = await dragPlan(args.from_x, args.from_y, args.to_x, args.to_y, args.onto)
         await backend.drag(args.from_x, args.from_y, args.to_x, args.to_y, pressed, execution.signal)
-        return `Dragged with ${pressed} from (${String(args.from_x)}, ${String(args.from_y)}) to (${String(args.to_x)}, ${String(args.to_y)})`
+        return `Dragged with ${pressed} from (${String(args.from_x)}, ${String(args.from_y)}) to (${String(args.to_x)}, ${String(args.to_y)})${plan}`
       }) }
     },
   }), options)
@@ -2272,6 +2498,7 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
       await onDisplay(args.x, args.y)
       const expectation = checkedExpectation(args.expect, true)
       return { done: await verified(expectation, [], execution.signal, async () => {
+        await admit(ownerOf(execution), { x: args.x, y: args.y })
         await backend.scroll(args.x, args.y, sign * amount, args.direction === 'left' || args.direction === 'right', execution.signal)
         return `Scrolled ${args.direction} ${String(amount)} notches at (${String(args.x)}, ${String(args.y)})`
       }) }
@@ -2301,6 +2528,7 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
         const chord = chords[0]
         if (chords.length !== 1 || chord === undefined) throw new Error('hold takes one chord, such as shift or ctrl+alt')
         const receiver = await target(args.window, args.title, execution.signal)
+        if (args.hold === 'down') await admit(ownerOf(execution), undefined)
         await backend.holdKeys(chord, args.hold === 'down', execution.signal)
         const name = chord.names.join('+')
         if (args.hold === 'down') heldChords.set(name, chord)
@@ -2312,6 +2540,7 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
       const expectation = checkedExpectation(args.expect, true)
       const receiver = await target(args.window, args.title, execution.signal)
       const done = await verified(expectation, [], execution.signal, async () => {
+        await admit(ownerOf(execution), undefined)
         await backend.keys(Array.from({ length: repeat }, () => chords).flat(), execution.signal)
         return `Pressed ${args.keys}${repeat > 1 ? ` x${String(repeat)}` : ''} into ${receiver}`
       })
@@ -2340,6 +2569,7 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
       const receiver = await target(args.window, args.title, execution.signal)
       const paste = args.paste ?? args.text.length > PASTE_THRESHOLD
       const done = await verified(expectation, [], execution.signal, async () => {
+        await admit(ownerOf(execution), undefined)
         await backend.type(args.text, paste, execution.signal)
         return `${paste ? 'Pasted' : 'Typed'} ${String(args.text.length)} characters into ${receiver}`
       })
@@ -2350,14 +2580,17 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
   ctx.tools.register(defineTool({
     name: 'desktop_window',
     description: 'List visible top-level windows and dialogs (handle, process, title, position, foreground); read one window (every control numbered [n] with its type, name, value, centre point @(x,y) and state; far cheaper than a screenshot); '
-      + 'focus, minimize, maximize, restore, close or move (position and size) one chosen by handle, title or process name; or wait until a window whose title contains title appears (or, with gone, closes), or, with text, until a window shows that text. '
-      + 'close asks the app to close and may leave a save prompt open.',
+      + 'focus, minimize, maximize, restore, close or move (position and size) one chosen by handle, title or process name; or wait until a window whose title contains title appears (or, with gone, closes), with text until a window shows that text, or with stable until it stops changing. '
+      + 'close asks the app to close and may leave a save prompt open. reserve keeps a window for this task: until release (or the lease runs out), input that would land in another app\'s window is refused, and other tasks cannot act in it.',
     parameters: {
-      action: { type: 'string', required: true, description: 'list, read, focus, minimize, maximize, restore, close, move or wait.' },
+      action: { type: 'string', required: true, description: 'list, read, focus, minimize, maximize, restore, close, move, wait, reserve or release.' },
+      seconds: { type: 'number', description: 'For reserve: how long the reservation lasts without input, 10 to 600 (default 120); each admitted action renews it.' },
       handle: { type: 'number', description: 'Window handle from list.' },
       title: { type: 'string', description: 'Part of the window title (or the process name, such as notepad), used when handle is omitted. For wait without text: the title to wait for.' },
       text: { type: 'string', description: 'For wait: wait until the window (handle or title, else the foreground window) shows this text; with gone, until it no longer does.' },
       gone: { type: 'boolean', description: 'For wait: wait until the window (or the text) is gone.' },
+      stable: { type: 'boolean', description: 'For wait: wait until the window (handle or title, else the one in front) stops changing, such as a page that finished loading.' },
+      quiet_ms: { type: 'number', description: 'For wait with stable: how long it must stay the same, 200 to 10000 milliseconds (default 1000).' },
       timeout_ms: { type: 'number', description: 'For wait: give up after this many milliseconds, 500 to 60000 (default 15000).' },
       x: { type: 'number', description: 'For move: new left edge in virtual-desktop pixels.' },
       y: { type: 'number', description: 'For move: new top edge.' },
@@ -2369,12 +2602,18 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
       if (args.action === 'wait') {
         const timeout = args.timeout_ms ?? 15_000
         const gone = args.gone === true
+        if (args.stable === true) {
+          if (args.text !== undefined || gone) throw new Error('stable waits for the window to stop changing; pass text or gone in a separate wait')
+          const read = (): Promise<string> => fingerprint(args.handle, args.title, execution.signal)
+          return { done: await waitForStable(read, args.quiet_ms ?? 1000, timeout, execution.signal) }
+        }
         if (args.text === undefined) return { done: await waitForWindow(backend, args.title, gone, timeout, execution.signal) }
         const window = await chosenWindow(args.handle, args.title)
         return { done: await waitForText(() => windowText(window, execution.signal), args.text, gone, timeout, execution.signal) }
       }
       const windows = await backend.windows()
       if (args.action === 'list') return { done: windows.length === 0 ? 'No visible windows.' : windows.map(describeWindow).join('\n') }
+      if (args.action === 'reserve' || args.action === 'release') return { done: reserveStep(args.action, windows, args.handle, args.title, args.seconds, ownerOf(execution)) }
       if (args.action === 'read') {
         const window = args.handle === undefined && args.title === undefined
           ? await chosenWindow()
@@ -2384,13 +2623,15 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
       }
       if (args.action === 'move') {
         const window = selectWindow(windows, args.handle, args.title)
+        await admit(ownerOf(execution), { handle: window.handle })
         return { done: await moveWindow(window, args, execution.signal) }
       }
       const action = args.action
       if (action !== 'focus' && action !== 'minimize' && action !== 'maximize' && action !== 'restore' && action !== 'close') {
-        throw new Error('action must be list, read, focus, minimize, maximize, restore, close, move or wait')
+        throw new Error('action must be list, read, focus, minimize, maximize, restore, close, move, wait, reserve or release')
       }
       const window = selectWindow(windows, args.handle, args.title)
+      await admit(ownerOf(execution), { handle: window.handle })
       await backend.window(window.handle, action, execution.signal)
       return { done: await windowOutcome(backend, window, action, execution.signal) }
     },
@@ -2433,10 +2674,12 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     async execute(args: ElementArgs & { then_read?: boolean; expect?: Expectation }, execution) {
       if (args.action === 'find') {
         if (args.expect !== undefined) throw new Error('expect does not apply to find, which only looks')
-        return { done: await elementStep(args, execution.signal) }
+        return { done: await elementStep(args, execution.signal, ownerOf(execution)) }
       }
       const expectation = checkedExpectation(args.expect, elementRepeatable(args.action))
-      const done = await verified(expectation, elementButtons(args.action), execution.signal, () => elementStep(args, execution.signal))
+      const owner = ownerOf(execution)
+      const run = (): Promise<string> => elementStep(args, execution.signal, owner)
+      const done = await verified(expectation, elementButtons(args.action), execution.signal, run)
       return { done: `${done}${await observe(args.then_read, execution.signal)}` }
     },
   }), options)
@@ -2478,11 +2721,36 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     },
   }), options)
 
+  /**
+   * Reserve a window for one task or release it; shared by desktop_window and the sequence step.
+   * @returns the result line.
+   */
+  function reserveStep(action: 'reserve' | 'release', windows: readonly WindowInfo[], handle: number | undefined, title: string | undefined, seconds: number | undefined, owner: string): string {
+    expire()
+    if (action === 'release') {
+      const mine = [...reservations].filter(([, held]) => held.owner === owner && (handle === undefined && title === undefined
+        ? true
+        : held.window.handle === handle || (title !== undefined && held.window.title.toLowerCase().includes(title.toLowerCase()))))
+      for (const [key] of mine) reservations.delete(key)
+      return mine.length === 0 ? 'This task holds no matching reservation.' : `Released ${mine.map(([, held]) => `"${held.window.title}"`).join(', ')}.`
+    }
+    const lease = Math.round((seconds ?? RESERVE_MS / 1000) * 1000)
+    if (!Number.isFinite(lease) || lease < 10_000 || lease > 600_000) throw new Error('seconds must be between 10 and 600')
+    const window = selectWindow(windows, handle, title)
+    const held = reservations.get(window.handle)
+    if (held !== undefined && held.owner !== owner) {
+      throw new Error(`${describeWindow(window)} is already reserved by another task for ${String(Math.ceil((held.until - Date.now()) / 1000))} more seconds`)
+    }
+    reservations.set(window.handle, { owner, window, until: Date.now() + lease })
+    return `Reserved ${describeWindow(window)} for this task for ${String(lease / 1000)} s; each action renews it. Until you release it, input that would land in another app's window is refused, and other tasks cannot act in it.`
+  }
+
   /** Find, click or operate one control of a window; shared by desktop_element and the sequence step. */
-  async function elementStep(args: ElementArgs, signal: AbortSignal): Promise<string> {
+  async function elementStep(args: ElementArgs, signal: AbortSignal, owner: string): Promise<string> {
     const action = args.action
     if (!ELEMENT_ACTIONS.has(action)) throw new Error(`action must be one of ${[...ELEMENT_ACTIONS].join(', ')}`)
     const window = await chosenWindow(args.window, args.title)
+    if (action !== 'find') await admit(owner, { handle: window.handle })
     if (window.minimized) await backend.window(window.handle, 'restore', signal)
     const clicks = CLICK_ACTIONS[action]
     let index = args.index
@@ -2553,7 +2821,7 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
 
   ctx.tools.register(defineTool({
     name: 'desktop_sequence',
-    description: 'Run several whole-desktop actions in order in one call, stopping at the first failure: launch, open, keys, type, wait, read, ocr, element, focus, minimize, maximize, restore, close, move, click, drag, scroll, sleep. '
+    description: 'Run several whole-desktop actions in order in one call, stopping at the first failure: launch, open, keys, type, wait, read, ocr, element, focus, minimize, maximize, restore, close, move, click, drag, scroll, sleep, reserve, release. '
       + 'Use it for steps whose outcome you can predict, such as launch an app, wait for its window, press a control by name, type, and end with read to check the result in the same call. '
       + 'Example: [{"action":"launch","app":"Notepad"},{"action":"wait","title":"Notepad"},{"action":"type","text":"hello"},{"action":"element","element_action":"click","name":"File"},{"action":"read","title":"Notepad"}].',
     parameters: {
@@ -2565,7 +2833,8 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
           type: 'object',
           additionalProperties: false,
           properties: {
-            action: { type: 'string', required: true, description: 'launch, open, keys, type, wait, read, ocr, element, focus, minimize, maximize, restore, close, move, click, drag, scroll or sleep.' },
+            action: { type: 'string', required: true, description: 'launch, open, keys, type, wait, read, ocr, element, focus, minimize, maximize, restore, close, move, click, drag, scroll, sleep, reserve or release.' },
+            seconds: { type: 'number', description: 'reserve: lease in seconds (default 120).' },
             optional: { type: 'boolean', description: 'Carry on when this step fails, for things that may not be there (a save prompt, a cookie banner, a first-run dialog). The result says the step was skipped and why.' },
             app: { type: 'string', description: 'launch: app name, such as "Calculator".' },
             keys: { type: 'string', description: 'keys: chords such as "ctrl+s" or "alt+tab enter".' },
@@ -2574,6 +2843,8 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
             title: { type: 'string', description: 'wait, read, ocr, element, focus, minimize, maximize, restore, close, move: part of the window title or the process name; keys and type: window to bring forward first.' },
             handle: { type: 'number', description: 'Window handle, instead of title.' },
             gone: { type: 'boolean', description: 'wait: wait for the window (or the text) to go away.' },
+            stable: { type: 'boolean', description: 'wait: wait until the window stops changing (quiet_ms, default 1000).' },
+            quiet_ms: { type: 'number', description: 'wait with stable: how long it must stay the same.' },
             timeout_ms: { type: 'number', description: 'wait: limit in milliseconds (default 15000); element: how long to wait for the control to appear (default 1500).' },
             element_action: { type: 'string', description: 'element: click, double_click, right_click, invoke, toggle, expand, collapse, select, set_value or focus.' },
             name: { type: 'string', description: 'element: visible name of the control.' },
@@ -2586,6 +2857,7 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
             y: { type: 'number', description: 'click, scroll: virtual-desktop y; drag: start y; move: new top edge.' },
             to_x: { type: 'number', description: 'drag: end x.' },
             to_y: { type: 'number', description: 'drag: end y.' },
+            onto: { type: 'string', description: 'drag: title or process of the window that must be under the drop point.' },
             button: { type: 'string', description: 'click, drag: left (default), right or middle.' },
             count: { type: 'number', description: 'click: 1 to 3 clicks.' },
             modifiers: { type: 'string', description: 'click: keys held while clicking, such as ctrl or shift.' },
@@ -2610,13 +2882,14 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
           throw new Error(`step ${String(index + 1)} (${step.action}): ${error instanceof Error ? error.message : String(error)}`, { cause: error })
         }
       })
+      const owner = ownerOf(execution)
       const done: string[] = []
       for (const [index, step] of args.steps.entries()) {
         execution.signal.throwIfAborted()
         try {
           const result = INPUT_STEPS.has(step.action)
-            ? await verified(expectations[index], stepButtons(step), execution.signal, () => runStep(step, execution.signal))
-            : await runStep(step, execution.signal)
+            ? await verified(expectations[index], stepButtons(step), execution.signal, () => runStep(step, execution.signal, owner))
+            : await runStep(step, execution.signal, owner)
           done.push(`${String(index + 1)}. ${result}`)
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error)
@@ -2635,21 +2908,26 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
   }), options)
 
   /** One `desktop_sequence` step, validated like the matching single-action tool. */
-  async function runStep(step: SequenceStep, signal: AbortSignal): Promise<string> {
+  async function runStep(step: SequenceStep, signal: AbortSignal, owner: string): Promise<string> {
     switch (step.action) {
+      case 'reserve': case 'release':
+        return reserveStep(step.action, await backend.windows(), step.handle, step.title, step.seconds, owner)
       case 'launch':
         return launchApp(step.app ?? '', signal)
       case 'element':
         return elementStep({
           action: step.element_action ?? '', index: step.index, name: step.name, role: step.role, value: step.value, window: step.handle, title: step.title,
           timeout_ms: step.timeout_ms,
-        }, signal)
+        }, signal, owner)
       case 'ocr': {
         const window = await chosenWindow(step.handle, step.title)
         return `text on screen in "${window.title}":\n${formatOcr(await windowOcr(window, signal)) || '(none recognized)'}`
       }
-      case 'move':
-        return moveWindow(selectWindow(await backend.windows(), step.handle, step.title), step, signal)
+      case 'move': {
+        const window = selectWindow(await backend.windows(), step.handle, step.title)
+        await admit(owner, { handle: window.handle })
+        return moveWindow(window, step, signal)
+      }
       case 'open': {
         const opened = (step.target ?? '').trim()
         if (opened.length === 0) throw new Error('open needs target')
@@ -2659,6 +2937,7 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
       case 'keys': {
         const chords = parseKeys(step.keys ?? '')
         const receiver = await target(step.handle, step.title, signal)
+        await admit(owner, undefined)
         await backend.keys(chords, signal)
         return `pressed ${step.keys ?? ''} into ${receiver}`
       }
@@ -2667,10 +2946,15 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
         if (text.length === 0 || text.length > 100_000) throw new Error('type needs text of 1 to 100000 characters')
         const receiver = await target(step.handle, step.title, signal)
         const paste = step.paste ?? text.length > PASTE_THRESHOLD
+        await admit(owner, undefined)
         await backend.type(text, paste, signal)
         return `${paste ? 'pasted' : 'typed'} ${String(text.length)} characters into ${receiver}`
       }
       case 'wait': {
+        if (step.stable === true) {
+          if (step.text !== undefined || step.gone === true) throw new Error('stable waits for the window to stop changing; pass text or gone in a separate wait')
+          return waitForStable(() => fingerprint(step.handle, step.title, signal), step.quiet_ms ?? 1000, step.timeout_ms ?? 15_000, signal)
+        }
         if (step.text === undefined) return waitForWindow(backend, step.title, step.gone === true, step.timeout_ms ?? 15_000, signal)
         const window = await chosenWindow(step.handle, step.title)
         return waitForText(() => windowText(window, signal), step.text, step.gone === true, step.timeout_ms ?? 15_000, signal)
@@ -2683,6 +2967,7 @@ ${text.length > 0 ? text : '(no readable text)'}`
       }
       case 'focus': case 'minimize': case 'maximize': case 'restore': case 'close': {
         const window = selectWindow(await backend.windows(), step.handle, step.title)
+        await admit(owner, { handle: window.handle })
         await backend.window(window.handle, step.action, signal)
         return windowOutcome(backend, window, step.action, signal)
       }
@@ -2693,6 +2978,7 @@ ${text.length > 0 ? text : '(no readable text)'}`
         await onDisplay(step.x, step.y)
         const pressed = button(step.button)
         const held = heldKeys(step.modifiers)
+        await admit(owner, { x: step.x, y: step.y })
         await backend.pointer(step.x, step.y, pressed, count, held, signal)
         return `${held === undefined ? '' : `${held.names.join('+')}+`}${pressed} click x${String(count)} at (${String(step.x)}, ${String(step.y)})`
       }
@@ -2701,8 +2987,11 @@ ${text.length > 0 ? text : '(no readable text)'}`
         await onDisplay(step.x, step.y)
         await onDisplay(step.to_x, step.to_y)
         const pressed = button(step.button)
+        await admit(owner, { x: step.x, y: step.y })
+        await admit(owner, { x: step.to_x, y: step.to_y })
+        const plan = await dragPlan(step.x, step.y, step.to_x, step.to_y, step.onto)
         await backend.drag(step.x, step.y, step.to_x, step.to_y, pressed, signal)
-        return `dragged from (${String(step.x)}, ${String(step.y)}) to (${String(step.to_x)}, ${String(step.to_y)})`
+        return `dragged from (${String(step.x)}, ${String(step.y)}) to (${String(step.to_x)}, ${String(step.to_y)})${plan}`
       }
       case 'scroll': {
         if (step.x === undefined || step.y === undefined) throw new Error('scroll needs x and y')
@@ -2711,6 +3000,7 @@ ${text.length > 0 ? text : '(no readable text)'}`
         const sign = { up: 1, down: -1, right: 1, left: -1 }[step.direction ?? '']
         if (sign === undefined) throw new Error('direction must be up, down, left or right')
         await onDisplay(step.x, step.y)
+        await admit(owner, { x: step.x, y: step.y })
         await backend.scroll(step.x, step.y, sign * amount, step.direction === 'left' || step.direction === 'right', signal)
         return `scrolled ${step.direction ?? ''} ${String(amount)} at (${String(step.x)}, ${String(step.y)})`
       }
@@ -2752,7 +3042,11 @@ interface WindowArgs extends Partial<CaptureArea> {
   title?: string
   text?: string
   gone?: boolean
+  stable?: boolean
+  quiet_ms?: number
   timeout_ms?: number
+  /** For reserve: lease length in seconds. */
+  seconds?: number
 }
 
 /** Arguments of `desktop_element` and of the sequence's element step. */
@@ -2768,6 +3062,9 @@ export interface ElementArgs {
   window?: number | undefined
   title?: string | undefined
 }
+
+/** How long a window reservation lasts without input unless told otherwise. */
+const RESERVE_MS = 120_000
 
 /** How long `desktop_element` waits for a control to appear unless told otherwise. */
 export const ELEMENT_WAIT_MS = 1500
@@ -2850,11 +3147,16 @@ export interface SequenceStep {
   title?: string
   handle?: number
   gone?: boolean
+  /** wait: until the window stops changing. */
+  stable?: boolean
+  quiet_ms?: number
   timeout_ms?: number
   x?: number
   y?: number
   to_x?: number
   to_y?: number
+  /** drag: the window that must be under the drop point. */
+  onto?: string
   button?: string
   count?: number
   modifiers?: string
@@ -2864,6 +3166,8 @@ export interface SequenceStep {
   ms?: number
   /** The outcome to wait for after the step. */
   expect?: Expectation
+  /** reserve: lease in seconds. */
+  seconds?: number
 }
 
 /** Sequence steps that send input, and so release what they may leave pressed when they fail. */

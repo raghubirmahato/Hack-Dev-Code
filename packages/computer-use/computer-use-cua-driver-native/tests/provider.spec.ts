@@ -57,7 +57,7 @@ describe('Cua Driver native provider', () => {
     expect(ctx.computerUse.providerName).toBe('cua-driver-native')
     const displayTools = process.platform === 'win32' || process.platform === 'linux'
       ? [
-        'desktop_list_displays', 'desktop_screenshot', 'desktop_pointer', 'desktop_drag', 'desktop_scroll',
+        'desktop_setup', 'desktop_list_displays', 'desktop_screenshot', 'desktop_pointer', 'desktop_drag', 'desktop_scroll',
         'desktop_keys', 'desktop_type', 'desktop_window', 'desktop_open', 'desktop_element', 'desktop_ocr', 'desktop_sequence',
       ]
       : []

@@ -231,3 +231,73 @@ export function parseWlrRandr(json: string): Array<Omit<DisplayInfo, 'index'>> {
       return [{ name: output.name ?? `output ${String(index)}`, primary: index === 0, x: output.position?.x ?? 0, y: output.position?.y ?? 0, width, height }]
     })
 }
+
+/**
+ * The string inside a GVariant text reply such as `('[{"id": 1}]',)` from `gdbus call`, with its escapes undone.
+ * @param reply - gdbus output.
+ * @returns the string.
+ * @throws when the reply holds no single string.
+ */
+export function gvariantString(reply: string): string {
+  const match = /^\s*\(\s*'((?:[^'\\]|\\.)*)',?\s*\)\s*$/su.exec(reply)
+  if (match?.[1] === undefined) throw new Error(`unexpected reply from GNOME Shell: ${reply.slice(0, 120)}`)
+  return match[1].replace(/\\(.)/gsu, '$1')
+}
+
+/** One window from the GNOME Window Calls extension, reduced to the fields used here. */
+interface WindowCallsWindow {
+  id?: number
+  pid?: number
+  wm_class?: string | null
+  title?: string | null
+  x?: number
+  y?: number
+  width?: number
+  height?: number
+  focus?: boolean
+  has_focus?: boolean
+  minimized?: boolean
+  window_type?: number
+}
+
+/** Meta window types listed as windows: normal windows, dialogs and modal dialogs. */
+const WINDOW_TYPES: ReadonlySet<number> = new Set([0, 3, 4])
+
+/**
+ * Windows from the GNOME Window Calls extension: its `List` reply, completed with `Details` for windows the list
+ * gives no title or geometry for (older versions list only ids and classes).
+ * @param list - the `List` reply's JSON.
+ * @param details - fetches the `Details` JSON of one window id.
+ * @returns the windows.
+ */
+export async function parseWindowCalls(list: string, details: (id: number) => Promise<string>): Promise<WindowInfo[]> {
+  const entries = (JSON.parse(list) as WindowCallsWindow[]).filter(entry => typeof entry.id === 'number' && WINDOW_TYPES.has(entry.window_type ?? 0))
+  return Promise.all(entries.map(async (entry) => {
+    const full: WindowCallsWindow = entry.title === undefined || entry.width === undefined
+      ? { ...entry, ...JSON.parse(await details(entry.id as number)) as WindowCallsWindow }
+      : entry
+    return {
+      handle: full.id as number,
+      pid: full.pid ?? 0,
+      process: full.wm_class ?? '',
+      title: full.title ?? '',
+      x: full.x ?? 0, y: full.y ?? 0, width: full.width ?? 0, height: full.height ?? 0,
+      minimized: full.minimized === true,
+      foreground: full.focus === true || full.has_focus === true,
+    }
+  }))
+}
+
+/**
+ * Position and size from `kdotool getwindowgeometry`, which prints `Position: x,y` and `Geometry: WxH` lines.
+ * @param text - the command's output.
+ * @returns the geometry, zero where a line is missing.
+ */
+export function parseKdotoolGeometry(text: string): { x: number; y: number; width: number; height: number } {
+  const position = /Position:\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)/u.exec(text)
+  const size = /Geometry:\s*([\d.]+)\s*x\s*([\d.]+)/u.exec(text)
+  return {
+    x: Math.round(Number(position?.[1] ?? 0)), y: Math.round(Number(position?.[2] ?? 0)),
+    width: Math.round(Number(size?.[1] ?? 0)), height: Math.round(Number(size?.[2] ?? 0)),
+  }
+}
