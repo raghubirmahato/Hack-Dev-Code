@@ -1,7 +1,7 @@
 /** Validate declared workspace paths and address their native-open actions. */
 import type { PresentedFile } from '@hackdevcode/dsh-tool-present/types'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
-import type { ToolCallId } from '@hackdevcode/dsh-llm/brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 
 /** Authenticated POST route for opening a workspace file on the Host desktop. */
 export const PRESENT_OPEN_PATH = '/api/present.open'

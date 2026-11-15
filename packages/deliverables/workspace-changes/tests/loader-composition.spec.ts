@@ -11,11 +11,12 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import Include from '@hackdevcode/cordis-plugin-include'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import LocalSubprocessRuntime from '@hackdevcode/dsh-subprocess-local'
 import LocalFileSystem from '@hackdevcode/dsh-fs-local'
 import * as WorkspaceChangesPlugin from '@hackdevcode/dsh-workspace-changes'
 import { changes, endTurn, git, startTurn, toolCall } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 let root: string | undefined
 let context: Context | undefined
@@ -69,7 +70,7 @@ describe('real Loader composition', () => {
     git(root, 'init', '-q', cwd)
     await writeFile(join(cwd, 'tracked.txt'), 'one\n')
     git(cwd, 'add', '-A'); git(cwd, 'commit', '-q', '-m', 'init')
-    const session = context.sessions.create(SessionId('composed'), { meta: { cwd } })
+    const session = context.sessions.create(brandString<SessionId>('composed'), { meta: { cwd } })
     startTurn(session, 1)
     await context.waterfall('tools/pre-execute', { agent: { session } } as never, () => Promise.resolve(undefined as never))
     await writeFile(join(cwd, 'tracked.txt'), 'one\ntwo\n')

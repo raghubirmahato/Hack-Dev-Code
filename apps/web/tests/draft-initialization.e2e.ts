@@ -250,15 +250,15 @@ async function launchDraftFixture(beforeBrowserOpen?: (page: Page, scaffold: Web
 
 function structuredDraft(sessionId: SessionId, title: string): DraftSnapshot {
   const file = `@"${FILE_NAME}"`
-  const folder = '@"Directory/"'
-  const session = formatSessionReferenceMention({ sessionId, label: 'Linked session 🧩' })
+  const folder = '@"\u76ee\u5f55/"'
+  const session = formatSessionReferenceMention({ sessionId, label: '\u5173\u8054\u4f1a\u8bdd 🧩' })
   const references: DraftSnapshot['references'] = []
   let text = `${title} 🧭 e\u0301 \u96ea\n`
   for (let repeat = 0; repeat < 2; repeat++) {
     for (const item of [
       { ref: file, label: FILE_NAME, appearance: 'file' },
-      { ref: folder, label: 'Directory/', appearance: 'folder' },
-      { ref: session, label: 'Linked session 🧩', appearance: 'session' },
+      { ref: folder, label: '\u76ee\u5f55/', appearance: 'folder' },
+      { ref: session, label: '\u5173\u8054\u4f1a\u8bdd 🧩', appearance: 'session' },
     ] as const) {
       references.push({
         ...item, offset: text.length, length: item.ref.length,
@@ -340,7 +340,7 @@ it('rebuilds a claimed command chip from the stored draft after reload without s
 it('restores repeated file, folder and Session capsules across edits, Workspace switches and reload without submitting', async () => {
   const { scaffold, page, console, first, firstId, second } = await launchDraftFixture()
   for (const workspace of [first, second]) {
-    await mkdir(join(workspace.path, 'Directory'))
+    await mkdir(join(workspace.path, '\u76ee\u5f55'))
     await writeFile(join(workspace.path, FILE_NAME), FILE_BODY)
   }
   await initialize(page, '', second.id)
@@ -371,12 +371,12 @@ it('restores repeated file, folder and Session capsules across edits, Workspace 
         },
         {
           "editable": "false",
-          "label": "Directory/",
+          "label": "\u76ee\u5f55/",
           "source": "reference",
         },
         {
           "editable": "false",
-          "label": "Linked session 🧩",
+          "label": "\u5173\u8054\u4f1a\u8bdd 🧩",
           "source": "reference",
         },
         {
@@ -386,19 +386,19 @@ it('restores repeated file, folder and Session capsules across edits, Workspace 
         },
         {
           "editable": "false",
-          "label": "Directory/",
+          "label": "\u76ee\u5f55/",
           "source": "reference",
         },
         {
           "editable": "false",
-          "label": "Linked session 🧩",
+          "label": "\u5173\u8054\u4f1a\u8bdd 🧩",
           "source": "reference",
         },
       ],
       "paragraphs": [
         "\u5de5\u4f5c\u533a\u4e59 🧭 é \u96ea",
-        "notes \u96ea.md Directory/ Linked session 🧩 ",
-        "notes \u96ea.md Directory/ Linked session 🧩 ",
+        "notes \u96ea.md \u76ee\u5f55/ \u5173\u8054\u4f1a\u8bdd 🧩 ",
+        "notes \u96ea.md \u76ee\u5f55/ \u5173\u8054\u4f1a\u8bdd 🧩 ",
         "\u666e\u901a\u6587\u5b57 @\"notes \u96ea.md\"\uff0c\u672b\u5c3e 🦉",
       ],
     }
@@ -416,7 +416,7 @@ it('restores repeated file, folder and Session capsules across edits, Workspace 
       await assertDraft(page, item.id, item.draft)
       await composer(page).click()
       await page.keyboard.press(EDITOR_END)
-      const suffix = ` · Edit${round} 🧪`
+      const suffix = ` · \u7f16\u8f91${round} 🧪`
       await page.keyboard.insertText(suffix)
       item.draft = { ...item.draft, text: item.draft.text + suffix }
       await assertDraft(page, item.id, item.draft)
@@ -570,7 +570,7 @@ it('rematches the current draft after a delayed real skills catalog without repl
 it('carries all reference capsules through the real Workspace picker and leaves the source draft empty', async () => {
   const { scaffold, page, console, first, firstId, second } = await launchDraftFixture()
   for (const workspace of [first, second]) {
-    await mkdir(join(workspace.path, 'Directory'))
+    await mkdir(join(workspace.path, '\u76ee\u5f55'))
     await writeFile(join(workspace.path, FILE_NAME), FILE_BODY)
   }
   const draft = structuredDraft(firstId, '\u5207\u6362\u5de5\u4f5c\u533a\u643a\u5e26')

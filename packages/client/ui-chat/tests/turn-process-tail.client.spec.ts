@@ -1,6 +1,7 @@
 /** Turn-node Locations and Assistant timing across partial windows and transient retirement. */
 import { describe, expect, it } from 'vitest'
-import { createAssistantMessage, createToolResultMessage, LlmAttemptId, ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import { createAssistantMessage, createToolResultMessage, type LlmAttemptId, type ToolCallId } from '@hackdevcode/dsh-llm'
 import { AssistantStreamAccumulator } from '@hackdevcode/dsh-llm/assistant-stream'
 import { SessionSeq, type SessionEvent } from '@hackdevcode/dsh-session/types'
 import type {
@@ -13,8 +14,8 @@ import { chatViewDefinition } from '../src/client/conversation-nodes/chat-snapsh
 import { turnProcessDefinition } from '../src/client/conversation-nodes/turn-process.ts'
 import { turnTailDefinition } from '../src/client/conversation-nodes/turn-tail.ts'
 
-const attemptId = LlmAttemptId('turn-projection-test')
-const callId = ToolCallId('turn-projection-call')
+const attemptId = brandString<LlmAttemptId>('turn-projection-test')
+const callId = brandString<ToolCallId>('turn-projection-call')
 const toolBlock = { type: 'tool-call' as const, id: callId, name: 'write', arguments: '{"content":"hello"}' }
 
 function entry(event: SessionEvent): SessionLiveEventEntry {

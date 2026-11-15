@@ -1,7 +1,7 @@
 - insert:
     - id: cua-provider-registry
       name: '@hackdevcode/dsh-computer-use'
-    - id: cua
+    - id: cua-macos
       name: '@hackdevcode/dsh-cua-macos'
       disabled: !!js process.platform !== 'darwin'
       config:
@@ -9,6 +9,12 @@
     - id: cua-driver
       name: '@hackdevcode/dsh-computer-use-cua-driver-native'
       disabled: !!js process.platform === 'darwin'
+    # The native Windows provider; the driver above already covers Windows, so this one is opt-in.
+    - id: cua-windows
+      name: '@hackdevcode/dsh-cua-windows'
+      disabled: true
+      config:
+        agentPreset: ptc
     - id: ui-cua
       name: '@hackdevcode/dsh-cua'
     - id: browser-provider-registry

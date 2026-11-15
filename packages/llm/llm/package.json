@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-llm",
   "description": "Provider-neutral LLM service interface for the Hack Dev Code",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -21,10 +21,6 @@
     "./types": {
       "types": "./lib/types/types.d.ts",
       "default": "./lib/types/types.js"
-    },
-    "./brand": {
-      "types": "./lib/types/brand.d.ts",
-      "default": "./lib/types/brand.js"
     },
     "./message": {
       "types": "./lib/types/message.d.ts",
@@ -51,19 +47,24 @@
     "lib/index.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "lib/typert.remote-client.d.ts.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@hackdevcode/dsh-error": "workspace:*",
     "@hackdevcode/cordis": "workspace:~"
   },
   "dependencies": {
     "@hackdevcode/dsh-util-crypto": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~",
-    "zod": "4.4.3",
+    "zod": "4.6.6",
     "@hackdevcode/dsh-timeout": "workspace:*",
     "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-util-values": "workspace:*",
@@ -71,6 +72,7 @@
   },
   "devDependencies": {
     "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*",
     "@hackdevcode/dsh-package-manifest": "workspace:*",
     "@hackdevcode/cordis": "workspace:~"
   }

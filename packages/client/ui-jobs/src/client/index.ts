@@ -5,7 +5,7 @@
  * holds no transport state of its own.
  */
 import type { Context as ClientContext } from '@hackdevcode/cordis'
-import type { JobId } from '@hackdevcode/dsh-jobs/brand'
+import type { JobId } from '@hackdevcode/dsh-jobs/types'
 import { JobListAction } from './JobListAction.tsx'
 import type { JobListInjected } from './JobListAction.tsx'
 import type {} from '@hackdevcode/dsh-api-job-controller/client'

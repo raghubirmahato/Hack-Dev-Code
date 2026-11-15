@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-spill-local",
   "description": "Local-filesystem implementation of the Hack Dev Code spill storage seam (private session-scoped files)",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -25,7 +25,10 @@
   "files": [
     "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
@@ -33,12 +36,12 @@
     "@hackdevcode/cordis": "workspace:~"
   },
   "dependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~"
   },
   "devDependencies": {
     "@hackdevcode/cordis-plugin-include": "workspace:~",
     "@hackdevcode/cordis-plugin-loader": "workspace:~",
-    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-llm": "workspace:*",
     "@hackdevcode/dsh-session": "workspace:*",
     "@hackdevcode/dsh-spill": "workspace:*",

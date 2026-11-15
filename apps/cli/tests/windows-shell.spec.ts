@@ -15,8 +15,7 @@ import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import yaml from 'js-yaml'
-import { entryListSchema } from '@hackdevcode/cordis-plugin-include'
+import { parseEntryYaml } from '@hackdevcode/cordis-plugin-include'
 import { evaluate } from '@hackdevcode/cordis-plugin-loader'
 import { bundlePatchPaths, composeEntries, initProfile, loadProfile, PROFILES_DIR } from '@hackdevcode/dsh-app-boot'
 
@@ -104,7 +103,7 @@ describe('shipped agent presets gate both shell tools by platform', () => {
   const webBundle = fileURLToPath(new URL('../../../packages/bundle/web-app/', import.meta.url))
   const webManifest = JSON.parse(readFileSync(join(webBundle, 'package.json'), 'utf8')) as { dsh: { bundle: { patch: string[] } } }
   const presetRows = composeEntries([bundlePatchPaths(webBundle, webManifest.dsh.bundle).flatMap(file =>
-    yaml.load(readFileSync(file, 'utf8'), { schema: entryListSchema }) as import('@hackdevcode/cordis-plugin-include').PatchOptions[])])
+    parseEntryYaml(readFileSync(file, 'utf8')) as import('@hackdevcode/cordis-plugin-include').PatchOptions[])])
 
   const definitions = presetRows.filter(row => row.name === '@hackdevcode/dsh-agent-preset').map(row => row.config as import('@hackdevcode/dsh-agent-preset-registry').PresetDefinition)
 

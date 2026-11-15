@@ -6,7 +6,8 @@ import type {} from '@hackdevcode/cordis-plugin-loader'
 import type {} from '@hackdevcode/dsh-agent'
 import type {} from '@hackdevcode/dsh-cmdline'
 import { createUserMessage } from '@hackdevcode/dsh-llm'
-import { SessionId, type SessionEvent } from '@hackdevcode/dsh-session'
+import type { SessionId, SessionEvent } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 /** Observations from one isolated Agent's run through the shipped headless profile. */
 export interface SourceToolEvidence {
@@ -37,7 +38,7 @@ export function apply(ctx: Context, config: { cwd: string }): void {
 
   const run = async (): Promise<void> => {
     const handle = await ctx.agents.create({
-      sessionId: SessionId(randomUUID()),
+      sessionId: brandString<SessionId>(randomUUID()),
       meta: { cwd: config.cwd },
       agentOptions: { provider: 'cli-mock', model: 'cli-mock' },
     })

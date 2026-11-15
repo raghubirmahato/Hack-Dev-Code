@@ -11,7 +11,8 @@ import type { Session, SessionEvent, SessionSeq as SessionSeqType } from '@hackd
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import TokenMeter from '@hackdevcode/dsh-token-meter'
 import type { ContextBreakdownProjection } from '@hackdevcode/dsh-token-meter/client'
-import { CompactionId } from '@hackdevcode/dsh-compaction'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { CompactionId } from '@hackdevcode/dsh-compaction/types'
 import { contextBreakdownProjectionDefinition } from '../src/breakdown-projection.ts'
 import {
   estimateContent,
@@ -92,7 +93,7 @@ function appendSummaryMeter(ctx: Context, session: Session, start: SessionSeqTyp
   const endIdx = nodes.findIndex(node => node.seq === end)
   const shadowed = nodes.slice(startIdx, endIdx + 1)
   session.append('compaction/summary', {
-    compactionId: CompactionId('context-breakdown-summary'),
+    compactionId: brandString<CompactionId>('context-breakdown-summary'),
     summary: [{ type: 'text', text: 'summary' }],
     shadowedRange: { start, end },
     shadowedSeqs: shadowed.map(node => node.seq),

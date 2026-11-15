@@ -16,6 +16,7 @@ import { createUserMessage } from '@hackdevcode/dsh-llm'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import type { ToolExecution, ToolRunContext } from '@hackdevcode/dsh-tools'
 import { ToolArgsError, validateJsonSchemaValue, type JsonSchemaNode, type ObjectJsonSchema } from '@hackdevcode/dsh-tools'
+import { SubagentError } from './error.ts'
 
 /** The model-facing tool name a structured child must call to finish. */
 export const STRUCTURED_OUTPUT_TOOL = 'structured_output'
@@ -142,7 +143,7 @@ export function jsonCandidates(text: string): string[] {
  * @param childCtx - the child agent's scope context (`setup`'s argument).
  * @param schema - the trusted, already-asserted schema subset to enforce (see
  *   `assertObjectJsonSchema` in dsh-tools).
- * @param canComplete - whether accepted input and owned child work have finished.
+ * @param canComplete - whether accepted input has been processed.
  * @returns the attachment handle (read `captured()` after the child settles).
  */
 export function attachStructuredRuntime(
@@ -196,7 +197,9 @@ export function attachStructuredRuntime(
         lastViolations = violations
         throw new ToolArgsError(violations)
       }
-      if (!canComplete()) throw new Error('Wait for all delegated child tasks to finish and process pending messages before submitting structured output.')
+      if (!canComplete()) {
+        throw new SubagentError('Process pending messages before submitting structured output.', 'STRUCTURED_OUTPUT_PENDING_INPUT')
+      }
       // Two-phase commit, keyed by THIS execution: later transformable
       // waterfalls may still turn the success into an error. ToolRuntime has
       // already frozen model-bound arguments at the actual input boundary.

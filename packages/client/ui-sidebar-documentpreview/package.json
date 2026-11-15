@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-sidebar-documentpreview",
   "description": "Extensible Sidebar previews for Office documents, spreadsheets, Markdown, code, images, PDF, HTML, and plain text",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -37,7 +37,8 @@
         "@hackdevcode/dsh-api-remotes",
         "@hackdevcode/dsh-client-locale",
         "@hackdevcode/dsh-client-ui-settings",
-        "@hackdevcode/dsh-client-ui-file-drag"
+        "@hackdevcode/dsh-client-ui-file-drag",
+        "@hackdevcode/dsh-client-ui-context-menu"
       ],
       "platform": "web"
     }
@@ -51,6 +52,7 @@
     "@hackdevcode/cordis": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-api-gateway": "workspace:*",
     "@hackdevcode/dsh-api-remotes": "workspace:*",
@@ -65,9 +67,10 @@
     "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
     "@hackdevcode/dsh-client-ui-session": "workspace:*",
     "@hackdevcode/dsh-client-ui-settings": "workspace:*",
+    "@hackdevcode/dsh-client-ui-sidebar-files": "workspace:*",
     "@hackdevcode/dsh-client-ui-sidebar-right": "workspace:*",
     "@hackdevcode/dsh-client-ui-slots": "workspace:*",
-    "@hackdevcode/dsh-office-to-pdf": "workspace:*",
+    "@hackdevcode/dsh-office-kit": "workspace:*",
     "@hackdevcode/dsh-host-webserver": "workspace:*",
     "@hackdevcode/dsh-session": "workspace:*",
     "@hackdevcode/dsh-util-workspace-path": "workspace:*",
@@ -86,14 +89,18 @@
     "react-dom": "^18.2.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "yaml": "^2.9.0",
-    "@hackdevcode/dsh-client-ui-file-drag": "workspace:*"
+    "@hackdevcode/dsh-client-ui-file-drag": "workspace:*",
+    "@hackdevcode/dsh-client-ui-context-menu": "workspace:*"
   },
   "files": [
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
     "lib/client.*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "dependencies": {
     "@hackdevcode/schemastery": "workspace:~"

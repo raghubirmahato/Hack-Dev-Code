@@ -2,8 +2,8 @@
 // The built-bundle boot smoke: the assembled-jsdom test that owns the boot
 // graph itself. Other files share the same scaffolding (assembled-boot.ts) to
 // reach a surface only the built bundles expose; this one asserts that the
-// graph assembles at all — staged activation across the immediately tier and
-// the inject layers, per-plugin CSS injection, and a rendered journey reaching
+// graph assembles at all — activation across the immediately tier and
+// the inject layers, renderer-owned module styles, and a rendered journey reaching
 // chat content from the keyless RemoteMock scenario.
 //
 // Component behavior remains owned by per-package suites (SlotTestRuntime
@@ -62,13 +62,18 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   // The sidebar renders from the boot graph: every inject layer activated.
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
   if (clientBuildValue('DSH_CLIENT_BUILD_PROFILE') === 'official') {
-    expect(document.querySelector('svg[viewBox="30 0 126 24"]')).not.toBeNull()
-    expect(screen.queryByText('Hack Dev Code')).toBeNull()
+    expect(document.querySelector('svg[viewBox="26 0 156 24"]')).not.toBeNull()
+    expect(screen.queryByText('DSH Local Build')).toBeNull()
   } else {
-    expect(document.querySelector('svg[viewBox="0 0 24 24"]')).not.toBeNull()
-    screen.getByText('Hack Dev Code')
-    // The brand never shows build metadata.
-    expect(screen.queryByText(clientBuildValue('DSH_CLIENT_VERSION') ?? 'no-version-recorded')).toBeNull()
+    expect(document.querySelector('svg[viewBox="0 0 23.16 17.04"]')).not.toBeNull()
+    const version = clientBuildValue('DSH_CLIENT_VERSION')
+    if (version === undefined) throw new Error('default client build record must carry DSH_CLIENT_VERSION')
+    const commit = clientBuildValue('DSH_CLIENT_COMMIT_HASH')
+    const buildVersion = version
+      + (commit === undefined ? '' : `-${commit}`)
+      + (clientBuildValue('DSH_CLIENT_GIT_DIRTY') === 'true' ? '-dirty' : '')
+    screen.getByText('DSH Local Build')
+    screen.getByText(buildVersion)
   }
   // The compact layout dropped group session counts; the fixture workspace
   // group row renders immediately with its sessions beneath it.
@@ -80,7 +85,7 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
   // The resident fixture has both a question and an approval; composer routing
   // exposes the question first, and the assembled workspace plugin mirrors that
   // actionable wait instead of the underlying running state.
-  const waitingTitle = await within(tree).findByText('Fixture history session')
+  const waitingTitle = await within(tree).findByText('Fixture \u5386\u53f2\u4f1a\u8bdd')
   const waitingRow = waitingTitle.closest<HTMLElement>('[role="treeitem"]')
   if (waitingRow === null) throw new Error('fixture Session title must belong to a tree row')
   expect(waitingRow.querySelector('[data-state="warning"]')).not.toBeNull()
@@ -175,7 +180,7 @@ it('boots without ui-chat and does not select another conversation view implicit
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
   const boot = Reflect.get(window, '__DSH_BOOT__') as { entries: Array<{ id: string }> } | undefined
   expect(boot?.entries.some(entry => entry.id === '@hackdevcode/dsh-client-ui-chat')).toBe(false)
-  const sessionTitle = await within(tree).findByText('Fixture history session')
+  const sessionTitle = await within(tree).findByText('Fixture \u5386\u53f2\u4f1a\u8bdd')
   fireEvent.click(sessionTitle)
   await waitFor(() => {
     expect(document.querySelector('[data-slot="conversation.session"]')).not.toBeNull()

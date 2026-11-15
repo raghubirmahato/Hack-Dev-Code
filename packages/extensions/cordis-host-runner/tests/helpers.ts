@@ -2,7 +2,8 @@ import { executeToolFixture } from '@hackdevcode/dsh-tool-testkit'
 import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import { Context } from '@hackdevcode/cordis'
 import Timer from '@hackdevcode/cordis-plugin-timer'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRegistry from '@hackdevcode/dsh-tools'
 import type { ToolDefinition, ToolExecutionResult } from '@hackdevcode/dsh-tools'
@@ -150,7 +151,7 @@ let callCounter = 0
 export function call(ctx: Context, name: string, args: unknown): Promise<ToolExecutionResult> {
   return executeToolFixture(ctx, {
     signal: new AbortController().signal,
-    callId: ToolCallId(`call-${++callCounter}`),
+    callId: brandString<ToolCallId>(`call-${++callCounter}`),
     name,
     arguments: args,
   })

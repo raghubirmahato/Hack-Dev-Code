@@ -5,8 +5,10 @@ import { join } from 'node:path'
 import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, selectedSessionFixture, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { saveFailureShot, connectFreshWorkspace } from './support.ts'
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  launchWebScaffold, selectedSessionFixture, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
+import { connectFreshWorkspaceZh, saveFailureShot, ZH_BROWSER_LOCALE } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/deepseek-messages-chat', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.v3.jsonl')
@@ -35,10 +37,10 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek Messages conversation', ()
     })
     await scaffold.ctx.agentDefaultModel.saveSelection({ provider: 'deepseek-messages', model: 'deepseek-v4-flash' })
     browser = await chromium.launch()
-    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-    await connectFreshWorkspace(page, scaffold.workspaceCwd)
+    await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
   }, 120_000)
 
   afterAll(async () => {
@@ -50,10 +52,10 @@ describe.skipIf(MODE === 'record')('web e2e: DeepSeek Messages conversation', ()
     const prompts = fixtureUserPrompts(await readFile(replayFixture, 'utf8'))
     expect(prompts).toHaveLength(1)
     expect(scaffold.ctx.agentDefaultModel.currentSelection()).toEqual({ provider: 'deepseek-messages', model: 'deepseek-v4-flash' })
-    await page.getByRole('button', { name: /^Choose models/ }).click()
-    await page.getByRole('menuitem', { name: /Model/ }).click()
-    await page.getByText('DeepSeek', { exact: true }).waitFor()
-    await page.getByRole('button', { name: /^Choose models/ }).click()
+    await page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ }).click()
+    await page.getByRole('menuitem', { name: /\u6a21\u578b/ }).click()
+    await page.getByRole('group', { name: 'DeepSeek', exact: true }).waitFor()
+    await page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ }).click()
     const input = page.locator('[data-composer-input]').first()
     const settled = scaffold.whenTurnSettled()
     await input.fill(prompts[0]!)

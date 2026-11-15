@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
 import { expect, it } from 'vitest'
-import { entryListSchema } from '@hackdevcode/cordis-plugin-include'
-import yaml from 'js-yaml'
+import { parseEntryYaml } from '@hackdevcode/cordis-plugin-include'
 import { WELCOME_NOTICE_VERSION, launchWebScaffold, watchConsole } from './scaffold.ts'
+import { ZH_BROWSER_LOCALE } from './support.ts'
 
 it('imports settings.yaml into the profile once and applies the imported values', async () => {
   const harnessHome = mkdtempSync(join(tmpdir(), 'dsh-settings-import-'))
@@ -23,14 +23,14 @@ it('imports settings.yaml into the profile once and applies the imported values'
     const patchPath = join(harnessHome, 'profiles', 'scaffold', 'cordis.patch.yml')
     type Row = { id?: string; config?: Record<string, unknown> }
     const config = (id: string): Record<string, unknown> | undefined =>
-      (yaml.load(readFileSync(patchPath, 'utf8'), { schema: entryListSchema }) as Row[]).find(row => row.id === id)?.config
+      (parseEntryYaml(readFileSync(patchPath, 'utf8')) as Row[]).find(row => row.id === id)?.config
     await expect.poll(() => config('ui-theme')?.['fontSize'], { timeout: 10_000 }).toBe(16)
     expect(config('ui-settings')?.['enabled']).toBe(false)
     expect(config('ui-settings-general')?.['welcomeNoticeVersion']).toBe(WELCOME_NOTICE_VERSION)
     expect(existsSync(join(harnessHome, 'settings.yaml'))).toBe(false)
     expect(readFileSync(join(harnessHome, 'settings.yaml.imported'), 'utf8')).toContain('fontSize: 16')
 
-    const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     const tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })

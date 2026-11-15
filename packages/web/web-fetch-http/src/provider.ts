@@ -10,6 +10,7 @@ import { WebError } from '@hackdevcode/dsh-web'
 import type { WebFetchBody, WebFetchProvider, WebFetchRequest, WebFetchResult } from '@hackdevcode/dsh-web'
 import { deadline, timeoutOf } from '@hackdevcode/dsh-timeout'
 import type { Response } from 'undici'
+import { classifyTransportFailure } from './transport-failure.ts'
 import { classifyContentType, decoderForCharset, isSameOrigin, parseCharset, validateFetchUrl } from './policy.ts'
 
 /** Resolved provider limits (the plugin's schemastery Config supplies defaults). */
@@ -32,6 +33,10 @@ export const LOCAL_FETCH_PROVIDER_ID = 'http'
 /** The anonymous HTTP(S) fetch provider. */
 export class HttpFetchProvider implements WebFetchProvider {
   readonly id = LOCAL_FETCH_PROVIDER_ID
+  /** Picker description: what this provider suits and what it costs or cannot do. */
+  readonly description: NonNullable<WebFetchProvider['description']> = {
+    en: 'Free, and can reach intranet and local addresses. Does not support pages that need JavaScript or sign-in, or PDFs.',
+  }
 
   /** @param limits - resolved transport and response limits. */
   constructor(private readonly limits: HttpFetchLimits) {}
@@ -238,11 +243,12 @@ function resolveRedirect(location: string, base: URL): URL {
  * recovering OUR reason means our timeout fired (`WEB_FETCH_TIMEOUT`); any other
  * abort — an upstream cancel, or a foreign/outer deadline's timeout under
  * nesting — is `WEB_ABORTED`; a throw with the signal NOT aborted is a
- * transport/network failure (`WEB_PROVIDER_ERROR`).
+ * transport failure, classified by {@link classifyTransportFailure}.
  */
 function translateAbortOrNetwork(error: unknown, signal: AbortSignal): WebError {
   const timeout = timeoutOf(signal, 'WEB_FETCH_TIMEOUT')
   if (timeout !== undefined) return new WebError('web fetch timed out', 'WEB_FETCH_TIMEOUT', { cause: timeout })
   if (signal.aborted) return new WebError('web fetch aborted', 'WEB_ABORTED', { cause: error })
-  return new WebError(`web fetch failed: ${String(error)}`, 'WEB_PROVIDER_ERROR', { cause: error })
+  const failure = classifyTransportFailure(error)
+  return new WebError(`web fetch failed: ${failure.message}`, failure.code, { cause: error })
 }

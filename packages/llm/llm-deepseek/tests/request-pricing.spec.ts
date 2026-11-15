@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { offloadedImageText, requestImageHandleText, textOnlyImageText } from '@hackdevcode/dsh-llm'
 import type { ImageBlock } from '@hackdevcode/dsh-llm'
-import { AttachmentId } from '@hackdevcode/dsh-attachment'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { AttachmentId } from '@hackdevcode/dsh-attachment/types'
 import type { ImageAttachmentRef } from '@hackdevcode/dsh-attachment'
 import { deepSeekImageRequestPricing } from '../src/request-pricing.ts'
 import { resolveAdapterOptions } from '../src/index.ts'
@@ -15,7 +16,7 @@ const VISION_MODEL = {
 
 function ref(name: string, width: number, height: number, bytes = 1024): ImageAttachmentRef {
   return {
-    attachmentId: AttachmentId(`sha256:${name.padEnd(8, '0')}`),
+    attachmentId: brandString<AttachmentId>(`sha256:${name.padEnd(8, '0')}`),
     mediaType: 'image/png',
     bytes,
     width,

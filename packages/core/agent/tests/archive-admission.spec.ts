@@ -2,10 +2,11 @@ import { unsupportedModel } from '@hackdevcode/dsh-agent-loop-testkit'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
-import { Session, SessionId } from '@hackdevcode/dsh-session'
+import { Session, type SessionId } from '@hackdevcode/dsh-session'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import type { Agent, AgentCancelCause, AgentStatus, CancelOptions } from '@hackdevcode/dsh-agent'
 import type { SessionActivity } from '@hackdevcode/dsh-workspace'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 type CancelCall = [AgentCancelCause, CancelOptions | undefined]
 
@@ -13,7 +14,7 @@ type CancelCall = [AgentCancelCause, CancelOptions | undefined]
 type LiveAgent = Agent & { cancels: CancelCall[]; setStatus(status: AgentStatus): void }
 
 async function liveAgent(ctx: Context, rawId: string, initial: AgentStatus): Promise<LiveAgent> {
-  const id = SessionId(rawId)
+  const id = brandString<SessionId>(rawId)
   const cancels: CancelCall[] = []
   let status = initial
   const agent: LiveAgent = {
@@ -56,9 +57,9 @@ describe('Turn archive admission', () => {
     ctx.on('workspace/session-activity', async (_request, next) => [...(await next()), { kind: 'probe' }])
 
     expect(await ask(ctx, agent.id)).toEqual([{ kind: 'turn' }, { kind: 'probe' }])
-    expect(await ask(ctx, SessionId('quiet'))).toEqual([{ kind: 'probe' }])
+    expect(await ask(ctx, brandString<SessionId>('quiet'))).toEqual([{ kind: 'probe' }])
     // A Session without a live Agent has no turn that could run.
-    expect(await ask(ctx, SessionId('cold-or-unknown'))).toEqual([{ kind: 'probe' }])
+    expect(await ask(ctx, brandString<SessionId>('cold-or-unknown'))).toEqual([{ kind: 'probe' }])
     agent.setStatus('idle')
     expect(await ask(ctx, agent.id)).toEqual([{ kind: 'probe' }])
   })
@@ -72,7 +73,7 @@ describe('Turn archive admission', () => {
 
     await stop(ctx, running.id)
     await stop(ctx, idle.id)
-    await stop(ctx, SessionId('nobody'))
+    await stop(ctx, brandString<SessionId>('nobody'))
     expect(running.cancels).toEqual([[{ kind: 'user' }, undefined]])
     expect(idle.cancels).toEqual([])
   })

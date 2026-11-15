@@ -2,7 +2,9 @@ import type { Context } from '@hackdevcode/cordis'
 import { existsSync, writeFileSync } from 'node:fs'
 import { setTimeout } from 'node:timers/promises'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@hackdevcode/dsh-llm'
-import { LlmAdapter, ReasoningEffortId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ReasoningEffortId } from '@hackdevcode/dsh-llm/types'
+import { LlmAdapter } from '@hackdevcode/dsh-llm'
 
 /**
  * Scripted model for the CHILD runtime: validates either the routed success
@@ -16,7 +18,7 @@ class RouteEchoAdapter extends LlmAdapter {
       id: model,
       name: model,
       reasoning: {
-        efforts: [{ id: ReasoningEffortId('max'), name: 'Maximum' }],
+        efforts: [{ id: brandString<ReasoningEffortId>('max'), name: 'Maximum' }],
       },
     })
   }

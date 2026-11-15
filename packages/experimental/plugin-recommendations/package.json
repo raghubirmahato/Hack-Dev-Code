@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-plugin-recommendations",
   "description": "Official plugin suggestions with explicit user activation and persistent conversation decisions",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -43,6 +43,7 @@
     "@hackdevcode/dsh-skill": "workspace:*"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-typert-protocol": "workspace:*",
     "@hackdevcode/dsh-llm": "workspace:*",
@@ -54,7 +55,7 @@
     "@hackdevcode/dsh-skill": "workspace:*"
   },
   "dependencies": {
-    "zod": "4.4.3",
+    "zod": "4.6.6",
     "@hackdevcode/dsh-client-ui-plugin-recommendations": "workspace:*",
     "@hackdevcode/dsh-action-cards": "workspace:*",
     "@hackdevcode/dsh-client-ui-action-cards": "workspace:*"
@@ -66,10 +67,14 @@
     "skills/*.md",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "lib/typert.remote-client.d.ts.map",
+    "src"
   ],
   "icon": "./icon.svg"
 }

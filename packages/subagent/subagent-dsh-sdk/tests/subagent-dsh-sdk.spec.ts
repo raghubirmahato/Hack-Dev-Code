@@ -25,7 +25,8 @@ import {
 import { createProcessHackDevCode } from '../../../sdk/client/src/api.ts'
 import type { RuntimeProcessOptions } from '../../../sdk/client/src/launch.ts'
 import type { HackDevCodeOptions } from '@hackdevcode/dsh-sdk-client'
-import { ReasoningEffortId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ReasoningEffortId } from '@hackdevcode/dsh-llm/types'
 import * as sdk from '../src/index.ts'
 import {
   DEFAULT_DISPOSE_EOF_GRACE_MS,
@@ -224,7 +225,7 @@ describe('dsh-subagent-dsh-sdk provider', () => {
     try {
       const ctx = await setup({ FAKE_RECORD_INIT: recordFile }, { maxTokens: 4096 })
       const run = await startExternalActivation(ctx, 'dsh-sdk', request('partial', new AbortController().signal, {
-        reasoningEffort: ReasoningEffortId('high'),
+        reasoningEffort: brandString<ReasoningEffortId>('high'),
       }))
       await run.result
       await run.dispose()
@@ -251,13 +252,13 @@ describe('dsh-subagent-dsh-sdk provider', () => {
         startExternalActivation(ctx, 'dsh-sdk', request('first', new AbortController().signal, {
           provider: 'provider-a',
           model: 'model-a',
-          reasoningEffort: ReasoningEffortId('high'),
+          reasoningEffort: brandString<ReasoningEffortId>('high'),
           maxTokens: 111,
         })),
         startExternalActivation(ctx, 'dsh-sdk', request('second', new AbortController().signal, {
           provider: 'provider-b',
           model: 'model-b',
-          reasoningEffort: ReasoningEffortId('max'),
+          reasoningEffort: brandString<ReasoningEffortId>('max'),
           maxTokens: 222,
         })),
       ])

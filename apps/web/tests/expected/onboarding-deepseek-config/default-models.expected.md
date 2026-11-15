@@ -18,6 +18,8 @@
       - button "Authentication details": "?"
       - textbox "API key":
         - /placeholder: Leave blank to use saved credentials
+        - /placeholder: dsh_onboa•••••••••••••••••••••••••••••••test
+      - paragraph: 使用已保存的 API key。
       - group:
         - text: Customized settings Base URL
         - textbox "Base URL":

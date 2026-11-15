@@ -1,4 +1,4 @@
-/** Browser-use provider identities. @module @hackdevcode/dsh-browser-use/brand */
+/** Browser-use provider identities. @module @hackdevcode/dsh-browser-use/src/brand.ts */
 
 import type { Branded } from '@hackdevcode/dsh-brand'
 

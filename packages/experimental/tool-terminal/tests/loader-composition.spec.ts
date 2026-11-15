@@ -9,8 +9,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import Include from '@hackdevcode/cordis-plugin-include'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
-import { Session, SessionId } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
+import { Session, type SessionId } from '@hackdevcode/dsh-session'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
@@ -42,7 +43,7 @@ class PassthroughSandbox extends SandboxProvider {
 
 async function agent(ctx: Context): Promise<Agent> {
   const scope = ctx.plugin(() => {})
-  const id = SessionId('pty-loader-agent')
+  const id = brandString<SessionId>('pty-loader-agent')
   const session = Session.create(id)
   const value: Agent = {
     id, options: {}, session, model: unsupportedModel(),
@@ -125,15 +126,15 @@ suite('terminal real Loader composition through cordis.yml', () => {
     const owner = await agent(context)
     const signal = new AbortController().signal
     const spawn = await executeToolFixture(context, {
-      signal, callId: ToolCallId('spawn'), name: 'terminal_open', arguments: { type: 'shell', name: 'main', cwd: root }, agent: owner,
+      signal, callId: brandString<ToolCallId>('spawn'), name: 'terminal_open', arguments: { type: 'shell', name: 'main', cwd: root }, agent: owner,
     })
     expect(resultText(spawn)).toContain('started terminal session pty-1 (main)')
 
     await executeToolFixture(context, {
-      signal, callId: ToolCallId('state'), name: 'terminal_send', arguments: { sessionId: 'pty-1', text: 'export KEEP=loader; cd /' }, agent: owner,
+      signal, callId: brandString<ToolCallId>('state'), name: 'terminal_send', arguments: { sessionId: 'pty-1', text: 'export KEEP=loader; cd /' }, agent: owner,
     })
     const read = await executeToolFixture(context, {
-      signal, callId: ToolCallId('read'), name: 'terminal_send', arguments: { sessionId: 'pty-1', text: 'printf "cwd=%s keep=%s\\n" "$PWD" "$KEEP"' }, agent: owner,
+      signal, callId: brandString<ToolCallId>('read'), name: 'terminal_send', arguments: { sessionId: 'pty-1', text: 'printf "cwd=%s keep=%s\\n" "$PWD" "$KEEP"' }, agent: owner,
     })
     expect(resultText(read)).toContain('cwd=/ keep=loader')
     expect(context.terminals.list(owner)).toHaveLength(1)

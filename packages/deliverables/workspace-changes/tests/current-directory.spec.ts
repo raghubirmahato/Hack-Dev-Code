@@ -6,12 +6,13 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@hackdevcode/dsh-agent-loop-testkit'
 import { createUserMessage } from '@hackdevcode/dsh-llm'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import LocalSubprocessRuntime from '@hackdevcode/dsh-subprocess-local'
 import * as ToolFs from '@hackdevcode/dsh-tool-fs'
 import * as StrReplaceEditor from '@hackdevcode/dsh-tool-str-replace-editor'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 import * as WorkspaceChanges from '../src/index.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const cleanups: Array<() => Promise<unknown>> = []
 afterEach(async () => {
@@ -40,7 +41,7 @@ it.each(['write', 'edit', 'str_replace_editor'] as const)('captures the resolved
       ? { file_path: 'witness.txt', old_string: 'before', new_string: 'after' }
       : { command: 'str_replace', path: join(current, 'witness.txt'), old_str: 'before', new_str: 'after' }
   ctx.llm.registerAdapter(['mock'], new MockAdapter([toolCallResponse('mutation', name, args), textResponse('done')]))
-  const agent = await harness.create(SessionId('capture-current'), { provider: 'mock', model: 'mock' }, { cwd: origin })
+  const agent = await harness.create(brandString<SessionId>('capture-current'), { provider: 'mock', model: 'mock' }, { cwd: origin })
   await ctx.workingDirectory.set(agent, current)
   // A later directory change cannot alter the filesystem's already resolved mutation target.
   const changeDirectory = async <T>(next: () => T): Promise<Awaited<T>> => {

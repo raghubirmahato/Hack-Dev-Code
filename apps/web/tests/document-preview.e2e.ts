@@ -14,7 +14,7 @@ import { excelDrawingFixture } from '../../../packages/client/ui-sidebar-documen
 import { xlsFixture } from '../../../packages/client/ui-sidebar-documentpreview/tests/xls-fixture.ts'
 import { pdfFixture, selectionPdfFixture } from '../../../packages/client/ui-sidebar-documentpreview/tests/pdf-fixture.ts'
 import { assertFixtureInventory, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { openSettings, connectFreshWorkspace, newEnglishPage, saveFailureShot, scrollIntoView } from './support.ts'
+import { openSettings, connectFreshWorkspace, connectFreshWorkspaceZh, newEnglishPage, saveFailureShot, scrollIntoView } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/lifecycle-chrome/session.v3.jsonl', import.meta.url))
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/document-preview', import.meta.url))
@@ -171,8 +171,7 @@ async function expectExcelLayout(excel: Locator): Promise<void> {
   }))).toBe(true)
 }
 
-it.skipIf(MODE === 'record')('fills the spreadsheet pane with read-only controls', async () => {
-  const locale = 'en-US'
+it.skipIf(MODE === 'record').each(['en-US', 'zh-CN'])('fills the spreadsheet pane with read-only controls in %s', async (locale) => {
   const scaffold = await launchWebScaffold({ replayFixture: FIXTURE, paceMs: 5, compareReplaySession: false })
   let browser: Browser | undefined
   try {
@@ -181,7 +180,7 @@ it.skipIf(MODE === 'record')('fills the spreadsheet pane with read-only controls
     const consoleErrors = watchConsole(page)
     onTestFailed(async () => { await saveFailureShot(page, `screenshots/0908-document-preview/excel-resize-${locale}-${process.pid}`) })
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-    await connectFreshWorkspace(page, scaffold.workspaceCwd)
+    await (locale === 'zh-CN' ? connectFreshWorkspaceZh : connectFreshWorkspace)(page, scaffold.workspaceCwd)
     const settled = scaffold.whenTurnSettled()
     const input = page.locator('[data-composer-input]').first()
     await input.fill(PROMPT)
@@ -189,7 +188,7 @@ it.skipIf(MODE === 'record')('fills the spreadsheet pane with read-only controls
     const sessionId = await settled
     const cwd = scaffold.ctx.agents.get(sessionId)?.session.header.cwd
     if (cwd === undefined) throw new Error('settled Session has no workspace cwd')
-    const longCellText = 'Monthly export/import matrix and category comparison. All product categories by month export/import matrix and structure comparison chart (formula summary) '.repeat(3)
+    const longCellText = 'Monthly export/import matrix and category comparison. \u5404\u5546\u54c1\u7c7b\u522b\u5206\u6708\u51fa\u53e3/\u8fdb\u53e3\u77e9\u9635\u4e0e\u7ed3\u6784\u5bf9\u6bd4\u56fe\uff08\u516c\u5f0f\u6c47\u603b\uff09 '.repeat(3)
     await Promise.all([
       writeFile(join(cwd, 'budget.xlsx'), await excelFixture()),
       writeFile(join(cwd, 'meeting.xlsx'), await meetingMinutesFixture()),
@@ -204,7 +203,7 @@ it.skipIf(MODE === 'record')('fills the spreadsheet pane with read-only controls
     await column.locator('[data-files-state="tree"]').waitFor({ state: 'visible' })
     await column.locator('[data-files-entry="file"]').getByRole('button', { name: 'budget.xlsx', exact: true }).click()
     const excel = column.locator('[data-excel-preview]')
-    await excel.locator('.luckysheet-sheets-item-name').getByText('Formulas and Formatting', { exact: true }).click()
+    await excel.locator('.luckysheet-sheets-item-name').getByText('\u516c\u5f0f\u4e0e\u683c\u5f0f', { exact: true }).click()
     await excel.locator('.fortune-sheet-overlay').click({ position: { x: 140, y: 30 } })
     const formula = excel.locator('.fortune-fx-input')
     await expect.poll(() => formula.innerText()).toBe('46281')
@@ -263,12 +262,12 @@ it.skipIf(MODE === 'record')('fills the spreadsheet pane with read-only controls
     await expect.poll(() => zoom.innerText()).toBe('150%')
     await zoom.click()
     await excel.locator('.fortune-zoom-ratio-item').getByText('100%', { exact: true }).click()
-    const filesTab = column.locator('[data-dockkit-tab]').filter({ has: page.getByText('Files', { exact: true }) })
+    const filesTab = column.locator('[data-dockkit-tab]').filter({ has: page.getByText(locale === 'zh-CN' ? '\u6587\u4ef6' : 'Files', { exact: true }) })
     const preview = column.locator('[data-textpreview-url]')
     await openPreviewFile(column, filesTab, preview, 'meeting.xlsx')
     const tabScroller = excel.locator('.fortune-sheettab-container-c')
     const activeSheet = excel.locator('.luckysheet-sheets-item-active .luckysheet-sheets-item-name')
-    await expect.poll(() => activeSheet.innerText()).toBe('Meeting info')
+    await expect.poll(() => activeSheet.innerText()).toBe('\u4f1a\u8bae\u4fe1\u606f')
     const meetingCanvas = await canvas.elementHandle()
     if (meetingCanvas === null) throw new Error('meeting spreadsheet canvas is unavailable')
     await expectExcelLayout(excel)
@@ -282,7 +281,7 @@ it.skipIf(MODE === 'record')('fills the spreadsheet pane with read-only controls
     await expect.poll(() => formula.innerText()).toBe('')
     await page.keyboard.press('ArrowLeft')
     await expect.poll(() => selection.innerText()).toBe('A1')
-    await expect.poll(() => formula.innerText()).toBe('Meeting minutes')
+    await expect.poll(() => formula.innerText()).toBe('\u4f1a\u8bae\u7eaa\u8981')
     for (const width of [1000, 360, 1000, 360]) {
       await layout.evaluate((node, width) => { node.textContent = `[data-sidebar-right-panel] { width: ${width}px !important; }` }, width)
       await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(width)
@@ -297,7 +296,7 @@ it.skipIf(MODE === 'record')('fills the spreadsheet pane with read-only controls
     await expect.poll(() => tabScroller.evaluate(node => node.scrollLeft)).toBeGreaterThan(0)
     await page.mouse.wheel(-1000, 0)
     await expect.poll(() => tabScroller.evaluate(node => node.scrollLeft)).toBe(0)
-    expect(await activeSheet.innerText()).toBe('Meeting info')
+    expect(await activeSheet.innerText()).toBe('\u4f1a\u8bae\u4fe1\u606f')
     expect(await selection.innerText()).toBe('A1')
     expect(await zoom.innerText()).toBe('100%')
     expect(await excel.locator('.luckysheet-scrollbar-x').evaluate(node => node.scrollLeft)).toBe(gridOffset)
@@ -312,7 +311,7 @@ it.skipIf(MODE === 'record')('fills the spreadsheet pane with read-only controls
         await arrow.click()
         await expect.poll(() => tabScroller.evaluate(node => node.scrollLeft)).toBeCloseTo(target, 0)
       }
-      const sheetName = direction === 'right' ? 'Instructions' : 'Meeting info'
+      const sheetName = direction === 'right' ? '\u586b\u5199\u8bf4\u660e' : '\u4f1a\u8bae\u4fe1\u606f'
       await excel.locator('.luckysheet-sheets-item-name').getByText(sheetName, { exact: true }).click()
       await expect.poll(() => activeSheet.innerText()).toBe(sheetName)
       await expectExcelLayout(excel)
@@ -328,7 +327,7 @@ it.skipIf(MODE === 'record')('fills the spreadsheet pane with read-only controls
     await zoom.click()
     await excel.locator('.fortune-zoom-ratio-item').getByText('150%', { exact: true }).click()
     await expect.poll(() => zoom.innerText()).toBe('150%')
-    expect(await activeSheet.innerText()).toBe('Meeting info')
+    expect(await activeSheet.innerText()).toBe('\u4f1a\u8bae\u4fe1\u606f')
     await expectExcelLayout(excel)
     await successShot(page, `excel-navigation-zoom-${locale}`)
     await layout.evaluate((node) => { node.textContent = '' })
@@ -697,8 +696,8 @@ else process.exit(1);
       writeFile(join(cwd, 'meeting.xlsx'), await meetingMinutesFixture()),
       writeFile(join(cwd, 'literal-html.xlsx'), await excelHtmlFixture()),
       writeFile(join(cwd, 'budget.xls'), xlsFixture()),
-      writeFile(join(cwd, 'table.csv'), '00123,"English,Field","=SUM(1,2)"\n2024-03-01,,TRUE'),
-      writeFile(join(cwd, 'table.tsv'), '00123\t"English\tField"\t=SUM(1,2)\n2024-03-01\t\tTRUE'),
+      writeFile(join(cwd, 'table.csv'), '00123,"\u4e2d\u6587,\u5b57\u6bb5","=SUM(1,2)"\n2024-03-01,,TRUE'),
+      writeFile(join(cwd, 'table.tsv'), '00123\t"\u4e2d\u6587\t\u5b57\u6bb5"\t=SUM(1,2)\n2024-03-01\t\tTRUE'),
       ...['doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'].map(extension => writeFile(join(cwd, `unavailable.${extension}`), Buffer.from('PK\u0003\u0004OFFICE_BINARY_PREVIEW'))),
       writeFile(join(cwd, 'clip.mp4'), Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70])),
     ])
@@ -715,7 +714,7 @@ else process.exit(1);
     const initialFilesClose = await filesTab.locator('[data-dockkit-tab-close]').count()
     expect(initialFilesClose).toBe(1)
     await filesTab.click({ button: 'right' })
-    expect(await page.locator('[data-dockkit-tab-menu]:visible').count()).toBe(1)
+    await page.locator('[data-context-menu][role="menu"]').waitFor()
     await page.keyboard.press('Escape')
     await addTab.waitFor({ state: 'visible' })
     const initialAdd = await addTab.count()
@@ -851,7 +850,7 @@ else process.exit(1);
       `- Local script: ${await basicHtml.locator('#local-result').innerText()}`,
       `- Network requests: ${previewNetworkRequests}`,
     ].join('\n'))
-    await openSettings(page)
+    await openSettings(page, 'en')
     const settings = page.getByRole('dialog', { name: 'Settings' })
     await settings.getByRole('switch', { name: 'Show coding view' }).click()
     await expect.poll(() => settings.getByRole('switch', { name: 'Show coding view' }).getAttribute('aria-checked')).toBe('true')
@@ -1333,8 +1332,8 @@ else process.exit(1);
     await openFile('budget.xlsx')
     const excel = preview.locator('[data-excel-preview]')
     const sheetTabs = excel.locator('.luckysheet-sheets-item-name')
-    await sheetTabs.getByText('Quarterly Budget', { exact: true }).waitFor({ state: 'visible' })
-    expect(await sheetTabs.getByText('Hidden page', { exact: true }).isVisible()).toBe(false)
+    await sheetTabs.getByText('\u5b63\u5ea6\u9884\u7b97', { exact: true }).waitFor({ state: 'visible' })
+    expect(await sheetTabs.getByText('\u9690\u85cf\u9875', { exact: true }).isVisible()).toBe(false)
     await successShot(page, 'excel-budget')
     expect(await preview.locator('[data-pdf-preview]').count()).toBe(0)
     expect(await excel.locator('.fortune-toolbar').count()).toBe(0)
@@ -1344,7 +1343,7 @@ else process.exit(1);
     await expect.poll(() => formulaInput.innerText()).toBe('=C3/B3')
     await page.keyboard.press('ControlOrMeta+C')
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('80.0%\n')
-    await sheetTabs.getByText('Formulas and Formatting', { exact: true }).click()
+    await sheetTabs.getByText('\u516c\u5f0f\u4e0e\u683c\u5f0f', { exact: true }).click()
     await expect.poll(() => excel.locator('.fortune-name-box').innerText()).toBe('A1')
     await sheetOverlay.click({ position: { x: 140, y: 30 } })
     await expect.poll(() => formulaInput.innerText()).toBe('46281')
@@ -1360,7 +1359,7 @@ else process.exit(1);
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('42\n')
     await successShot(page, 'excel-cached-formula')
     await openFile('chart-budget.xlsx')
-    await sheetTabs.getByText('Quarterly Budget', { exact: true }).waitFor({ state: 'visible' })
+    await sheetTabs.getByText('\u5b63\u5ea6\u9884\u7b97', { exact: true }).waitFor({ state: 'visible' })
     const unsupportedNotice = excel.locator('[data-excel-unsupported-notice]')
     const chartNotice = await unsupportedNotice.innerText()
     expect(chartNotice).toBe('This preview does not support charts, conditional formatting in this workbook. Open it in a system application for the full experience.')
@@ -1370,24 +1369,24 @@ else process.exit(1);
     await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('80.0%\n')
     await successShot(page, 'excel-chart-notice')
     await openFile('meeting.xlsx')
-    await sheetTabs.getByText('Meeting info', { exact: true }).waitFor({ state: 'visible' })
+    await sheetTabs.getByText('\u4f1a\u8bae\u4fe1\u606f', { exact: true }).waitFor({ state: 'visible' })
     expect(await unsupportedNotice.count()).toBe(0)
     expect(await excel.getByText('Read-only preview', { exact: false }).count()).toBe(0)
     expect(await excel.getByText('Some formulas have no saved result', { exact: false }).count()).toBe(0)
     const formulaWarning = excel.locator('[data-excel-formula-warning]')
     await formulaWarning.hover()
     await page.getByText('This workbook contains formulas. Displayed results may be missing or inaccurate.', { exact: true }).waitFor()
-    await sheetTabs.getByText('Statistics dashboard', { exact: true }).click()
+    await sheetTabs.getByText('\u7edf\u8ba1\u770b\u677f', { exact: true }).click()
     await expect.poll(() => excel.locator('.fortune-name-box').innerText()).toBe('A1')
     await successShot(page, 'excel-meeting')
     await openFile('budget.xls')
-    await sheetTabs.getByText('Budget', { exact: true }).waitFor({ state: 'visible' })
+    await sheetTabs.getByText('\u9884\u7b97', { exact: true }).waitFor({ state: 'visible' })
     await expect.poll(() => excel.locator('.fortune-name-box').innerText()).toBe('A1')
     await excel.locator('.fortune-sheet-overlay').click({ position: { x: 70, y: 30 } })
-    await expect.poll(() => excel.locator('.fortune-fx-input').innerText()).toBe('Legacy budget')
+    await expect.poll(() => excel.locator('.fortune-fx-input').innerText()).toBe('\u65e7\u7248\u9884\u7b97')
     await page.keyboard.press('ControlOrMeta+C')
-    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('Legacy budget')
-    await sheetTabs.getByText('Details', { exact: true }).click()
+    await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toContain('\u65e7\u7248\u9884\u7b97')
+    await sheetTabs.getByText('\u660e\u7ec6', { exact: true }).click()
     await expect.poll(() => excel.locator('.fortune-name-box').innerText()).toBe('A1')
     await successShot(page, 'excel-legacy')
     await openFile('literal-html.xlsx')
@@ -1415,7 +1414,7 @@ else process.exit(1);
     sections.push([
       '## Browser Excel preview', '',
       '- Opens without the Office conversion service',
-      '- Sheets: Quarterly Budget | Formulas and Formatting; hidden worksheet omitted',
+      '- Sheets: \u5b63\u5ea6\u9884\u7b97 | \u516c\u5f0f\u4e0e\u683c\u5f0f; hidden worksheet omitted',
       '- Formula workbooks use a compact warning beside fx; notice rows absent',
       `- Unsupported XLSX content: ${chartNotice}`,
       '- Drawing parts omitted; styled cells and cached formulas retained; notice cleared on file replacement',
@@ -1446,7 +1445,7 @@ else process.exit(1);
       await viewer.click()
       await page.getByRole('menuitem', { name: 'Spreadsheet', exact: true }).click()
       await excel.getByText(extension.toUpperCase(), { exact: true }).waitFor()
-      await writeFile(join(cwd, `table.${extension}`), extension === 'csv' ? '00999,Update' : '00999\tUpdate')
+      await writeFile(join(cwd, `table.${extension}`), extension === 'csv' ? '00999,\u66f4\u65b0' : '00999\t\u66f4\u65b0')
       await preview.locator('[data-textpreview-tool="reload"]').click()
       await expect.poll(() => excel.locator('.fortune-fx-input').innerText()).toBe('00999')
       await excel.locator('.fortune-sheet-overlay').click({ position: { x: 70, y: 30 } })
@@ -1564,6 +1563,62 @@ else process.exit(1);
     await compareOrRefreshGolden(EXPECTED, sections.join('\n\n'), MODE)
     await assertFixtureInventory(SNAPSHOT_DIR, ['document.expected.md', 'applications.expected.md', 'applications-no-default.expected.md', 'paging.patch.yml'])
   })
+
+  it('preserves Markdown reading position beyond the first page after automatic and manual refresh', async () => {
+    onTestFailed(() => saveFailureShot(page, `screenshots/0908-document-preview/refresh-scroll-${process.pid}`))
+    if (await page.getByText('LIGHTHOUSE', { exact: true }).count() === 0) {
+      const settled = scaffold.whenTurnSettled()
+      const input = page.locator('[data-composer-input]').first()
+      await input.fill(PROMPT)
+      await input.press('Enter')
+      await settled
+      await page.getByText('LIGHTHOUSE', { exact: true }).waitFor()
+    }
+    const cwd = scaffold.ctx.agents.list()[0]?.session.header.cwd
+    if (cwd === undefined) throw new Error('Session has no workspace cwd')
+    const path = join(cwd, 'refresh-scroll.md')
+    const markdown = '# Before refresh\n\n' + Array.from({ length: PAGE_LINES * 2 }, (_, index) => `Paragraph ${index + 1}\n`).join('\n')
+    await writeFile(path, markdown)
+    const column = page.locator('[data-rightbar-col]')
+    const expand = page.locator('[data-sidebar-right-expand]')
+    if (await expand.isVisible()) await expand.click()
+    const filesTab = column.locator('[data-dockkit-tab]').filter({ has: page.getByText('Files', { exact: true }) })
+    if (await filesTab.count() === 0) await column.locator('[data-sidebar-right-guide-entry="files"]').click()
+    await filesTab.click()
+    await column.locator('[data-files-reload]').click()
+    const preview = column.locator('[data-textpreview-url]')
+    await openPreviewFile(column, filesTab, preview, 'refresh-scroll.md')
+    const body = preview.locator('[data-textpreview-body]')
+    const heading = body.getByRole('heading', { level: 1 })
+    await expect.poll(() => heading.textContent()).toBe('Before refresh')
+    await expect.poll(() => preview.locator('[data-textpreview-more]').isEnabled()).toBe(true)
+    const target = await body.evaluate(node => node.scrollHeight + 100)
+    await scrollForNextPage(body)
+    await expect.poll(() => body.evaluate(node => node.scrollHeight - node.clientHeight)).toBeGreaterThan(target)
+    await body.evaluate((node, top) => new Promise<void>((resolve) => {
+      node.addEventListener('scroll', () => { resolve() }, { once: true })
+      node.scrollTop = top
+    }), target)
+    const original = await body.evaluate(node => node.scrollTop)
+    expect(original).toBe(target)
+    // Content growing above the viewport keeps the pixel offset instead of following the content.
+    await heading.evaluate((node) => { node.style.paddingTop = '300px' })
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))))
+    expect(await body.evaluate(node => node.scrollTop)).toBe(original)
+    await heading.evaluate((node) => { node.style.paddingTop = '' })
+
+    await writeFile(path, markdown.replace('Before refresh', 'After  refresh'))
+    await expect.poll(() => heading.textContent()).toBe('After  refresh')
+    await expect.poll(() => body.evaluate((node, top) => Math.abs(node.scrollTop - top), original)).toBeLessThanOrEqual(1)
+
+    const rendered = await heading.elementHandle()
+    await preview.locator('[data-textpreview-tool="reload"]').click()
+    await expect.poll(() => rendered!.evaluate(node => node.isConnected)).toBe(false)
+    await expect.poll(() => heading.textContent()).toBe('After  refresh')
+    await expect.poll(() => body.evaluate((node, top) => Math.abs(node.scrollTop - top), original)).toBeLessThanOrEqual(1)
+    await rendered!.dispose()
+    expect(tripwire.pageErrors).toEqual([])
+  })
 })
 
 describe.skipIf(MODE === 'record')('web e2e: Host Office preview', () => {
@@ -1606,8 +1661,8 @@ describe.skipIf(MODE === 'record')('web e2e: Host Office preview', () => {
       ...['doc', 'ppt'].map(extension => writeFile(join(cwd, `renamed.${extension}`), 'Plain text is not a binary Office document.')),
     ])
     const releaseConversion = Promise.withResolvers<undefined>()
-    const convertOffice = scaffold.ctx.officeToPdf.convert.bind(scaffold.ctx.officeToPdf)
-    const convert = vi.spyOn(scaffold.ctx.officeToPdf, 'convert').mockImplementationOnce(async (...args) => {
+    const convertOffice = scaffold.ctx.officeKit.convert.bind(scaffold.ctx.officeKit)
+    const convert = vi.spyOn(scaffold.ctx.officeKit, 'convert').mockImplementationOnce(async (...args) => {
       await releaseConversion.promise
       return convertOffice(...args)
     })
@@ -1627,7 +1682,7 @@ describe.skipIf(MODE === 'record')('web e2e: Host Office preview', () => {
         await successShot(page, `office-loading-${colorScheme}`)
       }
       const pdfResponse = page.waitForResponse(
-        response => new URL(response.url()).pathname === '/api/officeToPdf/render',
+        response => new URL(response.url()).pathname === '/api/officeKit/render',
         { timeout: 60_000 },
       )
       releaseConversion.resolve(undefined)

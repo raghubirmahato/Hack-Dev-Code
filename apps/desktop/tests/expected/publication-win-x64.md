@@ -8,6 +8,7 @@ After checking the details below, click **Review deployments**, select <code>des
 | Publication environment | <code>test</code> |
 | Version | <code>1.0.0</code> |
 | Update channel | <code>nightly</code> |
+| Staged update rollout | Everyone (not set) |
 | Platform | <code>win-x64</code> |
 | Test release ID | <code>aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</code><br>Random prefix for the test download path that makes the URL harder to guess; consecutive upgrade tests must reuse the same value. |
 | Download URL preview | <a href="https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/hack-dev-code-1.0.0-win-x64.exe">https&#58;//example.com/dsh-desk/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/bin/win-x64/hack-dev-code-1.0.0-win-x64.exe</a><br>Target URLs after publication; downloads are not guaranteed before approval. |

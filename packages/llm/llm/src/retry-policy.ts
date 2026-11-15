@@ -9,7 +9,8 @@
 
 import z from '@hackdevcode/schemastery'
 import { MAX_TIMER_DELAY_MS } from '@hackdevcode/dsh-timeout'
-import { EMPTY_RESPONSE_CODE } from './error.ts'
+import { EMPTY_RESPONSE_CODE, RETRY_CODE_CHOICES } from './error.ts'
+import type { BuiltinLlmFailureCode } from './error.ts'
 
 const DEFAULT_MAX_RETRIES = 5
 // A dropped connection is waited out: with the 60 s delay cap, 40 retries cover about half an hour offline, after
@@ -21,7 +22,7 @@ const DEFAULT_INITIAL_DELAY_MS = 500
 // Free tiers (Gemini, OpenRouter, Groq) often ask for 20 to 60 s after a rate limit; a shorter cap gave up at once.
 const DEFAULT_MAX_DELAY_MS = 60_000
 const DEFAULT_JITTER_RATIO = 0.1
-const DEFAULT_RETRYABLE_CODES = Object.freeze([
+const DEFAULT_RETRYABLE_CODES: readonly BuiltinLlmFailureCode[] = Object.freeze([
   EMPTY_RESPONSE_CODE,
   'RATE_LIMIT',
   // A stream the provider dropped mid-reply is as transient as a transport failure.
@@ -92,9 +93,11 @@ export interface ResolvedAlwaysRetryPolicy extends ResolvedRetryBackoff {
 /** Immutable provider policy captured when its adapter route is registered. */
 export type ResolvedRetryPolicy = ResolvedNormalRetryPolicy | ResolvedAlwaysRetryPolicy
 
+// Field bounds live in the schema so settings forms can read them; resolveRetryPolicy
+// additionally enforces the cross-field rules no field bound expresses.
 const backoffSchema: z<BackoffConfig> = z.object({
-  initialDelayMs: z.number().max(MAX_TIMER_DELAY_MS).default(DEFAULT_INITIAL_DELAY_MS),
-  maxDelayMs: z.number().max(MAX_TIMER_DELAY_MS).default(DEFAULT_MAX_DELAY_MS),
+  initialDelayMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_INITIAL_DELAY_MS),
+  maxDelayMs: z.number().min(Number.MIN_VALUE).max(MAX_TIMER_DELAY_MS).default(DEFAULT_MAX_DELAY_MS),
   jitterRatio: z.number().min(0).max(1).default(DEFAULT_JITTER_RATIO),
 })
 
@@ -102,7 +105,10 @@ const normalPolicySchema: z<NormalRetryPolicyConfig> = z.object({
   mode: z.const('normal').required(),
   maxRetries: z.number().step(1).min(0).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_MAX_RETRIES),
   networkRetries: z.number().step(1).min(0).max(Number.MAX_SAFE_INTEGER).default(DEFAULT_NETWORK_RETRIES),
-  retryableCodes: z.array(z.string()).default([...DEFAULT_RETRYABLE_CODES]),
+  // The constant branches publish the built-in choices to settings forms; the
+  // string branch admits codes that other providers raise.
+  retryableCodes: z.array(z.union([...RETRY_CODE_CHOICES.map(code => z.const(code)), z.string().min(1)]))
+    .min(1).default([...DEFAULT_RETRYABLE_CODES]),
   backoff: backoffSchema,
 })
 

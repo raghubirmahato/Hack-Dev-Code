@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-sdk-client",
   "description": "TypeScript client SDK for driving a Hack Dev Code runtime subprocess over stdio JSON-RPC: the HackDevCode high-level turns API and the lower-level HarnessClient",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -22,10 +22,14 @@
   },
   "files": [
     "lib/index.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "dependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh": "workspace:*"
   },
   "peerDependencies": {

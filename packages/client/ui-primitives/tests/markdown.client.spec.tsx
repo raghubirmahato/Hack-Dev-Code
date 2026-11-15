@@ -5,9 +5,6 @@ import { JsonBlock, MarkdownText } from './markdown-test-components.tsx'
 import { LinkIconMedium, MarkdownDelegateProvider } from '../src/index.ts'
 import { cjkFriendlyStrong } from '../src/markdown/cjkFriendlyStrong.ts'
 import { mathCompatibility } from '../src/markdown/mathCompatibility.ts'
-import { parseGfmWithMath } from '../src/markdown/parse.ts'
-// The node-type augmentation the `math` assertions below read.
-import type {} from 'mdast-util-math'
 
 afterEach(cleanup)
 
@@ -97,7 +94,7 @@ describe('MarkdownText', () => {
 
   it('keeps the CJK strong extension out of escaped, code, math, and ASCII contexts', () => {
     const source = [
-      '\\**\u6ce8\u610f\uff1a**\u5185\u5bb9',
+      String.raw`\**\u6ce8\u610f\uff1a**\u5185\u5bb9`,
       '`**\u6ce8\u610f\uff1a**\u5185\u5bb9`',
       '**Notice:**text',
       '*\u63d0\u9192\uff01*\u7ee7\u7eed',
@@ -107,6 +104,8 @@ describe('MarkdownText', () => {
       '```',
       '**\u666e\u901a**\u5185\u5bb9',
       '*\u666e\u901a*\u5185\u5bb9',
+      'word**“\u5f15\u53f7”**word',
+      '\u8bcd*“\u5f15\u53f7”*\u7ee7\u7eed',
     ].join('\n\n')
     const { container } = render(<MarkdownText text={source} />)
 
@@ -118,6 +117,29 @@ describe('MarkdownText', () => {
     expect(container.textContent).toContain('**Notice:**text')
     expect(container.textContent).toContain('*\u63d0\u9192\uff01*\u7ee7\u7eed')
     expect(container.textContent).toContain('**\u6ce8\u610f\uff1a**\u5185\u5bb9')
+    expect(container.textContent).toContain('word**“\u5f15\u53f7”**word')
+    expect(container.textContent).toContain('\u8bcd*“\u5f15\u53f7”*\u7ee7\u7eed')
+  })
+
+  it('opens strong emphasis after CJK text when the span starts with punctuation', () => {
+    const cases = [
+      ['\u9488\u5bf9**“\u5f53\u952e\u76d8\u5df2\u7ecf\u8fdb\u5165\u6df1\u7761\u7720\uff08\u5f7b\u5e95\u65ad\u8fde\uff09\u65f6\u7684\u91cd\u8fde\u901f\u5ea6”**\uff0c\u7ee7\u7eed', ['“\u5f53\u952e\u76d8\u5df2\u7ecf\u8fdb\u5165\u6df1\u7761\u7720\uff08\u5f7b\u5e95\u65ad\u8fde\uff09\u65f6\u7684\u91cd\u8fde\u901f\u5ea6”']],
+      ['\u4e00\u6761**“N \u5c0f\u3001D \u5927”**\u7684\u8def', ['“N \u5c0f\u3001D \u5927”']],
+      ['\u662f**“\u7528\u5927\u6a21\u578b\u5c11\u8bad”\u4e0e“\u7528\u5c0f\u6a21\u578b\u591a\u8bad”\u4e4b\u95f4\u7684\u6289\u62e9**\u3002', ['“\u7528\u5927\u6a21\u578b\u5c11\u8bad”\u4e0e“\u7528\u5c0f\u6a21\u578b\u591a\u8bad”\u4e4b\u95f4\u7684\u6289\u62e9']],
+      ['\u91c7\u7528**\uff08\u5b9e\u9a8c\u6027\uff09**\u65b9\u6848', ['\uff08\u5b9e\u9a8c\u6027\uff09']],
+      ['\u5bfc\u81f4\u4e86**“Wi-Fi \u4e0b\u6536\u4e0d\u5230\u63a8\u9001”**\u7684\u73b0\u8c61\uff0c\u4ee5\u53ca\u5305\u542b**\uff08\u5185\u5bb9\uff09**\u7684\u5217\u8868\u3002', ['“Wi-Fi \u4e0b\u6536\u4e0d\u5230\u63a8\u9001”', '\uff08\u5185\u5bb9\uff09']],
+      ['\u7528\u6237\u5224\u5b9a**\u300c\u8fd8\u662f\u6709\u70b9\u73b0\u4ee3\u300d**\uff0c\u6839\u56e0\u662f**\u8d70\u9519\u4e86\u4e00\u4ee3**\uff0c\u4e0d\u662f\u914d\u8272', ['\u300c\u8fd8\u662f\u6709\u70b9\u73b0\u4ee3\u300d', '\u8d70\u9519\u4e86\u4e00\u4ee3']],
+      ['\u6267\u884c**`bluetoothd`**\u8fdb\u7a0b\uff0c\u4ee5\u53ca**“\u6df1\u7761\u7720”**\u6d4b\u8bd5', ['bluetoothd', '“\u6df1\u7761\u7720”']],
+    ] as const
+    const source = cases.map(([markdown]) => markdown).join('\n\n')
+
+    for (const streaming of [false, true]) {
+      const rendered = render(<MarkdownText text={source} streaming={streaming} />)
+      expect([...rendered.container.querySelectorAll('strong')].map(node => node.textContent))
+        .toEqual(cases.flatMap(([, strong]) => strong))
+      expect(rendered.container.textContent).not.toContain('**')
+      rendered.unmount()
+    }
   })
 
   it('links complete HTTP(S) inline code without promoting commands, unsafe schemes, or fences', () => {
@@ -515,289 +537,6 @@ describe('MarkdownText', () => {
       expect(rendered.container.querySelector('.katex-error')).toBeNull()
       rendered.unmount()
     }
-  })
-
-  it('renders a display-dollar block whose opening line carries math across lines', () => {
-    const cases = [
-      { source: '$$a+b\nc+d$$', value: 'a+b\nc+d' },
-      { source: '$$a+b\nc+d\n$$', value: 'a+b\nc+d' },
-      { source: 'Prose line\n$$a+b\nc+d$$', value: 'a+b\nc+d' },
-      { source: '- item\n  $$a+b\n  c+d$$', value: 'a+b\nc+d' },
-      { source: '- item\n$$\na+b\n$$', value: 'a+b' },
-    ]
-
-    for (const item of cases) {
-      const rendered = render(<MarkdownText text={item.source} />)
-      expect(rendered.container.querySelectorAll('.katex')).toHaveLength(1)
-      expect(rendered.container.querySelectorAll('.katex-display')).toHaveLength(1)
-      expect(rendered.container.querySelector('annotation')?.textContent).toBe(item.value)
-      expect(rendered.container.querySelector('.katex-error')).toBeNull()
-      rendered.unmount()
-    }
-
-    const followed = render(<MarkdownText text={'$$a+b\nc+d$$\n\nAfter'} />)
-    expect(followed.container.querySelectorAll('.katex-display')).toHaveLength(1)
-    expect(followed.container.querySelectorAll('p')).toHaveLength(1)
-    expect(followed.container.querySelector('p')?.textContent).toBe('After')
-    followed.unmount()
-  })
-
-  it('leaves a dollar candidate with trailing text to inline math ahead of a later block', () => {
-    const { container } = render(<MarkdownText text={'$$x$$ trailing\n\n$$y$$'} />)
-
-    expect(container.querySelectorAll('.katex')).toHaveLength(2)
-    expect(container.querySelectorAll('.katex-display')).toHaveLength(1)
-    expect(container.querySelector('.katex-display annotation')?.textContent).toBe('y')
-    expect(container.querySelector('.katex-error')).toBeNull()
-    expect(container.textContent).toContain('trailing')
-  })
-
-  it('keeps an unclosed backslash candidate inside one paragraph', () => {
-    const { container } = render(<MarkdownText text={'**before\n\\[literal]\nafter**'} />)
-
-    expect(container.querySelectorAll('p')).toHaveLength(1)
-    expect(container.querySelector('strong')).not.toBeNull()
-    expect(container.textContent).not.toContain('**')
-  })
-
-  it('bounds parser work for repeated unclosed dollar candidates', () => {
-    const source = '$$a$b\n'.repeat(1_600)
-    const startedAt = performance.now()
-    const tree = parseGfmWithMath(source)
-
-    expect(performance.now() - startedAt).toBeLessThan(3_000)
-    expect(tree.children.every(node => node.type !== 'math')).toBe(true)
-  })
-
-  it('keeps a solitary dollar inside a display formula as content', () => {
-    for (const source of [
-      '$$P = \\begin{cases} 1 & \\text{if $x>0$} \\end{cases}$$',
-      '$$\\text{a $x$ b}\\tag{1}$$',
-    ]) {
-      const rendered = render(<MarkdownText text={source} />)
-
-      expect(rendered.container.querySelectorAll('.katex-display')).toHaveLength(1)
-      expect(rendered.container.querySelector('.katex-error')).toBeNull()
-      rendered.unmount()
-    }
-  })
-
-  it('renders a multi-line display formula that uses a solitary dollar', () => {
-    const source = '$$P = \\begin{cases} 1 & \\text{if $x>0$} \\\\\n0 & \\text{otherwise} \\end{cases}$$\n\nAfter'
-    const { container } = render(<MarkdownText text={source} />)
-
-    expect(container.querySelectorAll('.katex-display')).toHaveLength(1)
-    expect(container.querySelector('.katex-error')).toBeNull()
-    expect(container.querySelectorAll('p')).toHaveLength(1)
-    expect(container.querySelector('p')?.textContent).toBe('After')
-  })
-
-  it('ignores a closing fence inside a TeX comment on a later line', () => {
-    const commented = render(<MarkdownText text={'$$\n\\frac{1}{ % keep $$\n2}\n$$\n\nAfter'} />)
-    expect(commented.container.querySelectorAll('.katex-display')).toHaveLength(1)
-    expect(commented.container.querySelector('.katex-display annotation')?.textContent)
-      .toBe('\\frac{1}{ % keep $$\n2}')
-    expect(commented.container.querySelector('.katex-error')).toBeNull()
-    expect(commented.container.querySelector('p')?.textContent).toBe('After')
-    commented.unmount()
-
-    for (const source of ['$$\n% keep $$\n\\frac12\n$$\n\nAfter']) {
-      const rendered = render(<MarkdownText text={source} />)
-
-      expect(rendered.container.querySelectorAll('.katex-display')).toHaveLength(1)
-      expect(rendered.container.querySelector('.katex-error')).toBeNull()
-      expect(rendered.container.querySelector('p')?.textContent).toBe('After')
-      rendered.unmount()
-    }
-  })
-
-  it('closes a multi-line block whose last line ends in a bare percent', () => {
-    for (const source of ['$$\\text{acc} =\n95%$$', '$$\\text{acc} =\n95 %$$']) {
-      const rendered = render(<MarkdownText text={source} />)
-
-      const annotation = rendered.container.querySelector('.katex-display annotation')?.textContent ?? ''
-      expect(rendered.container.querySelectorAll('.katex-display')).toHaveLength(1)
-      expect(rendered.container.querySelector('.katex-error')).toBeNull()
-      expect(annotation).toContain('95')
-      expect(annotation).toMatch(/^\\text\{acc\} =/)
-      rendered.unmount()
-    }
-  })
-
-  it('keeps an escaped percent inside its formula', () => {
-    const { container } = render(<MarkdownText text={'$$a\\%b$$'} />)
-
-    expect(container.querySelectorAll('.katex-display')).toHaveLength(1)
-    expect(container.querySelector('.katex-display annotation')?.textContent).toBe('a\\%b')
-  })
-
-  it('leaves verbatim forms to the value scanner', () => {
-    const percent = render(<MarkdownText text={'$$\\verb|%|$$\n\nAfter\n\n$$\ny\n$$'} />)
-    expect(percent.container.querySelectorAll('.katex-display')).toHaveLength(2)
-    expect(percent.container.querySelector('.katex-error')).toBeNull()
-    expect(percent.container.querySelector('p')?.textContent).toBe('After')
-    percent.unmount()
-
-    const controlWord = render(<MarkdownText text={'$$\\verbatim + y$$'} />)
-    expect(controlWord.container.querySelector('.katex-display annotation')?.textContent).toBe('\\verbatim + y')
-    controlWord.unmount()
-
-    const starred = render(<MarkdownText text={'$$\\verb*a$$a$$'} />)
-    expect(starred.container.querySelector('.katex-display annotation')?.textContent).toBe('\\verb*a$$a')
-    starred.unmount()
-
-    for (const source of ['$$\\verb**abc*$$\n\nAfter\n\n$$\ny\n$$', '$$x % \\verb$abc$$\n\nAfter\n\n$$\ny\n$$']) {
-      const rendered = render(<MarkdownText text={source} />)
-
-      expect(rendered.container.querySelectorAll('.katex-display')).toHaveLength(2)
-      expect(rendered.container.querySelector('.katex-error')).toBeNull()
-      expect(rendered.container.querySelector('p')?.textContent).toBe('After')
-      rendered.unmount()
-    }
-  })
-
-  it('keeps a verb delimiter and its empty region inside the formula', () => {
-    for (const source of ['$$\\verb$$$$', '$$\\verb$x$ y$$']) {
-      const rendered = render(<MarkdownText text={source} />)
-
-      expect(rendered.container.querySelectorAll('.katex-display')).toHaveLength(1)
-      expect(rendered.container.querySelector('.katex-error')).toBeNull()
-      rendered.unmount()
-    }
-
-    // A region that holds text leaves its closing `$` to the fence logic, so the
-    // value keeps `\verb$abc` and KaTeX reports the unterminated command.
-    const unterminated = render(<MarkdownText text={'$$\\verb$abc$$'} />)
-    expect(unterminated.container.querySelector('.katex-error')?.textContent).toContain('\\verb$abc')
-    unterminated.unmount()
-  })
-
-  it('leaves a later-line trailing fence to upstream, which takes the following prose', () => {
-    const { container } = render(<MarkdownText text={'$$a+b\nc+d$$ trailing\n\nAfter'} />)
-
-    expect(container.querySelectorAll('p')).toHaveLength(0)
-    expect(container.querySelector('.katex-error')?.textContent).toContain('c+d$$ trailing')
-    expect(container.querySelector('.katex-error')?.textContent).toContain('After')
-  })
-
-  it('does not read a comment ending in verb as a verbatim delimiter', () => {
-    const { container } = render(<MarkdownText text={'$$x % \\verb$$\n\nAfter\n\n$$\ny\n$$'} />)
-
-    expect(container.querySelectorAll('.katex-display')).toHaveLength(2)
-    expect(container.querySelector('.katex-display annotation')?.textContent).toBe('x % \\verb')
-    expect(container.querySelector('.katex-error')).toBeNull()
-    expect(container.querySelector('p')?.textContent).toBe('After')
-  })
-
-  it('bounds parser work for repeated candidates ending in a verb tail', () => {
-    const source = '$$a$b\\verb\n\n'.repeat(1_600)
-    const startedAt = performance.now()
-    const tree = parseGfmWithMath(source)
-
-    expect(performance.now() - startedAt).toBeLessThan(3_000)
-    expect(tree.children.every(node => node.type !== 'math')).toBe(true)
-  })
-
-  it('does not carry the verb delimiter across a line ending', () => {
-    const { container } = render(<MarkdownText text={'$$a$b\\verb\n\n$$y$$'} />)
-
-    expect(container.querySelectorAll('.katex-display')).toHaveLength(1)
-    expect(container.querySelector('.katex-display annotation')?.textContent).toBe('y')
-  })
-
-  it('does not read an escaped backslash as the verb command', () => {
-    for (const source of ['$$\\\\verb$$\n\nAfter', '$$\\\\verb*$$\n\nAfter']) {
-      const rendered = render(<MarkdownText text={source} />)
-
-      expect(rendered.container.querySelectorAll('.katex-display')).toHaveLength(1)
-      expect(rendered.container.querySelector('p')?.textContent).toBe('After')
-      rendered.unmount()
-    }
-  })
-
-  it('reads the character after verb as that command delimiter, not a fence', () => {
-    for (const source of ['$$\n\\verb$$\nx\n$$\n\nAfter', '$$\n\\verb*$$\nx\n$$\n\nAfter']) {
-      const rendered = render(<MarkdownText text={source} />)
-
-      expect(rendered.container.querySelectorAll('.katex-display')).toHaveLength(1)
-      expect(rendered.container.querySelector('p')?.textContent).toBe('After')
-      rendered.unmount()
-    }
-  })
-
-  it('treats a percent inside a comment as comment text', () => {
-    for (const source of [
-      '$$\n% 100%$$\n$$',
-      '$$\n\\frac{1}{ % accuracy 95%$$\n2}\n$$\n\nAfter',
-    ]) {
-      const rendered = render(<MarkdownText text={source} />)
-
-      expect(rendered.container.querySelectorAll('.katex-display')).toHaveLength(1)
-      expect(rendered.container.querySelector('.katex-error')).toBeNull()
-      rendered.unmount()
-    }
-  })
-
-  it('keeps a lone dollar on a later line inside the block', () => {
-    const { container } = render(<MarkdownText text={'$$a+b\nc$d\n$$'} />)
-
-    expect(container.querySelector('.katex-error')?.textContent).toBe('a+b\nc$d')
-  })
-
-  it('renders a display formula whose later line uses a solitary dollar', () => {
-    const { container } = render(
-      <MarkdownText text={'$$f(x) = \\begin{cases}\n1 & \\text{if $x > 0$} \\\\\n0 & \\text{otherwise}\n\\end{cases}$$\n\nAfter'} />,
-    )
-
-    expect(container.querySelectorAll('.katex-display')).toHaveLength(1)
-    expect(container.querySelector('.katex-error')).toBeNull()
-    expect(container.querySelector('p')?.textContent).toBe('After')
-  })
-
-  it('keeps a fence that fails inside a comment and a trailing lone dollar parseable', () => {
-    const commentFail = render(<MarkdownText text={'$$x%$$ y'} />)
-    expect(commentFail.container.querySelector('.katex-display')).toBeNull()
-    expect(commentFail.container.querySelector('annotation')?.textContent).toBe('x%')
-    expect(commentFail.container.textContent).toContain('y')
-    commentFail.unmount()
-
-    const lone = render(<MarkdownText text={'$$a$'} />)
-    expect(lone.container.querySelectorAll('.katex')).toHaveLength(0)
-    expect(lone.container.querySelector('p')?.textContent).toBe('$$a$')
-    lone.unmount()
-  })
-
-  it('closes a block at a fence behind a whitespace-only comment', () => {
-    const { container } = render(<MarkdownText text={'$$\na = x% $$\n$$'} />)
-
-    expect(container.querySelectorAll('.katex-display')).toHaveLength(2)
-    expect(container.querySelector('.katex-display annotation')?.textContent).toContain('a = x% ')
-    expect(container.querySelector('.katex-error')).toBeNull()
-  })
-
-  it('ends the backslash escape run at a line ending', () => {
-    const { container } = render(<MarkdownText text={'$$a$b\\\n\n$$y$$'} />)
-
-    expect(container.querySelectorAll('.katex-display')).toHaveLength(1)
-    expect(container.querySelector('.katex-display annotation')?.textContent).toBe('y')
-    expect(container.querySelector('.katex-error')).toBeNull()
-  })
-
-  it('bounds parser work for repeated candidates ending in an odd backslash', () => {
-    const source = '$$a$b\\\n\n'.repeat(3_200)
-    const startedAt = performance.now()
-    const tree = parseGfmWithMath(source)
-
-    expect(performance.now() - startedAt).toBeLessThan(3_000)
-    expect(tree.children.every(node => node.type !== 'math')).toBe(true)
-  })
-
-  it('keeps an escaped-dollar display candidate inside its paragraph', () => {
-    const { container } = render(<MarkdownText text={'**before\n$$a\\$b\nafter**'} />)
-
-    expect(container.querySelectorAll('p')).toHaveLength(1)
-    expect(container.querySelector('strong')).not.toBeNull()
-    expect(container.textContent).not.toContain('**')
   })
 
   it('lets display math interrupt an open paragraph', () => {

@@ -3,15 +3,15 @@ export const NS = 'session-log-download'
 
 /** English Session export strings and key source. */
 export const en = {
-  'header.more': 'More actions',
   'menu.copyMarkdown': 'Copy Session as Markdown',
   'menu.download': 'Download session log',
   'menu.feedback': 'Feedback',
   'toast.copied': 'Session copied as Markdown.',
   'toast.preparationFailed': 'Could not read the Session for copying. Try again.',
   'toast.clipboardFailed': 'Could not write to the clipboard. Check clipboard permission and try again.',
+  'dialog.session': 'Session: {sessionId}',
   'dialog.preparingTitle': 'Exporting Session',
-  'dialog.preparingDescription': 'Preparing a ZIP containing this Session, its sub-Sessions, and attachments.',
+  'dialog.preparingDescription': 'Preparing a ZIP containing the selected Session, its sub-Sessions, and attachments.',
   'dialog.successTitle': 'Session download started',
   'dialog.successDescription': 'The browser is downloading the Session ZIP.',
   'dialog.errorTitle': 'Session export failed',

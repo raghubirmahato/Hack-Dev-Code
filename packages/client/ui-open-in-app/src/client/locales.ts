@@ -42,6 +42,19 @@ export type OpenInAppKey = keyof typeof en
 
 /** English dictionary (the key-set source of truth). */
 export const en = {
+  'menu.openIn': 'Open in',
+  'menu.openInSidebar': 'Open in sidebar',
+  'menu.openInFloat': 'Open in floating panel',
+  'menu.finder': 'Show in Finder',
+  'menu.reveal': 'Show in folder',
+  'menu.defaultApp': 'Open in default application',
+  'menu.external': 'Open in external browser',
+  'menu.copyLink': 'Copy link address',
+  'menu.copyPath': 'Copy file path',
+  'menu.copyDirectoryPath': 'Copy folder path',
+  'menu.copied': 'Copied',
+  'menu.copyFailed': 'Could not copy. Check that the content is available, then retry.',
+
   'open.title': 'Open in {app}',
   'path.appDefault': '{app} (default)',
   'path.appsError': 'Could not load applications',

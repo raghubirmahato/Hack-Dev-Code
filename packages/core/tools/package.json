@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-tools",
   "description": "Tool registry and execution pipeline for the Hack Dev Code",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -18,10 +18,6 @@
       "types": "./lib/types/index.d.ts",
       "default": "./lib/index.js"
     },
-    "./presentation": {
-      "types": "./lib/types/presentation.d.ts",
-      "default": "./lib/types/presentation.js"
-    },
     "./src/*": "./src/*",
     "./package.json": "./package.json",
     "./locale/*.json": "./locale/*.json",
@@ -35,8 +31,10 @@
     "lib/index.js",
     "lib/pipeline.js",
     "lib/shared-*.js",
-    "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
@@ -49,11 +47,11 @@
     "@hackdevcode/dsh-user-approval": "workspace:*"
   },
   "dependencies": {
-    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-util-values": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-agent": "workspace:*",
     "@hackdevcode/dsh-llm": "workspace:*",

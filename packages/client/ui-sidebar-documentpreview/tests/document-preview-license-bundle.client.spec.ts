@@ -65,16 +65,16 @@ describe('published document preview licenses', () => {
 
       const client = extract('package/lib/client.js')
       const pdf = extract('package/lib/client.pdf.js')
-      expect([...client.matchAll(/require\.async\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]))
+      expect([...client.matchAll(/require\.async\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]))
         .toEqual(['./client.frontmatter-fields.js', './client.pdf.js', './client.excel.js'])
-      expect(client).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
-      expect([...pdf.matchAll(/require\("(\.\/client[^"/]*\.js)"\)/gu)].map(match => match[1]))
+      expect(client).not.toMatch(/\brequire\((["'`])\.\/client[^"'`/]*\.js\1\)/u)
+      expect([...pdf.matchAll(/require\((["'`])(\.\/client[^"'`/]*\.js)\1\)/gu)].map(match => match[2]))
         .toEqual([])
       expect(client).not.toContain('//! Bundled PDF.js license notices')
       expect(client).not.toContain('/pdfjs-dist/')
       expect(pdf).toContain('//! Bundled PDF.js license notices')
       const excel = extract('package/lib/client.excel.js')
-      expect(excel).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
+      expect(excel).not.toMatch(/\brequire\((["'`])\.\/client[^"'`/]*\.js\1\)/u)
       expect(client).not.toContain('FortuneSheet')
       expect(excel).toContain('//! Bundled spreadsheet license notices')
       expect(excel).toContain('Copyright (c) 2022 Suzhou Ruilisi Technology Co., Ltd')
@@ -85,7 +85,7 @@ describe('published document preview licenses', () => {
         expect(excel).toContain(license.split('\n').map(line => `// ${line}`).join('\n'))
       }
       const frontmatter = extract('package/lib/client.frontmatter-fields.js')
-      expect(frontmatter).not.toMatch(/\brequire\("\.\/client[^"/]*\.js"\)/u)
+      expect(frontmatter).not.toMatch(/\brequire\((["'`])\.\/client[^"'`/]*\.js\1\)/u)
       let frontmatterInitialized = false
       runInNewContext(frontmatter, { window: { __ModuleLoader__: { load: (registration: {
         factory: (resolve: (specifier: string) => unknown) => { FrontmatterFields: unknown }

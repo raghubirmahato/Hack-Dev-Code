@@ -10,8 +10,13 @@ import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished } from 'vitest'
 import type { Session, SessionEvent, SessionId } from '@hackdevcode/dsh-session'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace, expandOwningTurnProcess, expandTurnProcesses, newEnglishPage, REPO_ROOT, saveFailureShot } from './support.ts'
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  fixtureUserPrompts, launchWebScaffold, watchConsole, webSnapshotMode,
+  type WebScaffold,
+} from './scaffold.ts'
+import {
+  connectFreshWorkspace, expandOwningTurnProcess, expandTurnProcesses, newEnglishPage, REPO_ROOT, saveFailureShot,
+} from './support.ts'
 
 const MODE = webSnapshotMode()
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/workflow-run', import.meta.url))
@@ -215,7 +220,7 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
 
     await page.getByRole('button', { name: '1 subagent', exact: true }).hover()
     const catalog = page.getByRole('tree', { name: 'Subagent sessions' })
-    await catalog.getByRole('treeitem', { name: /snapshot-flow child 1/ }).click()
+    await catalog.getByRole('treeitem', { name: /snapshot-flow child 1/ }).press('Enter')
     await page.getByText(CHILD_PROMPT, { exact: true }).waitFor({ timeout: 15_000 })
     expect(await page.locator('[data-composer-input][contenteditable="true"]').count()).toBe(1)
   }, 60_000)

@@ -10,16 +10,19 @@ import { createLaunchEnvironmentSnapshot } from '@hackdevcode/dsh-launch-environ
 import type { SessionEvent, SessionId } from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-tool-present/types'
 import {
-  acknowledgeReloadConnectionLoss, assertFinalWorkspaceSnapshot, captureExpandedTurnProcessAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  acknowledgeReloadConnectionLoss, assertFinalWorkspaceSnapshot, captureExpandedTurnProcessAria,
+  compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, recordFixture,
+  watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, expandTurnProcesses, newEnglishPage, scrollIntoView } from './support.ts'
 
 const DIR = fileURLToPath(new URL('../../../snapshots/web/present', import.meta.url))
 const FIXTURE = join(DIR, 'session.v3.jsonl')
 const MODE = webSnapshotMode()
 const PROMPT = 'Use one run_code program to do the following in order. Call present for missing.txt and catch its error without creating that file. '
-  + 'Use bash to run exactly `printf "DELIVERED_REPORT\\n" > report.txt; printf "DELIVERED_NOTE\\n" > Instructions.txt`. '
-  + 'Call present for report.txt and Instructions.txt. After present succeeds, deliberately throw the string "AFTER_PRESENT" (not an Error object) from that same run_code program. '
-  + 'Do not retry the program or create any other files. Finish by mentioning `report.txt` and `Instructions.txt` in inline code, and put PRESENT_DONE in a separate paragraph.'
+  + 'Use bash to run exactly `printf "DELIVERED_REPORT\\n" > report.txt; printf "DELIVERED_NOTE\\n" > \u8bf4\u660e.txt`. '
+  + 'Call present for report.txt and \u8bf4\u660e.txt. After present succeeds, deliberately throw the string "AFTER_PRESENT" (not an Error object) from that same run_code program. '
+  + 'Do not retry the program or create any other files. Finish by mentioning `report.txt` and `\u8bf4\u660e.txt` in inline code, and put PRESENT_DONE in a separate paragraph.'
 
 // The recorded Bash scenario and executable opener fixture require a POSIX host outside WSL.
 describe.skipIf(process.platform === 'win32' || release().toLowerCase().includes('microsoft'))('web e2e: explicit file delivery', () => {
@@ -54,7 +57,8 @@ fs.appendFileSync(${JSON.stringify(openLog)}, JSON.stringify({ path, action, con
       openInAppEnvironment: createLaunchEnvironmentSnapshot([{ source: 'process', values: { SSH_CONNECTION: '10.0.0.2 55000 10.0.0.9 22' } }]),
       extraOverlayPath: fileURLToPath(new URL('./present.overlay.yml', import.meta.url)),
       agentPresets: { default: 'ptc' }, compareReplaySession: true,
-      ...(MODE === 'record' ? {} : { replayFixture: FIXTURE }),
+      // The recorded UI includes decode throughput from an incremental stream.
+      ...(MODE === 'record' ? {} : { replayFixture: FIXTURE, paceMs: 15 }),
     })
     // File associations belong to the desktop rather than the recorded Session.
     const controller = scaffold.ctx.get('sessionController')
@@ -102,12 +106,12 @@ fs.appendFileSync(${JSON.stringify(openLog)}, JSON.stringify({ path, action, con
     await page.getByText(/^PRESENT_DONE\.?$/).waitFor({ timeout: 30_000 })
     await assertFinalWorkspaceSnapshot(DIR, cwd)
     expect(events.filter(event => event.type === 'deliverables/presented').flatMap(event => event.data.files.map(file => file.path)))
-      .toEqual([join(cwd, 'report.txt'), join(cwd, 'Instructions.txt')])
+      .toEqual([join(cwd, 'report.txt'), join(cwd, '\u8bf4\u660e.txt')])
     for (const event of events) {
       if (event.type === 'deliverables/presented') {
         expect(event.data.files).toEqual([
           { path: join(cwd, 'report.txt'), description: 'delivered report' },
-          { path: join(cwd, 'Instructions.txt'), description: 'delivered note' },
+          { path: join(cwd, '\u8bf4\u660e.txt'), description: 'delivered note' },
         ])
       }
     }
@@ -117,7 +121,7 @@ fs.appendFileSync(${JSON.stringify(openLog)}, JSON.stringify({ path, action, con
 
   it('opens current source files after edits and reload, and reports deletion without downloading', async () => {
     await writeFile(join(cwd, 'report.txt'), 'EDITED_REPORT\n')
-    await writeFile(join(cwd, 'Instructions.txt'), 'EDITED_NOTE\n')
+    await writeFile(join(cwd, '\u8bf4\u660e.txt'), 'EDITED_NOTE\n')
     for (const reload of [false, true]) {
       if (reload) {
         const warningStart = tripwire.warnings.length
@@ -143,7 +147,7 @@ fs.appendFileSync(${JSON.stringify(openLog)}, JSON.stringify({ path, action, con
       await page.mouse.move(0, 0)
       const beforePreview = (await opened()).length
       const column = page.locator('[data-rightbar-col]')
-      for (const [name, content] of [['report.txt', 'EDITED_REPORT'], ['Instructions.txt', 'EDITED_NOTE']] as const) {
+      for (const [name, content] of [['report.txt', 'EDITED_REPORT'], ['\u8bf4\u660e.txt', 'EDITED_NOTE']] as const) {
         const mention = page.locator('code').getByRole('button', { name: `Open ${join(cwd, name)} in sidebar`, exact: true })
         await mention.click()
         const preview = column.locator('[data-document-preview]')
@@ -165,7 +169,7 @@ fs.appendFileSync(${JSON.stringify(openLog)}, JSON.stringify({ path, action, con
       expect(await page.getByRole('alert').count()).toBe(0)
       await expect.poll(opened).toHaveLength(beforeReveal + 1)
       expect((await opened()).at(-1)).toEqual({ action: 'reveal', content: null, path: await realpath(process.platform === 'darwin' ? join(cwd, 'report.txt') : cwd) })
-      for (const [name, bytes] of [['report.txt', 'EDITED_REPORT\n'], ['Instructions.txt', 'EDITED_NOTE\n']] as const) {
+      for (const [name, bytes] of [['report.txt', 'EDITED_REPORT\n'], ['\u8bf4\u660e.txt', 'EDITED_NOTE\n']] as const) {
         const count = (await opened()).length
         const response = page.waitForResponse(response => response.url().includes('/api/present.open?') && response.request().method() === 'POST')
         await row.locator('[data-presented-file]').filter({ hasText: name }).getByRole('button', { name: 'Open in Test Editor', exact: true }).click()
@@ -189,7 +193,7 @@ fs.appendFileSync(${JSON.stringify(openLog)}, JSON.stringify({ path, action, con
     expect(declarations).toHaveLength(1)
     expect(declarations[0]!.data.files).toEqual([
       { path: join(cwd, 'report.txt'), description: 'delivered report' },
-      { path: join(cwd, 'Instructions.txt'), description: 'delivered note' },
+      { path: join(cwd, '\u8bf4\u660e.txt'), description: 'delivered note' },
     ])
     expect(exported).not.toContain('EDITED_REPORT')
     if (MODE !== 'record') {
@@ -308,7 +312,7 @@ fs.appendFileSync(${JSON.stringify(openLog)}, JSON.stringify({ path, action, con
       phone.on('download', (download) => { phoneDownloads.push(download.suggestedFilename()) })
       await phone.goto(page.url(), { waitUntil: 'load' })
       await phone.getByText(/^PRESENT_DONE\.?$/).waitFor({ timeout: 30_000 })
-      const card = phone.locator('[data-presented-file]').filter({ hasText: 'Instructions.txt' })
+      const card = phone.locator('[data-presented-file]').filter({ hasText: '\u8bf4\u660e.txt' })
       const open = card.getByRole('button', { name: 'Open in Test Editor', exact: true })
       await open.waitFor()
       const notices: string[] = []
@@ -320,7 +324,7 @@ fs.appendFileSync(${JSON.stringify(openLog)}, JSON.stringify({ path, action, con
       await success.waitFor()
       notices.push(`## Open\n\n${await success.ariaSnapshot()}`)
       await expect.poll(opened).toHaveLength(beforeOpen + 1)
-      expect((await opened()).at(-1)).toEqual({ action: 'open', path: await realpath(join(cwd, 'Instructions.txt')), content: 'EDITED_NOTE\n' })
+      expect((await opened()).at(-1)).toEqual({ action: 'open', path: await realpath(join(cwd, '\u8bf4\u660e.txt')), content: 'EDITED_NOTE\n' })
       expect(await card.locator('[role="status"]').count()).toBe(0)
       const bounds = await success.boundingBox()
       expect(bounds).not.toBeNull()
@@ -335,9 +339,9 @@ fs.appendFileSync(${JSON.stringify(openLog)}, JSON.stringify({ path, action, con
       await revealed.waitFor()
       notices.push(`## Show file location\n\n${await revealed.ariaSnapshot()}`)
       await expect.poll(opened).toHaveLength(beforeOpen + 2)
-      expect((await opened()).at(-1)).toEqual({ action: 'reveal', content: null, path: await realpath(process.platform === 'darwin' ? join(cwd, 'Instructions.txt') : cwd) })
+      expect((await opened()).at(-1)).toEqual({ action: 'reveal', content: null, path: await realpath(process.platform === 'darwin' ? join(cwd, '\u8bf4\u660e.txt') : cwd) })
 
-      await unlink(join(cwd, 'Instructions.txt'))
+      await unlink(join(cwd, '\u8bf4\u660e.txt'))
       const missingResponse = phone.waitForResponse(response => response.url().includes('/api/present.open?') && response.request().method() === 'POST')
       await open.tap()
       expect((await missingResponse).status()).toBe(404)

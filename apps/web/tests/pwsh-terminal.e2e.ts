@@ -18,7 +18,10 @@ import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { resolvePwshPath } from '@hackdevcode/dsh-pwsh-local'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, seedSession, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  fixtureUserPrompts, launchWebScaffold, seedSession, webSnapshotMode,
+  type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, expandOwningTurnProcess, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/pwsh-terminal', import.meta.url))

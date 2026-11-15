@@ -1,13 +1,14 @@
 /** Reconnect-safe Workspace baseline and increment producer. */
 
 import type { Context } from '@hackdevcode/cordis'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { WorkspaceId } from '@hackdevcode/dsh-workspace/types'
 import { Deque } from '@hackdevcode/dsh-deque'
 import type { DomainChanged } from '@hackdevcode/dsh-storage-domain'
 import type { Workspace, WorkspaceRecord } from '@hackdevcode/dsh-workspace'
 import {
   workspaceDomainState,
   workspaceRecord,
-  WorkspaceId,
 } from '@hackdevcode/dsh-workspace'
 import type {
   WorkspaceBaseline,
@@ -37,7 +38,7 @@ export function workspaceView(workspace: Workspace): WorkspaceView {
 function changedWorkspaceView(workspaceId: string, value: unknown): WorkspaceView {
   const record: WorkspaceRecord = workspaceRecord.parse(value)
   return {
-    workspaceId: WorkspaceId(workspaceId),
+    workspaceId: brandString<WorkspaceId>(workspaceId),
     path: record.path,
     title: record.title,
     sessionIds: [...record.sessionIds],
@@ -131,7 +132,7 @@ export class WorkspaceFeed {
     if (change.table !== 'workspaces') return
     if (change.operation === 'deleted') {
       if (!this.knownIds.delete(change.key)) return
-      this.publish({ type: 'remove', workspaceId: WorkspaceId(change.key) })
+      this.publish({ type: 'remove', workspaceId: brandString<WorkspaceId>(change.key) })
       return
     }
     if (!this.knownIds.has(change.key)) return

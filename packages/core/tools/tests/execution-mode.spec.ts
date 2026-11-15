@@ -4,7 +4,8 @@ import { ToolExecutionPipeline } from '@hackdevcode/dsh-tools/pipeline'
 import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime, { type ToolDefinition, type ToolExecutionInput, type ToolExecutionMode } from '@hackdevcode/dsh-tools'
 import { defineContentToolFixture } from '@hackdevcode/dsh-tool-testkit'
@@ -20,7 +21,7 @@ async function setup() {
 }
 
 function exec(name: string, args: unknown): ToolExecutionInput {
-  return { signal: testToolSignal, callId: ToolCallId('c1'), name, arguments: args }
+  return { signal: testToolSignal, callId: brandString<ToolCallId>('c1'), name, arguments: args }
 }
 
 describe('ToolExecutionPipeline.executionMode', () => {

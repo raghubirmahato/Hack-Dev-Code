@@ -10,7 +10,7 @@ export type {
 } from '../rpc.ts'
 export { RpcId, transportError } from '../rpc.ts'
 export type { SessionId, SessionEvent } from '@hackdevcode/dsh-session/types'
-export type { MessageId } from '@hackdevcode/dsh-llm/brand'
+export type { MessageId } from '@hackdevcode/dsh-llm/types'
 export type { ContentBlock, StreamChunk } from '@hackdevcode/dsh-llm/types'
 
 import type { RpcResponse, RpcResult } from '../rpc.ts'

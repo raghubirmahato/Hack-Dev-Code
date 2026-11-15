@@ -5,7 +5,8 @@ import type { Context } from '@hackdevcode/cordis'
 import type { Model, AgentOptions, PreStepDecision } from './runtime-types.ts'
 import type { ModelSelection } from './types.ts'
 import { boundContextSummary, createUserMessage, type ContextFormed } from '@hackdevcode/dsh-llm'
-import { ReasoningEffortId } from '@hackdevcode/dsh-llm/brand'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ReasoningEffortId } from '@hackdevcode/dsh-llm/types'
 import type { Session, EpochHeader } from '@hackdevcode/dsh-session'
 import type { ProjectionDefinition } from '@hackdevcode/dsh-session-projection'
 import { z } from 'zod'
@@ -62,7 +63,7 @@ function selectionOfHeader({ config, adapterDefaults }: EpochHeader): ModelSelec
 const selectionSchema = z.object({
   provider: z.string().min(1),
   model: z.string().min(1),
-  reasoningEffort: z.string().min(1).transform(ReasoningEffortId).exactOptional(),
+  reasoningEffort: z.string().min(1).transform(brandString<ReasoningEffortId>).exactOptional(),
 }).nullable()
 
 /**

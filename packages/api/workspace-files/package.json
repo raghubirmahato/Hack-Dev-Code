@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-api-workspace-files",
   "description": "Workspace file service and Client resource provider: bounded reads, directory listing, and live metadata over the workspaceFiles Remote namespace",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -56,12 +56,14 @@
     "@hackdevcode/dsh-deque": "workspace:*",
     "@hackdevcode/dsh-typert-protocol": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~",
-    "zod": "4.4.3"
+    "zod": "4.6.6",
+    "@hackdevcode/dsh-util-ripgrep": "workspace:*"
   },
   "peerDependencies": {
     "@hackdevcode/cordis": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-api-gateway": "workspace:*",
     "@hackdevcode/dsh-api-remote-access": "workspace:*",
@@ -73,7 +75,9 @@
     "@hackdevcode/dsh-sandbox-policy": "workspace:*",
     "@hackdevcode/dsh-session": "workspace:*",
     "@hackdevcode/dsh-session-persistence": "workspace:*",
-    "@hackdevcode/dsh-util-workspace-path": "workspace:*"
+    "@hackdevcode/dsh-util-workspace-path": "workspace:*",
+    "@hackdevcode/dsh-subprocess": "workspace:*",
+    "@hackdevcode/dsh-subprocess-local": "workspace:*"
   },
   "files": [
     "locale/*.json",
@@ -81,9 +85,13 @@
     "lib/client.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "lib/typert.remote-client.d.ts.map",
+    "src"
   ]
 }

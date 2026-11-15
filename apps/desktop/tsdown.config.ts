@@ -50,7 +50,8 @@ export default defineConfig([
     dts: false,
     clean: false,
     codeSplitting: false,
-    deps: { alwaysBundle: ['@hackdevcode/dsh-atomic-write'] },
+    // The standalone worker has no node_modules; inline even production dependencies.
+    deps: { alwaysBundle: ['@hackdevcode/dsh-atomic-write', '@hackdevcode/dsh-error'] },
   },
   {
     entry: ['lib/types/main.js'],

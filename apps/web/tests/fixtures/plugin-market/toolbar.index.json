@@ -1,0 +1,19 @@
+{
+  "format": 1,
+  "title": { "en": "Awesome DSH Plugin", "zh": "Awesome DSH Plugin \u63d2\u4ef6\u7cbe\u9009" },
+  "metadata": {
+    "categories": { "tools": { "title": { "en": "Tools", "zh": "\u5de5\u5177\u4e0e\u80fd\u529b" } } },
+    "labels": { "featured": { "title": { "en": "Featured", "zh": "\u7cbe\u9009" } } }
+  },
+  "plugins": [
+    {
+      "name": "dsh-toolbar-layout-fixture",
+      "title": { "en": "Toolbar layout fixture", "zh": "\u5de5\u5177\u680f\u5e03\u5c40\u793a\u4f8b" },
+      "description": { "en": "A local index for responsive toolbar checks.", "zh": "\u7528\u4e8e\u5de5\u5177\u680f\u54cd\u5e94\u5f0f\u68c0\u67e5\u7684\u672c\u5730\u7d22\u5f15" },
+      "metadata": { "category": "tools", "labels": ["featured"] },
+      "versions": [
+        { "version": "1.0.0", "publishTimestamp": 1793145600, "source": { "type": "npm" } }
+      ]
+    }
+  ]
+}

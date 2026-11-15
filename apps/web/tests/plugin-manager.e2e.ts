@@ -9,17 +9,23 @@ import type { Browser, Locator, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { FiberState } from '@hackdevcode/cordis'
 import { readProfileManifest } from '@hackdevcode/dsh-app-boot'
-import { createUserMessage } from '@hackdevcode/dsh-llm'
+import { HIDDEN_BUNDLES } from '@hackdevcode/dsh-official-bundles'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished, vi } from 'vitest'
 import { join } from 'node:path'
 import {
-  SCAFFOLD_DEFAULTS_BUNDLE, assertFixtureInventory, captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { experimentalBundleDescription, openSettings, PLUGIN_TOGGLE_SETTLE_MS, saveFailureShot, connectFreshWorkspace } from './support.ts'
+  SCAFFOLD_DEFAULTS_BUNDLE, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  launchWebScaffold, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
+import {
+  ZH_BROWSER_LOCALE, connectFreshWorkspaceZh, experimentalBundleDescription, newEnglishPage, openSettings,
+  PLUGIN_TOGGLE_SETTLE_MS, saveFailureShot,
+} from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/plugin-manager', import.meta.url))
 const MANAGER_EXPECTED = join(SNAPSHOT_DIR, 'manager.expected.md')
 const LIVE_EXPECTED = join(SNAPSHOT_DIR, 'live-enabled.expected.md')
 const EXPORTS_EXPECTED = join(SNAPSHOT_DIR, 'exports.expected.md')
+const EXPORTS_EN_EXPECTED = join(SNAPSHOT_DIR, 'exports-en.expected.md')
 const FIXTURE_PLUGINS = fileURLToPath(new URL('./fixtures/plugins', import.meta.url))
 const { version: badgeVersion } = JSON.parse(await readFile(
   new URL('../../../packages/experimental/badge-skill-bundle/package.json', import.meta.url), 'utf8',
@@ -40,7 +46,7 @@ describe('web e2e: plugin manager', () => {
       profile: { packages: [{ dir: join(FIXTURE_PLUGINS, 'fixture-bundle') }], bundles: ['@fixture/missing-bundle'] },
     })
     browser = await chromium.launch()
-    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
@@ -53,22 +59,39 @@ describe('web e2e: plugin manager', () => {
 
   /** Close any open settings dialog, so the sidebar and the main column are clickable. */
   async function closeSettings() {
-    if (await page.getByRole('dialog', { name: 'Settings' }).count() > 0) {
+    if (await page.getByRole('dialog', { name: '\u8bbe\u7f6e' }).count() > 0) {
       await page.keyboard.press('Escape')
-      await expect.poll(() => page.getByRole('dialog', { name: 'Settings' }).count(), { timeout: 5_000 }).toBe(0)
+      await expect.poll(() => page.getByRole('dialog', { name: '\u8bbe\u7f6e' }).count(), { timeout: 5_000 }).toBe(0)
     }
+  }
+
+  /** Change the UI language through Settings and close the dialog. */
+  async function setLanguage(language: 'en' | 'zh'): Promise<void> {
+    if (await page.locator('html').getAttribute('lang') === language) return
+    const settings = language === 'en' ? '\u8bbe\u7f6e' : 'Settings'
+    const source = language === 'en' ? '\u4e2d\u6587' : 'English'
+    const target = language === 'en' ? 'English' : '\u4e2d\u6587'
+    if (await page.getByRole('dialog', { name: settings }).count() === 0) {
+      await openSettings(page, language === 'en' ? 'zh' : 'en')
+    }
+    await page.getByRole('dialog', { name: settings }).getByRole('button', { name: source }).click()
+    await page.getByRole('menuitem', { name: target }).click()
+    const dialog = page.getByRole('dialog', { name: language === 'en' ? 'Settings' : '\u8bbe\u7f6e' })
+    await dialog.waitFor()
+    await page.keyboard.press('Escape')
+    await expect.poll(() => dialog.count()).toBe(0)
   }
 
   /** Select the sidebar's Plugins entry and wait for the management page in the main column. */
   async function openPluginsPanel() {
     await closeSettings()
-    await page.getByRole('navigation', { name: 'Global panels' }).getByRole('button', { name: 'Plugins', exact: true }).click()
+    await page.getByRole('navigation', { name: '\u5168\u5c40\u9762\u677f' }).getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
     const panel = page.locator('[data-plugin-panel]')
     await panel.waitFor({ timeout: 10_000 })
-    while (await panel.getByRole('button', { name: /^Back/ }).count() > 0) {
-      await panel.getByRole('button', { name: /^Back/ }).first().click()
+    while (await panel.getByRole('button', { name: /^\u8fd4\u56de/ }).count() > 0) {
+      await panel.getByRole('button', { name: /^\u8fd4\u56de/ }).first().click()
     }
-    await panel.getByRole('heading', { name: 'Plugins', exact: true }).waitFor({ timeout: 10_000 })
+    await panel.getByRole('heading', { name: '\u63d2\u4ef6', exact: true }).waitFor({ timeout: 10_000 })
     return panel
   }
 
@@ -89,23 +112,22 @@ describe('web e2e: plugin manager', () => {
       // widths shrink the actions to icons before they wrap; the collapsed-bar case
       // pins those widths.
       const PINNED_PLACEMENT: Record<number, 'beside' | 'below'> = { 1680: 'beside', 1024: 'beside' }
-      {
-        const language = 'en'
+      for (const language of ['en', 'zh'] as const) {
         const context = await browser.newContext({
-          viewport: { width: 1680, height: 1000 }, locale: 'en-US',
+          viewport: { width: 1680, height: 1000 }, locale: language === 'en' ? 'en-US' : ZH_BROWSER_LOCALE,
           reducedMotion: 'reduce',
         })
         try {
           const probe = await context.newPage()
           const consoleWatch = watchConsole(probe)
           await probe.goto(headerScaffold.authenticatedUrl, { waitUntil: 'load' })
-          const title = 'Plugins'
+          const title = language === 'en' ? 'Plugins' : '\u63d2\u4ef6'
           await probe.getByRole('button', { name: title, exact: true }).click()
           const panel = probe.locator('[data-plugin-panel]')
           const header = panel.locator('[data-plugin-bar] > header')
           await header.getByRole('heading', { name: title, exact: true }).waitFor()
           await probe.evaluate(() => document.fonts.ready)
-          const add = header.getByRole('button', { name: 'Add plugin', exact: true })
+          const add = header.getByRole('button', { name: language === 'en' ? 'Add plugin' : '\u6dfb\u52a0\u63d2\u4ef6', exact: true })
           await expect.poll(() => add.isEnabled()).toBe(true)
           await add.focus()
           const measure = () => header.evaluate((element) => {
@@ -208,7 +230,7 @@ describe('web e2e: plugin manager', () => {
           }
           await probe.setViewportSize({ width: 390, height: 1000 })
           await expect.poll(async () => validLayout(await measure())).toBe(true)
-          const menuTrigger = header.getByRole('button', { name: 'Choose how to add a plugin' })
+          const menuTrigger = header.getByRole('button', { name: language === 'en' ? 'Choose how to add a plugin' : '\u9009\u62e9\u6dfb\u52a0\u63d2\u4ef6\u65b9\u5f0f' })
           await menuTrigger.click()
           await probe.getByRole('menu').waitFor()
           await probe.keyboard.press('Escape')
@@ -221,7 +243,7 @@ describe('web e2e: plugin manager', () => {
       }
       await compareOrRefreshGolden(
         join(SNAPSHOT_DIR, 'header-responsive.expected.md'),
-        `# Plugin header responsive layout\n\n${facts.join('\n')}\n\nA forced no-wrap layout at 240px fails the same measured layout check; restoring wrap and 390px passes.\nAdd menu dismisses on Escape and returns focus.`,
+        `# Plugin header responsive layout\n\n${facts.join('\n')}\n\nA forced no-wrap layout at 240px fails the same measured layout check in both locales; restoring wrap and 390px passes.\nAdd menu dismisses on Escape and returns focus in both locales.`,
         MODE,
       )
     } finally {
@@ -247,8 +269,8 @@ describe('web e2e: plugin manager', () => {
       await bar.getByRole('tablist').waitFor()
       await add.focus()
       for (const [width, icons, narrowTabs, wraps] of [
-        [1280, false, false, false], [600, true, false, false],
-        [470, true, true, false], [390, true, true, true], [300, true, true, true],
+        [1280, false, false, false], [544, true, false, false],
+        [390, true, true, false], [320, true, true, true], [244, true, true, true],
       ] as const) {
         await probe.setViewportSize({ width, height: 480 })
         await body.evaluate((element) => { element.scrollTop = 180 })
@@ -325,8 +347,8 @@ describe('web e2e: plugin manager', () => {
       const barHeight = () => bar.evaluate(element => element.getBoundingClientRect().height)
       const resting = await headerTop()
       const restingHeight = await barHeight()
-      const refreshButton = bar.getByRole('button', { name: 'Refresh', exact: true })
-      const addButton = bar.getByRole('button', { name: 'Add plugin', exact: true })
+      const refreshButton = bar.getByRole('button', { name: '\u5237\u65b0', exact: true })
+      const addButton = bar.getByRole('button', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true })
       const restingActions = await Promise.all([refreshButton.boundingBox(), addButton.boundingBox()])
       expect(resting).toBe(await panel.evaluate(element => element.getBoundingClientRect().top))
       const restingBarBottom = await bar.evaluate(element => element.getBoundingClientRect().bottom)
@@ -394,7 +416,7 @@ describe('web e2e: plugin manager', () => {
     let aria = ''
     const shots = MODE === 'refresh' ? await mkdtemp(join(tmpdir(), 'dsh-plugin-loading-')) : undefined
     for (const width of [1680, 1000]) {
-      const context = await browser.newContext({ viewport: { width, height: 1000 }, locale: 'en-US' })
+      const context = await browser.newContext({ viewport: { width, height: 1000 }, locale: ZH_BROWSER_LOCALE })
       const release = Promise.withResolvers<undefined>()
       const listBundles = scaffold.ctx.pluginManager.listBundles.bind(scaffold.ctx.pluginManager)
       const reads: ReturnType<typeof listBundles>[] = []
@@ -408,7 +430,7 @@ describe('web e2e: plugin manager', () => {
         const consoleWatch = watchConsole(probe)
         await probe.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
         await probe.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-        await probe.getByRole('navigation', { name: 'Global panels' }).getByRole('button', { name: 'Plugins', exact: true }).click()
+        await probe.getByRole('navigation', { name: '\u5168\u5c40\u9762\u677f' }).getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
         await expect.poll(() => spy.mock.calls.length, { timeout: 10_000 }).toBeGreaterThan(0)
         const panel = probe.locator('[data-plugin-panel]')
         const skeleton = panel.locator('[data-plugin-loading]')
@@ -416,12 +438,12 @@ describe('web e2e: plugin manager', () => {
         await probe.evaluate(() => document.fonts.ready)
         expect(await skeleton.locator(':scope > ul > li').count()).toBe(4)
         expect(await skeleton.getAttribute('role')).toBe('status')
-        expect(await skeleton.getAttribute('aria-label')).toBe('Reading plugins…')
+        expect(await skeleton.getAttribute('aria-label')).toBe('\u6b63\u5728\u8bfb\u53d6\u63d2\u4ef6…')
         expect(await panel.getAttribute('aria-busy')).toBe('true')
         const actions = panel.locator('[data-plugin-bar] > header > div:last-child button')
         expect(await actions.count()).toBe(3)
         for (const action of await actions.all()) expect(await action.isDisabled()).toBe(true)
-        expect(await panel.getByRole('button', { name: 'About plugins' }).isEnabled()).toBe(true)
+        expect(await panel.getByRole('button', { name: '\u63d2\u4ef6\u8bf4\u660e' }).isEnabled()).toBe(true)
         const loadingAria = await captureStableAria(probe, '[data-plugin-panel]', scaffold.workspaceCwd)
         if (aria === '') aria = loadingAria
         else expect(loadingAria).toBe(aria)
@@ -518,7 +540,7 @@ describe('web e2e: plugin manager', () => {
   })
 
   it('delays refresh hints and keeps cards through manual refresh, failure, and retry', async () => {
-    const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     const listBundles = scaffold.ctx.pluginManager.listBundles.bind(scaffold.ctx.pluginManager)
     const reads: ReturnType<typeof listBundles>[] = []
     try {
@@ -527,17 +549,17 @@ describe('web e2e: plugin manager', () => {
       onTestFailed(() => saveFailureShot(probe, 'web-e2e-plugin-manager-refresh'))
       await probe.clock.install()
       await probe.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await probe.getByRole('navigation', { name: 'Global panels' }).getByRole('button', { name: 'Plugins', exact: true }).click()
+      await probe.getByRole('navigation', { name: '\u5168\u5c40\u9762\u677f' }).getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
       const panel = probe.locator('[data-plugin-panel]')
-      const refresh = panel.getByRole('button', { name: 'Refresh', exact: true })
-      const add = panel.getByRole('button', { name: 'Add plugin', exact: true })
-      await panel.getByRole('button', { name: 'View @fixture/bundle', exact: true }).waitFor()
+      const refresh = panel.getByRole('button', { name: '\u5237\u65b0', exact: true })
+      const add = panel.getByRole('button', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true })
+      await panel.getByRole('button', { name: '\u67e5\u770b @fixture/bundle', exact: true }).waitFor()
       await expect.poll(() => refresh.isEnabled()).toBe(true)
       await probe.evaluate(() => document.fonts.ready)
       const cards = panel.locator('[data-plugin-package], [data-plugin-item]')
       const cardText = await cards.allTextContents()
       expect(cardText.length).toBeGreaterThan(0)
-      const tooltip = probe.getByRole('tooltip').filter({ hasText: 'Refresh' })
+      const tooltip = probe.getByRole('tooltip').filter({ hasText: '\u5237\u65b0' })
       const trace: string[] = []
       const recordRefresh = async (phase: string) => {
         trace.push(phase, await refresh.ariaSnapshot(), JSON.stringify({
@@ -546,7 +568,7 @@ describe('web e2e: plugin manager', () => {
           cards: await cards.count(),
           skeletons: await panel.locator('[data-plugin-loading]').count(),
           alerts: await panel.getByRole('alert').allTextContents(),
-          retry: await panel.getByRole('button', { name: 'Retry', exact: true }).count(),
+          retry: await panel.getByRole('button', { name: '\u91cd\u8bd5', exact: true }).count(),
           toasts: await probe.locator('body > [role="alert"]').allTextContents(),
         }))
       }
@@ -619,9 +641,9 @@ describe('web e2e: plugin manager', () => {
             expect(await cards.allTextContents()).toEqual(cardText)
             expect(await panel.locator('[data-plugin-loading]').count()).toBe(0)
             expect(await panel.getByRole('alert').count()).toBe(0)
-            expect(await panel.getByRole('button', { name: 'Retry', exact: true }).count()).toBe(0)
+            expect(await panel.getByRole('button', { name: '\u91cd\u8bd5', exact: true }).count()).toBe(0)
             const toasts = probe.locator('body > [role="alert"]')
-            await expect.poll(() => toasts.allTextContents()).toEqual(['Refresh failed. Please try again.'])
+            await expect.poll(() => toasts.allTextContents()).toEqual(['\u5237\u65b0\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5'])
             await recordRefresh(`${outcome}: settled`)
           } finally {
             release.resolve(undefined)
@@ -645,7 +667,7 @@ describe('web e2e: plugin manager', () => {
 
   it('keeps touch actions direct before keyboard focus and mouse hover', async () => {
     const context = await browser.newContext({
-      viewport: { width: 1280, height: 900 }, locale: 'en-US',
+      viewport: { width: 1280, height: 900 }, locale: ZH_BROWSER_LOCALE,
     })
     try {
       const probe = await context.newPage()
@@ -664,10 +686,10 @@ describe('web e2e: plugin manager', () => {
       onTestFailed(() => saveFailureShot(probe, 'web-e2e-touch-tooltips'))
       await probe.clock.install()
       await probe.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await probe.getByRole('button', { name: 'Plugins', exact: true }).click()
+      await probe.getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
       const panel = probe.locator('[data-plugin-panel]')
-      const refresh = panel.getByRole('button', { name: 'Refresh', exact: true })
-      const info = panel.getByRole('button', { name: 'About plugins', exact: true })
+      const refresh = panel.getByRole('button', { name: '\u5237\u65b0', exact: true })
+      const info = panel.getByRole('button', { name: '\u63d2\u4ef6\u8bf4\u660e', exact: true })
       await expect.poll(() => refresh.isEnabled()).toBe(true)
       await probe.setViewportSize({ width: 390, height: 844 })
       await probe.evaluate(() => document.fonts.ready)
@@ -698,25 +720,25 @@ describe('web e2e: plugin manager', () => {
       expect(await help.count()).toBe(0)
       await tap(info)
       await help.waitFor()
-      await tap(panel.getByRole('heading', { name: 'Plugins', exact: true }))
+      await tap(panel.getByRole('heading', { name: '\u63d2\u4ef6', exact: true }))
       expect(await help.count()).toBe(0)
       facts.push('Explanation closes on another tap or an outside touch')
 
       await probe.keyboard.press('Tab')
       await refresh.focus()
       await probe.clock.runFor(500)
-      await probe.getByRole('tooltip').filter({ hasText: 'Refresh' }).waitFor()
+      await probe.getByRole('tooltip').filter({ hasText: '\u5237\u65b0' }).waitFor()
       facts.push('Keyboard focus after touch: refresh tooltip visible')
       await probe.keyboard.press('Tab')
       expect(await probe.evaluate(() => matchMedia('(any-hover: hover)').matches)).toBe(true)
       await refresh.hover()
       await probe.clock.runFor(500)
-      await probe.getByRole('tooltip').filter({ hasText: 'Refresh' }).waitFor()
+      await probe.getByRole('tooltip').filter({ hasText: '\u5237\u65b0' }).waitFor()
       facts.push('Mouse hover after touch: refresh tooltip visible')
       await probe.mouse.move(0, 843)
       // Tab moved focus to the icon-only Add plugin button, whose focus tooltip stays; the hovered ones leave.
-      expect(await probe.getByRole('tooltip').filter({ hasText: 'Refresh' }).count()).toBe(0)
-      expect(await probe.getByRole('tooltip').filter({ hasText: 'Configure official plugins here' }).count()).toBe(0)
+      expect(await probe.getByRole('tooltip').filter({ hasText: '\u5237\u65b0' }).count()).toBe(0)
+      expect(await probe.getByRole('tooltip').filter({ hasText: '\u5728\u8fd9\u91cc\u914d\u7f6e\u5b98\u65b9\u63d2\u4ef6' }).count()).toBe(0)
       await input.detach()
       await probe.clock.resume()
       await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'touch-tooltips.expected.md'),
@@ -730,8 +752,8 @@ describe('web e2e: plugin manager', () => {
   it('starts with an unavailable selected bundle and lets the user clear its error', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-missing-bundle'))
     const panel = await openPluginsPanel()
-    await panel.getByRole('button', { name: 'View @fixture/missing-bundle', exact: true }).click()
-    const toggle = panel.getByRole('switch', { name: 'Enable @fixture/missing-bundle', exact: true })
+    await panel.getByRole('button', { name: '\u67e5\u770b @fixture/missing-bundle', exact: true }).click()
+    const toggle = panel.getByRole('switch', { name: '\u542f\u7528 @fixture/missing-bundle', exact: true })
     expect(await toggle.getAttribute('aria-checked')).toBe('true')
     expect(await toggle.isDisabled()).toBe(false)
     await panel.getByText(/cannot resolve profile bundle/).waitFor({ timeout: 10_000 })
@@ -754,10 +776,10 @@ describe('web e2e: plugin manager', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-list'))
     const panel = await openPluginsPanel()
 
-    const info = panel.getByRole('button', { name: 'About plugins' })
+    const info = panel.getByRole('button', { name: '\u63d2\u4ef6\u8bf4\u660e' })
     const infoBounds = await info.boundingBox()
     const iconBounds = await info.locator('svg').boundingBox()
-    const subtitleBounds = await panel.getByText('Install, enable, and configure plugins', { exact: true }).boundingBox()
+    const subtitleBounds = await panel.getByText('\u5b89\u88c5\u3001\u542f\u7528\u548c\u914d\u7f6e\u63d2\u4ef6', { exact: true }).boundingBox()
     if (infoBounds === null || iconBounds === null || subtitleBounds === null) {
       throw new Error('Plugin information button, icon, and subtitle must be visible')
     }
@@ -770,29 +792,29 @@ describe('web e2e: plugin manager', () => {
     await info.hover()
     const hoverHelp = page.getByRole('tooltip')
     await hoverHelp.waitFor()
-    expect(await hoverHelp.textContent()).toBe('Configure official plugins and install or manage other plugins here. View the built-in plugin list and runtime status in Settings → Built-in plugins.')
-    await panel.getByRole('heading', { name: 'Plugins', exact: true }).hover()
+    expect(await hoverHelp.textContent()).toBe('\u5728\u8fd9\u91cc\u914d\u7f6e\u5b98\u65b9\u63d2\u4ef6\uff0c\u5b89\u88c5\u548c\u7ba1\u7406\u5176\u4ed6\u63d2\u4ef6\u3002\u5185\u7f6e\u63d2\u4ef6\u5217\u8868\u53ca\u8fd0\u884c\u72b6\u6001\u53ef\u5728\u300c\u8bbe\u7f6e → \u5185\u7f6e\u63d2\u4ef6\u300d\u4e2d\u67e5\u770b')
+    await panel.getByRole('heading', { name: '\u63d2\u4ef6', exact: true }).hover()
     await hoverHelp.waitFor({ state: 'hidden' })
     await info.focus()
     await page.keyboard.press('Enter')
     const help = page.getByRole('tooltip')
     await help.waitFor()
-    expect(await help.textContent()).toContain('Settings → Built-in plugins')
+    expect(await help.textContent()).toContain('\u8bbe\u7f6e → \u5185\u7f6e\u63d2\u4ef6')
     await page.keyboard.press('Escape')
     expect(await help.count()).toBe(0)
     expect(await info.evaluate(element => element === document.activeElement)).toBe(true)
     await info.click()
-    await panel.getByRole('heading', { name: 'Plugins', exact: true }).hover()
+    await panel.getByRole('heading', { name: '\u63d2\u4ef6', exact: true }).hover()
     await help.hover()
     expect(await help.isVisible()).toBe(true)
-    await panel.getByRole('heading', { name: 'Plugins', exact: true }).click()
+    await panel.getByRole('heading', { name: '\u63d2\u4ef6', exact: true }).click()
     expect(await help.count()).toBe(0)
 
-    await panel.getByRole('button', { name: 'View @fixture/bundle', exact: true }).waitFor({ timeout: 20_000 })
-    const toggle = panel.getByRole('switch', { name: 'Enable @fixture/bundle' })
+    await panel.getByRole('button', { name: '\u67e5\u770b @fixture/bundle', exact: true }).waitFor({ timeout: 20_000 })
+    const toggle = panel.getByRole('switch', { name: '\u542f\u7528 @fixture/bundle' })
     expect(await toggle.getAttribute('aria-checked')).toBe('false')
     const card = panel.locator('[data-plugin-package="@fixture/bundle"]')
-    const open = card.getByRole('button', { name: 'View @fixture/bundle', exact: true })
+    const open = card.getByRole('button', { name: '\u67e5\u770b @fixture/bundle', exact: true })
     await open.hover()
     const hoverRadius = await card.evaluate(element => getComputedStyle(element).borderRadius)
     await toggle.focus()
@@ -815,27 +837,33 @@ describe('web e2e: plugin manager', () => {
     expect(await panel.locator('[data-plugin-group="bundles"] [data-plugin-package]').count()).toBe(2)
     expect(await panel.locator('[data-plugin-group="basic"] [data-plugin-item]').count()).toBe(4)
     expect(await panel.locator('[data-plugin-package="@hackdevcode/dsh-experimental-inspector"]').count()).toBe(0)
-    expect(await panel.getByRole('switch', { name: 'Enable Voice input', exact: true }).getAttribute('aria-checked')).toBe('false')
-    expect(await panel.getByRole('switch', { name: 'Enable Custom plugin indexes', exact: true }).getAttribute('aria-checked')).toBe('false')
-    expect(await panel.getByRole('switch', { name: 'Enable Developer tools', exact: true }).count()).toBe(0)
+    expect(await panel.getByRole('switch', { name: '\u542f\u7528 \u8bed\u97f3\u8f93\u5165', exact: true }).getAttribute('aria-checked')).toBe('false')
+    expect(await panel.getByRole('switch', { name: '\u542f\u7528 \u81ea\u5b9a\u4e49\u63d2\u4ef6\u7d22\u5f15', exact: true }).getAttribute('aria-checked')).toBe('false')
+    expect(await panel.getByRole('switch', { name: '\u542f\u7528 \u5f00\u53d1\u8005\u5de5\u5177', exact: true }).count()).toBe(0)
     expect(await panel.getByText(/Cordis|Chrome DevTools/).count()).toBe(0)
     // A bundle the installation ships but the profile runs no row of stays out of both lists: the
     // LiveShare card appears only once its own plugins run (covered by the visibility scenario below).
     expect(await panel.locator('[data-plugin-group="extensions"] [data-plugin-package="@hackdevcode/dsh-experimental-liveshare"]').count()).toBe(0)
-    await panel.getByRole('button', { name: 'More', exact: true }).click()
-    await panel.getByRole('heading', { name: 'Experimental plugins', exact: true, level: 1 }).waitFor()
-    expect(await panel.getByText(experimentalBundleDescription('inspector-profile', 'en'), { exact: true }).count()).toBe(1)
+    await panel.getByRole('button', { name: '\u66f4\u591a', exact: true }).click()
+    await panel.getByRole('heading', { name: '\u5b9e\u9a8c\u6027\u63d2\u4ef6', exact: true, level: 1 }).waitFor()
+    expect(await panel.getByText(experimentalBundleDescription('inspector-profile', 'zh'), { exact: true }).count()).toBe(1)
     const bundles = await scaffold.ctx.pluginManager.listBundles()
     expect(bundles.some(bundle => bundle.name === '@hackdevcode/dsh-experimental-terminal-bundle')).toBe(true)
-    expect(await panel.getByRole('switch', { name: 'Enable Persistent terminals', exact: true }).count()).toBe(0)
+    expect(await panel.getByRole('switch', { name: '\u542f\u7528 \u6301\u4e45\u7ec8\u7aef', exact: true }).count()).toBe(0)
     // The More list also omits LiveShare until its rows run, so the offered count is one lower than
     // the eligible installed optional-bundle list.
     expect(await panel.locator('[data-plugin-group="more"] [data-plugin-package="@hackdevcode/dsh-experimental-liveshare"]').count()).toBe(0)
     expect(await panel.locator('[data-plugin-group="more"] [data-plugin-package]').count())
-      .toBe(bundles.filter(bundle => bundle.name !== '@hackdevcode/dsh-experimental-terminal-bundle'
+      .toBe(bundles.filter(bundle => !HIDDEN_BUNDLES.has(bundle.name)
         && bundle.name !== '@hackdevcode/dsh-experimental-liveshare'
         && bundle.official && (bundle.listedByDefault !== false || bundle.enabled || bundle.installed)).length)
-    for (const name of ['@hackdevcode/dsh-cua-bundle', '@hackdevcode/dsh-experimental-session-search', '@hackdevcode/dsh-experimental-ralph-bundle']) {
+    // Computer Use ships with the installation and is listed only on the macOS Hosts it supports.
+    const cuaSupported = process.platform === 'darwin' || process.platform === 'win32'
+    expect(bundles.find(bundle => bundle.name === '@hackdevcode/dsh-cua-bundle'))
+      .toMatchObject({ enabled: false, optional: true, availability: 'installation', ...cuaSupported ? {} : { listedByDefault: false } })
+    expect(await panel.locator('[data-plugin-group="more"] [data-plugin-package="@hackdevcode/dsh-cua-bundle"]').count())
+      .toBe(cuaSupported ? 1 : 0)
+    for (const name of ['@hackdevcode/dsh-experimental-session-search', '@hackdevcode/dsh-experimental-ralph-bundle']) {
       expect((await scaffold.ctx.pluginManager.listBundles()).find(bundle => bundle.name === name))
         .toMatchObject({ enabled: false, optional: true, availability: 'installation', listedByDefault: false })
       expect(await panel.locator(`[data-plugin-package="${name}"]`).count()).toBe(0)
@@ -843,62 +871,187 @@ describe('web e2e: plugin manager', () => {
     const cards = await panel.locator('[data-plugin-group="more"] [data-plugin-package]').all()
     expect(await Promise.all(cards.map(async card => [
       await card.getAttribute('data-plugin-package'),
-      await card.getByText('Experimental', { exact: true }).count(),
+      await card.getByText('\u5b9e\u9a8c\u6027', { exact: true }).count(),
     ]))).toEqual([
-      ['@hackdevcode/dsh-experimental-agent-team-profile', 1],
       ['@hackdevcode/dsh-experimental-voice-input-bundle', 1],
       ['@hackdevcode/dsh-experimental-plugin-market-bundle', 1],
       ['@hackdevcode/dsh-experimental-auto-review', 1],
       ['@hackdevcode/dsh-experimental-forge-bundle', 1],
       ['@hackdevcode/dsh-personalized-recommendations', 1],
       ['@hackdevcode/dsh-experimental-inspector-profile', 1],
-      ['@hackdevcode/dsh-experimental-tool-worktree', 1],
+      ...cuaSupported ? [['@hackdevcode/dsh-cua-bundle', 1]] : [],
+      ['@hackdevcode/dsh-timeline', 1],
       ['@hackdevcode/dsh-experimental-cot-translation-bundle', 1],
       ['@hackdevcode/dsh-experimental-session-titles-bundle', 1],
       ['@hackdevcode/dsh-experimental-badge-skill-bundle', 1],
+      ['@hackdevcode/dsh-deepseek-chat-import', 1],
       ['@hackdevcode/dsh-subagent-codex', 0],
       ['@hackdevcode/dsh-subagent-claude-code', 0],
     ])
     expect(await panel.locator('[data-plugin-group="bundles"]').count()).toBe(0)
-    await panel.getByRole('button', { name: 'Back to plugins', exact: true }).click()
+    await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6', exact: true }).click()
     expect(await panel.locator('[data-plugin-group="bundles"] [data-plugin-package]').count()).toBe(2)
     // A bundle that is off still shows the rows its patch declares, without switches.
-    await panel.getByRole('button', { name: 'View @fixture/bundle' }).click()
+    await panel.getByRole('button', { name: '\u67e5\u770b @fixture/bundle' }).click()
     await panel.locator('[data-plugin-row]', { hasText: 'fixture-row' }).waitFor({ timeout: 10_000 })
-    expect(await panel.getByRole('switch', { name: 'Enable component @fixture/bundle' }).count()).toBe(0)
-    await panel.getByRole('button', { name: 'Uninstall @fixture/bundle' }).waitFor({ timeout: 5_000 })
-    await panel.getByRole('button', { name: 'Back to plugins' }).click()
-    await expect.poll(() => panel.getByRole('button', { name: 'Uninstall @fixture/bundle' }).count(), { timeout: 5_000 }).toBe(0)
+    expect(await panel.getByRole('switch', { name: '\u542f\u7528\u7ec4\u4ef6 @fixture/bundle' }).count()).toBe(0)
+    await panel.getByRole('button', { name: '\u5378\u8f7d @fixture/bundle' }).waitFor({ timeout: 5_000 })
+    await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6' }).click()
+    await expect.poll(() => panel.getByRole('button', { name: '\u5378\u8f7d @fixture/bundle' }).count(), { timeout: 5_000 }).toBe(0)
 
     const snapshot = await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(MANAGER_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
+  it('authenticates Timeline edits and withdraws the channel when the plugin unloads', async () => {
+    const timeline = await launchWebScaffold({
+      profile: { packages: [], bundles: ['@hackdevcode/dsh-timeline'] },
+    })
+    try {
+      const request = (method: string, payload: object | string): RequestInit => ({
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ type: 'client-request', rpcId: 'timeline-test', method, payload }),
+      })
+      const anonymous = await fetch(new URL('/timeline/edit', timeline.baseUrl), request('edit', {}))
+      expect(anonymous.status).toBe(401)
+      expect(anonymous.headers.get('cache-control')).toBe('no-store')
+      const locale = await timeline.hostFetch('/timeline/locale', request('locale', 'en'))
+      expect(locale.status).toBe(200)
+      expect(await locale.json()).toMatchObject({ result: { ok: true, value: null } })
+      const edit = () => timeline.hostFetch('/timeline/edit', request('edit', {}))
+      const response = await edit()
+      expect(response.status).toBe(200)
+      expect(await response.json()).toMatchObject({
+        type: 'server-response',
+        rpcId: 'timeline-test',
+        result: { ok: false, error: { code: 'timeline/request-failed' } },
+      })
+      const sessionId = await seedSession(timeline, await readFile(
+        new URL('../../../snapshots/session/timeline-plan/session.v4.jsonl', import.meta.url), 'utf8',
+      ), 'timeline-edit-target')
+      const content = await readFile(
+        new URL('../../../packages/experimental/timeline/tests/checkpoint.timeline.json', import.meta.url), 'utf8',
+      )
+      const imported = await timeline.hostFetch('/timeline/edit', request('edit', {
+        action: 'import', sessionId, id: 'import-via-web', content,
+      }))
+      expect(imported.status).toBe(200)
+      expect(await imported.json()).toMatchObject({
+        result: { ok: true, value: { action: 'import', reused: false, notified: false } },
+      })
+      const fiber = [...timeline.ctx.loader.entries()]
+        .find(entry => entry.options.id === 'timeline-experimental')?.fiber
+      expect(fiber?.state).toBe(FiberState.ACTIVE)
+      await fiber?.dispose()
+      const unavailable = await edit()
+      // The Web Host's fallback rejects POST when no route owns the path.
+      expect(unavailable.status).toBe(405)
+    } finally {
+      await timeline.close()
+    }
+  })
+
+  it('shows the automatic Timeline sidebar setting and saves an opt-out', async () => {
+    const timeline = await launchWebScaffold({
+      profile: { packages: [], bundles: ['@hackdevcode/dsh-timeline'] },
+    })
+    try {
+      const probe = await newEnglishPage(browser)
+      try {
+        await probe.goto(timeline.authenticatedUrl)
+        await probe.getByRole('button', { name: 'Plugins', exact: true }).click()
+        const panel = probe.locator('[data-plugin-panel]')
+        await panel.getByRole('button', { name: 'More', exact: true }).click()
+        await panel.getByRole('button', { name: 'View Timeline', exact: true }).click()
+        const tracking = panel.getByRole('region', { name: 'Task tracking' })
+        const toggle = tracking.getByRole('switch', { name: 'Auto-open sidebar' })
+        const config = () => timeline.ctx.settings.describe().find(row => row.ns === 'timeline-experimental')?.value
+        await expect.poll(() => toggle.getAttribute('aria-checked')).toBe('true')
+        await toggle.click()
+        await panel.getByRole('button', { name: 'Save changes', exact: true }).click()
+        await expect.poll(config).toMatchObject({ autoOpenSidebar: false })
+        await panel.getByText('Saved', { exact: true }).waitFor()
+        expect(await toggle.getAttribute('aria-checked')).toBe('false')
+        await probe.getByRole('button', { name: 'Collapse sidebar', exact: true }).click()
+        await probe.setViewportSize({ width: 520, height: 850 })
+        expect(await tracking.evaluate(section => section.scrollWidth <= section.clientWidth)).toBe(true)
+        await toggle.click({ trial: true })
+        const snapshot = await captureStableAria(probe, '.timeline-settings [aria-label="Task tracking"]', timeline.workspaceCwd)
+        await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'timeline-tracking.expected.md'), snapshot, MODE)
+      } finally {
+        await probe.close()
+      }
+    } finally {
+      await timeline.close()
+    }
+  })
+
+  it('opens the saved Timeline tree after forking a cold session from its sidebar row', async () => {
+    const fixture = await readFile(
+      new URL('../../../snapshots/session/timeline-plan/session.v4.jsonl', import.meta.url),
+      'utf8',
+    )
+    const timeline = await launchWebScaffold({
+      profile: { packages: [], bundles: ['@hackdevcode/dsh-timeline'] },
+    })
+    try {
+      const source = await seedSession(timeline, fixture, 'timeline-fork-source')
+      const forkPage = await newEnglishPage(browser)
+      try {
+        await forkPage.goto(timeline.authenticatedUrl)
+        const row = forkPage.locator(`[data-row-key="session:${source}"]`)
+        const workspace = forkPage.getByRole('treeitem').first()
+        await workspace.waitFor()
+        if (await workspace.getAttribute('aria-expanded') === 'false') await workspace.click()
+        await row.hover()
+        await row.locator('button[aria-label^="Session actions for "]').click()
+        await forkPage.getByRole('menuitem', { name: 'Fork session', exact: true }).click()
+        await expect.poll(() => timeline.ctx.agents.list().some(agent => agent.session.header.isSeeded)).toBe(true)
+        const fork = timeline.ctx.agents.list().find(agent => agent.session.header.isSeeded)
+        if (fork === undefined) throw new Error('No fork was created')
+        expect(timeline.ctx.agents.get(source)).toBeUndefined()
+        await forkPage.locator(`[data-row-key="session:${fork.session.id}"]`).click()
+        const dock = forkPage.locator('.timeline-dock')
+        await dock.getByText('Release review', { exact: true }).waitFor()
+        expect(await dock.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('50')
+        await dock.getByRole('button', { name: 'Open task tree' }).click()
+        const tree = forkPage.getByRole('tabpanel', { name: 'Task Tree' })
+        await tree.getByRole('button', { name: /Verify examples/ }).waitFor()
+        await tree.getByRole('button', { name: /Confirm release approval/ }).waitFor()
+      } finally {
+        await forkPage.close()
+      }
+    } finally {
+      await timeline.close()
+    }
+  })
+
   it('enables both default-hidden shipped bundles by name without adding a profile dependency', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-bundled-enable'))
     const profileDir = join(scaffold.harnessHome, 'profiles', 'scaffold')
     const before = readProfileManifest('dsh', profileDir).dependencies
     for (const [name, title] of [
-      ['@hackdevcode/dsh-experimental-session-search', 'Session search'],
-      ['@hackdevcode/dsh-experimental-ralph-bundle', 'Ralph loops'],
+      ['@hackdevcode/dsh-experimental-session-search', '\u4f1a\u8bdd\u641c\u7d22'],
+      ['@hackdevcode/dsh-experimental-ralph-bundle', 'Ralph \u5faa\u73af'],
     ] as const) {
       const panel = await openPluginsPanel()
       expect(await panel.locator(`[data-plugin-package="${name}"]`).count()).toBe(0)
-      await panel.getByRole('button', { name: 'Add plugin', exact: true }).click()
-      const dialog = page.getByRole('dialog', { name: 'Add plugin', exact: true })
-      await dialog.getByRole('textbox', { name: 'Package name or address', exact: true }).fill(name)
-      await dialog.getByRole('button', { name: 'Install', exact: true }).click()
-      const ready = page.getByRole('dialog', { name: 'This plugin ships with DSH', exact: true })
+      await panel.getByRole('button', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true }).click()
+      const dialog = page.getByRole('dialog', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true })
+      await dialog.getByRole('textbox', { name: '\u5305\u540d\u6216\u5730\u5740', exact: true }).fill(name)
+      await dialog.getByRole('button', { name: '\u5b89\u88c5', exact: true }).click()
+      const ready = page.getByRole('dialog', { name: '\u63d2\u4ef6\u5df2\u968f DSH \u63d0\u4f9b', exact: true })
       await ready.waitFor()
       expect((await scaffold.ctx.pluginManager.listBundles()).find(bundle => bundle.name === name)?.enabled).toBe(false)
-      expect(await ready.getByText('Enable it without downloading another copy', { exact: true }).count()).toBe(1)
-      await ready.getByRole('button', { name: 'Enable now', exact: true }).click()
+      expect(await ready.getByText('\u65e0\u9700\u4e0b\u8f7d\uff0c\u542f\u7528\u5373\u53ef\u4f7f\u7528', { exact: true }).count()).toBe(1)
+      await ready.getByRole('button', { name: '\u7acb\u5373\u542f\u7528', exact: true }).click()
       const card = panel.locator(`[data-plugin-package="${name}"]`)
       await card.waitFor()
       expect((await scaffold.ctx.pluginManager.listBundles()).find(bundle => bundle.name === name)?.enabled).toBe(true)
       expect(readProfileManifest('dsh', profileDir).dependencies).toEqual(before)
-      await card.getByRole('switch', { name: `Enable ${title}`, exact: true }).click()
+      await card.getByRole('switch', { name: `\u542f\u7528 ${title}`, exact: true }).click()
       await card.waitFor({ state: 'hidden' })
       expect((await scaffold.ctx.pluginManager.listBundles()).find(bundle => bundle.name === name)?.enabled).toBe(false)
     }
@@ -908,14 +1061,14 @@ describe('web e2e: plugin manager', () => {
   it('keeps off-state switch thumbs light in both themes', async () => {
     // The off-state thumb must stay light so an operable toggle cannot read as
     // disabled, whose only other difference is reduced opacity.
-    for (const [theme, label] of [['light', 'Light'], ['dark', 'Dark']] as const) {
-      await openSettings(page)
-      const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
-      await settings.getByRole('button', { name: 'General', exact: true }).click()
+    for (const [theme, label] of [['light', '\u6d45\u8272'], ['dark', '\u6df1\u8272']] as const) {
+      await openSettings(page, 'zh')
+      const settings = page.getByRole('dialog', { name: '\u8bbe\u7f6e', exact: true })
+      await settings.getByRole('button', { name: '\u901a\u7528\u8bbe\u7f6e', exact: true }).click()
       await settings.getByRole('button', { name: label, exact: true }).click()
       await expect.poll(() => page.evaluate(() => document.body.hasAttribute('data-ds-dark-theme'))).toBe(theme === 'dark')
       const panel = await openPluginsPanel()
-      const toggle = panel.getByRole('switch', { name: 'Enable @fixture/bundle', exact: true })
+      const toggle = panel.getByRole('switch', { name: '\u542f\u7528 @fixture/bundle', exact: true })
       await expect.poll(() => toggle.getAttribute('aria-checked')).toBe('false')
       const appearance = await toggle.evaluate((element) => {
         const thumb = element.firstElementChild
@@ -936,10 +1089,10 @@ describe('web e2e: plugin manager', () => {
       })
     }
     // Leave the shared page in the default theme for the tests after this one.
-    await openSettings(page)
-    const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
-    await settings.getByRole('button', { name: 'General', exact: true }).click()
-    await settings.getByRole('button', { name: 'Light', exact: true }).click()
+    await openSettings(page, 'zh')
+    const settings = page.getByRole('dialog', { name: '\u8bbe\u7f6e', exact: true })
+    await settings.getByRole('button', { name: '\u901a\u7528\u8bbe\u7f6e', exact: true }).click()
+    await settings.getByRole('button', { name: '\u6d45\u8272', exact: true }).click()
     await expect.poll(() => page.evaluate(() => document.body.hasAttribute('data-ds-dark-theme'))).toBe(false)
     await closeSettings()
   })
@@ -949,7 +1102,7 @@ describe('web e2e: plugin manager', () => {
     onTestFinished(closeSettings)
     const fixtureIcon = `data:image/svg+xml;base64,${(await readFile(join(FIXTURE_PLUGINS, 'fixture-bundle/icon.svg'))).toString('base64')}`
     const fallbackIcon = `data:image/svg+xml;base64,${(await readFile(join(FIXTURE_PLUGINS, 'fixture-bundle/fallback-icon.svg'))).toString('base64')}`
-    const teamIcon = `data:image/svg+xml;base64,${(await readFile(fileURLToPath(new URL('../../../packages/experimental/agent-team-profile/icon.svg', import.meta.url)))).toString('base64')}`
+    const voiceIcon = `data:image/svg+xml;base64,${(await readFile(fileURLToPath(new URL('../../../packages/experimental/voice-input-bundle/icon.svg', import.meta.url)))).toString('base64')}`
     const images: string[] = []
     const checkImage = async (selector: string, source: string, label: string) => {
       const image = panel.locator(`${selector} img`).first()
@@ -963,9 +1116,9 @@ describe('web e2e: plugin manager', () => {
       images.push(`${label}: image, ${size.width}×${size.height}, decoded`)
     }
     await checkImage('[data-plugin-package="@fixture/bundle"]', fixtureIcon, 'Third-party bundle card')
-    const team = panel.locator('[data-plugin-package="@hackdevcode/dsh-experimental-agent-team-profile"]')
+    const team = panel.locator('[data-plugin-package="@hackdevcode/dsh-experimental-voice-input-bundle"]')
     expect(await team.getByRole('switch').getAttribute('aria-checked')).toBe('false')
-    await checkImage('[data-plugin-package="@hackdevcode/dsh-experimental-agent-team-profile"]', teamIcon, 'Disabled Agent Teams card')
+    await checkImage('[data-plugin-package="@hackdevcode/dsh-experimental-voice-input-bundle"]', voiceIcon, 'Disabled Voice Input card')
     try {
       for (const colorScheme of ['light', 'dark'] as const) {
         await page.emulateMedia({ colorScheme })
@@ -979,27 +1132,27 @@ describe('web e2e: plugin manager', () => {
     } finally {
       await page.emulateMedia({ colorScheme: null })
     }
-    await panel.getByRole('button', { name: 'View Agent team', exact: true }).click()
-    await checkImage('[data-plugin-detail]', teamIcon, 'Agent Teams detail')
-    await panel.getByRole('button', { name: 'Back to plugins' }).click()
-    await panel.getByRole('button', { name: 'View @fixture/bundle', exact: true }).click()
+    await panel.getByRole('button', { name: '\u67e5\u770b \u8bed\u97f3\u8f93\u5165', exact: true }).click()
+    await checkImage('[data-plugin-detail]', voiceIcon, 'Voice Input detail')
+    await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6' }).click()
+    await panel.getByRole('button', { name: '\u67e5\u770b @fixture/bundle', exact: true }).click()
     await checkImage('[data-plugin-detail]', fixtureIcon, 'Third-party bundle detail')
     await checkImage('[data-plugin-row="fixture-search"]', fallbackIcon, 'Independent search row')
     expect(await panel.locator('[data-plugin-row="fixture-review"] img').count()).toBe(0)
     expect(await panel.locator('[data-plugin-row="fixture-review"] svg').count()).toBeGreaterThan(0)
     images.push('Independent review row: generic artwork')
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'icons.expected.md'), images.join('\n'), MODE)
-    await panel.getByRole('button', { name: 'Back to plugins' }).click()
+    await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6' }).click()
     expect(tripwire.pageErrors).toEqual([])
   })
 
   it('shows a bundle detail document image before activation and leaves other plugin details unchanged', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-preview'))
     const panel = await openPluginsPanel()
-    await panel.getByRole('button', { name: 'More', exact: true }).click()
-    await panel.getByRole('button', { name: 'View DSH badge skill', exact: true }).click()
+    await panel.getByRole('button', { name: '\u66f4\u591a', exact: true }).click()
+    await panel.getByRole('button', { name: '\u67e5\u770b DSH \u5fbd\u7ae0\u6280\u80fd', exact: true }).click()
     const detail = panel.locator('[data-plugin-detail]')
-    const preview = detail.locator('[data-detail-document]').getByRole('img', { name: 'DSH badge skill feature preview', exact: true })
+    const preview = detail.locator('[data-detail-document]').getByRole('img', { name: 'DSH \u5fbd\u7ae0\u6280\u80fd\u529f\u80fd\u9884\u89c8', exact: true })
     await preview.waitFor()
     await preview.evaluate(async (image: HTMLImageElement) => { await image.decode() })
     expect(await preview.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(640)
@@ -1016,27 +1169,85 @@ describe('web e2e: plugin manager', () => {
       await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd, {
         replacements: [[badgeVersion, '{{version}}']],
       }), MODE)
-    await panel.getByRole('button', { name: 'Back to Experimental plugins', exact: true }).click()
-    await panel.getByRole('button', { name: 'Back to plugins', exact: true }).click()
-    await panel.getByRole('button', { name: 'View @fixture/bundle', exact: true }).click()
+    const chineseSource = await preview.getAttribute('src')
+    try {
+      await setLanguage('en')
+      const englishPreview = detail.locator('[data-detail-document]')
+        .getByRole('img', { name: 'DSH badge skill feature preview', exact: true })
+      await englishPreview.waitFor()
+      await englishPreview.evaluate(async (image: HTMLImageElement) => { await image.decode() })
+      expect(await englishPreview.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBe(640)
+      expect(await englishPreview.getAttribute('src')).not.toBe(chineseSource)
+    } finally {
+      await setLanguage('zh')
+    }
+    expect(await preview.getAttribute('src')).toBe(chineseSource)
+    await panel.getByRole('button', { name: '\u8fd4\u56de \u5b9e\u9a8c\u6027\u63d2\u4ef6', exact: true }).click()
+    await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6', exact: true }).click()
+    await panel.getByRole('button', { name: '\u67e5\u770b @fixture/bundle', exact: true }).click()
     // A bundle without meta.detail still shows its README; this one has no images.
     await panel.locator('[data-detail-document] h1').waitFor()
     expect(await panel.getByRole('img').count()).toBe(0)
-    await panel.getByRole('button', { name: 'Back to plugins', exact: true }).click()
+    await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6', exact: true }).click()
     expect(tripwire.pageErrors).toEqual([])
   })
 
-  it('shows independent exports with English titles and descriptions without activating the plugins', async () => {
+  it('introduces code review and worktrees with localized artwork before activation', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-forge-preview'))
+    const panel = await openPluginsPanel()
+    await panel.getByRole('button', { name: '\u67e5\u770b \u53d8\u66f4\u8bf7\u6c42\u4e0e\u5de5\u4f5c\u6811', exact: true }).click()
+    const detail = panel.locator('[data-plugin-detail]')
+    expect(await detail.getByRole('switch').getAttribute('aria-checked')).toBe('false')
+    const sources: (string | null)[] = []
+    let english = false
+    try {
+      for (const [language, alt] of [
+        ['zh', '\u4f1a\u8bdd\u5173\u8054 GitHub PR\uff0c\u8ddf\u8e2a\u68c0\u67e5\u3001\u8bc4\u5ba1\u4e0e\u4ee3\u7801\u5dee\u5f02\uff0c\u5e76\u7528\u5de5\u4f5c\u6811\u9694\u79bb\u4efb\u52a1\u6539\u52a8'],
+        ['en', 'A conversation linked to a GitHub pull request, with checks, reviews, code diffs, and an isolated worktree'],
+      ] as const) {
+        if (language === 'en') {
+          await setLanguage(language)
+          english = true
+        }
+        const document = detail.locator('[data-detail-document]')
+        const image = document.getByRole('img', { name: alt, exact: true })
+        await image.waitFor()
+        await image.evaluate(async (node: HTMLImageElement) => { await node.decode() })
+        expect(await image.evaluate((node: HTMLImageElement) => [node.naturalWidth, node.naturalHeight])).toEqual([640, 300])
+        sources.push(await image.getAttribute('src'))
+        for (const width of [1680, 390]) {
+          await page.setViewportSize({ width, height: 1000 })
+          expect(await image.evaluate((node: HTMLImageElement) => {
+            const bounds = node.getBoundingClientRect()
+            return bounds.width > 0 && bounds.left >= 0 && bounds.right <= window.innerWidth
+              && window.document.documentElement.scrollWidth <= window.innerWidth
+          })).toBe(true)
+        }
+        await page.setViewportSize({ width: 1680, height: 1000 })
+      }
+      expect(sources[0]).not.toBe(sources[1])
+    } finally {
+      await page.setViewportSize({ width: 1680, height: 1000 })
+      if (english) await setLanguage('zh')
+    }
+    await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'forge-preview.expected.md'),
+      await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd, {
+        replacements: [[badgeVersion, '{{version}}']],
+      }), MODE)
+    expect(tripwire.pageErrors).toEqual([])
+  })
+
+  it('localizes independent exports and falls back per field without activating the plugins', async () => {
     onTestFinished(closeSettings)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-exports'))
     const panel = await openPluginsPanel()
-    await panel.getByRole('button', { name: 'View @fixture/bundle' }).click()
+    await panel.getByRole('button', { name: '\u67e5\u770b @fixture/bundle' }).click()
     const search = panel.locator('[data-plugin-row]', { hasText: '@fixture/bundle/search' })
     const review = panel.locator('[data-plugin-row]', { hasText: '@fixture/bundle/review' })
-    await search.getByText('File Search', { exact: true }).waitFor()
-    await review.getByText('Code review', { exact: true }).waitFor()
-    expect(await search.getByText('Search files in the workspace.', { exact: true }).count()).toBe(1)
-    expect(await review.getByText('Review changes in the workspace.', { exact: true }).count()).toBe(1)
+    await search.getByText('\u6587\u4ef6\u641c\u7d22', { exact: true }).waitFor()
+    await review.getByText('\u4ee3\u7801\u5ba1\u67e5', { exact: true }).waitFor()
+    expect(await search.getByText('\u641c\u7d22\u5de5\u4f5c\u533a\u4e2d\u7684\u6587\u4ef6\u3002', { exact: true }).count()).toBe(1)
+    expect(await review.getByText('\u5ba1\u67e5\u5de5\u4f5c\u533a\u4e2d\u7684\u6539\u52a8\u3002', { exact: true }).count()).toBe(1)
     await panel.getByText('Registry description for the fixture bundle.', { exact: true }).first().waitFor()
     // The README detail document loads asynchronously after the description.
     const readmeHeading = panel.locator('[data-detail-document]').getByRole('heading', { name: 'Fixture bundle', exact: true })
@@ -1045,92 +1256,79 @@ describe('web e2e: plugin manager', () => {
     await compareOrRefreshGolden(EXPORTS_EXPECTED, await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd, {
       replacements: [[FIXTURE_PLUGINS, '{{fixtures}}']],
     }), MODE)
-    expect(await panel.locator('[data-plugin-name]').textContent()).toBe('@fixture/bundle')
-    await panel.getByRole('button', { name: 'Back to plugins' }).click()
+    try {
+      await setLanguage('en')
+      await search.getByText('File Search', { exact: true }).waitFor()
+      expect(await review.getByText('@fixture/bundle/review', { exact: true }).count()).toBeGreaterThan(0)
+      expect(await search.getByText('Search package introduction.', { exact: true }).count()).toBe(0)
+      expect(await review.getByText('\u5ba1\u67e5\u5de5\u4f5c\u533a\u4e2d\u7684\u6539\u52a8\u3002', { exact: true }).count()).toBe(0)
+      await readmeHeading.waitFor()
+      await compareOrRefreshGolden(EXPORTS_EN_EXPECTED, await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd, {
+        replacements: [[FIXTURE_PLUGINS, '{{fixtures}}']],
+      }), MODE)
+      expect(await panel.locator('[data-plugin-name]').textContent()).toBe('@fixture/bundle')
+    } finally {
+      await setLanguage('zh')
+    }
+    await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6' }).click()
     expect(tripwire.pageErrors).toEqual([])
   })
 
-  it('shows built-in names and descriptions in English', async () => {
+  it('updates built-in names and descriptions when the UI language changes', async () => {
     onTestFinished(closeSettings)
-    onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-names'))
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-locale'))
     const panel = await openPluginsPanel()
-    await panel.getByRole('button', { name: 'View Agent team', exact: true }).click()
+    await panel.getByRole('button', { name: '\u67e5\u770b \u8bed\u97f3\u8f93\u5165', exact: true }).click()
     const packageName = panel.locator('[data-plugin-name]')
-    expect(await packageName.textContent()).toBe('@hackdevcode/dsh-experimental-agent-team-profile')
-    expect(await panel.getByText(experimentalBundleDescription('agent-team-profile', 'en')).count()).toBe(1)
-    const child = panel.locator('[data-plugin-row]', { hasText: 'tool-agent-team' })
-    await child.getByText('Team tools', { exact: true }).waitFor()
-    expect(await child.getByText('Give agents tools to coordinate members, exchange messages, and manage shared tasks.', { exact: true }).count()).toBe(1)
-    await panel.getByRole('button', { name: 'Back to plugins' }).click()
-    await panel.getByRole('button', { name: 'View Agent teams', exact: true }).waitFor()
-    expect(await panel.getByRole('switch', { name: 'Enable Agent teams', exact: true }).count()).toBe(1)
-    // Schedule ships in the delivered composition, so no bundle card carries it.
-    expect(await panel.getByRole('button', { name: 'View Automation tasks', exact: true }).count()).toBe(0)
-    for (const title of ['Shell', 'Agent loop', 'Subagent', 'Web search']) {
-      await panel.getByRole('button', { name: `View ${title}`, exact: true }).waitFor()
+    expect(await packageName.textContent()).toBe('@hackdevcode/dsh-experimental-voice-input-bundle')
+    expect(await panel.getByText('\u5728\u672c\u673a\u4f7f\u7528 SenseVoice \u8f6c\u5199\u5f55\u97f3\uff0c\u9996\u6b21\u4f7f\u7528\u9700\u5b89\u88c5\u4f9d\u8d56\u3002').count()).toBe(1)
+    try {
+      await setLanguage('en')
+      await panel.getByRole('heading', { name: 'Voice input', exact: true }).waitFor()
+      expect(await packageName.textContent()).toBe('@hackdevcode/dsh-experimental-voice-input-bundle')
+      expect(await panel.getByText('Transcribe recordings locally with SenseVoice; first use requires installing dependencies').count()).toBe(1)
+      await panel.getByRole('button', { name: 'Back to plugins' }).click()
+      await panel.getByRole('button', { name: 'View Voice input', exact: true }).waitFor()
+      expect(await panel.getByRole('switch', { name: 'Enable Voice input', exact: true }).count()).toBe(1)
+      // Schedule ships in the delivered composition, so no bundle card carries it in either language.
+      expect(await panel.getByRole('button', { name: 'View Automation tasks', exact: true }).count()).toBe(0)
+      // The official configuration pages follow the language too, from their own dictionary.
+      for (const title of ['Shell', 'Agent loop', 'Subagent', 'Web search and fetch']) {
+        await panel.getByRole('button', { name: `View ${title}`, exact: true }).waitFor()
+      }
+    } finally {
+      await setLanguage('zh')
     }
+    await panel.getByRole('button', { name: '\u67e5\u770b \u8bed\u97f3\u8f93\u5165', exact: true }).waitFor()
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
-  it('enables the Team tools and browser plugin with one bundle switch', async () => {
+  it('provides Team mode per Session without an experimental plugin switch', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-team'))
+    onTestFinished(closeSettings)
     const panel = await openPluginsPanel()
-    const toggle = panel.getByRole('switch', { name: 'Enable Agent team', exact: true })
-    const teamRows = () => [...scaffold.ctx.loader.entries()]
-      .filter(entry => ['agent-team', 'tool-agent-team', 'ui-agent-team'].includes(entry.options.id))
-    const teamPage = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    expect(await panel.getByRole('switch', { name: '\u542f\u7528 \u667a\u80fd\u4f53\u56e2\u961f', exact: true }).count()).toBe(0)
+    expect(await panel.locator('[data-plugin-package="@hackdevcode/dsh-experimental-agent-team-profile"]').count()).toBe(0)
+    expect([...scaffold.ctx.loader.entries()].filter(entry =>
+      ['agent-team', 'tool-agent-team', 'ui-agent-team'].includes(entry.options.id)
+        && entry.fiber?.state === FiberState.ACTIVE)).toHaveLength(3)
+    const teamPage = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     const teamTripwire = watchConsole(teamPage)
     try {
       await teamPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await connectFreshWorkspace(teamPage, scaffold.workspaceCwd)
-      const agent = scaffold.ctx.agents.list()[0]
-      if (agent === undefined) throw new Error('connected Team workspace did not create an Agent')
-      // Session actions render only after the conversation leaves its blank state.
-      agent.session.append('turn/start', { turn: 1 })
-      agent.session.append('user/message', createUserMessage({
-        content: [{ type: 'text', text: 'Team UI lifecycle' }], source: { kind: 'user' },
-      }), { surfaceOp: 'append' })
-      agent.session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
-      await scaffold.ctx.sessions.flush(agent.session)
-      // The current crumb renders as plain text inside the hierarchy nav.
-      await teamPage.getByRole('navigation', { name: 'Session hierarchy' })
-        .getByText('Team UI lifecycle', { exact: true }).waitFor()
-      const action = teamPage.locator('[data-team-action]')
-      expect(await action.count()).toBe(0)
-      await toggle.click()
-      try {
-        await expect.poll(() => teamRows().filter(entry => entry.fiber?.state === FiberState.ACTIVE).length, { timeout: 20_000 }).toBe(3)
-        await expect.poll(() => toggle.getAttribute('aria-checked'), { timeout: PLUGIN_TOGGLE_SETTLE_MS }).toBe('true')
-        await action.waitFor({ timeout: 20_000 })
-        await action.getByRole('button', { name: 'Agent team', exact: true }).click()
-        const teamPanel = teamPage.getByRole('dialog', { name: 'Agent team', exact: true })
-        await teamPanel.getByText('Team is unavailable', { exact: true }).waitFor()
-        await teamPage.reload({ waitUntil: 'load' })
-        await action.getByRole('button', { name: 'Agent team', exact: true }).click()
-        await teamPanel.getByText('No shared tasks yet. Create them through the conversation.').waitFor()
-        await teamPanel.getByText('lead', { exact: true }).waitFor()
-        const manifest = JSON.parse(await homeFile('profiles', 'scaffold', 'package.json')) as {
-          dsh: { profile: { bundles: string[] } }
-        }
-        expect(manifest.dsh.profile.bundles).toEqual([...SCAFFOLD_BUNDLES, '@hackdevcode/dsh-experimental-agent-team-profile'])
-        await panel.getByRole('button', { name: 'View Agent team', exact: true }).click()
-        for (const id of ['agent-team', 'tool-agent-team', 'ui-agent-team']) {
-          await panel.locator('[data-plugin-row]', { hasText: id }).first().waitFor()
-        }
-        await panel.getByRole('button', { name: 'Back to plugins' }).click()
-      } finally {
-        const back = panel.getByRole('button', { name: 'Back to plugins' })
-        if (await back.count() > 0) await back.click()
-        if (await toggle.getAttribute('aria-checked') === 'true') await toggle.click()
-        await expect.poll(() => teamRows().filter(entry => entry.fiber?.state === FiberState.ACTIVE).length, { timeout: 20_000 }).toBe(0)
-        await expect.poll(() => action.count(), { timeout: 20_000 }).toBe(0)
-      }
+      await connectFreshWorkspaceZh(teamPage, scaffold.workspaceCwd)
+      await teamPage.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/u }).click()
+      await teamPage.getByRole('menuitem', { name: '\u667a\u80fd\u4f53\u56e2\u961f\u534f\u4f5c \u5173\u95ed', exact: true }).click()
+      const mode = teamPage.getByRole('switch', { name: '\u5f00\u542f\u667a\u80fd\u4f53\u56e2\u961f\u534f\u4f5c', exact: true })
+      await mode.waitFor()
+      expect(await mode.getAttribute('aria-checked')).toBe('false')
+      await mode.click()
+      await expect.poll(() => mode.getAttribute('aria-checked')).toBe('true')
       expect(teamTripwire.pageErrors).toEqual([])
       expect(teamTripwire.warnings).toEqual([])
     } finally {
       await teamPage.close()
     }
-    expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
   it('mounts the delivered Automation tasks rows without a bundle switch', async () => {
@@ -1142,14 +1340,14 @@ describe('web e2e: plugin manager', () => {
     // offers a switch for them.
     expect(scheduleRows()).toHaveLength(2)
     expect(scheduleRows().every(entry => entry.fiber?.state === FiberState.ACTIVE)).toBe(true)
-    expect(await panel.getByRole('button', { name: 'View Automation task', exact: true }).count()).toBe(0)
-    expect(await panel.getByRole('switch', { name: 'Enable Automation task', exact: true }).count()).toBe(0)
-    await page.getByRole('navigation', { name: 'Global panels' }).getByRole('button', { name: 'Automation task', exact: true }).waitFor()
+    expect(await panel.getByRole('button', { name: '\u67e5\u770b \u81ea\u52a8\u5316\u4efb\u52a1', exact: true }).count()).toBe(0)
+    expect(await panel.getByRole('switch', { name: '\u542f\u7528 \u81ea\u52a8\u5316\u4efb\u52a1', exact: true }).count()).toBe(0)
+    await page.getByRole('navigation', { name: '\u5168\u5c40\u9762\u677f' }).getByRole('button', { name: '\u81ea\u52a8\u5316\u4efb\u52a1', exact: true }).waitFor()
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
   it('keeps IME confirmation Enter in install fields and submits only a plain Enter', async () => {
-    const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     const manager = scaffold.ctx.pluginManager
     const manifest = await homeFile('profiles', 'scaffold', 'package.json')
     const registrySpy = vi.spyOn(manager, 'registries').mockResolvedValue({
@@ -1168,28 +1366,41 @@ describe('web e2e: plugin manager', () => {
       onTestFailed(() => saveFailureShot(probe, 'web-e2e-plugin-manager-ime-enter'))
       await probe.clock.install()
       await probe.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await probe.getByRole('navigation', { name: 'Global panels' }).getByRole('button', { name: 'Plugins', exact: true }).click()
+      await probe.getByRole('navigation', { name: '\u5168\u5c40\u9762\u677f' }).getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
       const panel = probe.locator('[data-plugin-panel]')
-      await panel.getByRole('button', { name: 'View @fixture/bundle', exact: true }).waitFor({ timeout: 20_000 })
+      await panel.getByRole('button', { name: '\u67e5\u770b @fixture/bundle', exact: true }).waitFor({ timeout: 20_000 })
       const trace: string[] = ['Synthetic browser KeyboardEvents, not an OS input-method test.']
       for (const target of ['package', 'custom registry'] as const) {
         inspectSpy.mockClear()
         installSpy.mockClear()
-        await panel.getByRole('button', { name: 'Add plugin', exact: true }).click()
-        const dialog = probe.getByRole('dialog', { name: 'Add plugin', exact: true })
+        await panel.getByRole('button', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true }).click()
+        const dialog = probe.getByRole('dialog', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true })
         await dialog.waitFor({ timeout: 10_000 })
         const spec = target === 'package' ? 'ime-confirm-package' : 'ime-confirm-registry'
-        const specField = dialog.getByRole('textbox', { name: 'Package name or address', exact: true })
+        const specField = dialog.getByRole('textbox', { name: '\u5305\u540d\u6216\u5730\u5740', exact: true })
         await specField.fill(spec)
         let field = specField
         const customRegistry = 'https://registry.example.test/'
         if (target === 'custom registry') {
-          const registryToggle = dialog.getByRole('button', { name: /^Registry/ })
+          const registryToggle = dialog.getByRole('button', { name: /^\u5b89\u88c5\u6e90/ })
           await registryToggle.click()
           const registry = probe.locator('[data-install-registry]')
-          const offered = registry.getByRole('radio', { name: 'Official npm registry registry.npmjs.org', exact: true })
-          const custom = registry.getByRole('radio', { name: 'Custom address', exact: true })
-          field = registry.getByRole('textbox', { name: 'Custom address', exact: true })
+          await registry.waitFor()
+          for (const width of [390, 800, 1680]) {
+            await probe.setViewportSize({ width, height: 1000 })
+            await probe.clock.runFor(300)
+            await expect.poll(async () => {
+              const rect = await registry.boundingBox()
+              const anchor = await registryToggle.boundingBox()
+              return rect !== null && anchor !== null
+                && rect.x >= 11 && rect.x + rect.width <= width - 11
+                && rect.y >= 11 && rect.y + rect.height <= 989
+                && Math.abs(rect.x - Math.max(12, Math.min(anchor.x + anchor.width - rect.width, width - rect.width - 12))) <= 1
+            }).toBe(true)
+          }
+          const offered = registry.getByRole('radio', { name: 'npm \u5b98\u65b9\u6e90 registry.npmjs.org', exact: true })
+          const custom = registry.getByRole('radio', { name: '\u81ea\u5b9a\u4e49\u5730\u5740', exact: true })
+          field = registry.getByRole('textbox', { name: '\u81ea\u5b9a\u4e49\u5730\u5740', exact: true })
           expect(await offered.isChecked()).toBe(true)
           expect(await custom.isChecked()).toBe(false)
           await offered.focus()
@@ -1226,7 +1437,7 @@ describe('web e2e: plugin manager', () => {
         const assertUnsubmitted = async (label: string) => {
           expect(await field.inputValue()).toBe(value)
           expect(await field.isEditable()).toBe(true)
-          expect(await dialog.getByRole('button', { name: 'Install', exact: true }).isEnabled()).toBe(true)
+          expect(await dialog.getByRole('button', { name: '\u5b89\u88c5', exact: true }).isEnabled()).toBe(true)
           expect(inspectSpy).not.toHaveBeenCalled()
           expect(installSpy).not.toHaveBeenCalled()
           trace.push(`${target} / ${label}: inspect=0, install=0; editable; value retained`, await field.ariaSnapshot())
@@ -1263,10 +1474,10 @@ describe('web e2e: plugin manager', () => {
         expect(inspectSpy.mock.calls[0]?.[0]).toBe(spec)
         expect(installSpy.mock.calls[0]?.[0]).toBe(spec)
         expect(installSpy.mock.calls[0]?.[1]).toMatchObject({ enabled: false, registry: target === 'package' ? null : customRegistry })
-        const failed = probe.getByRole('dialog', { name: 'The plugin could not be installed', exact: true })
+        const failed = probe.getByRole('dialog', { name: '\u63d2\u4ef6\u5b89\u88c5\u5931\u8d25', exact: true })
         await failed.waitFor({ timeout: 10_000 })
         trace.push(`${target} / plain Enter: inspect=1, install=1`, await failed.ariaSnapshot())
-        await failed.getByRole('button', { name: 'Close', exact: true }).click()
+        await failed.getByRole('button', { name: '\u5173\u95ed', exact: true }).click()
         await failed.waitFor({ state: 'hidden', timeout: 10_000 })
       }
       expect(await homeFile('profiles', 'scaffold', 'package.json')).toBe(manifest)
@@ -1286,65 +1497,65 @@ describe('web e2e: plugin manager', () => {
   it('checks a spec before installing it and words what the check refused', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-install'))
     const panel = await openPluginsPanel()
-    await panel.getByRole('button', { name: 'Add plugin', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Add plugin' })
+    await panel.getByRole('button', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true }).click()
+    const dialog = page.getByRole('dialog', { name: '\u6dfb\u52a0\u63d2\u4ef6' })
     await dialog.waitFor({ timeout: 10_000 })
-    const field = dialog.getByRole('textbox', { name: 'Package name or address' })
+    const field = dialog.getByRole('textbox', { name: '\u5305\u540d\u6216\u5730\u5740' })
     expect(await page.getByRole('menu').count()).toBe(0)
     await expect.poll(() => field.evaluate(element => document.activeElement === element)).toBe(true)
-    await dialog.getByRole('button', { name: 'Close', exact: true }).click()
+    await dialog.getByRole('button', { name: '\u5173\u95ed', exact: true }).click()
     await dialog.waitFor({ state: 'hidden' })
-    await panel.getByRole('button', { name: 'Choose how to add a plugin', exact: true }).click()
+    await panel.getByRole('button', { name: '\u9009\u62e9\u6dfb\u52a0\u63d2\u4ef6\u65b9\u5f0f', exact: true }).click()
     const menu = page.getByRole('menu')
-    await menu.getByRole('menuitem', { name: /^Install a third-party plugin/ }).click()
+    await menu.getByRole('menuitem', { name: /^\u5b89\u88c5\u7b2c\u4e09\u65b9\u63d2\u4ef6/ }).click()
     await menu.waitFor({ state: 'hidden' })
     await dialog.waitFor({ state: 'visible' })
     await expect.poll(() => field.evaluate(element => document.activeElement === element)).toBe(true)
-    const install = dialog.getByRole('button', { name: 'Install', exact: true })
+    const install = dialog.getByRole('button', { name: '\u5b89\u88c5', exact: true })
     expect(await install.isDisabled()).toBe(true)
-    expect(await dialog.getByRole('note').textContent()).toContain('Install only plugins you trust')
-    expect(await dialog.getByRole('note').textContent()).toContain('On-demand official plugins offer Update when their version differs from DSH')
-    expect(await dialog.getByRole('note').textContent()).toContain('uninstall and reinstall them')
-    await dialog.getByRole('button', { name: 'Install guide and examples' }).click()
+    expect(await dialog.getByRole('note').textContent()).toContain('\u8bf7\u786e\u8ba4\u63d2\u4ef6\u6765\u6e90\u53ef\u4fe1')
+    expect(await dialog.getByRole('note').textContent()).toContain('\u6309\u9700\u5b89\u88c5\u7684\u5b98\u65b9\u63d2\u4ef6\u4f1a\u5728\u7248\u672c\u4e0e DSH \u4e0d\u540c\u65f6\u63d0\u4f9b“\u66f4\u65b0”')
+    expect(await dialog.getByRole('note').textContent()).toContain('\u5176\u4ed6\u63d2\u4ef6\u8bf7\u5148\u5378\u8f7d\u518d\u5b89\u88c5\u65b0\u7248')
+    await dialog.getByRole('button', { name: '\u63d2\u4ef6\u5b89\u88c5\u5f15\u5bfc\u548c\u793a\u4f8b' }).click()
     // The guide carries the package-name example only; the former template strings keep their replacement reminder.
     await expect.poll(() => dialog.getByRole('listitem').count()).toBe(1)
-    await dialog.getByRole('button', { name: 'Use the example dsh-plugin-example-pet' }).click()
-    expect(await field.inputValue()).toBe('dsh-plugin-example-pet')
+    await dialog.getByRole('button', { name: '\u586b\u5165\u793a\u4f8b dsh-plugin-whale-pet' }).click()
+    expect(await field.inputValue()).toBe('dsh-plugin-whale-pet')
     expect(await dialog.getByRole('status').count()).toBe(0)
     for (const [example, hint] of [
-      ['https://github.com/author/dsh-plugin', 'Replace this with the actual Git repository address.'],
-      ['/Users/name/my-plugin', 'Replace this with the actual path to your local plugin directory.'],
+      ['https://github.com/author/dsh-plugin', '\u8bf7\u66ff\u6362\u4e3a\u5b9e\u9645\u7684 Git \u4ed3\u5e93\u5730\u5740'],
+      ['/Users/name/my-plugin', '\u8bf7\u66ff\u6362\u4e3a\u672c\u673a\u63d2\u4ef6\u76ee\u5f55\u7684\u5b9e\u9645\u8def\u5f84'],
     ] as const) {
       await field.fill(example)
       expect(await dialog.getByRole('status').textContent()).toBe(hint)
     }
     await field.fill('/actual/plugin-directory')
     expect(await dialog.getByRole('status').count()).toBe(0)
-    await dialog.getByRole('button', { name: 'Hide the guide' }).click()
-    expect(await dialog.getByRole('note').textContent()).toContain('Install only plugins you trust')
+    await dialog.getByRole('button', { name: '\u6536\u8d77\u5f15\u5bfc' }).click()
+    expect(await dialog.getByRole('note').textContent()).toContain('\u8bf7\u786e\u8ba4\u63d2\u4ef6\u6765\u6e90\u53ef\u4fe1')
     // A name the list already shows is refused without asking the Host.
     await field.fill('@fixture/bundle')
     await install.click()
     await dialog.getByRole('alert').waitFor({ timeout: 5_000 })
-    expect(await dialog.getByRole('alert').textContent()).toBe('This plugin is already installed. To upgrade it, uninstall it and install it again')
+    expect(await dialog.getByRole('alert').textContent()).toBe('\u8be5\u63d2\u4ef6\u5df2\u5b89\u88c5\u3002\u5982\u9700\u5347\u7ea7\uff0c\u8bf7\u5378\u8f7d\u540e\u91cd\u65b0\u5b89\u88c5')
     // A path the Host cannot read as a package is refused with its reason, and the spec stays editable.
     await field.fill(join(scaffold.harnessHome, 'no-such-plugin'))
     await install.click()
-    await expect.poll(() => dialog.getByRole('alert').textContent(), { timeout: 10_000 }).toBe('The path does not exist or is not a valid plugin package')
+    await expect.poll(() => dialog.getByRole('alert').textContent(), { timeout: 10_000 }).toBe('\u8be5\u8def\u5f84\u4e0d\u5b58\u5728\u6216\u4e0d\u662f\u6709\u6548\u7684\u63d2\u4ef6\u5305')
     expect(await field.isDisabled()).toBe(false)
     // A name the registry would refuse never reaches it.
     await field.fill('Not A Package')
     await install.click()
-    await expect.poll(() => dialog.getByRole('alert').textContent(), { timeout: 10_000 }).toContain('This is not a package name or address that can be installed')
-    await dialog.getByRole('button', { name: 'Close' }).click()
-    await expect.poll(() => page.getByRole('dialog', { name: 'Add plugin' }).count(), { timeout: 5_000 }).toBe(0)
+    await expect.poll(() => dialog.getByRole('alert').textContent(), { timeout: 10_000 }).toContain('\u65e0\u6cd5\u8bc6\u522b\u8fd9\u4e2a\u5305\u540d\u6216\u5730\u5740')
+    await dialog.getByRole('button', { name: '\u5173\u95ed' }).click()
+    await expect.poll(() => page.getByRole('dialog', { name: '\u6dfb\u52a0\u63d2\u4ef6' }).count(), { timeout: 5_000 }).toBe(0)
     expect(tripwire.pageErrors).toEqual([])
   }, 60_000)
 
   it('enables a bundle into the profile manifest, mounts its rows live, and switches one of them', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-enable'))
     const panel = await openPluginsPanel()
-    const toggle = panel.getByRole('switch', { name: 'Enable @fixture/bundle' })
+    const toggle = panel.getByRole('switch', { name: '\u542f\u7528 @fixture/bundle' })
     await toggle.waitFor({ timeout: 20_000 })
     const mounted = () => [...scaffold.ctx.loader.entries()].find(entry => entry.options.id === 'fixture-row')
     expect(mounted()?.fiber?.state).toBeUndefined()
@@ -1358,12 +1569,12 @@ describe('web e2e: plugin manager', () => {
     // A live profile: the row mounts once the whole tree recomposed, the switch is on, and nothing waits for a restart.
     await expect.poll(() => mounted()?.fiber?.state, { timeout: 20_000 }).toBe(2)
     await expect.poll(() => toggle.getAttribute('aria-checked'), { timeout: PLUGIN_TOGGLE_SETTLE_MS }).toBe('true')
-    expect(await panel.getByText(/after a restart/).count()).toBe(0)
+    expect(await panel.getByText(/\u4e0b\u6b21\u542f\u52a8\u751f\u6548/).count()).toBe(0)
     const snapshot = await captureStableAria(page, '[data-plugin-panel]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(LIVE_EXPECTED, snapshot, MODE)
     // The pack's page lists its rows as the Host runs them, each with a switch that writes the profile patch.
-    await panel.getByRole('button', { name: 'View @fixture/bundle' }).click()
-    const rowSwitch = panel.getByRole('switch', { name: 'Enable component @fixture/bundle' })
+    await panel.getByRole('button', { name: '\u67e5\u770b @fixture/bundle' }).click()
+    const rowSwitch = panel.getByRole('switch', { name: '\u542f\u7528\u7ec4\u4ef6 @fixture/bundle' })
     await rowSwitch.waitFor({ timeout: 10_000 })
     expect(await rowSwitch.getAttribute('aria-checked')).toBe('true')
     await rowSwitch.click()
@@ -1373,7 +1584,7 @@ describe('web e2e: plugin manager', () => {
     await expect.poll(() => mounted()?.fiber?.state, { timeout: 20_000 }).not.toBe(2)
     await rowSwitch.click()
     await expect.poll(() => mounted()?.fiber?.state, { timeout: 20_000 }).toBe(2)
-    await panel.getByRole('button', { name: 'Back to plugins' }).click()
+    await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6' }).click()
 
     await toggle.click()
     await expect.poll(() => mounted()?.fiber?.state, { timeout: 20_000 }).not.toBe(2)
@@ -1384,46 +1595,46 @@ describe('web e2e: plugin manager', () => {
   it('reveals LiveShare only while its plugin rows run, and hides it again when they stop', async () => {
     // A dedicated scaffold keeps this profile patch away from the shared fixture profile above.
     const visibilityScaffold = await launchWebScaffold({ profile: { packages: [] } })
-    const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     try {
       const probe = await context.newPage()
       onTestFailed(() => saveFailureShot(probe, 'web-e2e-plugin-manager-liveshare-visibility'))
       const consoleWatch = watchConsole(probe)
       await probe.goto(visibilityScaffold.authenticatedUrl, { waitUntil: 'load' })
-      await probe.getByRole('button', { name: 'Plugins', exact: true }).click()
+      await probe.getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
       const panel = probe.locator('[data-plugin-panel]')
-      await panel.getByRole('heading', { name: 'Plugins', exact: true }).waitFor({ timeout: 20_000 })
+      await panel.getByRole('heading', { name: '\u63d2\u4ef6', exact: true }).waitFor({ timeout: 20_000 })
       const liveShare = '@hackdevcode/dsh-experimental-liveshare'
       const card = panel.locator(`[data-plugin-package="${liveShare}"]`)
       // The profile is a managed one (the plugin manager lists its bundles) whose base bundle keeps HMR
       // on, so writing the patch file recomposes the running loader; each step first waits for that
       // recomposition and then re-reads the Host bundle list through the page's own Refresh.
       const patchFile = join(visibilityScaffold.harnessHome, 'profiles', 'scaffold', 'cordis.patch.yml')
-      const declarationsRow = (): boolean => [...visibilityScaffold.ctx.loader.entries()]
-        .some(entry => entry.options.id === 'liveshare-viewer-declarations')
-      const refresh = panel.getByRole('button', { name: 'Refresh', exact: true })
+      const shareHostRow = (): boolean => [...visibilityScaffold.ctx.loader.entries()]
+        .some(entry => entry.options.id === 'liveshare-share-host')
+      const refresh = panel.getByRole('button', { name: '\u5237\u65b0', exact: true })
 
       // Default install: the package ships, but no row it declares runs, so neither list offers it.
       await expect.poll(() => card.count(), {
         timeout: 20_000, message: 'the default profile lists a LiveShare card before its rows run',
       }).toBe(0)
-      await panel.getByRole('button', { name: 'More', exact: true }).click()
-      await probe.getByRole('heading', { name: 'Experimental plugins', exact: true, level: 1 }).waitFor()
+      await panel.getByRole('button', { name: '\u66f4\u591a', exact: true }).click()
+      await probe.getByRole('heading', { name: '\u5b9e\u9a8c\u6027\u63d2\u4ef6', exact: true, level: 1 }).waitFor()
       await expect.poll(() => card.count(), {
         timeout: 20_000, message: 'the default More list offers a LiveShare card before its rows run',
       }).toBe(0)
-      await panel.getByRole('button', { name: 'Back to plugins', exact: true }).click()
+      await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6', exact: true }).click()
 
       // Enabling through cordis.patch.yml runs one of the bundle's declared rows while the profile still
       // selects no such bundle: the card joins the experimental list.
       await writeFile(patchFile, [
         '- insert:',
-        '    - id: liveshare-viewer-declarations',
-        "      name: '@hackdevcode/dsh-experimental-liveshare/viewer-declarations'",
+        '    - id: liveshare-share-host',
+        "      name: '@hackdevcode/dsh-experimental-liveshare'",
         '',
       ].join('\n'))
-      await expect.poll(declarationsRow, {
-        timeout: 30_000, message: 'the profile patch did not compose the LiveShare declarations row',
+      await expect.poll(shareHostRow, {
+        timeout: 30_000, message: 'the profile patch did not compose the LiveShare share-host row',
       }).toBe(true)
       await refresh.click()
       await expect.poll(() => card.count(), {
@@ -1432,15 +1643,15 @@ describe('web e2e: plugin manager', () => {
 
       // Removing the row stops it: the card leaves both lists again.
       await writeFile(patchFile, '[]\n')
-      await expect.poll(declarationsRow, {
-        timeout: 30_000, message: 'the profile patch did not remove the LiveShare declarations row',
+      await expect.poll(shareHostRow, {
+        timeout: 30_000, message: 'the profile patch did not remove the LiveShare share-host row',
       }).toBe(false)
       await refresh.click()
       await expect.poll(() => card.count(), {
         timeout: 30_000, message: 'the card stayed listed after its rows stopped',
       }).toBe(0)
-      await panel.getByRole('button', { name: 'More', exact: true }).click()
-      await probe.getByRole('heading', { name: 'Experimental plugins', exact: true, level: 1 }).waitFor()
+      await panel.getByRole('button', { name: '\u66f4\u591a', exact: true }).click()
+      await probe.getByRole('heading', { name: '\u5b9e\u9a8c\u6027\u63d2\u4ef6', exact: true, level: 1 }).waitFor()
       await expect.poll(() => card.count(), {
         timeout: 20_000, message: 'the More list kept the card after its rows stopped',
       }).toBe(0)
@@ -1454,9 +1665,9 @@ describe('web e2e: plugin manager', () => {
   it.skipIf(MODE === 'record')('keeps the fixture inventory closed', async () => {
     expect(tripwire.warnings).toEqual([])
     await assertFixtureInventory(SNAPSHOT_DIR, [
-      'manager.expected.md', 'live-enabled.expected.md', 'missing-bundle.expected.md', 'exports.expected.md', 'icons.expected.md', 'loading.expected.md', 'refresh.expected.md',
+      'manager.expected.md', 'live-enabled.expected.md', 'missing-bundle.expected.md', 'exports.expected.md', 'exports-en.expected.md', 'icons.expected.md', 'loading.expected.md', 'refresh.expected.md',
       'ime-enter.expected.md', 'header-responsive.expected.md', 'header-natural-motion.expected.md', 'preview.expected.md',
-      'touch-tooltips.expected.md',
+      'touch-tooltips.expected.md', 'forge-preview.expected.md', 'timeline-tracking.expected.md',
     ])
   })
 })
@@ -1471,13 +1682,13 @@ describe('web e2e: startup-applied plugin management', () => {
     let browser: Browser | undefined
     try {
       browser = await chromium.launch()
-      const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+      const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
       const tripwire = watchConsole(page)
       onTestFailed(() => saveFailureShot(page, 'web-e2e-plugin-manager-live'))
       await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await page.getByRole('navigation', { name: 'Global panels' }).getByRole('button', { name: 'Plugins', exact: true }).click()
+      await page.getByRole('navigation', { name: '\u5168\u5c40\u9762\u677f' }).getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
       const panel = page.locator('[data-plugin-panel]')
-      const toggle = panel.getByRole('switch', { name: 'Enable @fixture/bundle' })
+      const toggle = panel.getByRole('switch', { name: '\u542f\u7528 @fixture/bundle' })
       await toggle.waitFor({ timeout: 20_000 })
       const mounted = () => [...scaffold.ctx.loader.entries()].find(entry => entry.options.id === 'fixture-row')
       const bundles = async () => {
@@ -1489,13 +1700,13 @@ describe('web e2e: startup-applied plugin management', () => {
       // The selection is saved and the switch turns on, but nothing mounts before the next start; a toast says so.
       await expect.poll(bundles, { timeout: PLUGIN_TOGGLE_SETTLE_MS }).toEqual([...SCAFFOLD_BUNDLES, '@fixture/bundle'])
       await expect.poll(() => toggle.getAttribute('aria-checked'), { timeout: PLUGIN_TOGGLE_SETTLE_MS }).toBe('true')
-      await page.getByText('Restart DSH to apply the change. This profile applies changes only at startup.', { exact: true }).waitFor({ timeout: 10_000 })
+      await page.getByText('\u8bf7\u91cd\u542f DSH \u4f7f\u66f4\u6539\u751f\u6548\u3002\u8fd9\u4e2a profile \u53ea\u5728\u542f\u52a8\u65f6\u5e94\u7528\u66f4\u6539\u3002', { exact: true }).waitFor({ timeout: 10_000 })
       expect(mounted()?.fiber?.state).toBeUndefined()
       // The pack's page lists its rows from their declarations, with no live entry to switch.
-      await panel.getByRole('button', { name: 'View @fixture/bundle' }).click()
+      await panel.getByRole('button', { name: '\u67e5\u770b @fixture/bundle' }).click()
       await panel.locator('[data-plugin-row]', { hasText: 'fixture-row' }).waitFor({ timeout: 10_000 })
-      expect(await panel.getByRole('switch', { name: 'Enable component @fixture/bundle' }).isDisabled()).toBe(true)
-      await panel.getByRole('button', { name: 'Back to plugins' }).click()
+      expect(await panel.getByRole('switch', { name: '\u542f\u7528\u7ec4\u4ef6 @fixture/bundle' }).isDisabled()).toBe(true)
+      await panel.getByRole('button', { name: '\u8fd4\u56de\u63d2\u4ef6' }).click()
 
       await toggle.click()
       await expect.poll(bundles, { timeout: PLUGIN_TOGGLE_SETTLE_MS }).toEqual(SCAFFOLD_BUNDLES)

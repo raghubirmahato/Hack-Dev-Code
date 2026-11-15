@@ -2,7 +2,7 @@
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { chromium } from 'playwright'
+import { chromium, webkit } from 'playwright'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import {
   assertFinalWorkspaceSnapshot, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold,
@@ -36,8 +36,8 @@ describe.skipIf(MODE === 'record')('web e2e: default Workspace', () => {
         await input.waitFor()
         // Language-neutral on disk, localized in the hero chip. The chip's
         // aria-label is its fixed call to action, so the label is its text.
-        await expect.poll(() => page.getByRole('button', { name: 'Choose workspace', exact: true }).textContent())
-          .toBe('Default workspace')
+        await page.getByRole('button', { name: 'Choose workspace', exact: true })
+          .getByText('Default workspace', { exact: true }).waitFor()
         expect(scaffold.ctx.workspaceRegistry.list()).toHaveLength(1)
         const initialSession = scaffold.ctx.sessions.list()[0]!
         expect(scaffold.ctx.sessions.list()).toHaveLength(1)
@@ -70,6 +70,30 @@ describe.skipIf(MODE === 'record')('web e2e: default Workspace', () => {
     }
   })
 
+  it.each([{ name: 'Chromium', engine: chromium }, { name: 'WebKit', engine: webkit }])(
+    'opens the default Workspace chooser from its external trigger ($name)', async ({ engine }) => {
+      const scaffold = await launchWebScaffold({ firstUse: true })
+      onTestFinished(() => scaffold.close())
+      const browser = await engine.launch()
+      onTestFinished(() => browser.close())
+      const page = await browser.newPage({
+        viewport: { width: 390, height: 844 }, locale: 'en-US', timezoneId: 'Asia/Shanghai',
+        isMobile: true, hasTouch: true,
+      })
+      await page.goto(scaffold.authenticatedUrl)
+      const trigger = page.getByRole('button', { name: 'Choose workspace', exact: true })
+      await trigger.getByText('Default workspace', { exact: true }).waitFor()
+      await trigger.tap()
+      const menu = page.getByRole('menu').filter({ has: page.getByRole('menuitem', { name: 'Default workspace', exact: true }) })
+      await menu.waitFor({ state: 'visible', timeout: 10_000 })
+      expect(await trigger.getAttribute('aria-expanded')).toBe('true')
+      expect(await trigger.evaluate(node => node.style.anchorName)).toBe(await menu.evaluate(node => node.style.positionAnchor))
+      await page.keyboard.press('Escape')
+      await menu.waitFor({ state: 'hidden' })
+      expect(await trigger.getAttribute('aria-expanded')).toBe('false')
+    },
+  )
+
   it('reports a startup directory conflict and opens the composed folder picker for recovery', async () => {
     const scaffold = await launchWebScaffold({ firstUse: true })
     onTestFinished(() => scaffold.close())
@@ -81,25 +105,25 @@ describe.skipIf(MODE === 'record')('web e2e: default Workspace', () => {
     await mkdir(chosen)
     const browser = await chromium.launch()
     try {
-      const page = await browser.newPage({ locale: 'en-US', timezoneId: 'Asia/Shanghai' })
+      const page = await browser.newPage({ locale: 'zh-CN', timezoneId: 'Asia/Shanghai' })
       const tripwire = watchConsole(page)
       try {
         await page.goto(scaffold.authenticatedUrl)
         const input = page.locator('[data-composer-input][contenteditable="true"]').first()
-        const notice = page.getByRole('alert').filter({ hasText: 'Unable to create default workspace' })
+        const notice = page.getByRole('alert').filter({ hasText: '\u65e0\u6cd5\u521b\u5efa\u9ed8\u8ba4\u5de5\u4f5c\u533a' })
         await notice.waitFor()
         expect(scaffold.ctx.workspaceRegistry.list()).toEqual([])
         expect(scaffold.ctx.sessions.list()).toEqual([])
         await compareOrRefreshGolden(FAILURE_EXPECTED, await notice.ariaSnapshot(), MODE)
         expect(await page.getByRole('dialog').count()).toBe(0)
         expect(await input.count()).toBe(0)
-        await page.getByRole('button', { name: 'Choose workspace', exact: true }).click()
-        const picker = page.getByRole('dialog', { name: 'Select Workspace Directory' })
+        await page.getByRole('button', { name: '\u9009\u62e9\u5de5\u4f5c\u533a', exact: true }).click()
+        const picker = page.getByRole('dialog', { name: '\u9009\u62e9\u5de5\u4f5c\u533a\u76ee\u5f55' })
         await picker.waitFor()
-        await picker.getByRole('button', { name: 'Edit path', exact: true }).click()
-        await picker.getByRole('textbox', { name: 'Edit path' }).fill(chosen)
+        await picker.getByRole('button', { name: '\u7f16\u8f91\u8def\u5f84', exact: true }).click()
+        await picker.getByRole('textbox', { name: '\u7f16\u8f91\u8def\u5f84' }).fill(chosen)
         await page.keyboard.press('Enter')
-        await picker.getByRole('button', { name: 'Open', exact: true }).click()
+        await picker.getByRole('button', { name: '\u6253\u5f00', exact: true }).click()
         await picker.waitFor({ state: 'hidden' })
         await expect.poll(() => scaffold.ctx.workspaceRegistry.list().length).toBe(1)
         await input.waitFor()

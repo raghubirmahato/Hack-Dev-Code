@@ -4,7 +4,7 @@
  * @module @hackdevcode/dsh-agent/types
  */
 
-import type { ReasoningEffortId } from '@hackdevcode/dsh-llm/brand'
+import type { ReasoningEffortId } from '@hackdevcode/dsh-llm/types'
 import type { UserMessage } from '@hackdevcode/dsh-llm/types'
 // Type-only: the Workspace registry's archive-admission family map this registry merges `turn` into.
 import type {} from '@hackdevcode/dsh-workspace/types'

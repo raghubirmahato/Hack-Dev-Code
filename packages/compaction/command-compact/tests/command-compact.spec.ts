@@ -3,8 +3,9 @@ import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import CommandRuntime, { type CommandResult } from '@hackdevcode/dsh-commands'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { CompactionId } from '@hackdevcode/dsh-compaction/types'
 import {
-  CompactionId,
   CompactionEngine,
   ManualCompactionError,
   type CompactionAgentContext,
@@ -12,10 +13,10 @@ import {
   type CompactionTrigger,
   type ManualCompactAgentContext,
 } from '@hackdevcode/dsh-compaction'
-import { Session, SessionId, SessionSeq } from '@hackdevcode/dsh-session'
+import { Session, type SessionId, SessionSeq } from '@hackdevcode/dsh-session'
 import * as commandCompact from '@hackdevcode/dsh-command-compact'
 
-const COMPACTION_ID = CompactionId('command-compact-test')
+const COMPACTION_ID = brandString<CompactionId>('command-compact-test')
 
 const RESULT: CompactionResult = {
   compactionId: COMPACTION_ID,
@@ -95,7 +96,7 @@ async function harness(): Promise<Harness> {
   await ctx.plugin(CommandRuntime)
   const compact = new StubCompactionEngine(ctx)
   const plugin = await ctx.plugin(commandCompact)
-  const session = Session.create(SessionId('command-compact'))
+  const session = Session.create(brandString<SessionId>('command-compact'))
   const agent = {
     session,
     status: 'idle',

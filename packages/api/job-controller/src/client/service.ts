@@ -10,7 +10,7 @@
 import { Service, type Context } from '@hackdevcode/cordis'
 import { RemoteStreamCarrierError, type ClientRemote } from '@hackdevcode/dsh-api-gateway/client'
 import type { RemoteResult } from '@hackdevcode/dsh-typert-protocol'
-import type { JobId } from '@hackdevcode/dsh-jobs/brand'
+import type { JobId } from '@hackdevcode/dsh-jobs/types'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 import type { JobKillRequest, JobKillValue, JobFollowFrame, JobFollowRequest, JobListFrame, JobListRequest } from '../types.ts'
 import type { ClientJobsModel, JobsSource } from './model.ts'

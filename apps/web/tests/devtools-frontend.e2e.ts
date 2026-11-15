@@ -22,7 +22,7 @@ it('serves the built DevTools frontend under its own path without rebuilding Dev
   resources.scaffold = scaffold
   const browser = await chromium.launch()
   resources.browser = browser
-  const page = await browser.newPage({ locale: 'en-US' })
+  const page = await browser.newPage({ locale: 'zh-CN' })
   const root = new URL('inspector/devtools/', scaffold.authenticatedUrl).href
   expect((await page.request.get(`${root}devtools_app.html`)).status()).toBe(401)
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })

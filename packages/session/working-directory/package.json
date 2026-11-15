@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-working-directory",
   "description": "Session working directories with durable changes and model context",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -25,7 +25,10 @@
   "files": [
     "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
@@ -35,9 +38,11 @@
     "@hackdevcode/dsh-llm": "workspace:*",
     "@hackdevcode/dsh-session": "workspace:*",
     "@hackdevcode/dsh-session-projection": "workspace:*",
-    "@hackdevcode/dsh-system-prompt": "workspace:*"
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-sandbox-policy": "workspace:*",
     "@hackdevcode/dsh-user-approval": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
@@ -51,10 +56,11 @@
     "@hackdevcode/dsh-fs-local": "workspace:*",
     "@hackdevcode/dsh-tool-testkit": "workspace:*",
     "@hackdevcode/dsh-tool-working-directory": "workspace:*",
-    "@hackdevcode/dsh-tools": "workspace:*"
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   },
   "dependencies": {
     "@hackdevcode/schemastery": "workspace:~",
-    "zod": "^4.4.3"
+    "zod": "4.6.6"
   }
 }

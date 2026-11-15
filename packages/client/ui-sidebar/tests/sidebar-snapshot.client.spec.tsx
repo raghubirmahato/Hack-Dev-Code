@@ -10,7 +10,7 @@ import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
  * the snapshots pin the shell chrome itself.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, waitFor } from '@testing-library/react'
+import { act, cleanup, waitFor } from '@testing-library/react'
 import { SlotTestRuntime } from '@hackdevcode/dsh-client-test-runtime'
 import { LocaleRuntime } from '@hackdevcode/dsh-client-locale/client'
 import { en as commonEn } from '@hackdevcode/dsh-client-locale/src/locales/en.ts'
@@ -47,20 +47,41 @@ async function bench() {
 }
 
 describe('sidebar shell snapshots', () => {
-  it('renders the expanded column (wordmark, capsule, empty holes)', async () => {
+  it('renders the expanded column in the default locale (zh, no setLocale)', async () => {
     const { runtime } = await bench()
-    const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300 })
+    const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300, drawer: false })
     // Wordmark + capsule both start a session in the expanded state.
     expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(2)
     expect(slot.container).toMatchSnapshot()
     await runtime.dispose()
   })
 
+  it('renders the expanded column (wordmark, capsule, empty holes)', async () => {
+    const { runtime } = await bench()
+    const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300, drawer: false })
+    // Wordmark + capsule both start a session in the expanded state.
+    expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(2)
+    expect(slot.container).toMatchSnapshot()
+    await runtime.dispose()
+  })
+
+  it('renders the New-session content through the unoccupied session-action HOC layer', async () => {
+    const { runtime } = await bench()
+    const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300, drawer: false })
+    const layer = slot.container.querySelector('[data-slot="sidebar.session.action"]')
+    // With no occupant the layer renders the owner's content unchanged, so the
+    // capsule keeps its box and no wrapper element joins the row.
+    expect(layer?.children).toHaveLength(1)
+    expect(layer?.firstElementChild?.getAttribute('aria-label')).toBe('New session')
+    expect(layer?.firstElementChild?.tagName).toBe('BUTTON')
+    await runtime.dispose()
+  })
+
   it('renders the collapsed rail after the crossfade settles, in place', async () => {
     const { runtime } = await bench()
-    const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300 })
+    const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300, drawer: false })
     const shell = slot.container.firstElementChild
-    slot.update({ collapsed: true, width: 56 })
+    slot.update({ collapsed: true, width: 56, drawer: false })
     // The wide content (wordmark shortcut) unmounts at the 150ms settle;
     // only the rail's capsule remains a New-session button.
     await waitFor(() => {
@@ -72,13 +93,23 @@ describe('sidebar shell snapshots', () => {
     await runtime.dispose()
   })
 
+  it('a locale switch refreshes mounted copy without re-registration', async () => {
+    const { runtime, locale } = await bench()
+    const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300, drawer: false })
+    expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(2)
+    // Same fiber, same registration: setLocale alone re-renders the outlet.
+    act(() => { locale.setLocale('en') })
+    expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(2)
+    await runtime.dispose()
+  })
+
   it('renders Windows caption controls in expanded and collapsed states', async () => {
     document.documentElement.setAttribute('data-windows-titlebar', '')
     const { runtime } = await bench()
     try {
-      const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300 })
+      const slot = runtime.renderSlot('sidebar', { collapsed: false, width: 300, drawer: false })
       expect(slot.container).toMatchSnapshot('windows expanded')
-      slot.update({ collapsed: true, width: 0 })
+      slot.update({ collapsed: true, width: 0, drawer: false })
       expect(slot.view.getAllByRole('button', { name: 'New session' })).toHaveLength(1)
       expect(slot.container).toMatchSnapshot('windows collapsed')
     } finally {

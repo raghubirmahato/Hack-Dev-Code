@@ -288,3 +288,68 @@ export function compactReport(report: HackDevReport): JsonValue {
       },
   }
 }
+
+/** One post on a roundtable's shared board. */
+export interface RoundtablePost {
+  readonly n: number
+  readonly round: number
+  readonly from: string
+  readonly to: readonly string[]
+  readonly kind: string
+  readonly ref: number | null
+  readonly text: string
+}
+
+/** The result of a `hackdev_roundtable` run: the agreed answer, how the discussion went, and its board. */
+export interface RoundtableReport {
+  readonly kind: 'roundtable'
+  readonly question: string
+  readonly answer: string
+  readonly confidence: number
+  /** Whether the captain ended the discussion on agreement rather than on the round limit. */
+  readonly consensus: boolean
+  readonly agreed: readonly string[]
+  readonly disputes: readonly { readonly topic: string; readonly resolution: string }[]
+  readonly dissent: readonly string[]
+  readonly openQuestions: readonly string[]
+  readonly rounds: number
+  readonly summaries: readonly string[]
+  readonly members: readonly { readonly name: string; readonly angle: string; readonly confidence: number | null }[]
+  readonly posts: number
+  readonly board: readonly RoundtablePost[]
+}
+
+/**
+ * Render a roundtable result for the calling model: the answer first, then what was agreed and disputed, the
+ * members, and the newest board posts that fit.
+ * @param report - the roundtable result.
+ * @param maxChars - budget for the whole text.
+ * @returns the text.
+ */
+export function renderRoundtable(report: RoundtableReport, maxChars: number): string {
+  const percent = Math.round(report.confidence * 100)
+  const lines = [
+    `# Roundtable answer (confidence ${String(percent)}%, ${report.consensus ? 'agreed' : 'round limit reached'} after ${String(report.rounds)} round${report.rounds === 1 ? '' : 's'})`,
+    '',
+    report.answer,
+  ]
+  const section = (title: string, items: readonly string[]): void => {
+    if (items.length > 0) lines.push('', `## ${title}`, ...items.map(item => `- ${item}`))
+  }
+  section('Agreed', report.agreed)
+  section('Disputes and how they were resolved', report.disputes.map(d => `${d.topic}: ${d.resolution}`))
+  section('Dissent', report.dissent)
+  section('Open questions', report.openQuestions)
+  lines.push('', '## Members', report.members.map(m => `@${m.name} (${m.angle}${m.confidence === null ? '' : `, ${String(Math.round(m.confidence * 100))}%`})`).join(', '))
+  const head = lines.join('\n')
+  const board: string[] = []
+  let used = head.length + 40
+  for (const post of [...report.board].reverse()) {
+    const line = `#${String(post.n)} [r${String(post.round)}] @${post.from} -> ${post.to.map(t => `@${t}`).join(' ')} (${post.kind}${post.ref === null ? '' : ` on #${String(post.ref)}`}): ${post.text}`
+    if (used + line.length + 1 > maxChars) break
+    used += line.length + 1
+    board.unshift(line)
+  }
+  const text = board.length === 0 ? head : `${head}\n\n## Board (${String(board.length)} of ${String(report.posts)} posts)\n${board.join('\n')}`
+  return text.length <= maxChars ? text : `${text.slice(0, maxChars)}\n…[truncated]`
+}

@@ -5,7 +5,8 @@
 
 import type { Context } from '@hackdevcode/cordis'
 import Schema from '@hackdevcode/schemastery'
-import { ComputerUseProviderName } from '@hackdevcode/dsh-computer-use/brand'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ComputerUseProviderName } from '@hackdevcode/dsh-computer-use/types'
 import { createMcpToolDefinition } from '@hackdevcode/dsh-mcp-client'
 import { z } from 'zod'
 import type { CuaDriver as NativeDriver } from '@trycua/cua-driver'
@@ -14,6 +15,9 @@ import { withSnapshotDefaults, withSnapshotIdentity } from './snapshot.ts'
 import type {} from '@hackdevcode/dsh-computer-use'
 import type {} from '@hackdevcode/dsh-system-prompt'
 import type {} from '@hackdevcode/dsh-tools'
+import { CuaDriverError } from './error.ts'
+
+export { CuaDriverError, type CuaDriverErrorCode } from './error.ts'
 
 /** Cordis plugin identity for the native Cua Driver provider. */
 export const name = 'computer-use-cua-driver-native'
@@ -117,7 +121,7 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
   }, { global: true })
   let ready: Promise<void> = Promise.resolve()
   const dispose = ctx.effect(function* () {
-    yield ctx.computerUse.register(ComputerUseProviderName('cua-driver-native'))
+    yield ctx.computerUse.register(brandString<ComputerUseProviderName>('cua-driver-native'))
     yield async () => {
       lifetime.abort()
       // apply() reports startup failure; teardown still owns its native handle.
@@ -170,9 +174,19 @@ export async function apply(ctx: Context, config: Config = {}): Promise<void> {
         async call(args, execution) {
           const combined = AbortSignal.any([execution.signal, lifetime.signal])
           combined.throwIfAborted()
-          const result = await activeDriver.callTool(tool.name, JSON.stringify(withSnapshotDefaults(tool.name, args)), { signal: combined })
+          const payload = JSON.stringify(withSnapshotDefaults(tool.name, args))
+          const result = await activeDriver.callTool(tool.name, payload, { signal: combined }).catch((error: unknown) => {
+            combined.throwIfAborted()
+            throw new CuaDriverError(error instanceof Error ? error.message : String(error), 'CUA_DRIVER_FAILED', { cause: error })
+          })
           combined.throwIfAborted()
-          return withSnapshotIdentity(tool.name, JSON.parse(result.rawJson) as unknown)
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(result.rawJson) as unknown
+          } catch (error) {
+            throw new CuaDriverError(`Cua Driver tool "${tool.name}" returned a result that is not JSON`, 'CUA_DRIVER_INVALID_RESULT', { cause: error })
+          }
+          return withSnapshotIdentity(tool.name, parsed)
         },
       })
       inner.tools.register(definition, onDemand ? { group: CORE_DRIVER_TOOLS.has(tool.name) ? DESKTOP_GROUP : DESKTOP_MORE_GROUP } : {})

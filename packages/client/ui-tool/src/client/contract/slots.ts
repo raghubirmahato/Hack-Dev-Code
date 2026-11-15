@@ -10,15 +10,13 @@ import type {
 import type { MessageImageLoader, MessageImageSource } from '@hackdevcode/dsh-client-ui-conversation/client'
 import type { AskUserQuestionAnswerItem, AskUserQuestionItem } from '@hackdevcode/dsh-user-questions/types'
 import type {} from '@hackdevcode/dsh-client-locale/client'
+import type { ToolFileInjected } from '../tool/file-menu.ts'
 
 declare module '@hackdevcode/dsh-client-ui-slots' {
   interface SlotMap {
-    /** Keyed Tool call view dispatched by wire Tool name. Any name is allowed,
-     * including tools registered by your package: register with `key: '<tool name>'`
-     * and expect a typo to render nothing. Registering an occupied key replaces its
-     * view; unclaimed keys use the generic row. The owner supplies the call identity
-     * and the running or settled node through explicit phase props, and every stage
-     * supplies `name` and a lazy `args` view; preparing arguments may be incomplete.
+    /**
+     * Key by wire name, including custom tools (`key: '<tool name>'`; a typo never renders); occupied keys replace
+     * the view, unclaimed keys use the generic row. Owner phase data has `name` and lazy, possibly incomplete `args`.
      */
     'tool.call.toolview': {
       kind: 'keyed'
@@ -151,4 +149,4 @@ export type ToolHostInfoInjected = {
 export type ToolTreeProps = PropsRuntime<'conversation.chat.node', 'tool-call'>
   & PropsRenderSlots<'tool.call.toolview'>
   & PropsLocale<'conversation'>
-  & InjectFace<ToolHostInfoInjected>
+  & InjectFace<ToolHostInfoInjected & ToolFileInjected>

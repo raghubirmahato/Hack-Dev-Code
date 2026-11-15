@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-commands",
   "description": "Client command surface: global directory cache, '/' source, three command UI kinds, popupSelect registry",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -46,6 +46,7 @@
     "@hackdevcode/cordis": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-api-remotes": "workspace:*",
     "@hackdevcode/dsh-client-connection": "workspace:*",
     "@hackdevcode/dsh-client-locale": "workspace:*",
@@ -63,12 +64,16 @@
     "@hackdevcode/dsh-util-values": "workspace:*",
     "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
     "@hackdevcode/dsh-client-ui-session": "workspace:*",
-    "clsx": "^2.0.0"
+    "clsx": "^2.0.0",
+    "@hackdevcode/dsh-util-text-search": "workspace:*"
   },
   "files": [
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ]
 }

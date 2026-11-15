@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-experimental-claude-code-mods",
   "description": "Experimental bridge: load Claude Code mods (hooks modules) and run their hook chains on Hack Dev Code extension points",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -44,17 +44,22 @@
     "lib/index.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "lib/typert.remote-client.d.ts.map",
+    "src"
   ],
   "license": "MIT",
   "dependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-util-crypto": "workspace:*",
     "@hackdevcode/dsh-util-values": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~",
-    "zod": "^4.4.3"
+    "zod": "4.6.6"
   },
   "peerDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -70,7 +75,8 @@
     "@hackdevcode/dsh-tools": "workspace:*",
     "@hackdevcode/dsh-typert-protocol": "workspace:*",
     "@hackdevcode/dsh-user-questions": "workspace:*",
-    "@hackdevcode/dsh-working-directory": "workspace:*"
+    "@hackdevcode/dsh-working-directory": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -100,6 +106,7 @@
     "@hackdevcode/dsh-typert-protocol": "workspace:*",
     "@hackdevcode/dsh-user-questions": "workspace:*",
     "@hackdevcode/dsh-working-directory": "workspace:*",
-    "@hackdevcode/dsh-session-persistence-jsonl": "workspace:*"
+    "@hackdevcode/dsh-session-persistence-jsonl": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   }
 }

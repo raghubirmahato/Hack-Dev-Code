@@ -5,7 +5,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { openSettings, saveFailureShot, connectFreshWorkspace } from './support.ts'
+import { openSettings, ZH_BROWSER_LOCALE, connectFreshWorkspaceZh, saveFailureShot } from './support.ts'
 
 const EXPECTED = fileURLToPath(new URL('./expected/agent-preset-authoring', import.meta.url))
 const mode = webSnapshotMode()
@@ -18,12 +18,12 @@ describe('web e2e: preset roster guidance', () => {
   beforeAll(async () => {
     scaffold = await launchWebScaffold({ profile: { packages: [] } })
     browser = await chromium.launch()
-    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-    await openSettings(page)
-    await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Agent presets' }).click()
-    await page.getByRole('heading', { name: 'Agent presets' }).waitFor()
+    await openSettings(page, 'zh')
+    await page.getByRole('dialog', { name: '\u8bbe\u7f6e' }).getByRole('button', { name: 'Agent \u9884\u8bbe' }).click()
+    await page.getByRole('heading', { name: 'Agent \u9884\u8bbe' }).waitFor()
   }, 120_000)
   afterAll(async () => { await browser?.close(); await scaffold?.close() })
 
@@ -32,34 +32,34 @@ describe('web e2e: preset roster guidance', () => {
     await expect.poll(() => page.locator('[data-agent-preset-id]').count()).toBe(4)
     const snapshot = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(join(EXPECTED, 'section.expected.md'), snapshot, mode)
-    expect(snapshot).toContain('Let the agent help me create a preset')
-    expect(snapshot).toContain('View configuration: Standard mode')
-    expect(snapshot).not.toContain('Duplicate preset')
-    expect(snapshot).not.toContain('Edit plugins')
-    expect(snapshot).not.toContain('Open folder')
-    expect(snapshot).not.toContain('Delete')
+    expect(snapshot).toContain('\u8ba9 Agent \u5e2e\u6211\u521b\u5efa\u9884\u8bbe\u6a21\u5f0f')
+    expect(snapshot).toContain('\u67e5\u770b\u914d\u7f6e: \u6807\u51c6\u6a21\u5f0f')
+    expect(snapshot).not.toContain('\u590d\u5236\u9884\u8bbe')
+    expect(snapshot).not.toContain('\u7f16\u8f91\u63d2\u4ef6')
+    expect(snapshot).not.toContain('\u6253\u5f00\u76ee\u5f55')
+    expect(snapshot).not.toContain('\u5220\u9664')
   })
 
   it('reads mode details and examples without changing the new-task default', async () => {
     onTestFailed(() => saveFailureShot(page, 'preset-roster-guide'))
-    const settings = page.getByRole('dialog', { name: 'Settings' })
-    const trigger = settings.getByRole('button', { name: 'Mode details: PTC mode', exact: true })
+    const settings = page.getByRole('dialog', { name: '\u8bbe\u7f6e' })
+    const trigger = settings.getByRole('button', { name: '\u6a21\u5f0f\u8bf4\u660e: PTC \u6a21\u5f0f', exact: true })
     await trigger.click()
-    const guide = page.getByRole('dialog', { name: 'PTC mode', exact: true })
-    await guide.getByRole('heading', { name: 'How tools are called', exact: true }).waitFor()
-    await guide.getByRole('tab', { name: 'How to use', exact: true }).click()
-    await guide.getByRole('heading', { name: 'Check a set of configuration files', exact: true }).waitFor()
-    await guide.getByRole('tab', { name: 'How to use', exact: true }).press('Escape')
+    const guide = page.getByRole('dialog', { name: 'PTC \u6a21\u5f0f', exact: true })
+    await guide.getByRole('heading', { name: '\u600e\u6837\u8c03\u7528\u5de5\u5177', exact: true }).waitFor()
+    await guide.getByRole('tab', { name: '\u5982\u4f55\u4f7f\u7528', exact: true }).click()
+    await guide.getByRole('heading', { name: '\u6279\u91cf\u68c0\u67e5\u914d\u7f6e\u6587\u4ef6', exact: true }).waitFor()
+    await guide.getByRole('tab', { name: '\u5982\u4f55\u4f7f\u7528', exact: true }).press('Escape')
     await guide.waitFor({ state: 'detached' })
     expect(await trigger.evaluate(element => document.activeElement === element)).toBe(true)
-    expect(await settings.getByRole('button', { name: 'New task default: Standard mode', exact: true }).getAttribute('aria-pressed')).toBe('true')
+    expect(await settings.getByRole('button', { name: '\u65b0\u4efb\u52a1\u9ed8\u8ba4: \u6807\u51c6\u6a21\u5f0f', exact: true }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('views a shipped composition read-only', async () => {
     onTestFailed(() => saveFailureShot(page, 'preset-roster-view'))
-    const settings = page.getByRole('dialog', { name: 'Settings' })
-    await settings.getByRole('button', { name: 'View configuration: PTC mode', exact: true }).click()
-    const viewer = page.getByRole('dialog', { name: 'View configuration · PTC mode', exact: true })
+    const settings = page.getByRole('dialog', { name: '\u8bbe\u7f6e' })
+    await settings.getByRole('button', { name: '\u67e5\u770b\u914d\u7f6e: PTC \u6a21\u5f0f', exact: true }).click()
+    const viewer = page.getByRole('dialog', { name: '\u67e5\u770b\u914d\u7f6e · PTC \u6a21\u5f0f', exact: true })
     await viewer.waitFor({ timeout: 10_000 })
     // The real shipped declaration, not a golden: the viewer shows whatever
     // the deployment ships, and this lane only asserts it is shown read-only
@@ -70,22 +70,22 @@ describe('web e2e: preset roster guidance', () => {
     expect(shown).toContain("disabled: !!js process.platform === 'win32'\n")
     expect(shown).not.toContain('__jsExpr')
     expect(await viewer.getByRole('textbox').count()).toBe(0)
-    // The header X and the footer button share the Close name; the footer one is last.
-    await viewer.getByRole('button', { name: 'Close', exact: true }).last().click()
+    // The header X and the footer button share the \u5173\u95ed name; the footer one is last.
+    await viewer.getByRole('button', { name: '\u5173\u95ed', exact: true }).last().click()
     await viewer.waitFor({ state: 'detached', timeout: 10_000 })
-    expect(await settings.getByRole('button', { name: 'New task default: Standard mode', exact: true }).getAttribute('aria-pressed')).toBe('true')
+    expect(await settings.getByRole('button', { name: '\u65b0\u4efb\u52a1\u9ed8\u8ba4: \u6807\u51c6\u6a21\u5f0f', exact: true }).getAttribute('aria-pressed')).toBe('true')
   })
 
   it('starts a Creator-mode task from the section entry', async () => {
     onTestFailed(() => saveFailureShot(page, 'preset-roster-creator'))
     // The entry stages the self-referential preset and lands a new task on it,
     // so the flow needs a connected workspace to enter.
-    await page.getByRole('dialog', { name: 'Settings' }).getByRole('button', { name: 'Close', exact: true }).last().click()
-    await connectFreshWorkspace(page, scaffold.workspaceCwd)
-    await openSettings(page)
-    const settings = page.getByRole('dialog', { name: 'Settings' })
-    await settings.getByRole('button', { name: 'Agent presets' }).click()
-    await settings.getByRole('button', { name: 'Let the agent help me create a preset', exact: true }).click()
+    await page.getByRole('dialog', { name: '\u8bbe\u7f6e' }).getByRole('button', { name: '\u5173\u95ed', exact: true }).last().click()
+    await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
+    await openSettings(page, 'zh')
+    const settings = page.getByRole('dialog', { name: '\u8bbe\u7f6e' })
+    await settings.getByRole('button', { name: 'Agent \u9884\u8bbe' }).click()
+    await settings.getByRole('button', { name: '\u8ba9 Agent \u5e2e\u6211\u521b\u5efa\u9884\u8bbe\u6a21\u5f0f', exact: true }).click()
     await settings.waitFor({ state: 'detached', timeout: 10_000 })
     await expect.poll(async () => {
       const response = await scaffold.hostFetch('/api/session/list', {

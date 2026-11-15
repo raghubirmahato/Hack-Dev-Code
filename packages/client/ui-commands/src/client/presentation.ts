@@ -2,15 +2,15 @@
 import type { ComponentType } from 'react'
 import type { InputTriggerCandidate } from '@hackdevcode/dsh-client-ui-input-trigger/client'
 import {
-  IconCompactOutlineRegular, IconDownloadOutlineRegular, IconGoalOutlineRegular, IconPaperPlaneOutlineRegular, IconPlanOutlineRegular,
+  IconCompactOutlineRegular, IconDownloadOutlineRegular,
+  IconGoalOutlineRegular, IconPaperPlaneOutlineRegular, IconPlanOutlineRegular,
   PermissionIconFullAccessRegular,
 } from '@hackdevcode/dsh-client-ui-primitives'
 import type { IconProps } from '@hackdevcode/dsh-client-ui-primitives'
 import type { TranslateNS } from '@hackdevcode/dsh-client-locale/client'
 import type { CommandDescriptor } from '@hackdevcode/dsh-commands/types'
 import type { CommandKey } from './locales.ts'
-import { builtinCommandName } from './resolution.ts'
-import type { BuiltinCommandName } from './resolution.ts'
+import { builtinCommandName, type BuiltinCommandName } from '@hackdevcode/dsh-commands/builtin'
 
 /** The menu's two sections. */
 export type MenuSection = 'add' | 'commands'

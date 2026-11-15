@@ -9,7 +9,7 @@ import type { SessionListState } from '@hackdevcode/dsh-api-session-controller/c
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
 import { bindSnapshotSelector, makeTranslate } from '@hackdevcode/dsh-client-test-runtime'
 import type { BindingState } from '@hackdevcode/dsh-experimental-forge-session/types'
-import { SessionId } from '@hackdevcode/dsh-session/types'
+import type { SessionId } from '@hackdevcode/dsh-session/types'
 import type { SessionProjectionSummaryValues } from '@hackdevcode/dsh-session-projection/types'
 import { en } from '../src/client/locales.ts'
 import { sessionForgeFacts, type ChangeRequestStates } from '../src/client/session-list.ts'
@@ -18,11 +18,12 @@ import { SessionRowForge, stateLine, type SessionRowForgeProps } from '../src/cl
 import css from '../src/client/SessionList.module.css'
 import type { ForgeChangeRequestListState } from '../src/types.ts'
 import { created, listState as state } from './client-fixtures.client.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 afterEach(cleanup)
 
 const t = makeTranslate(en)
-const S1 = SessionId('s1')
+const S1 = brandString<SessionId>('s1')
 
 type Values = Readonly<Partial<SessionProjectionSummaryValues>>
 
@@ -108,19 +109,19 @@ describe('SessionRowForge', () => {
     expect(screen.getByRole('img', { name: en['list.worktree'] }).getAttribute('data-forge-row-worktree')).toBe('')
     const change = screen.getByRole('img', { name: 'Change request state: Open · Checks running' })
     expect(change.getAttribute('data-forge-row-change')).toBe('open')
-    expect(change.querySelector(`.${css.dot}`)?.getAttribute('data-checks')).toBe('pending')
+    expect(change.querySelector('[data-checks]')?.getAttribute('data-checks')).toBe('pending')
   })
 
   it('names only the state of a finished or unpolled change request, without a checks dot', () => {
     const merged = renderRow({ forgeChangeRequests: [binding(1)] }, statesOf(state(1, { state: 'merged', checksRollup: 'failure' })))
     const glyph = screen.getByRole('img', { name: 'Change request state: Merged' })
     expect(glyph.getAttribute('data-forge-row-change')).toBe('merged')
-    expect(glyph.querySelector(`.${css.dot}`)).toBeNull()
+    expect(glyph.querySelector('[data-checks]')).toBeNull()
     expect(screen.queryByRole('img', { name: en['list.worktree'] })).toBeNull()
     merged.view.unmount()
 
     renderRow({ forgeChangeRequests: [binding(2)] })
-    expect(screen.getByRole('img', { name: 'Change request state: Unknown' }).querySelector(`.${css.dot}`)).toBeNull()
+    expect(screen.getByRole('img', { name: 'Change request state: Unknown' }).querySelector('[data-checks]')).toBeNull()
   })
 
   it('follows the listed values and the polled states as they change', () => {

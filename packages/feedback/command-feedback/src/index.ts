@@ -9,7 +9,8 @@
  */
 
 import type { Context } from '@hackdevcode/cordis'
-import { CommandDefinitionId } from '@hackdevcode/dsh-commands/brand'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { CommandDefinitionId } from '@hackdevcode/dsh-commands/types'
 import type { CommandInvocation, CommandResult } from '@hackdevcode/dsh-commands'
 import type { Session } from '@hackdevcode/dsh-session'
 import { getOrCreateAnonymousUserId } from '@hackdevcode/dsh-anonymous-user-id'
@@ -117,7 +118,7 @@ export class SessionFeedbackService extends TypertRemoteService {
 export function apply(ctx: Context): void {
   ctx.plugin(SessionFeedbackService)
   ctx.commands.register({
-    definitionId: CommandDefinitionId('@hackdevcode/dsh-command-feedback'),
+    definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-command-feedback'),
     name: 'feedback',
     description: 'Record feedback about this session',
     input: { hint: '<text>' },

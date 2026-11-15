@@ -6,16 +6,78 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Browser, Locator, Page } from 'playwright'
 import { expect, vi, type MockInstance } from 'vitest'
+import type { RegionRect } from '@hackdevcode/dsh-client-web/src/window-drag/regions.ts'
 
 /** The built page under test; `pnpm run test:web` rebuilds it before running. */
 export const DIST_INDEX = fileURLToPath(new URL('../dist/index.html', import.meta.url))
 
 export const REPO_ROOT = fileURLToPath(new URL('../../..', import.meta.url))
 
+/** A visible control, including controls that declare no native window region. */
+interface WindowControlBox extends Omit<RegionRect, 'draggable'> {
+  /** Sample points where the browser hit test reaches this control or its content. */
+  readonly hits: readonly (readonly [number, number])[]
+}
+
+/** Native region owners and optional control probes from one browser evaluation. */
+export interface CollectedWindowSurface {
+  readonly regions: readonly RegionRect[]
+  /** Empty when no control probe was requested. */
+  readonly controls: readonly WindowControlBox[]
+}
+
+/** Controls to probe alongside the native region owners. */
+interface WindowControlProbe {
+  readonly selector: string
+  /** Containers whose nested drag rows own their pixels independently of the container. */
+  readonly containersWithDragRows: string
+}
+
+/**
+ * Collect visible native window regions in DOM order and optionally probe controls in the same frame.
+ * Controls with computed `none` contribute no native rectangle but still receive hit-test probes.
+ * @param page - Page whose current layout is sampled.
+ * @param controlProbe - Control selectors; omit when only native regions are needed.
+ * @returns Native regions with unclipped bounds and independently sampled controls.
+ */
+export async function collectWindowSurface(page: Page, controlProbe?: WindowControlProbe): Promise<CollectedWindowSurface> {
+  return page.evaluate((probe) => {
+    const regions: RegionRect[] = []
+    const controls: WindowControlBox[] = []
+    for (const element of document.querySelectorAll('*')) {
+      const style = getComputedStyle(element)
+      const region = style.getPropertyValue('-webkit-app-region')
+      if (style.visibility === 'hidden' || style.display === 'none') continue
+      const rect = element.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) continue
+      const box = { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
+      if (region === 'drag' || region === 'no-drag') regions.push({ ...box, draggable: region === 'drag' })
+      if (probe === undefined || !element.matches(probe.selector)) continue
+      const insetX = Math.min(2, rect.width / 4)
+      const insetY = Math.min(2, rect.height / 4)
+      const samples: [number, number][] = [
+        [rect.x + rect.width / 2, rect.y + rect.height / 2],
+        [rect.x + insetX, rect.y + insetY],
+        [rect.x + rect.width - insetX, rect.y + insetY],
+        [rect.x + insetX, rect.y + rect.height - insetY],
+        [rect.x + rect.width - insetX, rect.y + rect.height - insetY],
+      ]
+      const hits = samples.filter(([x, y]) => {
+        const top = document.elementFromPoint(x, y)
+        const strip = top?.closest('[data-window-drag]')
+        if (element.matches(probe.containersWithDragRows) && strip != null && element.contains(strip)) return false
+        return top !== null && (top === element || element.contains(top))
+      })
+      controls.push({ ...box, hits })
+    }
+    return { regions, controls }
+  }, controlProbe)
+}
+
 /**
  * Read the `meta.description` an experimental bundle's plugin page shows for one locale.
  * @param bundle - Package directory under `packages/experimental`.
- * @param locale - Locale resource name; `en` is the only shipped resource.
+ * @param locale - Locale resource name, such as `en` or `zh`.
  * @returns The description text from `locale/<locale>.json`.
  */
 export function experimentalBundleDescription(bundle: string, locale: string): string {
@@ -24,6 +86,36 @@ export function experimentalBundleDescription(bundle: string, locale: string): s
 }
 
 const installationRequire = createRequire(join(REPO_ROOT, 'apps/cli/package.json'))
+
+/**
+ * Check the shared warning title, theme color, and compact body alignment.
+ * @param dialog - visible warning dialog under test.
+ */
+export async function assertWarningDialogLayout(dialog: Locator): Promise<void> {
+  const layout = await dialog.evaluate((element) => {
+    const title = element.querySelector('h2')!
+    const icon = title.querySelector('svg')!
+    const paragraph = element.querySelector('p')!
+    const titleRect = title.getBoundingClientRect()
+    const bodyRect = paragraph.getBoundingClientRect()
+    const color = getComputedStyle(icon).color
+    const previous = icon.style.color
+    icon.style.color = 'var(--dsw-alias-state-warn-primary)'
+    const warningColor = getComputedStyle(icon).color
+    icon.style.color = previous
+    return {
+      decorative: icon.getAttribute('aria-hidden'),
+      matchesWarningColor: color === warningColor,
+      leftGap: Math.abs(bodyRect.left - titleRect.left),
+      topGap: bodyRect.top - titleRect.bottom,
+    }
+  })
+  expect(layout.decorative).toBe('true')
+  expect(layout.matchesWarningColor).toBe(true)
+  expect(layout.leftGap).toBeLessThan(1)
+  expect(layout.topGap).toBeGreaterThanOrEqual(0)
+  expect(layout.topGap).toBeLessThanOrEqual(16)
+}
 
 /**
  * The built copy of a workspace package, as the dsh installation resolves it.
@@ -41,6 +133,13 @@ const installationRequire = createRequire(join(REPO_ROOT, 'apps/cli/package.json
 export function requireBuilt(name: string): unknown {
   return installationRequire(name)
 }
+
+/**
+ * Browser language a page must advertise to boot into the product's Chinese
+ * surface: with no stored preference the client derives its initial locale
+ * from the browser, and Playwright's default browser asks for English.
+ */
+export const ZH_BROWSER_LOCALE = 'zh-CN'
 
 /** Same-day anchor for seeded event times and the Asia/Shanghai browser clock. */
 export const WEB_FIXTURE_TIME = Date.parse('2026-01-15T12:00:00+08:00')
@@ -110,9 +209,10 @@ export async function pinBrowserClock(page: Page): Promise<void> {
 /**
  * Open the standard browser-test page advertising English before client boot.
  * This keeps role locators and goldens deterministic while leaving the Host
- * settings document free to override the provisional browser-derived locale.
- * The context uses Asia/Shanghai to preserve the recorded Web user-source
- * timezone independently of the host timezone.
+ * settings document free to override the provisional browser-derived locale;
+ * scenarios asserting the Chinese surface advertise
+ * {@link ZH_BROWSER_LOCALE} instead. The context uses Asia/Shanghai to preserve
+ * the recorded Web user-source timezone independently of the host timezone.
  * @param browser - Playwright browser owning the page.
  * @param height - Viewport height; width is fixed to the lane baseline.
  * @returns the initialized page.
@@ -131,6 +231,17 @@ export async function scrollIntoView(target: Locator): Promise<void> {
     element.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'instant' })
     return true
   }), { timeout: 10_000 }).toBe(true)
+}
+
+/**
+ * Request one earlier page without scrolling the transcript to its automatic pagination threshold.
+ * @param page - Page showing the English Chat history control.
+ */
+export async function loadEarlierChatPage(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Load earlier', exact: true }).evaluate((button) => {
+    button.focus({ preventScroll: true })
+  })
+  await page.keyboard.press('Enter')
 }
 
 /**
@@ -193,6 +304,23 @@ export function probeFreePort(): Promise<number> {
 }
 
 /**
+ * Open collapsed mobile navigation before using a sidebar action.
+ * @param page - browser page with the mounted sidebar.
+ * @param locale - current UI language.
+ */
+export async function revealNavigationDrawer(page: Page, locale: 'en' | 'zh' | 'ja'): Promise<void> {
+  const drawer = await page.evaluate(() => window.innerWidth < 768
+    && !document.documentElement.hasAttribute('data-windows-titlebar'))
+  await page.waitForFunction(expected => Boolean(document.querySelector('[data-sidebar-drawer]')) === expected, drawer)
+  const closed = page.locator('[data-sidebar-drawer][data-sidebar-collapsed]')
+  if (await closed.count() === 0) return
+  await page.locator('[data-shell-leading]').getByRole('button', {
+    name: { en: 'Open sidebar', zh: '\u6253\u5f00\u4fa7\u8fb9\u680f', ja: '\u30b5\u30a4\u30c9\u30d0ー\u3092\u958b\u304f' }[locale], exact: true,
+  }).click()
+  await closed.waitFor({ state: 'detached' })
+}
+
+/**
  * Drive the hero's workspace picker through the composed directory dialog
  * until the live composer unlocks. A fresh world has no Workspace, so the boot
  * lands in the Workspace-trigger view state (startup auto-selection has nothing to
@@ -208,10 +336,10 @@ export function probeFreePort(): Promise<number> {
  * @param page - the page under test.
  * @param root - host directory the workspace folder is staged in (the scaffold's `workspaceCwd`).
  * @param name - folder name staged and adopted as the workspace.
- * @param modelAvailable - require an editable composer when the selected model is available.
  */
-export async function connectFreshWorkspace(page: Page, root: string, name = 'workspace', modelAvailable = true): Promise<void> {
+export async function connectFreshWorkspace(page: Page, root: string, name = 'workspace'): Promise<void> {
   mkdirSync(join(root, name), { recursive: true })
+  await revealNavigationDrawer(page, 'en')
   await page.getByRole('button', { name: 'Add workspace', exact: true }).click()
   const dialog = page.getByRole('dialog', { name: 'Select Workspace Directory' })
   await dialog.waitFor({ timeout: 10_000 })
@@ -222,8 +350,33 @@ export async function connectFreshWorkspace(page: Page, root: string, name = 'wo
   await dialog.getByRole('button', { name: 'Open', exact: true }).click()
   // The pick connected the workspace: the blank session's live composer
   // replaces the locked placeholder and enables.
+  await page.locator('[data-composer-input][contenteditable="true"][data-placeholder="Describe what you want to build, / commands, @ files or sessions"]')
+    .waitFor({ timeout: 15_000 })
+}
+
+/**
+ * {@link connectFreshWorkspace} over a page that advertises
+ * {@link ZH_BROWSER_LOCALE}: the English helper's anchors assume the locale
+ * most other scenarios boot, so a scenario that deliberately keeps zh needs
+ * the localized picker copy.
+ * @param page - the browser page under test.
+ * @param root - workspace parent directory.
+ * @param name - directory created under `root` and connected.
+ * @param modelAvailable - require an editable composer when the selected model is available.
+ */
+export async function connectFreshWorkspaceZh(page: Page, root: string, name = 'workspace', modelAvailable = true): Promise<void> {
+  mkdirSync(join(root, name), { recursive: true })
+  await revealNavigationDrawer(page, 'zh')
+  await page.getByRole('button', { name: '\u6dfb\u52a0\u5de5\u4f5c\u533a', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: '\u9009\u62e9\u5de5\u4f5c\u533a\u76ee\u5f55' })
+  await dialog.waitFor({ timeout: 10_000 })
+  await dialog.getByRole('button', { name: '\u7f16\u8f91\u8def\u5f84' }).click()
+  const pathInput = dialog.getByRole('textbox', { name: '\u7f16\u8f91\u8def\u5f84' })
+  await pathInput.fill(join(root, name))
+  await pathInput.press('Enter')
+  await dialog.getByRole('button', { name: '\u6253\u5f00', exact: true }).click()
   const editable = modelAvailable ? '[contenteditable="true"]' : ''
-  await page.locator(`[data-composer-input]${editable}[data-placeholder="Describe what you want to build, / commands, @ files or sessions"]`)
+  await page.locator(`[data-composer-input]${editable}[data-placeholder="\u63cf\u8ff0\u4f60\u60f3\u8981\u6784\u5efa\u7684\u5185\u5bb9, / \u8c03\u7528\u6307\u4ee4, @ \u6587\u4ef6\u6216\u5bf9\u8bdd"]`)
     .waitFor({ timeout: 15_000 })
 }
 
@@ -311,8 +464,28 @@ export function conversationContextKey(kind: string, id: string): string {
 
 /** Open Settings through the sidebar account menu.
  * @param page - browser page with the mounted sidebar.
+ * @param locale - current UI language.
  */
-export async function openSettings(page: Page): Promise<void> {
-  await page.getByRole('button', { name: 'Account menu', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Settings', exact: true }).click()
+export async function openSettings(page: Page, locale: 'en' | 'zh' | 'ja'): Promise<void> {
+  const labels = { en: ['Account menu', 'Settings'], zh: ['\u8d26\u53f7\u83dc\u5355', '\u8bbe\u7f6e'], ja: ['\u30a2\u30ab\u30a6\u30f3\u30c8\u30e1\u30cb\u30e5ー', '\u8a2d\u5b9a'] } as const
+  const trigger = page.getByRole('button', {
+    name: labels[locale][0], exact: true, includeHidden: true,
+  })
+  await trigger.waitFor({ state: 'attached' })
+  await revealNavigationDrawer(page, locale)
+  if (!await trigger.isVisible()) {
+    await page.getByRole('button', { name: { en: 'Open sidebar', zh: '\u6253\u5f00\u4fa7\u8fb9\u680f', ja: '\u30b5\u30a4\u30c9\u30d0ー\u3092\u958b\u304f' }[locale], exact: true }).click()
+  }
+  await trigger.click()
+  await page.getByRole('menuitem', { name: labels[locale][1], exact: true }).click()
+}
+
+/**
+ * The right Sidebar's fullscreen panel box: 1px wider than the viewport, so the
+ * first column's divider sits past the window's left edge where the frame clips it.
+ * @param viewport - the page viewport size.
+ * @returns the panel's expected bounding box.
+ */
+export function fullscreenBox(viewport: { width: number; height: number }): { x: number; y: number; width: number; height: number } {
+  return { x: -1, y: 0, width: viewport.width + 1, height: viewport.height }
 }

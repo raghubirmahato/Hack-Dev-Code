@@ -11,6 +11,9 @@ export type SidebarRightKey = keyof typeof en
 
 /** English dictionary (the key-set source of truth). */
 export const en = {
+  'menu.close': 'Close',
+  'menu.closeOthers': 'Close Other Tabs',
+  'menu.closeRight': 'Close Tabs to the Right',
   'command.close': 'Close current page or window',
   'command.refresh': 'Refresh current page',
   'command.noRefresh': 'This page cannot be refreshed',

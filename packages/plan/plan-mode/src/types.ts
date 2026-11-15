@@ -8,7 +8,7 @@
  * @module @hackdevcode/dsh-plan-mode/types
  */
 
-import type { CommandId } from '@hackdevcode/dsh-commands/brand'
+import type { CommandId } from '@hackdevcode/dsh-commands/types'
 
 /**
  * The plan projection's wire value. `active` is the logged state in force

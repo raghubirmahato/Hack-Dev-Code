@@ -147,7 +147,7 @@ describe('GoalBar', () => {
     expect(screen.getByRole('textbox', { name: 'Goal objective' })).toBeTruthy()
   })
 
-  it('active goal: the pause action pauses', () => {
+  it('active goal: the pause action follows edit and clear, and pauses', () => {
     const actions = makeActions()
     render(<GoalBar goal={makeGoal()} activation="armed" {...actions} t={t} />)
     fireEvent.click(screen.getByRole('button', { name: 'Pause goal' }))

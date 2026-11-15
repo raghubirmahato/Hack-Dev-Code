@@ -2,8 +2,8 @@
 // substructure references. Stable node and location stores make old snapshots
 // live readers rather than time-point views.
 
-import type { CommandId } from '@hackdevcode/dsh-commands/brand'
-import type { MessageId } from '@hackdevcode/dsh-llm/brand'
+import type { CommandId } from '@hackdevcode/dsh-commands/types'
+import type { MessageId } from '@hackdevcode/dsh-llm/types'
 import type { ContentBlock } from '@hackdevcode/dsh-llm/types'
 import type { ImageAttachmentRef } from '@hackdevcode/dsh-attachment'
 import type { LlmRetryEventData } from '@hackdevcode/dsh-llm-retry/types'

@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url'
 import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
-  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, watchConsole, type WebScaffold } from './scaffold.ts'
+  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  fixtureUserPrompts, launchWebScaffold, watchConsole, type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage } from './support.ts'
 
 const directory = fileURLToPath(new URL('../../../snapshots/web/creation-recommendations', import.meta.url))

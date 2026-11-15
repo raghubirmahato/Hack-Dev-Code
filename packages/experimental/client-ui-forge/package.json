@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-experimental-client-ui-forge",
   "description": "Sidebar panel for a Session's change requests, with a worktree option for new Sessions and its Host Remote",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -44,6 +44,8 @@
         "@hackdevcode/dsh-client-locale",
         "@hackdevcode/dsh-client-ui-conversation",
         "@hackdevcode/dsh-client-ui-layout",
+        "@hackdevcode/dsh-client-ui-plugin-manager",
+        "@hackdevcode/dsh-client-ui-settings",
         "@hackdevcode/dsh-client-ui-sidebar-right",
         "@hackdevcode/dsh-client-ui-workspace"
       ],
@@ -67,11 +69,13 @@
     "@hackdevcode/schemastery": "workspace:~",
     "@hackdevcode/dsh-util-values": "workspace:*",
     "diff": "^9.0.0",
-    "zod": "^4.4.3",
+    "zod": "4.6.6",
     "@hackdevcode/dsh-typert-protocol": "workspace:*",
-    "@hackdevcode/dsh-storage-domain": "workspace:*"
+    "@hackdevcode/dsh-storage-domain": "workspace:*",
+    "picomatch": "^4.0.7"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-agent": "workspace:*",
     "@hackdevcode/dsh-agent-loop-testkit": "workspace:*",
@@ -82,9 +86,11 @@
     "@hackdevcode/dsh-client-test-runtime": "workspace:*",
     "@hackdevcode/dsh-client-ui-conversation": "workspace:*",
     "@hackdevcode/dsh-client-ui-layout": "workspace:*",
+    "@hackdevcode/dsh-client-ui-plugin-manager": "workspace:*",
     "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
     "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
     "@hackdevcode/dsh-client-ui-session": "workspace:*",
+    "@hackdevcode/dsh-client-ui-settings": "workspace:*",
     "@hackdevcode/dsh-client-ui-sidebar-right": "workspace:*",
     "@hackdevcode/dsh-client-ui-slots": "workspace:*",
     "@hackdevcode/dsh-client-ui-workspace": "workspace:*",
@@ -111,16 +117,22 @@
     "@hackdevcode/dsh-timeout": "workspace:*",
     "@hackdevcode/dsh-session-projection-cache": "workspace:*",
     "@hackdevcode/dsh-session-query": "workspace:*",
-    "@hackdevcode/dsh-api-remote-access": "workspace:*"
+    "@hackdevcode/dsh-api-remote-access": "workspace:*",
+    "@types/picomatch": "^4.0.3",
+    "@hackdevcode/dsh-brand": "workspace:*"
   },
   "files": [
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
     "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "lib/typert.remote-client.d.ts.map",
+    "src"
   ]
 }

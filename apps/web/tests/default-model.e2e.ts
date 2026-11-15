@@ -16,9 +16,10 @@ import { join } from 'node:path'
 import type { Browser, Locator, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import { launchWebScaffold, watchConsole, captureStableAria, compareOrRefreshGolden, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { saveFailureShot, connectFreshWorkspace } from './support.ts'
+import { ZH_BROWSER_LOCALE, connectFreshWorkspaceZh, saveFailureShot } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 /** Points the shipped shared Agent default at this scenario's own route. */
 const OVERLAY = fileURLToPath(new URL('./default-model.overlay.yml', import.meta.url))
@@ -39,7 +40,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
   /** Create one session and its agent through the same wire face the browser uses. */
   const createSession = async (sessionId: string): Promise<string> => {
     const response = await scaffold.ctx.sessionController.create({
-      sessionId: SessionId(sessionId),
+      sessionId: brandString<SessionId>(sessionId),
       cwd: scaffold.workspaceCwd,
     })
     return response.sessionId
@@ -47,7 +48,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
 
   /** The route the Client derives from the Session projection and Host default. */
   const currentOf = (sessionId: string): Promise<unknown> => {
-    const session = scaffold.ctx.sessions.get(SessionId(sessionId))
+    const session = scaffold.ctx.sessions.get(brandString<SessionId>(sessionId))
     if (session === undefined) throw new Error(`session "${sessionId}" is not live`)
     return Promise.resolve(
       scaffold.ctx.sessionProjections.snapshot(session).values.modelSelection?.next
@@ -78,13 +79,13 @@ describe('web e2e: the composer model switch is the default for later sessions',
       },
     })
     browser = await chromium.launch()
-    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     // The composer's seats only exist once a workspace is connected: without
     // one the input is the locked placeholder and no session scope is open.
-    await connectFreshWorkspace(page, scaffold.workspaceCwd)
+    await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
   }, 120_000)
 
   afterAll(async () => {
@@ -93,7 +94,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
   })
 
   it('exposes inline model labels with exact routes throughout the composer picker', async () => {
-    const trigger = page.getByRole('button', { name: /^Choose models/ })
+    const trigger = page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ })
     const label = '[data-provider-id][data-model-id]'
     const readLabels = (surface: Locator) => surface.locator(label).evaluateAll(nodes => nodes.map(node => ({
       provider: node.getAttribute('data-provider-id'), model: node.getAttribute('data-model-id'),
@@ -107,10 +108,10 @@ describe('web e2e: the composer model switch is the default for later sessions',
     await expect.poll(() => readLabels(trigger)).toEqual([current])
     try {
       await trigger.click()
-      const cell = page.getByRole('menuitem', { name: /^Model/ })
+      const cell = page.getByRole('menuitem', { name: /^\u6a21\u578b/ })
       expect(await readLabels(cell)).toEqual([current])
       await cell.click()
-      const menu = page.getByRole('menu', { name: 'Model', exact: true })
+      const menu = page.getByRole('menu', { name: '\u6a21\u578b', exact: true })
       await compareOrRefreshGolden(
         fileURLToPath(new URL('./expected/default-model/model-labels.expected.md', import.meta.url)),
         JSON.stringify(await readLabels(menu), null, 2),
@@ -124,12 +125,12 @@ describe('web e2e: the composer model switch is the default for later sessions',
 
   it.each(['root', 'model'])('reanchors the %s menu when a label grows and shrinks without a window resize', async (pane) => {
     const viewport = page.viewportSize()!
-    const trigger = page.getByRole('button', { name: /^Choose models/ })
+    const trigger = page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ })
     try {
       await page.setViewportSize({ width: 390, height: 844 })
       await trigger.click()
-      if (pane === 'model') await page.getByRole('menuitem', { name: /^Model/ }).click()
-      const surface = page.getByRole(pane === 'model' ? 'group' : 'menu', { name: 'Model and reasoning effort', exact: true })
+      if (pane === 'model') await page.getByRole('menuitem', { name: /^\u6a21\u578b/ }).click()
+      const surface = page.getByRole(pane === 'model' ? 'group' : 'menu', { name: '\u6a21\u578b\u4e0e\u63a8\u7406\u7b49\u7ea7', exact: true })
       const label = surface.locator('[data-provider-id="origin-gateway"][data-model-id="origin-large"]')
       await label.waitFor()
       const original = await surface.boundingBox()
@@ -141,7 +142,13 @@ describe('web e2e: the composer model switch is the default for later sessions',
         badge.textContent = ' — Provider identification badge with a long channel name'
         node.appendChild(badge)
       })
-      await expect.poll(async () => (await surface.boundingBox())!.width).toBeGreaterThan(original!.width + 50)
+      if (pane === 'root') {
+        expect(original!.width).toBe(240)
+        await expect.poll(async () => (await surface.boundingBox())!.width).toBe(240)
+        await expect.poll(async () => (await surface.boundingBox())!.x).toBeCloseTo(original!.x)
+      } else {
+        await expect.poll(async () => (await surface.boundingBox())!.width).toBeGreaterThan(original!.width + 50)
+      }
       await expect.poll(async () => {
         const box = (await surface.boundingBox())!
         return box.x >= 12 && box.x + box.width <= 378
@@ -158,26 +165,27 @@ describe('web e2e: the composer model switch is the default for later sessions',
 
   it('keeps command popup search borders transparent in both palettes', async () => {
     const composer = page.locator('[data-composer-input]').first()
-    await page.getByRole('button', { name: 'Add files or run commands', exact: true }).click()
+    await page.getByRole('button', { name: '\u6dfb\u52a0\u6587\u4ef6\u6216\u8c03\u7528\u6307\u4ee4', exact: true }).click()
     const commandMenuBounds = await page.locator('[data-trigger-menu]').boundingBox()
-    await page.getByRole('option', { name: /^Model/ }).click()
-    const search = page.getByRole('textbox', { name: 'Filter options', exact: true })
+    await page.getByRole('option', { name: /^\u6a21\u578b/ }).click()
+    const search = page.getByRole('textbox', { name: '\u7b5b\u9009\u9009\u9879', exact: true })
     await search.waitFor()
     try {
-      const popupBounds = await page.locator('[aria-label="/model Options"]').boundingBox()
+      const popupBounds = await page.locator('[aria-label="/model \u9009\u9879"]').boundingBox()
       expect(popupBounds).not.toBeNull()
       expect(commandMenuBounds).not.toBeNull()
       expect(popupBounds!.width).toBeCloseTo(commandMenuBounds!.width)
       expect(popupBounds!.x).toBeCloseTo(commandMenuBounds!.x)
-      expect(await search.getAttribute('placeholder')).toBe('Search models…')
-      await page.getByRole('option').first().waitFor()
+      expect(await search.getAttribute('placeholder')).toBe('\u641c\u7d22\u6a21\u578b…')
+      // Command menu height changes where the pointer lands in the model popup.
+      await page.getByRole('option', { name: 'Acme Large', exact: true }).hover()
       await compareOrRefreshGolden(
         fileURLToPath(new URL('./expected/default-model/command-picker.expected.md', import.meta.url)),
-        await captureStableAria(page, '[aria-label="/model Options"]', scaffold.workspaceCwd),
+        await captureStableAria(page, '[aria-label="/model \u9009\u9879"]', scaffold.workspaceCwd),
         webSnapshotMode(),
       )
       await search.fill('no-model-matches')
-      await page.getByText('No matching models.', { exact: true }).waitFor()
+      await page.getByText('\u6ca1\u6709\u5339\u914d\u7684\u6a21\u578b\u3002', { exact: true }).waitFor()
       await search.fill('')
       const borders = await search.evaluate((input) => {
         const body = input.ownerDocument.body
@@ -206,19 +214,19 @@ describe('web e2e: the composer model switch is the default for later sessions',
     { device: 'narrow desktop', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.6 Safari/605.1.15', automatic: true },
   ])('respects $device composer sizing and search focus when opening /model', async ({ userAgent, automatic }) => {
     const context = await browser.newContext({
-      userAgent, viewport: { width: 390, height: 844 }, locale: 'en-US', hasTouch: !automatic,
+      userAgent, viewport: { width: 390, height: 844 }, locale: ZH_BROWSER_LOCALE, hasTouch: !automatic,
     })
     try {
       const devicePage = await context.newPage()
       const consoleWatch = watchConsole(devicePage)
       await devicePage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await devicePage.getByRole('textbox', { name: 'Choose workspace' }).click()
+      await devicePage.getByRole('textbox', { name: '\u9009\u62e9\u5de5\u4f5c\u533a' }).click()
       const composer = devicePage.locator('[data-composer-input][contenteditable="true"]').first()
       await composer.waitFor()
       expect(await composer.evaluate(element => getComputedStyle(element).fontSize)).toBe(automatic ? '14px' : '16px')
       await composer.fill('/model')
-      await devicePage.getByRole('option', { name: /^Model/ }).click()
-      const search = devicePage.getByRole('textbox', { name: 'Filter options', exact: true })
+      await devicePage.getByRole('option', { name: /^\u6a21\u578b/ }).click()
+      const search = devicePage.getByRole('textbox', { name: '\u7b5b\u9009\u9009\u9879', exact: true })
       await search.waitFor()
       await devicePage.getByRole('option', { name: /Origin Large/ }).waitFor()
       expect(await search.evaluate(input => document.activeElement === input)).toBe(automatic)
@@ -240,7 +248,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
     { device: 'desktop-mode iPad', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.6 Safari/605.1.15', platform: 'MacIntel' },
   ])('retains model menu keyboard focus on $device', async ({ userAgent, platform }) => {
     const context = await browser.newContext({
-      userAgent, viewport: { width: 390, height: 844 }, locale: 'en-US', hasTouch: true,
+      userAgent, viewport: { width: 390, height: 844 }, locale: ZH_BROWSER_LOCALE, hasTouch: true,
     })
     try {
       await context.addInitScript(({ platform }) => {
@@ -250,8 +258,8 @@ describe('web e2e: the composer model switch is the default for later sessions',
       const devicePage = await context.newPage()
       const consoleWatch = watchConsole(devicePage)
       await devicePage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await devicePage.getByRole('textbox', { name: 'Choose workspace' }).click()
-      const trigger = devicePage.getByRole('button', { name: /^Choose models/ })
+      await devicePage.getByRole('textbox', { name: '\u9009\u62e9\u5de5\u4f5c\u533a' }).click()
+      const trigger = devicePage.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ })
       const observations: string[] = []
       const observeFocus = async (action: string): Promise<void> => {
         const focused = await devicePage.evaluate(() => {
@@ -271,11 +279,12 @@ describe('web e2e: the composer model switch is the default for later sessions',
       await expect.poll(() => model.evaluate(element => document.activeElement === element)).toBe(true)
       await observeFocus('Enter model pane')
       await devicePage.keyboard.press('ArrowDown')
-      const search = devicePage.getByRole('searchbox', { name: 'Search models…' })
+      const search = devicePage.getByRole('searchbox', { name: '\u641c\u7d22\u6a21\u578b…' })
+      expect(await search.evaluate(input => getComputedStyle(input).fontSize)).toBe('16px')
       await expect.poll(() => search.evaluate(element => document.activeElement === element)).toBe(true)
       await observeFocus('Navigate models')
       await devicePage.keyboard.press('Escape')
-      const modelCell = devicePage.getByRole('menuitem', { name: /^Model/ })
+      const modelCell = devicePage.getByRole('menuitem', { name: /^\u6a21\u578b/ })
       await expect.poll(() => modelCell.evaluate(element => document.activeElement === element)).toBe(true)
       await observeFocus('Return to root')
       await devicePage.keyboard.press('Escape')
@@ -316,23 +325,23 @@ describe('web e2e: the composer model switch is the default for later sessions',
       return stuck
     }
     try {
-      await page.getByRole('button', { name: /^Choose models/ }).click()
-      await page.getByRole('menuitem', { name: /^Model/ }).click()
-      const menu = page.getByRole('group', { name: 'Model and reasoning effort', exact: true })
-      const menuSearch = page.getByRole('searchbox', { name: 'Search models…' })
+      await page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ }).click()
+      await page.getByRole('menuitem', { name: /^\u6a21\u578b/ }).click()
+      const menu = page.getByRole('group', { name: '\u6a21\u578b\u4e0e\u63a8\u7406\u7b49\u7ea7', exact: true })
+      const menuSearch = page.getByRole('searchbox', { name: '\u641c\u7d22\u6a21\u578b…' })
       const order = await readGroups(menu, 'menuitemradio')
-      const sticky = await checkSticky(menu, menu.getByRole('menu', { name: 'Model', exact: true }))
+      const sticky = await checkSticky(menu, menu.getByRole('menu', { name: '\u6a21\u578b', exact: true }))
       await menuSearch.fill('  ACMLG  ')
       const filtered = await readGroups(menu, 'menuitemradio')
       await menuSearch.press('Escape')
       await page.keyboard.press('Escape')
-      await page.getByRole('button', { name: 'Add files or run commands', exact: true }).click()
-      await page.getByRole('option', { name: /^Model/ }).click()
-      const popup = page.locator('[aria-label="/model Options"]')
+      await page.getByRole('button', { name: '\u6dfb\u52a0\u6587\u4ef6\u6216\u8c03\u7528\u6307\u4ee4', exact: true }).click()
+      await page.getByRole('option', { name: /^\u6a21\u578b/ }).click()
+      const popup = page.locator('[aria-label="/model \u9009\u9879"]')
       await popup.getByRole('option').first().waitFor()
       expect(await readGroups(popup, 'option')).toEqual(order)
       expect(await checkSticky(popup, popup.getByRole('listbox'))).toEqual(sticky)
-      const popupSearch = page.getByRole('textbox', { name: 'Filter options', exact: true })
+      const popupSearch = page.getByRole('textbox', { name: '\u7b5b\u9009\u9009\u9879', exact: true })
       await popupSearch.fill('  ACMLG  ')
       expect(await readGroups(popup, 'option')).toEqual(filtered)
       expect(await popupSearch.evaluate(node => node === node.ownerDocument.activeElement)).toBe(true)
@@ -344,8 +353,8 @@ describe('web e2e: the composer model switch is the default for later sessions',
   })
 
   it('hides search only in the button menu when four models remain', async () => {
-    const trigger = page.getByRole('button', { name: /^Choose models/ })
-    const search = page.getByRole('searchbox', { name: 'Search models…' })
+    const trigger = page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ })
+    const search = page.getByRole('searchbox', { name: '\u641c\u7d22\u6a21\u578b…' })
     const setModels = (expanded: boolean) => scaffold.ctx.settings.update('llm-pi-ai', {
       providers: { [ROUTE]: {
         displayName: 'Acme Gateway', api: 'openai-completions', baseURL: 'https://gateway.acme.example/v1',
@@ -356,7 +365,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
     try {
       await setModels(false)
       await trigger.click()
-      await page.getByRole('menuitem', { name: /Model/ }).click()
+      await page.getByRole('menuitem', { name: /\u6a21\u578b/ }).click()
       await expect.poll(() => page.getByRole('menuitemradio').count()).toBe(4)
       expect(await search.count()).toBe(0)
       const current = page.getByRole('menuitemradio', { name: 'Origin Large', exact: true })
@@ -368,11 +377,11 @@ describe('web e2e: the composer model switch is the default for later sessions',
       await page.keyboard.press('Enter')
       await expect.poll(() => trigger.evaluate(node => node === node.ownerDocument.activeElement)).toBe(true)
       expect(await trigger.evaluate(node => getComputedStyle(node).boxShadow)).toBe('none')
-      await page.getByRole('button', { name: 'Add files or run commands', exact: true }).click()
-      await page.getByRole('option', { name: /^Model/ }).click()
-      const commandSearch = page.getByRole('textbox', { name: 'Filter options', exact: true })
+      await page.getByRole('button', { name: '\u6dfb\u52a0\u6587\u4ef6\u6216\u8c03\u7528\u6307\u4ee4', exact: true }).click()
+      await page.getByRole('option', { name: /^\u6a21\u578b/ }).click()
+      const commandSearch = page.getByRole('textbox', { name: '\u7b5b\u9009\u9009\u9879', exact: true })
       await commandSearch.waitFor()
-      expect(await commandSearch.getAttribute('placeholder')).toBe('Search models…')
+      expect(await commandSearch.getAttribute('placeholder')).toBe('\u641c\u7d22\u6a21\u578b…')
       await commandSearch.press('Escape')
       await page.locator('[data-composer-input]').first().fill('')
       expect(await rows.count()).toBe(0)
@@ -381,7 +390,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
       await page.keyboard.press('Escape')
       await setModels(true)
       await trigger.click()
-      await page.getByRole('menuitem', { name: /Model/ }).click()
+      await page.getByRole('menuitem', { name: /\u6a21\u578b/ }).click()
       await expect.poll(() => page.getByRole('menuitemradio').count()).toBe(5)
       await search.waitFor()
       await search.press('Escape')
@@ -396,14 +405,14 @@ describe('web e2e: the composer model switch is the default for later sessions',
       platform: document.documentElement.getAttribute('data-platform'),
       theme: document.body.getAttribute('data-ds-dark-theme'),
     }))
-    const surface = page.getByRole('group', { name: 'Model and reasoning effort', exact: true })
-    const trigger = page.getByRole('button', { name: /^Choose models/ })
-    const search = page.getByRole('searchbox', { name: 'Search models…' })
+    const surface = page.getByRole('group', { name: '\u6a21\u578b\u4e0e\u63a8\u7406\u7b49\u7ea7', exact: true })
+    const trigger = page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ })
+    const search = page.getByRole('searchbox', { name: '\u641c\u7d22\u6a21\u578b…' })
     try {
       await page.setViewportSize({ width: 1680, height: 220 })
       await trigger.click()
-      await page.getByRole('menuitem', { name: /Model/ }).click()
-      const scroller = page.getByRole('menu', { name: 'Model', exact: true })
+      await page.getByRole('menuitem', { name: /\u6a21\u578b/ }).click()
+      const scroller = page.getByRole('menu', { name: '\u6a21\u578b', exact: true })
       const headings = surface.locator('section[role="group"] > div')
       const readPinned = () => headings.evaluateAll(nodes => nodes.map(node => node.hasAttribute('data-stuck')))
       const resetScroll = async (): Promise<void> => {
@@ -441,16 +450,16 @@ describe('web e2e: the composer model switch is the default for later sessions',
       await search.fill('Origin Large')
       await expect.poll(() => headings.count()).toBe(1)
       await expect.poll(readPinned).toEqual([false])
-      await page.getByRole('button', { name: 'Clear search', exact: true }).click()
+      await page.getByRole('button', { name: '\u6e05\u9664\u641c\u7d22', exact: true }).click()
       await expect.poll(readPinned).toEqual([false, false, false])
       await search.fill('zzzz')
       await expect.poll(() => surface.locator('[data-stuck]').count()).toBe(0)
-      await page.getByRole('button', { name: 'Clear search', exact: true }).click()
+      await page.getByRole('button', { name: '\u6e05\u9664\u641c\u7d22', exact: true }).click()
       await expect.poll(readPinned).toEqual([false, false, false])
       await search.press('Escape')
       await page.keyboard.press('Escape')
       await trigger.click()
-      await page.getByRole('menuitem', { name: /Model/ }).click()
+      await page.getByRole('menuitem', { name: /\u6a21\u578b/ }).click()
       expect(await search.inputValue()).toBe('')
       await resetScroll()
     } finally {
@@ -471,19 +480,19 @@ describe('web e2e: the composer model switch is the default for later sessions',
     // A session that has already run a turn, spelled as the fact a turn
     // leaves behind: its own logged route.
     const loggedId = await createSession('default-model-logged')
-    scaffold.ctx.sessions.get(SessionId(loggedId))?.append('request/header', {
+    scaffold.ctx.sessions.get(brandString<SessionId>(loggedId))?.append('request/header', {
       header: { config: { provider: START_ROUTE, model: START_MODEL } },
       reason: 'initial',
     })
 
-    const trigger = page.getByRole('button', { name: /^Choose models/ })
+    const trigger = page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ })
     await trigger.waitFor({ timeout: 15_000 })
     expect(await trigger.evaluate(element => getComputedStyle(element).fontWeight)).toBe('400')
     await trigger.click()
-    const modelMenuBounds = await page.getByRole('menu', { name: 'Model and reasoning effort', exact: true }).boundingBox()
+    const modelMenuBounds = await page.getByRole('menu', { name: '\u6a21\u578b\u4e0e\u63a8\u7406\u7b49\u7ea7', exact: true }).boundingBox()
     const composerBounds = await page.locator('[data-composer-card]').first().boundingBox()
     expect(modelMenuBounds!.width).toBeLessThan(composerBounds!.width)
-    const modelCell = page.getByRole('menuitem', { name: /Model/ })
+    const modelCell = page.getByRole('menuitem', { name: /\u6a21\u578b/ })
     await trigger.press('ArrowDown')
     expect(await modelCell.evaluate(element => element.matches(':focus-visible'))).toBe(true)
     expect(await modelCell.evaluate(element => getComputedStyle(element).outlineStyle)).toBe('none')
@@ -492,7 +501,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
     await modelCell.hover()
     expect(await modelCell.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(focusedBackground)
     await modelCell.click()
-    const search = page.getByRole('searchbox', { name: 'Search models…' })
+    const search = page.getByRole('searchbox', { name: '\u641c\u7d22\u6a21\u578b…' })
     const rowIds = await page.getByRole('menuitemradio').evaluateAll(rows => rows.map(row => row.id))
     const initialHighlight = rowIds.indexOf(await search.getAttribute('aria-activedescendant') ?? '')
     expect(initialHighlight).toBeGreaterThanOrEqual(0)
@@ -532,7 +541,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
       getComputedStyle(row.querySelector('span span')!).fontWeight,
     ))
     expect(new Set(modelWeights)).toEqual(new Set(['400']))
-    const headingPalettes = await page.getByRole('group', { name: 'Model and reasoning effort', exact: true }).evaluate((menu) => {
+    const headingPalettes = await page.getByRole('group', { name: '\u6a21\u578b\u4e0e\u63a8\u7406\u7b49\u7ea7', exact: true }).evaluate((menu) => {
       const html = menu.ownerDocument.documentElement
       const body = menu.ownerDocument.body
       const previousPlatform = html.getAttribute('data-platform')
@@ -563,24 +572,24 @@ describe('web e2e: the composer model switch is the default for later sessions',
     for (const palette of headingPalettes) {
       expect(palette.headingFills, `${palette.platform}, dark=${String(palette.dark)}`)
         .toEqual(['rgba(0, 0, 0, 0)'])
-      expect(palette.menuFill).toBe(palette.dark ? 'rgba(67, 69, 74, 0.45)' : 'rgba(248, 249, 250, 0.58)')
+      expect(palette.menuFill).toBe(palette.dark ? 'rgba(48, 49, 54, 0.64)' : 'rgba(252, 253, 254, 0.7)')
       expect(palette.searchBorder).toBe('rgba(0, 0, 0, 0)')
       expect(palette.positions).toEqual(['sticky'])
       expect(palette.headingRadii).toEqual([palette.platform === 'darwin' ? '0px' : palette.optionRadius])
     }
     await search.fill('zzzz')
-    await page.getByText('No matching models.', { exact: true }).waitFor()
-    await page.getByRole('button', { name: 'Clear search', exact: true }).click()
+    await page.getByText('\u6ca1\u6709\u5339\u914d\u7684\u6a21\u578b\u3002', { exact: true }).waitFor()
+    await page.getByRole('button', { name: '\u6e05\u9664\u641c\u7d22', exact: true }).click()
     expect(await search.inputValue()).toBe('')
     expect(await search.evaluate(input => input === input.ownerDocument.activeElement)).toBe(true)
     expect(await page.getByRole('menuitemradio').count()).toBe(modelWeights.length)
-    expect(await page.getByRole('button', { name: 'Clear search', exact: true }).count()).toBe(0)
+    expect(await page.getByRole('button', { name: '\u6e05\u9664\u641c\u7d22', exact: true }).count()).toBe(0)
     await search.fill('  ACMLG  ')
     expect(await page.getByRole('menuitemradio').allTextContents()).toEqual(['Acme Large'])
     expect(await page.getByRole('group', { name: 'Origin Gateway', exact: true }).count()).toBe(0)
     await compareOrRefreshGolden(
       fileURLToPath(new URL('./expected/default-model/search.expected.md', import.meta.url)),
-      await captureStableAria(page, '[role="group"][aria-label="Model and reasoning effort"]', scaffold.workspaceCwd),
+      await captureStableAria(page, '[role="group"][aria-label="\u6a21\u578b\u4e0e\u63a8\u7406\u7b49\u7ea7"]', scaffold.workspaceCwd),
       webSnapshotMode(),
     )
     const entered = Promise.withResolvers<undefined>()
@@ -644,7 +653,7 @@ describe('web e2e: the composer model switch is the default for later sessions',
         baseURL: 'https://gateway.origin.example/v1', models: [{ id: START_MODEL, name: 'Origin Large' }] },
     } })
 
-    const seat = page.getByRole('button', { name: 'Select model', exact: true })
+    const seat = page.getByRole('button', { name: '\u8bf7\u9009\u62e9\u6a21\u578b', exact: true })
     await seat.waitFor()
     expect(await box.isEnabled()).toBe(true)
     expect(scaffold.ctx.agentDefaultModel.currentSelection()).toMatchObject({ provider: ROUTE, model: MODEL })

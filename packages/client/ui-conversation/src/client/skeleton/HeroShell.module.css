@@ -81,7 +81,7 @@
   width: 36px;
   height: 3px;
   border-radius: 2px;
-  background: var(--dsw-static-accent-450);
+  background: var(--dsw-alias-state-business-primary);
 }
 
 /* Keep hover detection on a stationary box while the mark moves within it;

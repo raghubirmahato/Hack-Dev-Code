@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-model-selection",
   "description": "Model selection over the shared model catalog, Session projection, and session.selectModel",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -46,6 +46,7 @@
     "@hackdevcode/cordis": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-agent": "workspace:*",
     "@hackdevcode/dsh-api-remotes": "workspace:*",
     "@hackdevcode/dsh-api-session-controller": "workspace:*",
@@ -66,12 +67,16 @@
     "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
     "@hackdevcode/dsh-client-ui-session": "workspace:*",
     "clsx": "^2.1.1",
-    "@hackdevcode/dsh-client-product-analytics": "workspace:*"
+    "@hackdevcode/dsh-client-product-analytics": "workspace:*",
+    "@hackdevcode/dsh-util-text-search": "workspace:*"
   },
   "files": [
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ]
 }

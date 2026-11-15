@@ -13,6 +13,8 @@ const guard = registerHooks({
 const { Context } = await import('@hackdevcode/cordis')
 const host = await import('@hackdevcode/dsh-cua')
 const { createCuaApi } = await import('@hackdevcode/dsh-cua/api')
+const { CuaConfigFields } = await import('@hackdevcode/dsh-cua/config')
+assert.equal(typeof CuaConfigFields.connectTimeoutMs.default, 'function')
 const { connectCua } = await import('@hackdevcode/dsh-cua/bridge')
 const { NativeClient } = await import('@hackdevcode/dsh-cua/native-client')
 const { Request } = await import('@hackdevcode/dsh-cua/protocol')

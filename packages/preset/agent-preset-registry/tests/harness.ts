@@ -3,7 +3,7 @@ import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import Group from '@hackdevcode/cordis-plugin-group'
 import LlmRuntime from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
@@ -11,6 +11,7 @@ import AgentRegistry from '@hackdevcode/dsh-agent'
 import AgentLoop from '@hackdevcode/dsh-agent-loop'
 import AgentPresets, { type PresetDefinition } from '../src/index.ts'
 import { liveConfig } from '../../../settings/settings/tests/live-config.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 /** Loader-backed registry entries by harness context, for tests that edit live fields. */
 export const liveRegistries = new WeakMap<Context, Awaited<ReturnType<typeof liveConfig>>>()
@@ -42,7 +43,7 @@ export async function declare(ctx: Context, config: PresetDefinition) {
 }
 export async function agentOn(ctx: Context, id: string, presetId?: string) {
   const handle = await ctx.agents.create({
-    sessionId: SessionId(id),
+    sessionId: brandString<SessionId>(id),
     setup: async (agentCtx: Context) => { await ctx.agentPresets.mount(agentCtx, presetId) },
   })
   return handle.agent

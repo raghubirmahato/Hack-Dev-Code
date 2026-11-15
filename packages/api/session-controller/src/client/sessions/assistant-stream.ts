@@ -6,7 +6,7 @@ import type {
 } from '../../types.ts'
 import { expandAssistantStream } from '@hackdevcode/dsh-llm/assistant-stream'
 import type { AssistantStreamRecord } from '@hackdevcode/dsh-llm/assistant-stream'
-import type { LlmAttemptId } from '@hackdevcode/dsh-llm/brand'
+import type { LlmAttemptId } from '@hackdevcode/dsh-llm/types'
 import type {
   SessionAssistantSettlementEntry,
   SessionEventLikeEntry,

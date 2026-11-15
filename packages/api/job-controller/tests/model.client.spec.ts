@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
-import type { JobId } from '@hackdevcode/dsh-jobs/brand'
+import type { JobId } from '@hackdevcode/dsh-jobs/types'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 import { ClientJobsModel } from '../src/client/model.ts'
 import { ClientJobs } from '../src/client/service.ts'

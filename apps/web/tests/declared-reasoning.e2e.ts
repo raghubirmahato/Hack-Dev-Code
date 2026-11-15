@@ -10,8 +10,10 @@ import type { Browser, Page, Request } from 'playwright'
 import { chromium, webkit } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, onTestFinished } from 'vitest'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { saveFailureShot, connectFreshWorkspace } from './support.ts'
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
+import { ZH_BROWSER_LOCALE, connectFreshWorkspaceZh, saveFailureShot } from './support.ts'
 
 /** Starts the shipped default on this scenario's declared reasoning model. */
 const OVERLAY = fileURLToPath(new URL('./declared-reasoning.overlay.yml', import.meta.url))
@@ -53,11 +55,11 @@ describe.skipIf(MODE === 'record').each([
       },
     })
     browser = await engine.launch()
-    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
-    await connectFreshWorkspace(page, scaffold.workspaceCwd)
+    await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
   }, 120_000)
 
   afterAll(async () => {
@@ -70,10 +72,10 @@ describe.skipIf(MODE === 'record').each([
 
   it('offers exactly the declared levels and records the picked one', async () => {
     onTestFailed(() => saveFailureShot(page, `web-e2e-declared-reasoning-${engine.name()}`))
-    const trigger = page.getByRole('button', { name: /^Choose models/ })
+    const trigger = page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ })
     await trigger.waitFor({ timeout: 15_000 })
     await trigger.click()
-    await page.getByRole('menuitem', { name: /Reasoning levels/ }).click()
+    await page.getByRole('menuitem', { name: /\u63a8\u7406\u7b49\u7ea7/ }).click()
 
     // Declared levels, nothing else: the provider-default entry (the route
     // configures no `reasoning`), then Off/High/Max — minimal, low, medium,
@@ -111,12 +113,12 @@ describe.skipIf(MODE === 'record').each([
       { timeout: 10_000 },
     ).toContain('reasoningEffort: high')
     await expect.poll(() => trigger.getAttribute('aria-label'), { timeout: 10_000 })
-      .toBe('Select model, current Acme Think, reasoning effort High')
+      .toBe('\u9009\u62e9\u6a21\u578b\uff0c\u5f53\u524d Acme Think\uff0c\u63a8\u7406\u7b49\u7ea7 High')
 
     // Reopening the drilled pane parks the keyboard on the level in use, and
     // Shift+Tab walks back out like Escape: to the drilled cell, then closed.
     await trigger.click()
-    await page.getByRole('menuitem', { name: /Effort/ }).click()
+    await page.getByRole('menuitem', { name: /\u63a8\u7406\u7b49\u7ea7/ }).click()
     const high = page.getByRole('menuitemradio', { name: 'High' })
     await expect.poll(
       () => high.evaluate(element => element === document.activeElement),
@@ -124,7 +126,7 @@ describe.skipIf(MODE === 'record').each([
     ).toBe(true)
     await page.keyboard.press('Shift+Tab')
     await expect.poll(
-      () => page.getByRole('menuitem', { name: /Reasoning levels/ })
+      () => page.getByRole('menuitem', { name: /\u63a8\u7406\u7b49\u7ea7/ })
         .evaluate(element => element === document.activeElement),
       { timeout: 10_000 },
     ).toBe(true)
@@ -135,7 +137,7 @@ describe.skipIf(MODE === 'record').each([
 
   it('opens from the pointer with keyboard focus and closes from the trigger in every pane', async () => {
     onTestFailed(() => saveFailureShot(page, `web-e2e-model-trigger-${engine.name()}`))
-    const trigger = page.getByRole('button', { name: /^Choose models/ })
+    const trigger = page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ })
     const menu = page.getByRole('menu')
     for (const pane of ['root', 'model', 'effort']) {
       await page.locator('[data-composer-input][contenteditable="true"]').focus()
@@ -143,12 +145,12 @@ describe.skipIf(MODE === 'record').each([
       await expect.poll(() => trigger.evaluate(element => element === document.activeElement)).toBe(true)
       if (pane === 'root') {
         await page.keyboard.press('ArrowDown')
-        await expect.poll(() => page.getByRole('menuitem', { name: /^Model/ })
+        await expect.poll(() => page.getByRole('menuitem', { name: /^\u6a21\u578b/ })
           .evaluate(element => element === document.activeElement)).toBe(true)
       } else {
-        await page.getByRole('menuitem', { name: pane === 'model' ? /^Model/ : /Reasoning levels/ }).click()
+        await page.getByRole('menuitem', { name: pane === 'model' ? /^\u6a21\u578b/ : /\u63a8\u7406\u7b49\u7ea7/ }).click()
         const focused = pane === 'model'
-          ? page.getByRole('searchbox', { name: 'Search models…' })
+          ? page.getByRole('searchbox', { name: '\u641c\u7d22\u6a21\u578b…' })
           : page.locator('[role="menuitemradio"][aria-checked="true"]')
         await expect.poll(() => focused.evaluate(element => element === element.ownerDocument.activeElement)).toBe(true)
       }
@@ -167,13 +169,13 @@ describe.skipIf(MODE === 'record').each([
     }
     page.on('request', countSelection)
     onTestFinished(() => { page.off('request', countSelection) })
-    const trigger = page.getByRole('button', { name: /^Choose models/ })
+    const trigger = page.getByRole('button', { name: /^\u9009\u62e9\u6a21\u578b/ })
     const menu = page.getByRole('menu')
     await trigger.click()
-    await page.getByRole('menuitem', { name: /^Model/ }).click()
+    await page.getByRole('menuitem', { name: /^\u6a21\u578b/ }).click()
     const current = page.getByRole('menuitemradio', { name: 'Acme Think', exact: true })
     const target = page.getByRole('menuitemradio', { name: 'Acme Swift', exact: true })
-    const search = page.getByRole('searchbox', { name: 'Search models…' })
+    const search = page.getByRole('searchbox', { name: '\u641c\u7d22\u6a21\u578b…' })
     await expect.poll(() => search.evaluate(element => element === element.ownerDocument.activeElement)).toBe(true)
     expect(await search.getAttribute('aria-activedescendant')).toBe(await current.getAttribute('id'))
 
@@ -199,7 +201,7 @@ describe.skipIf(MODE === 'record').each([
     await menu.waitFor({ state: 'detached' })
 
     await trigger.click()
-    await page.getByRole('menuitem', { name: /^Model/ }).click()
+    await page.getByRole('menuitem', { name: /^\u6a21\u578b/ }).click()
     await target.getByText('Acme Swift', { exact: true }).click()
     await menu.waitFor({ state: 'detached' })
     expect(selections).toBe(1)
@@ -207,7 +209,7 @@ describe.skipIf(MODE === 'record').each([
       .toBe('acme-swift')
 
     await trigger.click()
-    await page.getByRole('menuitem', { name: /Reasoning levels/ }).click()
+    await page.getByRole('menuitem', { name: /\u63a8\u7406\u7b49\u7ea7/ }).click()
     await page.getByRole('menuitemradio', { name: 'Max', exact: true }).click()
     await menu.waitFor({ state: 'detached' })
     expect(selections).toBe(2)
@@ -227,14 +229,14 @@ describe.skipIf(MODE === 'record').each([
       })
     }, { times: 1 })
     await trigger.click()
-    await page.getByRole('menuitem', { name: /^Model/ }).click()
+    await page.getByRole('menuitem', { name: /^\u6a21\u578b/ }).click()
     await expect.poll(() => search.evaluate(element => element === element.ownerDocument.activeElement)).toBe(true)
     expect(await search.getAttribute('aria-activedescendant')).toBe(await target.getAttribute('id'))
     await current.click()
     await page.getByRole('alert').waitFor()
     expect(selections).toBe(3)
     await compareOrRefreshGolden(POINTER_EXPECTED,
-      await captureStableAria(page, '[role="group"][aria-label="Model and reasoning effort"]', scaffold.workspaceCwd), MODE)
+      await captureStableAria(page, '[role="group"][aria-label="\u6a21\u578b\u4e0e\u63a8\u7406\u7b49\u7ea7"]', scaffold.workspaceCwd), MODE)
     await expect.poll(() => trigger.evaluate(element => element === document.activeElement)).toBe(true)
     await page.keyboard.press('Tab')
     await expect.poll(() => search.evaluate(element => element === element.ownerDocument.activeElement)).toBe(true)
@@ -247,7 +249,7 @@ describe.skipIf(MODE === 'record').each([
     await menu.waitFor({ state: 'detached' })
 
     await trigger.click()
-    await page.getByRole('menuitem', { name: /^Model/ }).click()
+    await page.getByRole('menuitem', { name: /^\u6a21\u578b/ }).click()
     await page.locator('[data-composer-input][contenteditable="true"]').focus()
     await menu.waitFor({ state: 'detached' })
     await trigger.click()

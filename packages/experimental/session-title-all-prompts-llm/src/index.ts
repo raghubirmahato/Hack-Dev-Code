@@ -5,9 +5,10 @@ import type { Context } from '@hackdevcode/cordis'
 import z from '@hackdevcode/schemastery'
 import type { LlmResolvedModelInfo, ReasoningEffortId } from '@hackdevcode/dsh-llm'
 import { assertNever } from '@hackdevcode/dsh-util-values'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { SessionTitleProviderId } from '@hackdevcode/dsh-session-title/types'
 import {
   normalizeSessionTitle,
-  SessionTitleProviderId,
   type SessionTitleUserMessage,
 } from '@hackdevcode/dsh-session-title'
 import {
@@ -153,7 +154,7 @@ function titleFromResponse(response: SessionTitleLlmResponse): string {
  */
 export function apply(ctx: Context, config: Config): void {
   const resolved = resolveConfig(config)
-  const titleProvider = SessionTitleProviderId(name)
+  const titleProvider = brandString<SessionTitleProviderId>(name)
   ctx.sessionTitle.register({
     id: titleProvider,
     automatic: 'all-prompts',

@@ -1,10 +1,11 @@
 // @vitest-environment jsdom
+import { contextMenuHook } from '@hackdevcode/dsh-client-test-runtime'
 import type { GlobalStandardProps } from '@hackdevcode/dsh-client-ui-slots'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { allowAllAccess } from '@hackdevcode/dsh-client-test-runtime'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
-import type { ToolCallId } from '@hackdevcode/dsh-llm/brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import {
   createWaterfallRequest, PendingQuestion, planReviewOf, type QuestionComposerProps, type QuestionWait,
 } from '../src/client/contract/slots.ts'
@@ -42,7 +43,7 @@ const sessionState: SessionState = {
   openState: 'open',
   openError: null,
   hasMore: false,
-  loadingOlder: false,
+  loadingOlder: false, historyLoadStatus: 'idle', historyWasPartial: false,
   promptError: null,
   blank: false,
   lastAgentError: null,
@@ -125,6 +126,7 @@ const kit: Omit<QuestionComposerProps, 'matched'> = {
   useSessionRetainInfo: () => undefined,
   useWorkspaces: selector => selector(workspaceState),
   ...allowAllAccess,
+  useContextMenu: contextMenuHook(),
   useConversation: selector => selector(conversationState),
   useChat: selector => selector(chatState),
   useTrajectory: selector => selector(trajectoryState),

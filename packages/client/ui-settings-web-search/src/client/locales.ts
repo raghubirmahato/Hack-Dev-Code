@@ -4,32 +4,47 @@ import type { SettingsFormLabels } from '@hackdevcode/dsh-client-ui-primitives'
 
 /** Locale keys the page renders. */
 export type WebSearchSettingsLocaleKey =
-  | 'title' | 'description' | 'useSearchApi' | 'useSearchApiHint' | 'searchGuide' | 'searchGuideUrl'
-  | 'apiKey' | 'apiKeyHint' | 'apiKeySet' | 'apiKeyUnset'
-  | 'baseUrl' | 'baseUrlHint' | 'searchApiBaseUrl' | 'searchApiBaseUrlHint' | 'maxUses' | 'maxUsesHint' | 'count' | 'countHint'
+  | 'title' | 'description' | 'searchSection' | 'fetchSection'
+  | 'providerDeepSeek' | 'providerLocal' | 'providerDeepSeekFetch' | 'providerMissing' | 'providerAuto'
+  | 'providerLegacy' | 'legacyKeyHint' | 'maxUses' | 'maxUsesHint' | 'invalidMaxUses'
+  | 'providersFailed' | 'retry'
+  | 'pluginProviderHint' | 'searchGuide' | 'searchGuideUrl'
+  | 'credential' | 'apiKeySet' | 'apiKeyUnsetApi'
+  | 'baseUrl' | 'baseUrlHint'
+  | 'count' | 'countHint'
   | 'overridden' | 'reset' | 'readOnly' | 'unavailable'
   | 'save' | 'saving' | 'saveFailed' | 'invalidNumber' | 'invalidCount'
+  | 'billing' | 'billingAuto' | 'billingAutoHint' | 'billingAccount' | 'billingAccountHint' | 'billingApiKey' | 'billingApiKeyHint'
+  | 'billingAdvancedOverride'
 
 /** English copy. */
 export const en: Record<WebSearchSettingsLocaleKey, string> = {
-  title: 'Web search',
-  description: 'Set up the DeepSeek search provider.',
-  useSearchApi: 'Use the new Web Search API',
-  useSearchApiHint: 'Off by default: search runs through DeepSeek Messages. For the new Web Search API\'s features and pricing, see the ',
+  title: 'Web search and fetch',
+  description: 'Choose the providers web search and web fetch use.',
+  searchSection: 'Web search provider',
+  fetchSection: 'Web fetch provider',
+  providerDeepSeek: 'DeepSeek Search API',
+  providerLegacy: 'DeepSeek (legacy)',
+  legacyKeyHint: 'Uses the signed-in account on account-model requests; otherwise uses this API key ({ref}), shared with Models by default.',
+  maxUses: 'Maximum searches per request',
+  maxUsesHint: 'Maximum server-side searches per Messages request: a positive integer, default 5.',
+  invalidMaxUses: 'Enter a positive integer, or leave blank to use the default.',
+  providerLocal: 'Direct fetch',
+  providerDeepSeekFetch: 'DeepSeek Fetch API',
+  providerMissing: '{id} (not loaded)',
+  providerAuto: 'Automatic',
+  providersFailed: "Couldn't load the provider list, so this menu may be incomplete.",
+  retry: 'Retry',
+  pluginProviderHint: 'Configure this provider in its own plugin settings.',
+  credential: 'API key',
+  baseUrl: 'Base URL',
+  baseUrlHint: 'Include the API prefix. Leave blank to use the official address. The provider appends {path}.',
+  apiKeyUnsetApi: 'No key is configured.',
   searchGuide: 'Search & Fetch guide',
   searchGuideUrl: 'https://api-docs.deepseek.com/guides/search',
-  apiKey: 'API key',
-  apiKeyHint: 'Stored outside the settings file. Leave blank to keep the current key.',
   apiKeySet: 'A key is configured.',
-  apiKeyUnset: 'No key is configured; only conversations using a DeepSeek Account model can search, through the default endpoint.',
-  baseUrl: 'Messages API base URL',
-  baseUrlHint: 'Include the API prefix, such as https://api.deepseek.com/anthropic/v1. The provider appends /messages. Leave blank to restore the default.',
-  searchApiBaseUrl: 'Search / Fetch API base URL',
-  searchApiBaseUrlHint: 'Include the API prefix, such as https://api.deepseek.com/v1/tools. The provider appends /search or /fetch. Leave blank to restore the default.',
-  maxUses: 'Max searches per request',
-  maxUsesHint: 'How many searches the auxiliary model may run within one Messages request. Applies only to the Messages API.',
   count: 'Results per search',
-  countHint: 'Results returned per query: an integer from 1 to 50, default 10. This controls result count, not search calls. web_search keeps no more sources than its own result limit.',
+  countHint: 'Results returned per search: 1 to 50, default 10.',
   overridden: 'Overridden',
   reset: 'Reset to default',
   readOnly: 'This deployment stores settings read-only.',
@@ -39,6 +54,14 @@ export const en: Record<WebSearchSettingsLocaleKey, string> = {
   saveFailed: 'The deployment did not accept these values; they were left for you to correct.',
   invalidNumber: 'Enter a number, or leave blank to use the default.',
   invalidCount: 'Enter an integer from 1 to 50, or leave blank to use the default.',
+  billing: 'Billing',
+  billingAuto: 'Automatic',
+  billingAutoHint: "Follows the conversation's DeepSeek account or API key; with other models, uses the API key first, then the signed-in account.",
+  billingAccount: 'Signed-in DeepSeek account',
+  billingAccountHint: 'Requires signing in to DeepSeek.',
+  billingApiKey: 'DeepSeek API key',
+  billingApiKeyHint: 'Uses the API key from the Models page; set one first.',
+  billingAdvancedOverride: 'Overridden by {fields}',
 }
 
 /**

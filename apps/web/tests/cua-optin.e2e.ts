@@ -1,19 +1,20 @@
-/** CUA follows PTC Agent scopes and changes the default only from its detail page. */
+/** CUA selects each Agent's tool form and changes the default only from its detail page. */
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium, type Browser } from 'playwright'
 import { readProfileManifest } from '@hackdevcode/dsh-app-boot'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-ptc-runtime'
 import type {} from '@hackdevcode/dsh-agent-preset-registry'
-import { load } from 'js-yaml'
+import { parseEntryYaml } from '@hackdevcode/cordis-plugin-include'
 import { expect, it, vi } from 'vitest'
 import { captureStableAria, compareOrRefreshGolden, launchWebScaffold, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace } from './support.ts'
+import { connectFreshWorkspaceZh, ZH_BROWSER_LOCALE } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
-// The shipped bundle admits only macOS Hosts; unsupported Hosts are exercised in bundle-platform.e2e.ts.
+// This fixture exercises the macOS provider’s permission setup.
 it.skipIf(process.platform !== 'darwin').each([
   { selectedDefault: undefined, codingTools: false, script: false },
   { selectedDefault: undefined, codingTools: true, script: false },
@@ -26,7 +27,7 @@ it.skipIf(process.platform !== 'darwin').each([
   try {
     const patch = join(directory, 'native-fixture.yml')
     // Permission inspection fails against this non-helper executable; activation still permits dismissing setup.
-    await writeFile(patch, JSON.stringify([{ id: 'cua', config: { helperPath: process.execPath } }]))
+    await writeFile(patch, JSON.stringify([{ id: 'cua-macos', config: { helperPath: process.execPath } }]))
     const defaults = join(directory, 'script-defaults')
     if (script) {
       await mkdir(defaults)
@@ -45,34 +46,24 @@ it.skipIf(process.platform !== 'darwin').each([
     const settingsPath = join(harnessHome, 'profiles/scaffold/cordis.patch.yml')
     const beforeEnable = await readFile(settingsPath, 'utf8')
     browser = await chromium.launch()
-    const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-    await connectFreshWorkspace(page, scaffold.workspaceCwd)
-    await page.getByRole('navigation', { name: 'Global panels' }).getByRole('button', { name: 'Plugins', exact: true }).click()
+    await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
+    await page.getByRole('navigation', { name: '\u5168\u5c40\u9762\u677f' }).getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
     const plugins = page.locator('[data-plugin-panel]')
-    await plugins.getByRole('button', { name: 'More', exact: true }).waitFor()
+    await plugins.getByRole('button', { name: '\u66f4\u591a', exact: true }).waitFor()
     expect(await page.locator('[data-plugin-package="@hackdevcode/dsh-cua-bundle"]').count()).toBe(0)
-    await plugins.getByRole('button', { name: 'More', exact: true }).click()
+    await plugins.getByRole('button', { name: '\u66f4\u591a', exact: true }).click()
+    // The installation ships the bundle off; the Experimental plugins list offers it without an installation step.
     const card = page.locator('[data-plugin-package="@hackdevcode/dsh-cua-bundle"]')
-    expect(await card.count()).toBe(0)
-    expect((await scaffold.ctx.pluginManager.listBundles()).find(bundle => bundle.name === '@hackdevcode/dsh-cua-bundle'))
-      .toMatchObject({ listedByDefault: false, enabled: false, installed: false })
-    await plugins.getByRole('button', { name: 'Back to plugins', exact: true }).click()
-    const offerCua = async () => {
-      await plugins.getByRole('button', { name: 'Add plugin', exact: true }).click()
-      const dialog = page.getByRole('dialog', { name: 'Add plugin', exact: true })
-      await dialog.getByRole('textbox', { name: 'Package name or address', exact: true }).fill('@hackdevcode/dsh-cua-bundle')
-      await dialog.getByRole('button', { name: 'Install', exact: true }).click()
-      const ready = page.getByRole('dialog', { name: 'This plugin ships with DSH', exact: true })
-      await ready.waitFor()
-      expect(await ready.getByText('Enable it without downloading another copy', { exact: true }).count()).toBe(1)
-      return ready.getByRole('button', { name: 'Enable now', exact: true })
-    }
-    const enableNow = await offerCua()
-    let toggle = card.getByRole('switch', { name: 'Enable Computer Use', exact: true })
+    await plugins.locator('[data-plugin-group="more"] [data-plugin-package="@hackdevcode/dsh-cua-bundle"]').waitFor()
+    const listed = (await scaffold.ctx.pluginManager.listBundles()).find(bundle => bundle.name === '@hackdevcode/dsh-cua-bundle')
+    expect(listed).toMatchObject({ availability: 'installation', optional: true, enabled: false, installed: false })
+    expect(listed).not.toHaveProperty('listedByDefault')
+    let toggle = card.getByRole('switch', { name: '\u542f\u7528 Computer Use', exact: true })
     const originalAgent = scaffold.ctx.agents.list()[0]!
     const ptcAgent = (await scaffold.ctx.agents.create({
-      sessionId: SessionId('cua-existing-ptc'),
+      sessionId: brandString<SessionId>('cua-existing-ptc'),
       setup: async (ctx) => { await scaffold.ctx.agentPresets.mount(ctx, 'ptc') },
     })).agent
     expect(scaffold.ctx.tools.schemas(ptcAgent).some(tool => tool.name === 'cua')).toBe(false)
@@ -97,12 +88,10 @@ it.skipIf(process.platform !== 'darwin').each([
       return applying
     })
     try {
-      await enableNow.click()
-      await expect.poll(() => enableNow.isEnabled()).toBe(false)
-      expect(await enableNow.getAttribute('aria-busy')).toBe('true')
-      expect(await card.count()).toBe(0)
+      await toggle.click()
+      await card.getByRole('status').getByText('\u6b63\u5728\u5e94\u7528 Computer Use \u7684\u66f4\u6539', { exact: true }).waitFor()
       await compareOrRefreshGolden(fileURLToPath(new URL('./expected/cua-permissions/enabling.expected.md', import.meta.url)),
-        await captureStableAria(page, '[data-install-phase="done"] button[aria-busy]', scaffold.workspaceCwd), webSnapshotMode())
+        await captureStableAria(page, '[data-plugin-package="@hackdevcode/dsh-cua-bundle"] [role="status"]', scaffold.workspaceCwd), webSnapshotMode())
     } finally {
       enabling.resolve(undefined)
       enableCall.mockRestore()
@@ -110,22 +99,22 @@ it.skipIf(process.platform !== 'darwin').each([
     }
     // Bundle transitions await native cleanup under the browser action deadline.
     await toggle.and(page.locator('[aria-checked="true"]')).waitFor({ state: 'visible' })
-    await card.getByRole('status').getByText('Applying changes to Computer Use', { exact: true }).waitFor({ state: 'hidden' })
-    const setup = page.getByRole('dialog', { name: 'Set up computer use before use', exact: true })
+    await card.getByRole('status').getByText('\u6b63\u5728\u5e94\u7528 Computer Use \u7684\u66f4\u6539', { exact: true }).waitFor({ state: 'hidden' })
+    const setup = page.getByRole('dialog', { name: '\u4f7f\u7528 Computer Use \u524d\u9700\u8981\u8bbe\u7f6e', exact: true })
     await setup.waitFor()
-    expect(await setup.getByText('Computer use is enabled, but system permissions could not be checked. Open the plugin details to see the error and retry.', { exact: true }).count()).toBe(1)
+    expect(await setup.getByText('Computer Use \u63d2\u4ef6\u5df2\u5f00\u542f\uff0c\u4f46\u6682\u65f6\u65e0\u6cd5\u68c0\u6d4b\u7cfb\u7edf\u6743\u9650\u3002\u8bf7\u524d\u5f80\u63d2\u4ef6\u8be6\u60c5\u9875\u67e5\u770b\u539f\u56e0\u5e76\u91cd\u8bd5\u3002', { exact: true }).count()).toBe(1)
     await compareOrRefreshGolden(fileURLToPath(new URL('./expected/cua-permissions/setup.expected.md', import.meta.url)),
       await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
-    expect(await setup.getByRole('button', { name: 'Set to PTC', exact: true }).count()).toBe(0)
+    expect(await setup.getByRole('button', { name: '\u8bbe\u4e3a PTC', exact: true }).count()).toBe(0)
     expect(scaffold.ctx.agentPresets.defaultId).toBe(initialDefault)
     expect(selected()).toContain('@hackdevcode/dsh-cua-bundle')
     expect(profileManifest().dependencies).toEqual(dependencies)
-    expect(await card.getByText('Experimental', { exact: true }).count()).toBe(1)
-    expect(await card.textContent()).not.toContain('Use persistent mode')
-    expect(await card.textContent()).toContain('Switch to PTC mode')
-    expect(await card.textContent()).toContain('Windows support is in development')
+    expect(await card.getByText('\u5b9e\u9a8c\u6027', { exact: true }).count()).toBe(1)
+    expect(await card.textContent()).not.toContain('\u5c06 PTC \u6a21\u5f0f\u6539\u4e3a\u53ef\u6301\u4e45\u5316')
+    expect(await card.textContent()).not.toContain('\u8bf7\u5207\u6362\u5230 PTC \u6a21\u5f0f')
+    expect(await card.textContent()).toContain('\u901a\u8fc7 npm \u5b89\u88c5 DSH \u7684 Windows \u7528\u6237\u9700\u8981\u5355\u72ec\u914d\u7f6e helper')
     expect(await card.textContent()).not.toContain('Swift')
-    const description = await card.getByRole('button', { name: 'View Computer Use', exact: true }).evaluate((button) => {
+    const description = await card.getByRole('button', { name: '\u67e5\u770b Computer Use', exact: true }).evaluate((button) => {
       const element = document.getElementById(button.getAttribute('aria-describedby')!)!
       const style = getComputedStyle(element)
       return { lines: style.webkitLineClamp, height: element.getBoundingClientRect().height,
@@ -138,14 +127,17 @@ it.skipIf(process.platform !== 'darwin').each([
     expect(scaffold.ctx.agents.get(ptcAgent.id) === ptcAgent).toBe(true)
     expect(scaffold.ctx.agentPresets.composedPreset(originalAgent.ctx)).toBe(initialDefault)
     expect(scaffold.ctx.tools.schemas(originalAgent).some(tool => tool.name === 'cua')).toBe(false)
+    expect(scaffold.ctx.tools.schemas(originalAgent).some(tool => tool.name === 'cua_run_code')).toBe(true)
+    expect(scaffold.ctx.tools.schemas(ptcAgent).some(tool => tool.name === 'cua_run_code')).toBe(false)
     expect(scaffold.ctx.tools.schemas(ptcAgent).some(tool => tool.name === 'cua')).toBe(true)
     expect((await scaffold.ctx.systemPrompt.assemble({ scope: ptcAgent })).tools.map(tool => tool.name)).toEqual(['run_code'])
     for (const preset of ['ptc', 'standard', 'ptc', initialDefault]) {
       await scaffold.ctx.agentPresets.select(originalAgent, preset)
       expect(scaffold.ctx.tools.schemas(originalAgent).some(tool => tool.name === 'cua')).toBe(preset === 'ptc')
+      expect(scaffold.ctx.tools.schemas(originalAgent).some(tool => tool.name === 'cua_run_code')).toBe(preset !== 'ptc')
     }
     const child = await scaffold.ctx.agents.create({
-      sessionId: SessionId('cua-child'), parentAgent: ptcAgent,
+      sessionId: brandString<SessionId>('cua-child'),
       setup: (ctx) => { scaffold.ctx.agentPresets.composeFrom(ctx, ptcAgent.ctx) },
     })
     expect(scaffold.ctx.tools.schemas(child.agent).some(tool => tool.name === 'cua')).toBe(true)
@@ -155,70 +147,96 @@ it.skipIf(process.platform !== 'darwin').each([
     expect(runtimeFiber() === originalRuntimeFiber).toBe(true)
     expect(scaffold.ctx.ptcRuntime.programFormat).toBe(script ? 'script' : 'function-body')
     await setup.waitFor()
-    expect(await setup.getByText('Computer use is enabled, but system permissions could not be checked. Open the plugin details to see the error and retry.', { exact: true }).count()).toBe(1)
-    await setup.getByRole('button', { name: 'Later', exact: true }).click()
+    expect(await setup.getByText('Computer Use \u63d2\u4ef6\u5df2\u5f00\u542f\uff0c\u4f46\u6682\u65f6\u65e0\u6cd5\u68c0\u6d4b\u7cfb\u7edf\u6743\u9650\u3002\u8bf7\u524d\u5f80\u63d2\u4ef6\u8be6\u60c5\u9875\u67e5\u770b\u539f\u56e0\u5e76\u91cd\u8bd5\u3002', { exact: true }).count()).toBe(1)
+    await setup.getByRole('button', { name: '\u7a0d\u540e', exact: true }).click()
     await setup.waitFor({ state: 'hidden' })
     let saved = await readFile(settingsPath, 'utf8')
     expect(saved).toBe(beforeEnable)
     expect(scaffold.ctx.settings.describe().find(row => row.ns === 'ui-settings')?.value).toMatchObject({ enabled: codingTools })
     expect(saved).not.toContain('executionMode:')
     if (selectedDefault === undefined) {
-      expect(load(saved)).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: 'agent-preset-registry' })]))
+      expect(parseEntryYaml(saved)).not.toEqual(expect.arrayContaining([expect.objectContaining({ id: 'agent-preset-registry' })]))
     } else {
-      expect(load(saved)).toEqual(expect.arrayContaining([
+      expect(parseEntryYaml(saved)).toEqual(expect.arrayContaining([
         expect.objectContaining({ id: 'agent-preset-registry', config: { default: 'standard', selectedDefault } }),
       ]))
     }
     const freshDefault = (await scaffold.ctx.agents.create({
-      sessionId: SessionId('cua-new-default'),
+      sessionId: brandString<SessionId>('cua-new-default'),
       setup: async (ctx) => { await scaffold.ctx.agentPresets.mount(ctx) },
     })).agent
     expect(scaffold.ctx.agentPresets.composedPreset(freshDefault.ctx)).toBe(initialDefault)
     expect(scaffold.ctx.tools.schemas(freshDefault).some(tool => tool.name === 'cua')).toBe(false)
+    expect(scaffold.ctx.tools.schemas(freshDefault).some(tool => tool.name === 'cua_run_code')).toBe(true)
     const fresh = (await scaffold.ctx.agents.create({
-      sessionId: SessionId('cua-new-ptc'),
+      sessionId: brandString<SessionId>('cua-new-ptc'),
       setup: async (ctx) => { await scaffold.ctx.agentPresets.mount(ctx, 'ptc') },
     })).agent
     expect(scaffold.ctx.agentPresets.composedPreset(fresh.ctx)).toBe('ptc')
     expect(scaffold.ctx.tools.schemas(fresh).some(tool => tool.name === 'cua')).toBe(true)
-    await card.getByRole('button', { name: 'View Computer Use', exact: true }).click()
-    toggle = page.locator('[data-plugin-panel]').getByRole('switch', { name: 'Enable Computer Use', exact: true })
-    const persistent = page.getByRole('group', { name: 'PTC execution mode', exact: true })
+    await card.getByRole('button', { name: '\u67e5\u770b Computer Use', exact: true }).click()
+    await plugins.locator('[data-detail-document]').getByText('helperPath', { exact: true }).waitFor()
+    toggle = page.locator('[data-plugin-panel]').getByRole('switch', { name: '\u542f\u7528 Computer Use', exact: true })
+    const persistent = page.getByRole('group', { name: 'PTC \u6267\u884c\u65b9\u5f0f', exact: true })
+    if (!codingTools) {
+      const panel = page.locator('[data-cua-settings]')
+      await expect.poll(() => panel.getAttribute('aria-busy')).toBe('false')
+      expect(await panel.textContent()).toContain('\u6807\u51c6\u3001\u521b\u9020\u548c PTC \u6a21\u5f0f\u5747\u53ef\u4f7f\u7528 Computer Use')
+      expect(await persistent.textContent()).toContain('\u5176\u4ed6\u6a21\u5f0f\u59cb\u7ec8\u5355\u72ec\u4fdd\u7559 Computer Use \u72b6\u6001')
+      for (const width of [1680, 390]) {
+        await page.setViewportSize({ width, height: 1000 })
+        for (const colorScheme of ['light', 'dark'] as const) {
+          await page.emulateMedia({ colorScheme })
+          await expect.poll(() => page.evaluate(() => document.body.hasAttribute('data-ds-dark-theme'))).toBe(colorScheme === 'dark')
+          await expect.poll(() => panel.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+          if (webSnapshotMode() === 'refresh') {
+            const directory = fileURLToPath(new URL('../../../.playwright-mcp/cua-run-code-ui', import.meta.url))
+            await mkdir(directory, { recursive: true })
+            await panel.screenshot({ path: join(directory, `details-zh-${width}-${colorScheme}.png`), animations: 'disabled' })
+          }
+        }
+      }
+      await page.emulateMedia({ colorScheme: null })
+      await page.setViewportSize({ width: 1680, height: 1000 })
+    }
     const beforePersistent = scaffold.ctx.ptcRuntime
-    await persistent.getByRole('button', { name: 'Use persistent mode', exact: true }).click()
-    await persistent.getByRole('button', { name: 'Persistent mode enabled', exact: true }).waitFor()
-    expect(scaffold.ctx.ptcRuntime.programFormat).toBe(script ? 'script' : 'repl')
+    await persistent.getByRole('button', { name: '\u8bbe\u4e3a\u6301\u4e45\u5316', exact: true }).click()
+    await persistent.getByRole('button', { name: '\u5df2\u8bbe\u4e3a\u6301\u4e45\u5316', exact: true }).waitFor()
+    expect(scaffold.ctx.ptcRuntime.programFormat).toBe(script ? 'script' : 'scoped-repl')
     expect(scaffold.ctx.ptcRuntime.retainsState).toBe(true)
     expect(scaffold.ctx.ptcRuntime === beforePersistent).toBe(false)
     saved = await readFile(settingsPath, 'utf8')
     expect(saved).toContain(`executionMode: ${script ? 'vm-script' : 'persistent-in-memory'}`)
     expect(saved).toContain(`scriptPersistence: ${script}`)
+    expect(saved).toContain(`replScoped: ${!script}`)
     const runtime = scaffold.ctx.ptcRuntime
     const persistentRuntimeFiber = runtimeFiber()
     const owner = {}
     const program = 'globalThis.counter = (globalThis.counter ?? 0) + 1'
     expect((await runtime.run(runtime.resolve({ program, bindings: [], stateOwner: owner }))).value).toBe(1)
     await toggle.click()
-    await toggle.waitFor({ state: 'hidden' })
-    await card.waitFor({ state: 'hidden' })
+    await toggle.and(page.locator('[aria-checked="false"]')).waitFor({ state: 'visible' })
     expect(scaffold.ctx.get('computerUse')).toBeUndefined()
     expect(runtimeFiber() === persistentRuntimeFiber).toBe(true)
     expect(scaffold.ctx.agentPresets.defaultId).toBe(initialDefault)
     expect(scaffold.ctx.agents.get(ptcAgent.id) === ptcAgent).toBe(true)
+    for (const agent of [originalAgent, freshDefault, ptcAgent, fresh]) {
+      expect(scaffold.ctx.tools.schemas(agent).some(tool => tool.name === 'cua_run_code')).toBe(false)
+    }
     for (const agent of [ptcAgent, fresh]) {
       expect(scaffold.ctx.tools.schemas(agent).some(tool => tool.name === 'cua')).toBe(false)
       expect((await scaffold.ctx.systemPrompt.assemble({ scope: agent })).tools.map(tool => tool.name)).toEqual(['run_code'])
     }
     expect((await runtime.run(runtime.resolve({ program, bindings: [], stateOwner: owner }))).value).toBe(2)
     expect(await readFile(settingsPath, 'utf8')).toBe(saved)
-    await (await offerCua()).click()
+    await toggle.click()
     await toggle.and(page.locator('[aria-checked="true"]')).waitFor({ state: 'visible' })
     await setup.waitFor()
-    expect(await setup.getByText('Computer use is enabled, but system permissions could not be checked. Open the plugin details to see the error and retry.', { exact: true }).count()).toBe(1)
+    expect(await setup.getByText('Computer Use \u63d2\u4ef6\u5df2\u5f00\u542f\uff0c\u4f46\u6682\u65f6\u65e0\u6cd5\u68c0\u6d4b\u7cfb\u7edf\u6743\u9650\u3002\u8bf7\u524d\u5f80\u63d2\u4ef6\u8be6\u60c5\u9875\u67e5\u770b\u539f\u56e0\u5e76\u91cd\u8bd5\u3002', { exact: true }).count()).toBe(1)
     expect(scaffold.ctx.agentPresets.defaultId).toBe(initialDefault)
-    await setup.getByRole('button', { name: 'Open settings', exact: true }).click()
+    await setup.getByRole('button', { name: '\u524d\u5f80\u8bbe\u7f6e', exact: true }).click()
     await setup.waitFor({ state: 'hidden' })
-    await page.getByRole('region', { name: 'Authorize computer use', exact: true }).getByRole('alert').waitFor()
+    await page.getByRole('region', { name: '\u7ed9 Computer Use \u6388\u6743', exact: true }).getByRole('alert').waitFor()
     if (!codingTools) {
       expect(await readFile(settingsPath, 'utf8')).toBe(saved)
       expect(scaffold.ctx.settings.describe().find(row => row.ns === 'ui-settings')?.value).toMatchObject({ enabled: false })
@@ -227,16 +245,16 @@ it.skipIf(process.platform !== 'darwin').each([
       await runtime.release(owner)
       return
     }
-    const defaultSetting = page.getByRole('group', { name: 'Default mode for new sessions', exact: true })
-    await expect.poll(() => defaultSetting.getByRole('button', { name: 'Set to PTC', exact: true }).isEnabled()).toBe(true)
+    const defaultSetting = page.getByRole('group', { name: '\u65b0\u4f1a\u8bdd\u9ed8\u8ba4\u6a21\u5f0f', exact: true })
+    await expect.poll(() => defaultSetting.getByRole('button', { name: '\u8bbe\u4e3a PTC', exact: true }).isEnabled()).toBe(true)
     await compareOrRefreshGolden(fileURLToPath(new URL('./expected/cua-permissions/default-mode.expected.md', import.meta.url)),
-      await captureStableAria(page, '[role="group"][aria-label="Default mode for new sessions"]', scaffold.workspaceCwd), webSnapshotMode())
-    await defaultSetting.getByRole('button', { name: 'Set to PTC', exact: true }).click()
+      await captureStableAria(page, '[role="group"][aria-label="\u65b0\u4f1a\u8bdd\u9ed8\u8ba4\u6a21\u5f0f"]', scaffold.workspaceCwd), webSnapshotMode())
+    await defaultSetting.getByRole('button', { name: '\u8bbe\u4e3a PTC', exact: true }).click()
     await expect.poll(() => scaffold.ctx.agentPresets.defaultId).toBe('ptc')
     expect(scaffold.ctx.agentPresets.composedPreset(originalAgent.ctx)).toBe(initialDefault)
     expect(scaffold.ctx.agentPresets.composedPreset(freshDefault.ctx)).toBe(initialDefault)
     const confirmed = (await scaffold.ctx.agents.create({
-      sessionId: SessionId('cua-confirmed-default'),
+      sessionId: brandString<SessionId>('cua-confirmed-default'),
       setup: async (ctx) => { await scaffold.ctx.agentPresets.mount(ctx) },
     })).agent
     expect(scaffold.ctx.agentPresets.composedPreset(confirmed.ctx)).toBe('ptc')
@@ -245,17 +263,16 @@ it.skipIf(process.platform !== 'darwin').each([
     expect(scaffold.ctx.tools.schemas(ptcAgent).some(tool => tool.name === 'cua')).toBe(true)
     expect((await runtime.run(runtime.resolve({ program, bindings: [], stateOwner: owner }))).value).toBe(3)
     const confirmedSettings = await readFile(settingsPath, 'utf8')
-    expect(load(confirmedSettings)).toEqual(expect.arrayContaining([
+    expect(parseEntryYaml(confirmedSettings)).toEqual(expect.arrayContaining([
       expect.objectContaining({ id: 'agent-preset-registry', config: { default: 'standard', selectedDefault: 'ptc' } }),
     ]))
     await toggle.click()
-    await toggle.waitFor({ state: 'hidden' })
-    await card.waitFor({ state: 'hidden' })
-    await (await offerCua()).click()
+    await toggle.and(page.locator('[aria-checked="false"]')).waitFor({ state: 'visible' })
+    await toggle.click()
     await toggle.and(page.locator('[aria-checked="true"]')).waitFor({ state: 'visible' })
     await setup.waitFor()
-    expect(await setup.getByText('Computer use is enabled, but system permissions could not be checked. Open the plugin details to see the error and retry.', { exact: true }).count()).toBe(1)
-    expect(await setup.getByRole('button', { name: 'Set to PTC', exact: true }).count()).toBe(0)
+    expect(await setup.getByText('Computer Use \u63d2\u4ef6\u5df2\u5f00\u542f\uff0c\u4f46\u6682\u65f6\u65e0\u6cd5\u68c0\u6d4b\u7cfb\u7edf\u6743\u9650\u3002\u8bf7\u524d\u5f80\u63d2\u4ef6\u8be6\u60c5\u9875\u67e5\u770b\u539f\u56e0\u5e76\u91cd\u8bd5\u3002', { exact: true }).count()).toBe(1)
+    expect(await setup.getByRole('button', { name: '\u8bbe\u4e3a PTC', exact: true }).count()).toBe(0)
     expect(await readFile(settingsPath, 'utf8')).toBe(confirmedSettings)
     expect(scaffold.ctx.settings.describe().find(row => row.ns === 'ui-settings')?.value).toMatchObject({ enabled: codingTools })
     await runtime.release(owner)

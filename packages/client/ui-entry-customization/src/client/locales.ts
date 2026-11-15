@@ -1,5 +1,7 @@
 /** Copy for the More menu rows: navigation actions, and Creator draft prompts per region. */
 export const en = {
+  'pinTooltip': 'Pin to left sidebar',
+  'pin': 'Pin {name} to sidebar',
   install: 'Browse other plugins',
   create: 'Create your plugin',
   'createPrompt.sidebar': 'Create a DSH plugin with a left sidebar entry.',

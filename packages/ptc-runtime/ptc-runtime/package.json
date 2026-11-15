@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-ptc-runtime",
   "description": "Abstract PTC execution seam (ctx.ptcRuntime) for the Hack Dev Code",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -23,15 +23,22 @@
   },
   "files": [
     "lib/index.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
     "@hackdevcode/cordis": "workspace:~",
-    "@hackdevcode/dsh-sandbox": "workspace:*"
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
-    "@hackdevcode/dsh-sandbox": "workspace:*"
+    "@hackdevcode/dsh-sandbox": "workspace:*",
+    "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*"
   }
 }

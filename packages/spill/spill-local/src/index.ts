@@ -13,7 +13,8 @@ import { Context } from '@hackdevcode/cordis'
 import { resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import z from '@hackdevcode/schemastery'
-import { SpillLocator, SpillStore } from '@hackdevcode/dsh-spill'
+import { type SpillLocator, SpillStore } from '@hackdevcode/dsh-spill'
+import { brandString } from '@hackdevcode/dsh-brand'
 import type { SaveTextSpill, SpillRef } from '@hackdevcode/dsh-spill'
 import { gatherSweepRoots, sweepSpillRoots } from './cleanup.ts'
 import type { SweepRoot, WarnFn } from './cleanup.ts'
@@ -154,7 +155,7 @@ export class LocalSpillStore extends SpillStore {
       content: input.content,
     })
     return {
-      locator: SpillLocator(saved.path),
+      locator: brandString<SpillLocator>(saved.path),
       bytes: saved.bytes,
       retrievalHint: 'Use read with offset/limit, or grep this path to search within it.',
     }

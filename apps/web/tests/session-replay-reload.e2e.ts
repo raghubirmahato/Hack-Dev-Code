@@ -4,7 +4,9 @@ import { fileURLToPath } from 'node:url'
 import { chromium, webkit } from 'playwright'
 import { describe, expect, it, onTestFailed, onTestFinished } from 'vitest'
 import {
-  acknowledgeReloadConnectionLoss, captureExpandedTurnProcessAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, selectedSessionFixture, watchConsole, webSnapshotMode } from './scaffold.ts'
+  acknowledgeReloadConnectionLoss, captureExpandedTurnProcessAria, compareOrRefreshGolden, fixtureUserPrompts,
+  launchWebScaffold, selectedSessionFixture, watchConsole, webSnapshotMode,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/fresh-round-trip/session.v3.jsonl', import.meta.url))

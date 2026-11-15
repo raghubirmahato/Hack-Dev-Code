@@ -2,7 +2,7 @@
 import type { Context } from '@hackdevcode/cordis'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import type { JsonValue } from '@hackdevcode/dsh-util-values'
-import { defineTool } from '@hackdevcode/dsh-tools'
+import { defineTool, ToolContextUnavailableError } from '@hackdevcode/dsh-tools'
 import type { ToolExecution } from '@hackdevcode/dsh-tools'
 import { presentInspectListCall, presentInspectQueryCall } from './present.ts'
 
@@ -10,7 +10,7 @@ export const name = 'tool-cordis'
 export const inject = ['tools', 'cordisInspect']
 
 function requireAgent(exec: ToolExecution): Agent {
-  if (exec.agent === undefined) throw new Error('Cordis inspection requires an Agent-backed session')
+  if (exec.agent === undefined) throw new ToolContextUnavailableError('Cordis inspection requires an Agent-backed session')
   return exec.agent
 }
 
@@ -32,6 +32,8 @@ export function apply(ctx: Context): void {
       schema: { type: 'json' },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
     },
+    // Listing reads the Provider registry without mutating it.
+    isConcurrencySafe: () => true,
     execute(_args, _exec): Promise<JsonValue> {
       return Promise.resolve({ providers: ctx.cordisInspect.list() } as unknown as JsonValue)
     },
@@ -57,6 +59,8 @@ export function apply(ctx: Context): void {
       schema: { type: 'json' },
       render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }],
     },
+    // Provider methods are read-only, and each Client query settles by its own request id.
+    isConcurrencySafe: () => true,
     async execute(args, exec) {
       const data = await ctx.cordisInspect.query(
         args.platform,

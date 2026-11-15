@@ -42,7 +42,7 @@
 
 @media (hover: hover) {
   .card:hover {
-    border-color: var(--dsw-static-accent-450);
+    border-color: var(--dsw-alias-state-business-primary);
     background: var(--dsw-alias-interactive-bg-hover);
   }
 }

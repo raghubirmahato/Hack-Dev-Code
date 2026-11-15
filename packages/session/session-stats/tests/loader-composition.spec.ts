@@ -13,9 +13,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
 import Include from '@hackdevcode/cordis-plugin-include'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import * as SessionStatsPlugin from '@hackdevcode/dsh-session-stats'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 let root: string | undefined
 let context: Context | undefined
@@ -69,7 +70,7 @@ describe('real Loader composition', () => {
       .map(entry => entry.options.name)
     expect(unloaded).toEqual([])
 
-    const session = loaded.sessions.create(SessionId('composed'))
+    const session = loaded.sessions.create(brandString<SessionId>('composed'))
     session.append('turn/start', { turn: 1 })
     session.append('step/start', { turn: 1, step: 1 })
     session.append('step/end', { turn: 1, step: 1 })

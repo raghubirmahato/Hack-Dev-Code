@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-desktop",
   "description": "Electron desktop shell for a bundled dsh runtime and external plugins",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "private": true,
   "license": "MIT",
   "author": {
@@ -15,6 +15,7 @@
     "bundle": "tsdown --config-loader native",
     "dev": "tsx scripts/dev.ts",
     "start": "tsx scripts/dev.ts --skip-build",
+    "test:updates:channels": "pnpm run build && node scripts/test-update-channels.mjs",
     "test:updates:local": "pnpm run build && node scripts/test-local-updater.mjs",
     "prepare:runtime": "tsx scripts/prepare-runtime.ts",
     "render:tray-icon": "tsx scripts/render-tray-icon.ts",
@@ -50,10 +51,15 @@
     "semver": "^7.8.5",
     "ws": "^8.21.3",
     "@hackdevcode/dsh-api-gateway": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*",
     "@hackdevcode/cordis": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-app-boot": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-host-authentication-desktop": "workspace:*",
+    "@hackdevcode/dsh-host-webserver": "workspace:*",
     "@hackdevcode/dsh-client-ui-settings-general": "workspace:*",
     "@hackdevcode/dsh-client-ui-sidebar-browser": "workspace:*",
     "@hackdevcode/dsh-home-paths": "workspace:*",
@@ -85,8 +91,10 @@
     "@hackdevcode/dsh-atomic-write": "workspace:*",
     "@hackdevcode/dsh-client-product-analytics": "workspace:*",
     "@hackdevcode/dsh-plugin-manager": "workspace:*",
-    "zod": "4.4.3",
+    "zod": "4.6.6",
     "@hackdevcode/dsh-util-file-drag": "workspace:*",
-    "tencentcloud-sdk-nodejs-teo": "4.1.330"
+    "@hackdevcode/dsh-client-ui-file-actions": "workspace:*",
+    "tencentcloud-sdk-nodejs-teo": "4.1.330",
+    "@hackdevcode/dsh-desktop-publisher": "workspace:*"
   }
 }

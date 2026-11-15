@@ -4,7 +4,8 @@ import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import { isAbsolute } from 'node:path'
 import { Context } from '@hackdevcode/cordis'
 import ComputerUse from '@hackdevcode/dsh-computer-use'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
 import { expect, it } from 'vitest'
@@ -49,7 +50,7 @@ it.skipIf(executable === undefined || executable === '')(
       const result = await executeToolFixture(ctx, {
         name: 'mcp__cua-driver-mcp__check_permissions',
         arguments: { prompt: false },
-        callId: ToolCallId('installed-driver-permissions'),
+        callId: brandString<ToolCallId>('installed-driver-permissions'),
         signal,
       })
       expect(result.isError).toBe(false)

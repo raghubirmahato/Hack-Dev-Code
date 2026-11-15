@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-sidebar-right",
   "description": "Right Sidebar: the docking surface's session-bound state, its panel and header expand control, and the navigation service over it",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -34,7 +34,8 @@
         "@hackdevcode/dsh-client-ui-conversation",
         "@hackdevcode/dsh-client-ui-layout",
         "@hackdevcode/dsh-client-ui-session",
-        "@hackdevcode/dsh-client-shortcuts"
+        "@hackdevcode/dsh-client-shortcuts",
+        "@hackdevcode/dsh-client-ui-context-menu"
       ],
       "platform": "web"
     }
@@ -69,14 +70,18 @@
     "picomatch": "^4.0.7",
     "clsx": "^2.0.0",
     "@hackdevcode/dsh-util-crypto": "workspace:*",
-    "zod": "4.4.3",
+    "zod": "4.6.6",
     "@hackdevcode/dsh-client-shortcuts": "workspace:*",
-    "@hackdevcode/dsh-brand": "workspace:*"
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-client-ui-context-menu": "workspace:*"
   },
   "files": [
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ]
 }

@@ -6,13 +6,14 @@ import AgentRegistry, { type Agent } from '@hackdevcode/dsh-agent'
 import AgentLoop from '@hackdevcode/dsh-agent-loop'
 import LlmRuntime, { createUserMessage } from '@hackdevcode/dsh-llm'
 import type { GenerateOptions } from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
 import type { ResolvedToolSet } from '@hackdevcode/dsh-tools'
 import { defineContentToolFixture } from '@hackdevcode/dsh-tool-testkit'
 import { MockAdapter, textResponse, toolCallResponse } from './mock-adapter.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const contexts: Context[] = []
 afterEach(async () => {
@@ -31,7 +32,7 @@ async function harness(adapter: MockAdapter) {
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(AgentLoop, { agents: [] })
   ctx.llm.registerAdapter(['mock'], adapter)
-  const agent = await ctx.agentLoop.create(SessionId('tool-updates'), { provider: 'mock', model: 'model' })
+  const agent = await ctx.agentLoop.create(brandString<SessionId>('tool-updates'), { provider: 'mock', model: 'model' })
   return { ctx, agent }
 }
 

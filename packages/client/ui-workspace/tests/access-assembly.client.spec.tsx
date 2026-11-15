@@ -4,20 +4,23 @@
  *
  * Hand-built row props spread allow-all access Hooks, so they cannot show that the browsing region
  * reads the Hooks a page actually binds. This spec replaces the runtime's allow-all access row with the
- * remote-access snapshot owner itself and renders the real slot tree, so the global and Workspace
- * access Hooks are the renderer's bindings over one non-owner snapshot.
+ * remote-access snapshot owner itself and renders the real slot tree, so the Workspace access Hooks
+ * are the renderer's bindings over one non-owner snapshot.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, screen } from '@testing-library/react'
-import type { TypertResourceKind } from '@hackdevcode/dsh-api-remote-access/client'
+import type { AccessEffect, RemoteEndpoint, TypertResourceKind } from '@hackdevcode/dsh-api-remote-access/client'
 import { ClientAccessState } from '@hackdevcode/dsh-api-remote-access/src/client/state.ts'
+import { whenAllowed } from '@hackdevcode/dsh-api-remote-access/src/client/when-allowed.ts'
 import type { WorkspaceId } from '@hackdevcode/dsh-api-workspace-controller/client'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
 import { LocaleRuntime } from '@hackdevcode/dsh-client-locale/client'
 import type { PropsRenderSlots } from '@hackdevcode/dsh-client-ui-slots'
 import { allowAllAccessPlugin, SlotTestRuntime, usePinnedBrowserLanguages } from '@hackdevcode/dsh-client-test-runtime'
+import { apply as applyMenus, inject as injectMenus } from '@hackdevcode/dsh-client-ui-context-menu/client'
 import { apply, inject } from '@hackdevcode/dsh-client-ui-workspace/client'
+import { SECTION_HOOK_CONTEXT, SECTION_INJECT } from './section-scroller.client.ts'
 
 usePinnedBrowserLanguages('en-US')
 
@@ -27,7 +30,7 @@ beforeEach(() => { localStorage.clear() })
 /** Test-owned sidebar shell role: declares and renders the browsing region. */
 type FrameProps = PropsRenderSlots<'sidebar.workspaces'>
 function SidebarFrame({ renderSlot }: FrameProps) {
-  return <>{renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => {} })}</>
+  return <>{renderSlot('sidebar.workspaces', { wide: true, expandSidebar: () => {} }, { hookContext: SECTION_HOOK_CONTEXT })}</>
 }
 
 const WORKSPACE = 'w1' as WorkspaceId
@@ -46,6 +49,8 @@ async function bench(access: ClientAccessState, options: { ungroupedSession?: Se
     apply(ctx) {
       ctx.provide('remoteAccess', {
         source: (kind: TypertResourceKind, id: string, action: string) => access.resource(kind, id, action),
+        whenAccess: (action: RemoteEndpoint, callback: () => AccessEffect) =>
+          whenAllowed(ctx, access.global(action), callback, `access-assembly: ${action}`),
       })
       ctx.slots.provideRoot({ keyedHooks: { remoteAccess: action => access.global(action) } })
     },
@@ -71,9 +76,10 @@ async function bench(access: ClientAccessState, options: { ungroupedSession?: Se
     }] as never
   })
   await runtime.root.declare(
-    { 'sidebar.workspaces': { kind: 'single', scope: 'root' } } as never,
+    { 'sidebar.workspaces': { kind: 'single', scope: 'root', inject: SECTION_INJECT } } as never,
     SidebarFrame as never,
   )
+  await runtime.mount({ inject: [...injectMenus], apply: applyMenus })
   await runtime.mount({ inject: [...inject], apply })
   return runtime
 }
@@ -90,7 +96,12 @@ describe('Workspace header actions under the page access snapshot', () => {
       runtime.renderRoot()
       const header = await screen.findByRole('treeitem')
       expect(screen.queryByRole('button', { name: 'New session in Project' })).toBeNull()
-      expect(screen.queryByRole('button', { name: 'Workspace actions for Project' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'Workspace actions for Project' })).toBeTruthy()
+      const target = { kind: 'workspace' as const, value: { workspaceId: WORKSPACE, path: '/projects/project', displayTitle: 'Project' } }
+      const deniedMenu = runtime.ctx.contextMenus.resolve(target)
+      await deniedMenu.ready
+      expect(deniedMenu.source.getSnapshot()).toEqual([])
+      deniedMenu.dispose()
       expect(header.getAttribute('draggable')).toBe('false')
 
       // The Workspace's own grant moves its actions; the global answer is never consulted for them.
@@ -107,6 +118,14 @@ describe('Workspace header actions under the page access snapshot', () => {
       expect(screen.getByRole('button', { name: 'Workspace actions for Project' })).toBeTruthy()
       expect(screen.getByRole('treeitem').getAttribute('draggable')).toBe('true')
 
+      const grantedMenu = runtime.ctx.contextMenus.resolve(target)
+      await grantedMenu.ready
+      expect(grantedMenu.source.getSnapshot().map(item => item.id)).toEqual(['workspace.rename/rename'])
+      act(() => { access.replace({ type: 'baseline', owner: false, grants: [] }) })
+      grantedMenu.select('workspace.rename/rename')
+      expect(screen.queryByRole('dialog')).toBeNull()
+      grantedMenu.dispose()
+
       // The owner's snapshot answers every action.
       act(() => { access.replace({ type: 'baseline', owner: true }) })
       expect(screen.getByRole('button', { name: 'New session in Project' })).toBeTruthy()
@@ -115,7 +134,7 @@ describe('Workspace header actions under the page access snapshot', () => {
     }
   })
 
-  it('asks the global resource before the Ungrouped header offers New Session', async () => {
+  it('never offers New Session on the Ungrouped header, even under a global grant', async () => {
     const access = new ClientAccessState({ type: 'baseline', owner: false, grants: [] })
     const runtime = await bench(access, { ungroupedSession: 'loose' as SessionId })
     try {
@@ -125,7 +144,7 @@ describe('Workspace header actions under the page access snapshot', () => {
       act(() => {
         access.update({ type: 'upsert', grant: { resource: { kind: 'global' }, actions: ['session/create'] } })
       })
-      expect(screen.getByRole('button', { name: 'New session in Ungrouped' })).toBeTruthy()
+      expect(screen.queryByRole('button', { name: 'New session in \u672a\u5206\u7ec4' })).toBeNull()
     } finally {
       await runtime.dispose()
     }

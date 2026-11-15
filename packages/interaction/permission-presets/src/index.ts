@@ -17,7 +17,8 @@ import type {} from '@hackdevcode/dsh-agent'
 import type { Volatile } from '@hackdevcode/cordis'
 
 import { Context, Service } from '@hackdevcode/cordis'
-import { CommandDefinitionId } from '@hackdevcode/dsh-commands/brand'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { CommandDefinitionId } from '@hackdevcode/dsh-commands/types'
 import z from '@hackdevcode/schemastery'
 import { z as zod } from 'zod'
 import { Remote, TypertRemoteService } from '@hackdevcode/dsh-typert-protocol'
@@ -253,7 +254,7 @@ export class PermissionPresetService extends TypertRemoteService {
     // activates only when a command registry is composed.
     ctx.inject(['commands'], (commandCtx) => {
       commandCtx.commands.register({
-        definitionId: CommandDefinitionId('@hackdevcode/dsh-permission-presets'),
+        definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-permission-presets'),
         name: 'permission',
         description: 'Switch the permission preset (sandbox mode + approval policy)',
         input: { hint: '<preset>' },

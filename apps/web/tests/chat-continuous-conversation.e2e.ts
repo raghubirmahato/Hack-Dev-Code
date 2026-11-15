@@ -9,12 +9,19 @@ import { join } from 'node:path'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { ToolCallId, expandAssistantStream, type StreamChunk } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import { type ToolCallId, expandAssistantStream, type StreamChunk } from '@hackdevcode/dsh-llm'
 import type { ReplayEntry, ReplayOverrideDoc } from '@hackdevcode/dsh-llm-replay'
 import type { SessionEvent, SessionId } from '@hackdevcode/dsh-session'
 import {
-  launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace, conversationContextKey, expandOwningTurnProcess, newEnglishPage, saveFailureShot } from './support.ts'
+  launchWebScaffold,
+  watchConsole,
+  webSnapshotMode,
+  type WebScaffold,
+} from './scaffold.ts'
+import {
+  connectFreshWorkspace, conversationContextKey, expandOwningTurnProcess, newEnglishPage, saveFailureShot,
+} from './support.ts'
 
 const MODE = webSnapshotMode()
 const TURN_COUNT = 12
@@ -28,7 +35,7 @@ interface TurnSpec {
   readonly firstMarker: string
   readonly doneMarker: string
   readonly deltas: readonly string[]
-  readonly callId?: ReturnType<typeof ToolCallId>
+  readonly callId?: ToolCallId
   readonly toolResultMarker?: string
 }
 
@@ -77,7 +84,7 @@ function turnSpec(index: number): TurnSpec {
     firstMarker,
     doneMarker,
     deltas,
-    callId: ToolCallId(`continuous-chat-tool-${id}`),
+    callId: brandString<ToolCallId>(`continuous-chat-tool-${id}`),
     toolResultMarker: `CONTINUOUS_CHAT_TOOL_RESULT_${id}`,
   }
 }

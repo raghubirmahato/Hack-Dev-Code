@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
-import { ToolCallId } from '@hackdevcode/dsh-llm/brand'
-import { SessionId } from '@hackdevcode/dsh-session/types'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
+import type { SessionId } from '@hackdevcode/dsh-session/types'
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
 import { FoldedText } from '@hackdevcode/dsh-client-ui-action-cards/src/client/Card.tsx'
 import type { ActionCardFields, ActionCardResult } from '@hackdevcode/dsh-action-cards/types'
@@ -10,15 +11,18 @@ import { PageCardBody, type PageCardProps } from '../src/client/Card.tsx'
 import { makeTranslate } from '@hackdevcode/dsh-client-test-runtime'
 import { en } from '../src/client/locales.ts'
 
+// English is the only product language; the other dictionaries resolve to it.
+const zh = en
+
 afterEach(() => { cleanup(); vi.restoreAllMocks() })
-const callId = ToolCallId('creation-1')
+const callId = brandString<ToolCallId>('creation-1')
 const ACTION = 'create_personalized_page'
 type Act = (verb: string, payload?: ActionCardFields) => Promise<ActionCardResult | undefined>
 
 function props(decision?: { phase: string; data?: ActionCardFields }, details: ActionCardFields = { slot: 'sidebar-right' }): PageCardProps & { act: ReturnType<typeof vi.fn<Act>> } {
   const proposal = { callId, turn: 1, action: ACTION, title: 'Counter', brief: 'Keep my task count visible.', details }
   return { proposal, decision: decision === undefined ? undefined : { callId, action: ACTION, ...decision },
-    sessionId: SessionId('session-1'), summary: <><strong>{proposal.title}</strong><p>{proposal.brief}</p></>, Folded: FoldedText,
+    sessionId: brandString<SessionId>('session-1'), summary: <><strong>{proposal.title}</strong><p>{proposal.brief}</p></>, Folded: FoldedText,
     act: vi.fn<Act>(async () => ({ status: 'accepted' })), infoDismissed: createSnapshotStore(true),
     t: makeTranslate(en) }
 }
@@ -151,15 +155,17 @@ it('explains cost and background creation without starting work', () => {
   expect(value.act).not.toHaveBeenCalled()
 })
 
-it('offers cancellation during generation, then waits for cleanup before retrying', async () => {
+it('offers cancellation beside the location during generation, then waits for cleanup before retrying', async () => {
   const value = props({ phase: 'creating', data: { slot: 'page', bundleName: '@dsh-local/view-fixture' } })
   const pending = Promise.withResolvers<ActionCardResult | undefined>()
   value.act.mockImplementation(() => pending.promise)
   const { rerender } = render(<PageCardBody {...value} />)
-  expect(screen.queryByText(en.sourceRetained)).toBeNull()
-  fireEvent.click(screen.getByRole('button', { name: en.creationInfo }))
-  expect(screen.getByText(en.sourceRetained)).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Cancel creation' }))
+  expect(screen.queryByText(zh.sourceRetained)).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: zh.creationInfo }))
+  expect(screen.getByText(zh.sourceRetained)).toBeTruthy()
+  const cancel = screen.getByRole('button', { name: 'Cancel creation' })
+  expect(cancel.parentElement).toBe(screen.getByText(`${zh.location} · ${zh.page}`).parentElement)
+  fireEvent.click(cancel)
   expect(value.act).toHaveBeenCalledWith('cancel', undefined)
   expect(screen.getByRole('button', { name: 'Cancelling…' }).hasAttribute('disabled')).toBe(true)
   expect(screen.queryByRole('button', { name: 'Create again' })).toBeNull()
@@ -178,18 +184,20 @@ it.each(['failed', 'interrupted', 'cancelled', 'unconfirmed'] as const)('offers 
   await waitFor(() => { expect(value.act).toHaveBeenCalledWith('create', { slot: 'page' }) })
 })
 
-it('retains installed and kept plugins with an Undo action and the actual application outcome', async () => {
+it('offers only Undo, beside the location, on installed and earlier kept plugins, with the actual application outcome', async () => {
   const value = props({ phase: 'installed', data: { slot: 'page', application: 'applied' } })
   const { rerender } = render(<PageCardBody {...value} />)
   expect(screen.getAllByRole('status')).toHaveLength(1)
-  expect(screen.getByText(en.scope)).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
-  await waitFor(() => { expect(value.act).toHaveBeenCalledWith('keep', undefined) })
+  const undo = screen.getByRole('button', { name: zh.undo })
+  expect(screen.getAllByRole('button')).toEqual([screen.getByRole('button', { name: zh.creationInfo }), undo])
+  expect(undo.parentElement).toBe(screen.getByText(`${zh.location} · ${zh.page}`).parentElement)
+  fireEvent.click(undo)
+  await waitFor(() => { expect(value.act).toHaveBeenCalledWith('undo', undefined) })
   const kept = props({ phase: 'kept', data: { slot: 'page', application: 'restart-required' } })
   rerender(<PageCardBody {...kept} />)
-  expect(screen.queryByRole('button', { name: 'Keep' })).toBeNull()
-  expect(screen.getByText(en['restart-required'])).toBeTruthy()
-  fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+  expect(screen.getByText(zh['restart-required'])).toBeTruthy()
+  expect(screen.getAllByRole('button')).toEqual([screen.getByRole('button', { name: zh.creationInfo }), screen.getByRole('button', { name: zh.undo })])
+  fireEvent.click(screen.getByRole('button', { name: zh.undo }))
   await waitFor(() => { expect(kept.act).toHaveBeenCalledWith('undo', undefined) })
 })
 
@@ -198,10 +206,10 @@ it('offers only Restore on a removed card, labels it while pending and explains 
   const pending = Promise.withResolvers<ActionCardResult | undefined>()
   value.act.mockImplementation(() => pending.promise)
   render(<PageCardBody {...value} />)
-  expect(screen.getByRole('status').textContent).toBe(en.removed)
-  const restore = screen.getByRole('button', { name: en.restore })
-  expect(screen.getAllByRole('button')).toEqual([screen.getByRole('button', { name: en.creationInfo }), restore])
-  expect(restore.closest('footer')).not.toBeNull()
+  expect(screen.getByRole('status').textContent).toBe(zh.removed)
+  const restore = screen.getByRole('button', { name: zh.restore })
+  expect(screen.getAllByRole('button')).toEqual([screen.getByRole('button', { name: zh.creationInfo }), restore])
+  expect(restore.parentElement).toBe(screen.getByText(`${zh.location} · ${zh.page}`).parentElement)
   fireEvent.click(restore)
   expect(value.act).toHaveBeenCalledExactlyOnceWith('restore', undefined)
   expect(screen.getByRole('button', { name: en.restoring }).hasAttribute('disabled')).toBe(true)

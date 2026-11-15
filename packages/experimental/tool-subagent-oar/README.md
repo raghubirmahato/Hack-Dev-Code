@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-Use one `subagent_oar` tool to choose a configured external agent for each standalone text task. Configuration fixes the available runtime aliases and their providers; the model selects an alias without changing native arguments or permissions. Each task uses independent context and returns a child id, with a later completion notice delivered to the parent.
+Use one `subagent_oar` tool to choose a configured external agent for each standalone text task. Configuration fixes the available runtime aliases and their providers; the model selects an alias without changing native arguments or permissions. Each task uses independent context and returns the child's name, with a later completion notice delivered to the parent.
 
 ## Table of Contents
 
@@ -56,7 +56,7 @@ The [configuration catalog](../../../docs/config-catalog.md#hackdevcodedsh-exper
 <details>
 <summary>Implementation internals — click to expand</summary>
 
-[`src/index.ts`](src/index.ts) builds the runtime enum from the configured aliases and registers one tool. Each call resolves its provider and starts an activation through the shared subagent service, which owns capacity, parent lifetime, cancellation, terminal recording, and completion delivery. The tool's call card uses the task description and submitted arguments. Disposing the plugin removes its tool registration; the activation manager retains ownership of accepted children.
+[`src/index.ts`](src/index.ts) builds the runtime enum from the configured aliases and registers one tool. Each call resolves its provider and starts an activation through the shared subagent service, which owns capacity, parent lifetime, cancellation, terminal recording, and completion delivery. The tool's call card uses the task description and submitted arguments. The result records `{ kind: 'activation', name }` as presentation metadata. Disposing the plugin removes its tool registration; the activation manager retains ownership of accepted children.
 
 </details>
 
@@ -82,7 +82,7 @@ The [tool catalog](../../../docs/tool-catalog.md#hackdevcodedsh-experimental-too
 
 #### Token effect
 
-Each mounted instance adds one tool schema. The acknowledgement and completion notice append to the parent context; the provider owns the child's independent context and token use.
+Each mounted instance adds one tool schema, including the optional `name` field. The acknowledgement and completion notice append to the parent context; the provider owns the child's independent context and token use.
 
 #### KV Cache effect
 

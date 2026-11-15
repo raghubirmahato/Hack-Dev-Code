@@ -7,7 +7,7 @@
  */
 
 import { notifySubscribers } from '@hackdevcode/dsh-client-store'
-import type { JobId } from '@hackdevcode/dsh-jobs/brand'
+import type { JobId } from '@hackdevcode/dsh-jobs/types'
 import type { JobView } from '@hackdevcode/dsh-jobs/view'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 import type { JobFollowFrame } from '../types.ts'

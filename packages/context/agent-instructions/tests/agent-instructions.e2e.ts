@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import AgentLoop from '@hackdevcode/dsh-agent-loop'
 import * as LlmDeepSeek from '@hackdevcode/dsh-llm-deepseek-api-key'
@@ -14,6 +14,7 @@ import { candidateScopeKey } from '../src/render.ts'
 import LocalFileSystem from '@hackdevcode/dsh-fs-local'
 import * as ToolFs from '@hackdevcode/dsh-tool-fs'
 import type { SessionEvent } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const PROBE = 'banana-271828'
 const NESTED_PROBE = 'papaya-314159'
@@ -48,7 +49,7 @@ async function harness(): Promise<{ ctx: Context; agent: Agent }> {
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(LlmDeepSeek, { models: [{ id: 'deepseek-v4-flash' }] })
   const handle = await ctx.agents.create({
-    sessionId: SessionId('workspace-context-e2e-session'),
+    sessionId: brandString<SessionId>('workspace-context-e2e-session'),
     meta: { cwd: workdir },
     agentOptions: { provider: 'deepseek-official', model: 'deepseek-v4-flash' },
   })

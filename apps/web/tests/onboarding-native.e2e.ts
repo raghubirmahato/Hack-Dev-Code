@@ -8,7 +8,7 @@ import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
   launchWebScaffold, watchConsole, webSnapshotMode, WELCOME_NOTICE_COPY, type WebScaffold,
 } from './scaffold.ts'
-import { openSettings, saveFailureShot } from './support.ts'
+import { openSettings, ZH_BROWSER_LOCALE, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/onboarding-native', import.meta.url))
 const SIGNED_OUT_MENU_EXPECTED = join(SNAPSHOT_DIR, 'signed-out-menu.expected.md')
@@ -27,7 +27,7 @@ describe.skipIf(MODE === 'record').each([false, true])('web e2e: native credenti
       ...desktop ? {} : { extraOverlayPath: fileURLToPath(new URL('./fixtures/onboarding-native/cordis.patch.yml', import.meta.url)) },
     })
     browser = await chromium.launch()
-    page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: 'en-US' })
+    page = await browser.newPage({ viewport: { width: 1440, height: 960 }, locale: ZH_BROWSER_LOCALE })
     // The shared menu golden uses the Linux shortcut profile on every test host.
     await page.addInitScript(() => { Object.defineProperty(navigator, 'platform', { value: 'Linux x86_64' }) })
     if (desktop) await page.addInitScript(() => { Object.defineProperty(globalThis, 'dshDesktop', { value: { protocolVersion: 1 } }) })
@@ -44,10 +44,10 @@ describe.skipIf(MODE === 'record').each([false, true])('web e2e: native credenti
     const credentialPath = join(scaffold.harnessHome, '.credentials.yaml')
     const credentials = await readFile(credentialPath, 'utf8')
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-    const welcome = page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.title })
+    const welcome = page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.zh.title })
     if (!desktop) {
       await welcome.waitFor()
-      await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.continueLabel }).click()
+      await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.zh.continueLabel }).click()
       await welcome.waitFor({ state: 'detached' })
     }
 
@@ -57,16 +57,16 @@ describe.skipIf(MODE === 'record').each([false, true])('web e2e: native credenti
         await page.reload({ waitUntil: 'load' })
         acknowledgeReloadConnectionLoss(tripwire, warningsBefore)
       }
-      const accountMenu = page.getByRole('button', { name: 'Account menu', exact: true })
+      const accountMenu = page.getByRole('button', { name: '\u8d26\u53f7\u83dc\u5355', exact: true })
       await accountMenu.waitFor()
-      expect(await accountMenu.textContent()).toBe('More')
+      expect(await accountMenu.textContent()).toBe('\u66f4\u591a')
       const triggerBox = (await accountMenu.boundingBox())!
       expect(Math.abs(triggerBox.height - 32)).toBeLessThan(1)
       await accountMenu.click()
       const menu = page.getByRole('menu')
       await menu.waitFor()
       expect(await menu.getByRole('menuitem').count()).toBe(3)
-      for (const name of ['Settings', 'Feedback', 'Sign in']) {
+      for (const name of ['\u8bbe\u7f6e', '\u610f\u89c1\u53cd\u9988', '\u767b\u5f55']) {
         expect(await menu.getByRole('menuitem', { name, exact: true }).count()).toBe(1)
       }
       const menuBox = (await menu.boundingBox())!
@@ -85,12 +85,12 @@ describe.skipIf(MODE === 'record').each([false, true])('web e2e: native credenti
       await compareOrRefreshGolden(SIGNED_OUT_MENU_EXPECTED, menuAria, MODE)
       await page.keyboard.press('Escape')
       await menu.waitFor({ state: 'detached' })
-      expect(await page.getByRole('dialog', { name: 'Get started', exact: true }).count()).toBe(0)
-      await openSettings(page)
-      const settings = page.getByRole('dialog', { name: 'Settings', exact: true })
-      await settings.getByRole('button', { name: 'Model', exact: true }).click()
-      await settings.getByLabel('API key', { exact: true }).waitFor()
-      expect(await page.getByRole('dialog', { name: 'Add an API key to get started' }).count()).toBe(0)
+      expect(await page.getByRole('dialog', { name: '\u5f00\u59cb\u4f7f\u7528', exact: true }).count()).toBe(0)
+      await openSettings(page, 'zh')
+      const settings = page.getByRole('dialog', { name: '\u8bbe\u7f6e', exact: true })
+      await settings.getByRole('button', { name: '\u6a21\u578b', exact: true }).click()
+      await settings.getByLabel('API \u5bc6\u94a5', { exact: true }).waitFor()
+      expect(await page.getByRole('dialog', { name: '\u6dfb\u52a0\u4e00\u4e2a API Key \u5f00\u59cb\u4f7f\u7528' }).count()).toBe(0)
       expect(await welcome.count()).toBe(0)
       expect(await readFile(credentialPath, 'utf8')).toBe(credentials)
       const aria = await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd)

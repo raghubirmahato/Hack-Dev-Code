@@ -11,7 +11,9 @@ import { parseSessionLog } from '@hackdevcode/dsh-llm-replay'
 import type { SessionEvent, SessionId } from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-goal'
 import {
-  assertFixtureInventory, captureExpandedTurnProcessAria, captureStableAria, compareOrRefreshGolden, launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  assertFixtureInventory, captureExpandedTurnProcessAria, captureStableAria, compareOrRefreshGolden,
+  launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/goal-multi-turn-actions', import.meta.url))
@@ -21,7 +23,7 @@ const UI_EXPECTED = join(SNAPSHOT_DIR, 'ui.expected.md')
 const UI_EXPANDED_EXPECTED = join(SNAPSHOT_DIR, 'ui-expanded.expected.md')
 const MODE = webSnapshotMode()
 
-const PROMPT = 'Do two turns; in each turn output the file structure of a random package. After finishing one turn, output the content directly and stop; the system starts another turn for you, so make that one similar.'
+const PROMPT = '\u505a\u4e24\u4e2aturn\uff0c\u6bcf\u4e2aturn\u8f93\u51fa\u968f\u673a\u4e00\u4e2a\u5305\u7684\u6587\u4ef6\u7ed3\u6784\u3002\u6ce8\u610f\u4f60\u505a\u5b8c\u4e00\u4e2aturn\u4e4b\u540e\uff0c\u76f4\u63a5\u8f93\u51fa\u5185\u5bb9\uff0c\u505c\u6b62\uff0c\u6211\u4eec\u7684\u7cfb\u7edf\u4f1a\u5e2e\u4f60\u518d\u5f00\u4e00\u4e2aturn\uff0c\u4f60\u770b\u7740\u505a\u4e00\u4e2a\u7c7b\u4f3c\u7684'
 const COMMAND = `/goal ${PROMPT}`
 
 const PACKAGE_FILES: Readonly<Record<string, string>> = {

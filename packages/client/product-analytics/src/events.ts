@@ -1,6 +1,6 @@
 /** Desktop analytics fields selected by product event owners. */
 import type { SessionId } from '@hackdevcode/dsh-session/types'
-import type { MessageId } from '@hackdevcode/dsh-llm/brand'
+import type { MessageId } from '@hackdevcode/dsh-llm/types'
 
 /** Event names and their selected product attributes. */
 export interface ProductEventMap {

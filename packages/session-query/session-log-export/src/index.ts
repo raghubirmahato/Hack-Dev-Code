@@ -1,7 +1,7 @@
 /** Session export command and Host-owned ZIP download and Markdown copy routes. */
 
 import type { Context } from '@hackdevcode/cordis'
-import type { CommandDefinitionId } from '@hackdevcode/dsh-commands/brand'
+import type { CommandDefinitionId } from '@hackdevcode/dsh-commands/types'
 import Schema from '@hackdevcode/schemastery'
 import { brandString } from '@hackdevcode/dsh-brand'
 import type {} from '@hackdevcode/dsh-attachment'

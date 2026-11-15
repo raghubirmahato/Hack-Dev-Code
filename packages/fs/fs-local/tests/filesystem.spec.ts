@@ -14,7 +14,8 @@ import { join, parse, relative } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { Context } from '@hackdevcode/cordis'
 import { LocalFileSystem } from '@hackdevcode/dsh-fs-local'
-import { FsVersion } from '@hackdevcode/dsh-fs'
+import type { FsVersion } from '@hackdevcode/dsh-fs'
+import { brandString } from '@hackdevcode/dsh-brand'
 import type { FsTarget } from '@hackdevcode/dsh-fs'
 
 let dir: string
@@ -763,7 +764,7 @@ describe('editText', () => {
 
   it('rejects a non-regular target', async () => {
     const target = await fs.resolve('.')
-    await expect(fs.editText(target, { oldString: 'a', newString: 'b', replaceAll: false }, { version: FsVersion('v') }))
+    await expect(fs.editText(target, { oldString: 'a', newString: 'b', replaceAll: false }, { version: brandString<FsVersion>('v') }))
       .rejects.toMatchObject({ code: 'FS_NOT_REGULAR_FILE' })
   })
 

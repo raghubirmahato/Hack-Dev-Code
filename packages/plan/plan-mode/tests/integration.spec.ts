@@ -2,7 +2,7 @@ import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import { describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import LlmRuntime, { createUserMessage, type GenerateOptions, type Message, type StreamChunk } from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId, type SessionEvent } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId, type SessionEvent } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
@@ -12,6 +12,7 @@ import AgentLoop from '@hackdevcode/dsh-agent-loop'
 import PlanModeController from '@hackdevcode/dsh-plan-mode'
 import UserQuestionService, { UserQuestionError } from '@hackdevcode/dsh-user-questions'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const PLAN_CONFIG = { section: 'Test plan mode instructions.' }
 
@@ -101,7 +102,7 @@ describe('plan mode through the agent loop', () => {
       textResponse('Noted in the plan.'),
     ])
     const ctx = await harness(adapter)
-    const agent = await ctx.agentLoop.create(SessionId('it-plan-seed'), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(brandString<SessionId>('it-plan-seed'), { provider: 'mock', model: 'mock' })
     // Selected while idle: the mode commits immediately, before the first assembly.
     ctx.planMode.set(agent, true)
 
@@ -136,7 +137,7 @@ describe('plan mode through the agent loop', () => {
       textResponse('Second turn, plan mode.'),
     ])
     const ctx = await harness(adapter)
-    const agent = await ctx.agentLoop.create(SessionId('it-plan-flip'), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(brandString<SessionId>('it-plan-flip'), { provider: 'mock', model: 'mock' })
 
     agent.followup(createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } }))
     await waitForIdle(ctx, agent)
@@ -183,7 +184,7 @@ describe('plan mode through the agent loop', () => {
       textResponse('Entered plan mode on the next step.'),
     ])
     const ctx = await harness(adapter)
-    const agent = await ctx.agentLoop.create(SessionId('it-plan-retry-flip'), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(brandString<SessionId>('it-plan-retry-flip'), { provider: 'mock', model: 'mock' })
     ctx.on('agent/request-error', async ({ agent: subject }, next) => {
       if (subject !== agent) return next()
       ctx.planMode.set(agent, true)
@@ -236,7 +237,7 @@ describe('plan mode through the agent loop', () => {
     const ctx = await harness(adapter)
     await ctx.plugin(UserQuestionService)
     ctx.on('user-questions/request', () => Promise.reject(new UserQuestionError('the user cancelled ask_user_question', 'ASK_CANCELLED')))
-    const agent = await ctx.agentLoop.create(SessionId('it-plan-dismiss'), { provider: 'mock', model: 'mock' })
+    const agent = await ctx.agentLoop.create(brandString<SessionId>('it-plan-dismiss'), { provider: 'mock', model: 'mock' })
     ctx.planMode.set(agent, true)
 
     const idle = waitForIdle(ctx, agent)

@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-session-log-export",
   "description": "Web Session-log ZIP export and Session Markdown copy",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -30,7 +30,10 @@
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "scripts": {
     "bundle": "tsdown",
@@ -57,12 +60,12 @@
     "@hackdevcode/dsh-client-locale": "workspace:*",
     "@hackdevcode/dsh-client-store": "workspace:*",
     "@hackdevcode/dsh-client-ui-commands": "workspace:*",
+    "@hackdevcode/dsh-client-ui-context-menu": "workspace:*",
     "@hackdevcode/dsh-client-ui-conversation": "workspace:*",
     "@hackdevcode/dsh-client-ui-layout": "workspace:*",
     "@hackdevcode/dsh-client-ui-message-feedback": "workspace:*",
     "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
     "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
-    "@hackdevcode/dsh-client-ui-session": "workspace:*",
     "@hackdevcode/dsh-client-ui-slots": "workspace:*",
     "@hackdevcode/dsh-commands": "workspace:*",
     "@hackdevcode/dsh-session": "workspace:*",
@@ -76,10 +79,10 @@
       "inject": [
         "@hackdevcode/dsh-client-locale",
         "@hackdevcode/dsh-client-ui-commands",
+        "@hackdevcode/dsh-client-ui-context-menu",
         "@hackdevcode/dsh-client-ui-conversation",
         "@hackdevcode/dsh-client-ui-layout",
-        "@hackdevcode/dsh-client-ui-renderer",
-        "@hackdevcode/dsh-client-ui-session"
+        "@hackdevcode/dsh-client-ui-renderer"
       ],
       "platform": "web"
     }

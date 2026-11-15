@@ -27,7 +27,7 @@ describe.skipIf(MODE === 'record')('web e2e: refused New Session', () => {
     onTestFinished(() => scaffold.close())
     const browser = await chromium.launch()
     try {
-      const page = await browser.newPage({ locale: 'en-US', timezoneId: 'Asia/Shanghai' })
+      const page = await browser.newPage({ locale: 'zh-CN', timezoneId: 'Asia/Shanghai' })
       const tripwire = watchConsole(page)
       try {
         await Promise.all([
@@ -36,14 +36,14 @@ describe.skipIf(MODE === 'record')('web e2e: refused New Session', () => {
         ])
         // Startup prepares the default Workspace, and its own blank-Session
         // attempt is refused without a notice: the hero stays on the picker.
-        await page.getByRole('button', { name: 'Choose workspace', exact: true }).waitFor()
+        await page.getByRole('button', { name: '\u9009\u62e9\u5de5\u4f5c\u533a', exact: true }).waitFor()
         await expect.poll(() => scaffold.ctx.workspaceRegistry.list().length).toBe(1)
         expect(scaffold.ctx.sessions.list()).toEqual([])
         expect(await page.getByRole('alert').count()).toBe(0)
 
-        await page.getByRole('treeitem').filter({ hasText: 'Default workspace' }).hover()
-        await page.getByRole('button', { name: 'New session in Default workspace', exact: true }).click()
-        const notice = page.getByRole('alert').filter({ hasText: 'Unable to create a new session' })
+        await page.getByRole('treeitem').filter({ hasText: '\u9ed8\u8ba4\u5de5\u4f5c\u533a' }).hover()
+        await page.getByRole('button', { name: '\u5728“\u9ed8\u8ba4\u5de5\u4f5c\u533a”\u4e2d\u65b0\u5efa\u4f1a\u8bdd', exact: true }).click()
+        const notice = page.getByRole('alert').filter({ hasText: '\u65b0\u5efa\u4f1a\u8bdd\u5931\u8d25' })
         await notice.waitFor()
         await compareOrRefreshGolden(NOTICE_EXPECTED, await notice.ariaSnapshot(), MODE)
         expect(scaffold.ctx.sessions.list()).toEqual([])

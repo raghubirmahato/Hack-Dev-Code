@@ -8,13 +8,14 @@
  */
 
 import { Context } from '@hackdevcode/cordis'
-import { AttachmentId } from '@hackdevcode/dsh-attachment'
+import type { AttachmentId } from '@hackdevcode/dsh-attachment/types'
+import { brandString } from '@hackdevcode/dsh-brand'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import { mountAgentLoopTestDependencies, mountAgentLoopTestHarness } from '@hackdevcode/dsh-agent-loop-testkit'
 import TypertGatewayService from '@hackdevcode/dsh-api-gateway'
 import type { RemoteAccessBinding, RemoteAccessRole } from '@hackdevcode/dsh-api-remote-access'
 import { createUserMessage } from '@hackdevcode/dsh-llm'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import { remoteMethods, type PeerId, type PeerScope, type Principal, type RemoteInvocation } from '@hackdevcode/dsh-typert-protocol'
 import TypertRegistry from '@hackdevcode/dsh-typert-registry'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -32,8 +33,8 @@ declare module '@hackdevcode/dsh-typert-protocol' {
 
 const OWNER: Principal = { kind: 'owner' }
 const GUEST: Principal = { kind: 'test-guest', guest: 'session-controller' }
-const SHARED = SessionId('shared-session')
-const PRIVATE = SessionId('private-session')
+const SHARED = brandString<SessionId>('shared-session')
+const PRIVATE = brandString<SessionId>('private-session')
 
 /** Calls the Session list and control methods; each item still needs a Session role. */
 const LISTER: RemoteAccessRole<'global'> = { name: 'test:session-lister', resource: 'global', actions: ['session/list', 'session/control'] }
@@ -239,7 +240,7 @@ describe('Session Controller access', () => {
       for (;;) {
         const next = await iterator.next()
         if (next.done === true) throw new Error('control stream ended')
-        if (next.value.type === 'projection' && next.value.key === 'inbox') return next.value.sessionId
+        if (next.value.type === 'projection' && next.value.changes.some(change => change.key === 'inbox')) return next.value.sessionId
       }
     }
     // The owner sees the private Session's frame first; the guest's first Inbox frame is the shared one.
@@ -274,7 +275,7 @@ describe('Session Controller access', () => {
     await ctx.plugin(TypertGatewayService)
     const bindings = guestPolicy(ctx)
     const ref = {
-      attachmentId: AttachmentId(`sha256:${'ab'.repeat(32)}`),
+      attachmentId: brandString<AttachmentId>(`sha256:${'ab'.repeat(32)}`),
       mediaType: 'image/png' as const, bytes: 2, width: 1, height: 1,
     }
     hidden.session.append('user/message', createUserMessage({

@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-experimental-terminal-bundle",
-  "description": "Keep shell processes alive across tool calls.",
-  "version": "0.2.2-alpha.2",
+  "description": "Let the agent run long-lived commands in terminals you can watch in the sidebar.",
+  "version": "0.2.2-rc.3",
   "icon": "./icon.svg",
   "publishConfig": {
     "access": "public"
@@ -30,7 +30,10 @@
     "docs",
     "lib/index.js",
     "cordis.patch.yml",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "dsh": {
@@ -41,7 +44,7 @@
   "dependencies": {
     "@hackdevcode/dsh-tool-terminal": "workspace:*",
     "@hackdevcode/dsh-terminal": "workspace:*",
-    "@hackdevcode/dsh-terminal-bash": "workspace:*"
+    "@hackdevcode/dsh-terminal-panel": "workspace:*"
   },
   "peerDependencies": {
     "@hackdevcode/cordis": "workspace:~"

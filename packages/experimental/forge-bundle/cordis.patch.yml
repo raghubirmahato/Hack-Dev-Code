@@ -1,17 +1,13 @@
 - insert:
+    - id: worktree
+      name: '@hackdevcode/dsh-experimental-worktree'
+    - id: tool-worktree
+      name: '@hackdevcode/dsh-experimental-tool-worktree'
     - id: forge
       name: '@hackdevcode/dsh-experimental-forge'
     - id: forge-github
       name: '@hackdevcode/dsh-experimental-forge-github'
     - id: forge-session
       name: '@hackdevcode/dsh-experimental-forge-session'
-    - id: optional-forge-panel
-      name: cordis:group
-      group: true
-      isolate:
-        worktrees: true
-      config:
-        - id: forge-worktree
-          name: '@hackdevcode/dsh-experimental-worktree'
-        - id: forge-panel
-          name: '@hackdevcode/dsh-experimental-client-ui-forge'
+    - id: forge-panel
+      name: '@hackdevcode/dsh-experimental-client-ui-forge'

@@ -53,6 +53,8 @@ export const en = {
   install: 'Install',
   installTitle: 'Install {name}',
   installVersionTitle: 'Install {name} {version}',
+  update: 'Update',
+  updateTitle: 'Update {name} to {version}',
   openInstalled: 'View {name} in Installed',
   statusInstalled: 'Installed',
   statusUpdate: 'Update available',

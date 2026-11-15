@@ -14,9 +14,10 @@ import AgentRegistry from '@hackdevcode/dsh-agent'
 import AgentLoop from '@hackdevcode/dsh-agent-loop'
 import ComputerUseRegistry from '@hackdevcode/dsh-computer-use'
 import LocalAttachmentStore from '@hackdevcode/dsh-attachment-local'
-import LlmRuntime, { LlmAdapter, ToolCallId, createUserMessage } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import LlmRuntime, { LlmAdapter, type ToolCallId, createUserMessage } from '@hackdevcode/dsh-llm'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
@@ -35,7 +36,7 @@ class VisualModel extends LlmAdapter {
   async * stream(options: GenerateOptions): AsyncIterable<StreamChunk> {
     this.requests.push(options)
     if (this.requests.length === 1) {
-      const call = { type: 'tool-call' as const, id: ToolCallId('native-window'), name: 'cua_driver_native__get_window_state', arguments: '{"pid":9,"window_id":7}' }
+      const call = { type: 'tool-call' as const, id: brandString<ToolCallId>('native-window'), name: 'cua_driver_native__get_window_state', arguments: '{"pid":9,"window_id":7}' }
       yield { type: 'block-start', index: 0, blockType: 'tool-call' }
       yield { type: 'block-end', index: 0, block: call }
       yield { type: 'finish', reason: { kind: 'tool-calls' } }
@@ -97,7 +98,7 @@ it('loads from cordis.yml and logs the native screenshot before the next model r
   for (const entry of context.loader.entries()) await entry.fiber?.await()
   const model = new VisualModel()
   context.llm.registerAdapter(['native-fixture'], model)
-  const agent = await context.agentLoop.create(SessionId('native-loader'), { provider: 'native-fixture', model: 'vision' })
+  const agent = await context.agentLoop.create(brandString<SessionId>('native-loader'), { provider: 'native-fixture', model: 'vision' })
   const idle: PromiseWithResolvers<void> = Promise.withResolvers()
   const stop = context.on('agent/status', ({ agent: subject, status }) => {
     if (subject === agent && status === 'idle') idle.resolve()
@@ -122,7 +123,7 @@ it('loads from cordis.yml and logs the native screenshot before the next model r
   expect(JSON.stringify(model.requests[1]?.messages)).toContain(JSON.stringify(image.attachment))
   expect(JSON.stringify(toolResult.content)).not.toContain(screenshotBase64)
   const direct = await executeToolFixture(context, {
-    agent, signal: new AbortController().signal, callId: ToolCallId('programmatic-window'),
+    agent, signal: new AbortController().signal, callId: brandString<ToolCallId>('programmatic-window'),
     name: 'cua_driver_native__get_window_state', arguments: { pid: 9, window_id: 7 },
   })
   if (direct.isError) throw new Error('Programmatic native screenshot failed')

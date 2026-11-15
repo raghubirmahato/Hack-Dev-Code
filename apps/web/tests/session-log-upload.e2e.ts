@@ -3,8 +3,8 @@ import { mkdtemp, rm, writeFile, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { chromium } from 'playwright'
-import yaml from 'js-yaml'
 import { expect, it, onTestFinished } from 'vitest'
+import { parseEntryYaml } from '@hackdevcode/cordis-plugin-include'
 import { credentialRef } from '@hackdevcode/dsh-credentials'
 import { startMockLlmServer } from '@hackdevcode/dsh-llm-mock-server'
 import { launchWebScaffold, webSnapshotMode } from './scaffold.ts'
@@ -38,13 +38,13 @@ it.skipIf(webSnapshotMode() === 'record')('persists the upload switch and omits 
     return settled
   }
   const setUpload = async (enabled: boolean) => {
-    await openSettings(page)
+    await openSettings(page, 'en')
     const toggle = page.getByRole('switch', { name: 'Upload Session Log when using the official model API' })
     await expect.poll(() => toggle.getAttribute('aria-checked')).toBe(String(!enabled))
     await toggle.click()
     await expect.poll(() => toggle.getAttribute('aria-checked')).toBe(String(enabled))
     await expect.poll(async () => {
-      const patches = yaml.load(await readFile(join(scaffold.harnessHome, 'profiles/scaffold/cordis.patch.yml'), 'utf8')) as { id: string; config?: { enabled?: boolean } }[]
+      const patches = parseEntryYaml(await readFile(join(scaffold.harnessHome, 'profiles/scaffold/cordis.patch.yml'), 'utf8')) as { id: string; config?: { enabled?: boolean } }[]
       return patches.find(patch => patch.id === 'session-log-deepseek')?.config?.enabled ?? true
     }).toBe(enabled)
     await page.keyboard.press('Escape')
@@ -56,7 +56,7 @@ it.skipIf(webSnapshotMode() === 'record')('persists the upload switch and omits 
   const first = server.requests[0]!.body as { dsh_session_log: { throughSeq: number } }
   await setUpload(false)
   await page.reload()
-  await openSettings(page)
+  await openSettings(page, 'en')
   await expect.poll(() => page.getByRole('switch', { name: 'Upload Session Log when using the official model API' }).getAttribute('aria-checked')).toBe('false')
   await page.keyboard.press('Escape')
   expect(await send('upload-disabled-marker')).toBe(sessionId)

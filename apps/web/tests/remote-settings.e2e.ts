@@ -11,7 +11,7 @@ import {
   launchWebScaffold, watchConsole, webSnapshotMode, WELCOME_NOTICE_COPY,
   type WebScaffold,
 } from './scaffold.ts'
-import { openSettings } from './support.ts'
+import { openSettings, ZH_BROWSER_LOCALE } from './support.ts'
 
 const MODE = webSnapshotMode()
 
@@ -23,12 +23,12 @@ const MODE = webSnapshotMode()
  */
 async function expectOnboardingSettled(page: Page): Promise<Locator> {
   await page.waitForSelector('#root', { timeout: 30_000 })
-  await page.getByRole('textbox', { name: 'Choose workspace' }).waitFor({ timeout: 30_000 })
-  await openSettings(page)
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
-  await dialog.getByRole('button', { name: 'Model', exact: true }).click()
-  await dialog.getByRole('button', { name: 'Add model provider', exact: true }).waitFor({ timeout: 15_000 })
-  expect(await page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.title }).count()).toBe(0)
+  await page.getByRole('textbox', { name: '\u9009\u62e9\u5de5\u4f5c\u533a' }).waitFor({ timeout: 30_000 })
+  await openSettings(page, 'zh')
+  const dialog = page.getByRole('dialog', { name: '\u8bbe\u7f6e' })
+  await dialog.getByRole('button', { name: '\u6a21\u578b', exact: true }).click()
+  await dialog.getByRole('button', { name: '\u6dfb\u52a0\u6a21\u578b\u63d0\u4f9b\u5546', exact: true }).waitFor({ timeout: 15_000 })
+  expect(await page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.zh.title }).count()).toBe(0)
   return dialog
 }
 
@@ -46,7 +46,7 @@ describe.skipIf(MODE === 'record')('web e2e: trusted remote host preferences', (
     browser = await chromium.launch()
     page = await browser.newPage({
       viewport: { width: 1440, height: 960 },
-      locale: 'en-US',
+      locale: ZH_BROWSER_LOCALE,
     })
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
@@ -66,11 +66,11 @@ describe.skipIf(MODE === 'record')('web e2e: trusted remote host preferences', (
   }
 
   it('persists welcome acknowledgement, model configuration, and appearance across reloads and browser contexts', async () => {
-    const welcome = page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.title })
+    const welcome = page.getByRole('dialog', { name: WELCOME_NOTICE_COPY.zh.title })
     await welcome.waitFor({ timeout: 15_000 })
     expect(await page.locator('#root').evaluate(root => (root as HTMLElement).inert)).toBe(true)
 
-    await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.continueLabel }).click()
+    await welcome.getByRole('button', { name: WELCOME_NOTICE_COPY.zh.continueLabel }).click()
     await welcome.waitFor({ state: 'detached', timeout: 15_000 })
     await expect.poll(
       () => page.locator('#root').evaluate(root => (root as HTMLElement).inert),
@@ -85,29 +85,29 @@ describe.skipIf(MODE === 'record')('web e2e: trusted remote host preferences', (
     const dialog = await expectOnboardingSettled(page)
 
     await page.emulateMedia({ colorScheme: 'light' })
-    await dialog.getByRole('button', { name: 'Add model provider', exact: true }).click()
-    await dialog.getByLabel('Provider', { exact: true }).selectOption('minimax-cn')
-    await dialog.getByRole('button', { name: 'Save', exact: true }).click()
-    await dialog.getByText('Saved minimax-cn.', { exact: true }).waitFor({ timeout: 15_000 })
+    await dialog.getByRole('button', { name: '\u6dfb\u52a0\u6a21\u578b\u63d0\u4f9b\u5546', exact: true }).click()
+    await dialog.getByLabel('\u63d0\u4f9b\u5546', { exact: true }).selectOption('minimax-cn')
+    await dialog.getByRole('button', { name: '\u4fdd\u5b58', exact: true }).click()
+    await dialog.getByText('\u5df2\u4fdd\u5b58 minimax-cn\u3002', { exact: true }).waitFor({ timeout: 15_000 })
     await expect.poll(() => readFile(settingsPath, 'utf8'), { timeout: 10_000 })
       .toContain('minimax-cn: {}')
 
-    await dialog.getByRole('button', { name: 'General', exact: true }).click()
-    await dialog.getByRole('button', { name: 'Dark', exact: true }).click()
+    await dialog.getByRole('button', { name: '\u901a\u7528\u8bbe\u7f6e', exact: true }).click()
+    await dialog.getByRole('button', { name: '\u6df1\u8272', exact: true }).click()
     await expect.poll(() => page.locator('body').getAttribute('data-ds-dark-theme')).toBe('')
     await expect.poll(() => readFile(settingsPath, 'utf8'), { timeout: 10_000 })
       .toContain('preference: dark')
 
     await reloadPage()
     await expectOnboardingSettled(page)
-    await dialog.getByRole('button', { name: 'Edit minimax-cn', exact: true }).waitFor({ timeout: 15_000 })
+    await dialog.getByRole('button', { name: '\u7f16\u8f91 minimax-cn', exact: true }).waitFor({ timeout: 15_000 })
     await expect.poll(() => page.locator('body').getAttribute('data-ds-dark-theme'), { timeout: 15_000 }).toBe('')
     expect(tripwire.warnings).toEqual([])
     expect(tripwire.pageErrors).toEqual([])
 
     const context = await browser.newContext({
       viewport: { width: 1440, height: 960 },
-      locale: 'en-US',
+      locale: ZH_BROWSER_LOCALE,
       colorScheme: 'light',
     })
     try {
@@ -115,7 +115,7 @@ describe.skipIf(MODE === 'record')('web e2e: trusted remote host preferences', (
       const freshTripwire = watchConsole(freshPage)
       await freshPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
       const freshDialog = await expectOnboardingSettled(freshPage)
-      await freshDialog.getByRole('button', { name: 'Edit minimax-cn', exact: true }).waitFor({ timeout: 15_000 })
+      await freshDialog.getByRole('button', { name: '\u7f16\u8f91 minimax-cn', exact: true }).waitFor({ timeout: 15_000 })
       await expect.poll(
         () => freshPage.locator('body').getAttribute('data-ds-dark-theme'),
         { timeout: 15_000 },
