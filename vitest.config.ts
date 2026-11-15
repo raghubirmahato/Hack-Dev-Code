@@ -162,11 +162,12 @@ const coveragePartitionMode = coveragePartitionRaw === '1'
 // project below because CLI flags do not reach them (coverageTestTimeoutOptions
 // owns the rule and its reach).
 // Windows starts processes several times slower than Linux, so suites that run many git or node children need
-// more than Vitest's 5 s per-test and 10 s hook defaults there. expect.poll keeps its 1 s default: a longer poll
-// would change what failing polls assert, not just how long slow tests may run. An explicit budget still wins.
+// more than Vitest's 5 s per-test and 10 s hook defaults there; a forge or worktree test that runs dozens of git
+// commands can take over a minute while the full suite keeps every core busy. expect.poll keeps its 1 s default: a longer
+// poll would change what failing polls assert, not just how long slow tests may run. An explicit budget still wins.
 const laneTestBudget = process.env[COVERAGE_TEST_TIMEOUT_ENV] !== undefined
   ? coverageTestTimeoutOptions(process.env[COVERAGE_TEST_TIMEOUT_ENV])
-  : process.platform === 'win32' ? { testTimeout: 20_000, hookTimeout: 20_000 } : {}
+  : process.platform === 'win32' ? { testTimeout: 120_000, hookTimeout: 120_000 } : {}
 // Outside CI, forks follow the local worker budget; CI keeps Vitest's own default for its runner.
 const localWorkerBudget = process.env.CI === 'true' ? {} : { maxWorkers: defaultParallelism(process.env, undefined, LOCAL_TEST_PARALLELISM_CAP) }
 

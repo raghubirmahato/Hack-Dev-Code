@@ -3,4 +3,3 @@
   config:
     agentPreset: false
     helperPath: !!js process.execPath
-  disabled: true

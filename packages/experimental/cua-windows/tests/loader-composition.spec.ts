@@ -10,18 +10,26 @@ import SubprocessLocal from '@hackdevcode/dsh-subprocess-local'
 import { expect, it, onTestFinished } from 'vitest'
 import * as WindowsProvider from '../src/index.ts'
 import { brandString } from '@hackdevcode/dsh-brand'
+import { copyFile, mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 it.skipIf(process.platform !== 'win32')('loads the Windows provider and rejects a numeric window ID before native dispatch', async () => {
   const ctx = new Context()
-  onTestFinished(() => ctx.fiber.dispose())
+  // The Loader writes entry state back to its include file (disposing marks it disabled), so load a copy.
+  const root = await mkdtemp(join(tmpdir(), 'dsh-cua-windows-loader-'))
+  onTestFinished(async () => { try { await ctx.fiber.dispose() } finally { await rm(root, { recursive: true, force: true }) } })
   await mountAgentLoopTestDependencies(ctx)
   await mountAgentLoopTestHarness(ctx)
   await ctx.plugin(ComputerUseRegistry)
   await ctx.plugin(SubprocessLocal)
+  const config = join(root, 'provider.yml')
+  await copyFile(new URL('./fixtures/provider.yml', import.meta.url), config)
   ctx.baseUrl = import.meta.url
   await ctx.plugin(Loader)
   Object.assign(ctx.loader.builtins, { include: Include, 'windows-provider': WindowsProvider })
-  await ctx.loader.create({ name: 'cordis:include', config: { path: new URL('./fixtures/provider.yml', import.meta.url).href } })
+  await ctx.loader.create({ name: 'cordis:include', config: { path: pathToFileURL(config).href } })
   await ctx.loader.await()
   const entry = [...ctx.loader.entries()].find(entry => entry.options.id === 'windows-provider')
   if (!entry?.fiber) throw new Error('Loader did not activate the Windows provider')
