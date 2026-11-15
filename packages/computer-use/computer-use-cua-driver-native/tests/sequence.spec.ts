@@ -93,7 +93,8 @@ describe('desktop_sequence', () => {
       { action: 'read', title: 'Notepad' },
     ])
     expect(result.isError).toBe(false)
-    expect(actions).toEqual(['keys win+r', 'focus 2', 'type "notepad\\n"', 'focus 3', 'type "hello"', 'pointer 100,200 left x2'])
+    // The Run dialog and Notepad come to the front by themselves, so they are not focused again.
+    expect(actions).toEqual(['keys win+r', 'type "notepad\\n"', 'type "hello"', 'pointer 100,200 left x2'])
     expect(text(result)).toContain('5. typed 5 characters into handle 3 pid 3 Notepad')
     expect(text(result)).toContain('7. text of \\"Untitled - Notepad\\":\\nDocument: Text editor = hello')
     expect(text(result)).toContain('Foreground now: handle 3 pid 3 Notepad')

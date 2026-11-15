@@ -105,6 +105,73 @@ describe('waiting for the screen to settle', () => {
   })
 })
 
+describe('several tasks at once', () => {
+  it('keeps each task\'s focus and typing together, so text never lands in another task\'s window', async () => {
+    const { backend, windows } = fakeDesktop()
+    const landed: string[] = []
+    const slow = (): Promise<void> => new Promise(resolve => setTimeout(resolve, 40))
+    // Focus and typing both take time, as they do on a real desktop; text goes to the window in front.
+    backend.window = async (handle, action) => {
+      await slow()
+      if (action === 'focus') for (const window of windows) window.foreground = window.handle === handle
+    }
+    backend.type = async (text) => {
+      await slow()
+      landed.push(`${text} -> ${String(windows.find(window => window.foreground)?.handle)}`)
+    }
+    await mount(backend)
+    await Promise.all([
+      call('desktop_type', { text: 'report text', title: 'Report' }, first),
+      call('desktop_type', { text: 'file name', title: 'Downloads' }, second),
+      call('desktop_type', { text: 'more report text', title: 'Report' }, first),
+    ])
+    expect(landed.toSorted()).toEqual(['file name -> 2', 'more report text -> 1', 'report text -> 1'])
+  })
+
+  it('waits until a window really is in front before typing, and sends nothing when it never comes', async () => {
+    const { backend, windows } = fakeDesktop()
+    const landed: string[] = []
+    let focusable = true
+    // Like a real window manager: the focus change lands a moment after it is asked for, or not at all.
+    backend.window = async (handle, action) => {
+      if (action === 'focus' && focusable) setTimeout(() => { for (const window of windows) window.foreground = window.handle === handle }, 300)
+    }
+    backend.type = async (text) => { landed.push(`${text} -> ${String(windows.find(window => window.foreground)?.handle)}`) }
+    await mount(backend)
+    expect((await call('desktop_type', { text: 'late focus', title: 'Downloads' }, second)).isError).toBe(false)
+    expect(landed).toEqual(['late focus -> 2'])
+    focusable = false
+    const refused = await call('desktop_type', { text: 'never', title: 'Report' })
+    expect(refused.isError).toBe(true)
+    expect(text(refused)).toContain('\\"Report - Editor\\" did not come to the front within 2000 ms; handle 2 pid 20 Files')
+    expect(text(refused)).toContain('stayed in front, so nothing was sent')
+    expect(landed).toEqual(['late focus -> 2'])
+  })
+
+  it('lets a cancelled wait for the turn go without unblocking the actions queued behind it', async () => {
+    const { backend } = fakeDesktop()
+    let typing = 0
+    let most = 0
+    backend.type = async () => {
+      typing++
+      most = Math.max(most, typing)
+      await new Promise(resolve => setTimeout(resolve, 60))
+      typing--
+    }
+    await mount(backend)
+    const cancelled = new AbortController()
+    const calls = [
+      call('desktop_type', { text: 'one' }),
+      executeToolFixture(ctx, { name: 'desktop_type', callId: ToolCallId('cancelled'), arguments: { text: 'two' }, agent: first, signal: cancelled.signal }),
+      call('desktop_type', { text: 'three' }),
+    ]
+    cancelled.abort()
+    const results = await Promise.all(calls)
+    expect(results.map(result => result.isError)).toEqual([false, true, false])
+    expect(most).toBe(1)
+  })
+})
+
 describe('starting an app', () => {
   it('reports the main window that follows a first prompt, and names a prompt that stays', async () => {
     const { backend, windows } = fakeDesktop()
@@ -119,6 +186,21 @@ describe('starting an app', () => {
     expect(opened).toContain('New window: handle 10 pid 90 mousepad \\"Untitled 1 - Mousepad\\"')
     expect(opened).toContain('It also opened handle 9 pid 90 mousepad \\"Mousepad\\" 570x177')
     expect(opened).toContain('a prompt there may need an answer first')
+  })
+
+  it('does not count another app started at the same moment as this one\'s prompt', async () => {
+    const { backend, windows } = fakeDesktop()
+    backend.launch = async (app) => {
+      setTimeout(() => {
+        windows.push({ handle: 11, pid: 110, process: 'mousepad', title: 'Untitled 1 - Mousepad', x: 0, y: 0, width: 700, height: 518, minimized: false, foreground: false })
+        windows.push({ handle: 12, pid: 120, process: 'gnome-calculator', title: 'Calculator', x: 0, y: 0, width: 410, height: 666, minimized: false, foreground: true })
+      }, 50)
+      return `Started ${app}`
+    }
+    await mount(backend)
+    const opened = text(await call('desktop_open', { app: 'gnome-calculator' }))
+    expect(opened).toContain('New window: handle 12 pid 120 gnome-calculator \\"Calculator\\"')
+    expect(opened).not.toContain('also opened')
   })
 })
 

@@ -43,6 +43,7 @@ This page compares Hack Dev Code with Claude Code, Codex, Cursor, Trae and Antig
 | Ollama | Ollama on any port or machine for Ollama routes; real context length per model; embedding models left out; tool and image support shown; tool calls written as text are recovered; a clear message when a model cannot call tools. |
 | Desktop control | `desktop_element` waits for controls that load late; `desktop_sequence` steps can be optional. |
 | Desktop control | Verify and retry: `expect` makes an input action wait for its outcome (text, a window, a change) and repeat up to 3 times when it does not show; a failed or cancelled action releases the keys and buttons it may have left pressed. |
+| Desktop control | Several tasks at once: one input turn per action, focus confirmed before input, no input into windows X cannot see on GNOME; GTK 4 controls pressed through accessibility; long values read by their start and end; newlines typed as Return on Linux; process names on Linux. Verified with a two-task Mousepad and Calculator workflow on Kali. |
 | Desktop control | Waits until a window stops changing; window reservations that refuse input about to land in the wrong app; drags that check the drop target and report windows on the path; Linux controls by name through AT-SPI; GNOME (Window Calls) and KDE (kdotool) window lists on Wayland; `desktop_setup` with one install command. |
 
 ## Plan

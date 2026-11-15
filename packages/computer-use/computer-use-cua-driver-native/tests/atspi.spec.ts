@@ -134,6 +134,30 @@ describe.skipIf(PYTHON === undefined)('AT-SPI controls script', () => {
     ])
   })
 
+  it('gives no screen point for GTK 4 controls, which know positions inside their window only', async () => {
+    const shown = ['sensitive', 'showing']
+    writeFileSync(treeFile, JSON.stringify([{ pid: 60, children: [{ name: 'Calculator', role: 'frame', states: shown, box: [0, 0, 360, 616], children: [
+      { name: '7', role: 'push button', states: shown, box: [0, 0, 64, 44], window_box: [24, 428, 64, 44], actions: ['click'] },
+      { role: 'text', text: '5535', states: shown, box: [0, 0, 92, 23], window_box: [246, 251, 92, 23] },
+    ] }] }]))
+    expect((await python(atspiArgs('read', 60, 'Calculator'))).trimEnd().split('\n')).toEqual(['  [1] Button "7"', '  [2] Edit = "5535" (read-only)'])
+    await expect(python(atspiArgs('point', 60, 'Calculator', '1'))).rejects.toThrow('element [1] has no screen position (the app reports positions inside its window only); press it with invoke')
+    expect((await python(atspiArgs('act', 60, 'Calculator', '1', 'invoke', ''))).trim()).toBe('Button "7"')
+    expect(calls()).toEqual(['do_action 7 click'])
+  })
+
+  it('shows the start and the end of a long text, where new typing lands', async () => {
+    const shown = ['sensitive', 'showing']
+    const text = `${'a'.repeat(3000)}MIDDLE${'b'.repeat(3000)}THE END`
+    writeFileSync(treeFile, JSON.stringify([{ pid: 61, children: [{ name: 'Notes', role: 'frame', states: shown, box: [0, 0, 400, 300], children: [
+      { role: 'text', text, states: [...shown, 'editable'], box: [0, 0, 400, 300], editable: true },
+    ] }] }]))
+    const line = (await python(atspiArgs('read', 61, 'Notes'))).trim()
+    expect(line).toContain('THE END')
+    expect(line).not.toContain('MIDDLE')
+    expect(line).toMatch(/^\[1\] Edit = "a{1000} \.\.\. .*b{900,}THE END" @\(200,150\)$/u)
+  })
+
   it('falls back to a real click at the control when it has no matching action', async () => {
     expect((await python(atspiArgs('act', 42, 'Display Settings', '8', 'invoke', ''))).trim()).toBe('CLICK 640 565')
     expect((await python(atspiArgs('point', 42, 'Display Settings', '8'))).trim()).toBe('640 565')
@@ -195,5 +219,50 @@ describe.skipIf(PYTHON === undefined)('desktop_element on Linux', () => {
     const read = await call('desktop_window', { action: 'read', title: 'Display Settings' })
     expect(JSON.stringify(read.content)).toContain('[4] Edit \\"Profile name\\" = \\"Ada\\" @(110,82) (focused)')
     expect(calls()).toEqual(['do_action Night light toggle'])
+  })
+})
+
+describe.skipIf(PYTHON === undefined)('desktop_element under GNOME on Wayland', () => {
+  it('presses a covered control through its accessible action instead of clicking a window it cannot see', async () => {
+    // Apply has a press action here, so the fallback can use it.
+    const data = tree() as Array<{ pid: number; children: Array<{ children: Array<Record<string, unknown>> }> }>
+    const apply = data[1]?.children[0]?.children.find(child => child['name'] === 'Apply')
+    if (apply !== undefined) apply['actions'] = ['press']
+    writeFileSync(treeFile, JSON.stringify(data))
+    const sent: string[] = []
+    const run: CommandRunner = async (file, args) => {
+      if (file === 'python3') return python(args)
+      if (file === 'sh' && String(args[1]).startsWith('pgrep -x ydotoold')) return ''
+      if (file === 'sh' && args[1] === 'command -v "$1" >/dev/null 2>&1 && echo yes') return args[3] === 'xdotool' ? 'yes\n' : ''
+      if (file === 'gdbus') throw new Error('no Window Calls extension')
+      if (file === 'wlr-randr') throw new Error('wlr-randr is not installed')
+      if (file === 'wmctrl' && args[0] === '-lpG') return '0x04000007  0 42     0    0    800  600  host Display Settings\n'
+      if (file === 'xrandr') return 'HDMI-1 connected primary 1920x1080+0+0 (normal) 527mm x 296mm\n'
+      if (file === 'xdotool' && args[0] === 'getactivewindow') return String(0x04000007)
+      // A native Wayland window covers the point: X reports its root window there.
+      if (file === 'xwininfo') return 'xwininfo: Window id: 0x2e9 (the root window) (has no name)\n'
+      if (file === 'xdotool' && args[0] === 'getmouselocation') return 'X=640\nY=565\nSCREEN=0\nWINDOW=745\n'
+      if (file === 'sh' || file === 'ps') return ''
+      sent.push(`${file} ${args.join(' ')}`)
+      return ''
+    }
+    const ctx = new Context()
+    await ctx.plugin(SystemPrompt)
+    await ctx.plugin(ToolRuntime)
+    await ctx.plugin(NativeToolExecutor)
+    const backend = linuxBackend(run, { XDG_SESSION_TYPE: 'wayland', XDG_CURRENT_DESKTOP: 'GNOME', WAYLAND_DISPLAY: 'wayland-0', DISPLAY: ':0' })
+    await ctx.plugin({ inject: ['tools'], apply: (inner: Context) => { registerDisplayTools(inner, backend) } })
+    try {
+      const result = await executeToolFixture(ctx, {
+        name: 'desktop_element', callId: ToolCallId('covered'), arguments: { action: 'click', name: 'Apply', title: 'Display Settings' }, signal: new AbortController().signal,
+      })
+      expect(result.isError).toBe(false)
+      expect(JSON.stringify(result.content)).toContain('[8] is covered by a window these tools cannot see, so it was pressed through its accessible action')
+      expect(calls()).toEqual(['do_action Apply press'])
+      // The pointer moved to look, but no button was pressed.
+      expect(sent).toEqual(['xdotool mousemove --sync 640 565'])
+    } finally {
+      await ctx.fiber.dispose()
+    }
   })
 })

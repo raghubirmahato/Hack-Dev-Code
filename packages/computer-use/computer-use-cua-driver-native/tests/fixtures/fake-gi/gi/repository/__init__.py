@@ -95,6 +95,7 @@ class StateType:
 
 class CoordType:
     SCREEN = 'screen'
+    WINDOW = 'window'
 
 
 class Text:
@@ -122,6 +123,9 @@ class Value:
 class Component:
     @staticmethod
     def get_extents(node, coord):
+        # GTK 4 nodes give "window_box" inside their window and (0, 0) on screen.
+        if coord == CoordType.WINDOW and 'window_box' in node.data:
+            return _Box(node.data['window_box'])
         return _Box(node.data.get('box', [0, 0, 0, 0]))
 
     @staticmethod

@@ -162,7 +162,9 @@ describe('real keyboard input', () => {
     await backend.open('https://example.com')
     expect(calls).toEqual([
       ['xdotool', 'key', '--clearmodifiers', 'ctrl+alt+t'],
-      ['xdotool', 'type', '--clearmodifiers', '--delay', '12', '--', 'ls -la\n'],
+      // A newline is pressed as Return: xdotool would type it as Linefeed, which single-line fields ignore.
+      ['xdotool', 'type', '--clearmodifiers', '--delay', '12', '--', 'ls -la'],
+      ['xdotool', 'key', '--clearmodifiers', 'Return'],
       ['xdotool', 'mousemove', '--sync', '1', '2', 'click', '--repeat', '4', '4'],
       ['xdotool', 'mousemove', '--sync', '1', '2', 'click', '--repeat', '2', '6'],
       ['xdotool', ...linuxDragArgs(0, 0, 50, 60, '3')],
@@ -274,7 +276,7 @@ describe('Linux window text and modifier clicks', () => {
   it('reads a window through AT-SPI by its process and title', async () => {
     const calls: string[][] = []
     const run: CommandRunner = async (file, args) => {
-      if (file === 'sh') return ''
+      if (file === 'sh' || file === 'ps') return ''
       calls.push([file, ...args.slice(file === 'python3' ? 2 : 0)])
       if (file === 'wmctrl') return '0x01400007  0 4321   10 20  800 600  host  Calculator\n'
       return 'Frame: Calculator\n  Label: 56\n'

@@ -75,10 +75,14 @@ describe.runIf(process.platform === 'linux' && process.env['HACKDEV_LIVE_DESKTOP
       const settled = await call('desktop_window', { action: 'wait', stable: true, handle, quiet_ms: 600, timeout_ms: 10_000 })
       expect.soft(settled.text).toContain('stayed the same')
 
-      // Select some of the typed text by dragging inside the window; the drop target must be the editor.
-      const dragged = await call('desktop_drag', { from_x: 200, from_y: 250, to_x: 400, to_y: 250, onto: TITLE })
-      expect.soft(dragged.text).toContain('onto')
-      const refusedDrop = await call('desktop_drag', { from_x: 200, from_y: 250, to_x: 400, to_y: 250, onto: 'no such window' })
+      // Select some of the typed text by dragging inside the window's left part, away from the middle of the screen where
+      // a native Wayland window (a terminal) may float above it; the drop target must be the editor.
+      const dragged = await call('desktop_drag', { from_x: 120, from_y: 250, to_x: 300, to_y: 250, onto: TITLE })
+      // GNOME may keep a native window (such as the person's own) above the editor; the drag must then be refused
+      // before anything is pressed, never reported as done.
+      expect.soft(dragged.text).toMatch(/onto "[^"]*Mousepad"|a window these tools cannot see is on top/u)
+      if (dragged.failed) expect.soft(dragged.text).toContain('nothing was pressed')
+      const refusedDrop = await call('desktop_drag', { from_x: 120, from_y: 250, to_x: 300, to_y: 250, onto: 'no such window' })
       expect.soft(refusedDrop.text).toContain('Nothing was dragged')
 
       // A point well outside the reserved window (80, 80, 700x480): the click must be refused before it is sent.

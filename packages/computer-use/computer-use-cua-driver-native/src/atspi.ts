@@ -41,15 +41,20 @@ def kind(node):
 def clean(text):
     return ' '.join((text or '').split())
 
-def quote(text):
-    text = text if len(text) <= 200 else text[:200] + '...'
+def quote(text, limit=200):
+    # Long values keep their start and their end, where new typing usually lands.
+    if len(text) > limit:
+        text = text[:limit // 2] + ' ... ' + text[-(limit // 2):]
     return '"' + text.replace('"', "'") + '"'
 
 def value_of(node):
     try:
         text = node.get_text_iface()
         if text is not None:
-            return clean(Atspi.Text.get_text(text, 0, min(Atspi.Text.get_character_count(text), 2000)))
+            count = Atspi.Text.get_character_count(text)
+            if count <= 4000:
+                return clean(Atspi.Text.get_text(text, 0, count))
+            return clean(Atspi.Text.get_text(text, 0, 2000)) + ' ... ' + clean(Atspi.Text.get_text(text, count - 2000, count))
     except Exception:
         pass
     try:
@@ -92,9 +97,15 @@ def centre(node):
         s = node.get_state_set()
         if not s.contains(Atspi.StateType.SHOWING):
             return None
-        box = Atspi.Component.get_extents(node.get_component_iface(), Atspi.CoordType.SCREEN)
+        component = node.get_component_iface()
+        box = Atspi.Component.get_extents(component, Atspi.CoordType.SCREEN)
         if box.width <= 0 or box.height <= 0:
             return None
+        if box.x == 0 and box.y == 0:
+            # GTK 4 knows positions inside its window only and reports (0, 0) on screen for every control.
+            inner = Atspi.Component.get_extents(component, Atspi.CoordType.WINDOW)
+            if inner.x != 0 or inner.y != 0:
+                return None
         return (int(round(box.x + box.width / 2.0)), int(round(box.y + box.height / 2.0)))
     except Exception:
         return None
@@ -107,7 +118,7 @@ def describe(node):
     if name:
         line += ' ' + quote(name)
     if value and value != name:
-        line += ' = ' + quote(value)
+        line += ' = ' + quote(value, 2000 if role in ('Edit', 'Document') else 200)
     point = centre(node)
     if point is not None:
         line += ' @(' + str(point[0]) + ',' + str(point[1]) + ')'
@@ -216,8 +227,11 @@ def main():
         rows = ['=[' + str(i) + '] ' + l for i, l in exact] + ['~[' + str(i) + '] ' + l for i, l in partial]
         print('\n'.join(rows[:limit]))
     elif mode == 'point':
-        point = centre(element(numbered, int(sys.argv[4])))
+        node = element(numbered, int(sys.argv[4]))
+        point = centre(node)
         if point is None:
+            if showing(node):
+                sys.exit('element [' + sys.argv[4] + '] has no screen position (the app reports positions inside its window only); press it with invoke')
             sys.exit('element [' + sys.argv[4] + '] is off screen or hidden; scroll it into view or expand its parent first')
         print(str(point[0]) + ' ' + str(point[1]))
     elif mode == 'act':
