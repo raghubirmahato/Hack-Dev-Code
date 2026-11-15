@@ -78,6 +78,12 @@ export interface CaptureResult {
   height: number
   /** Saved pixels per screen pixel; 1 when the capture was not reduced. */
   scale: number
+  /**
+   * Desktop position of the image's top-left corner, when it is not that of the area asked for (a window's content
+   * without its title bar).
+   */
+  x?: number
+  y?: number
 }
 
 /** Runs one helper program and returns its standard output, within `timeoutMs` (default 30 s). */
@@ -1213,6 +1219,45 @@ export function parseWmctrl(text: string, active?: number): WindowInfo[] {
 }
 
 /**
+ * Shell script that prints `id x y left right top bottom` for each X11 window id it is given: where the window's
+ * content really is (xwininfo) and the frame the window manager draws around it (_NET_FRAME_EXTENTS). wmctrl and
+ * xdotool add the frame's offset inside its parent a second time under reparenting window managers such as Mutter.
+ */
+export const X11_GEOMETRY = 'for id in "$@"; do '
+  + 'g=$(xwininfo -id "$id" 2>/dev/null | awk \'/Absolute upper-left X/{x=$4} /Absolute upper-left Y/{y=$4} END{print x" "y}\'); '
+  + 'e=$(xprop -id "$id" _NET_FRAME_EXTENTS 2>/dev/null | sed -n \'s/.*= *//p\' | tr -d \',\'); '
+  + 'echo "$id $g $e"; done'
+
+/**
+ * Put X11 windows where they really are: each window's rectangle becomes its frame (content plus title bar and
+ * borders), and its content area is kept for captures.
+ * @param windows - windows from wmctrl.
+ * @param geometry - X11_GEOMETRY output; a window it does not cover keeps wmctrl's numbers.
+ * @returns the windows, and the content area of each corrected one.
+ */
+export function applyX11Geometry(
+  windows: readonly WindowInfo[], geometry: string,
+): { windows: WindowInfo[]; clients: Map<number, CaptureArea> } {
+  const found = new Map<number, number[]>()
+  for (const line of geometry.split(/\r?\n/u)) {
+    const [id, ...numbers] = line.trim().split(/\s+/u)
+    const values = numbers.map(Number)
+    const position = values.slice(0, 2)
+    if (id === undefined || !/^0x[0-9a-f]+$/iu.test(id) || position.length < 2 || position.some(value => !Number.isFinite(value))) continue
+    found.set(Number.parseInt(id, 16), values)
+  }
+  const clients = new Map<number, CaptureArea>()
+  const placed = windows.map((window) => {
+    const values = found.get(window.handle)
+    if (values === undefined) return window
+    const [x = 0, y = 0, left = 0, right = 0, top = 0, bottom = 0] = values.map(value => Number.isFinite(value) ? value : 0)
+    clients.set(window.handle, { x, y, width: window.width, height: window.height })
+    return { ...window, x: x - left, y: y - top, width: window.width + left + right, height: window.height + top + bottom }
+  })
+  return { windows: placed, clients }
+}
+
+/**
  * Parse `xprop -root -notype _NET_CLIENT_LIST_STACKING`: the X11 window ids from bottom to top.
  * @param text - xprop output, such as `_NET_CLIENT_LIST_STACKING: window id # 0x1e00003, 0x2200007`.
  * @returns the ids, bottom first.
@@ -1449,6 +1494,12 @@ export function linuxBackend(
       await rm(join(whole, '..'), { recursive: true, force: true }).catch(() => {})
     }
   }
+  /**
+   * Whether a window is an X11 window ImageMagick can capture as it draws itself: every window of an X11 session, and
+   * on Wayland the XWayland windows listed when the compositor keeps its own windows private.
+   */
+  const drawsX11 = async (window: WindowInfo): Promise<boolean> =>
+    !window.minimized && (!wayland || ((env['DISPLAY'] ?? '').length > 0 && await whichCompositor() === 'xwayland'))
   /** Run xdotool with its arguments when input goes through it, else ydotool with the other set. */
   const tool = async (ydotool: readonly string[], xdotool: readonly string[], signal?: AbortSignal, timeoutMs?: number): Promise<string> =>
     await useXdotool() ? helper('xdotool', xdotool, signal, timeoutMs) : helper('ydotool', ydotool, signal, timeoutMs)
@@ -1471,8 +1522,16 @@ export function linuxBackend(
       }
     }
     const active = await run('xdotool', ['getactivewindow']).then(out => Number(out.trim()), () => undefined)
-    return parseWmctrl(await helper('wmctrl', ['-lpG']), active)
+    const listed = parseWmctrl(await helper('wmctrl', ['-lpG']), active)
+    if (listed.length === 0) return listed
+    // wmctrl's positions are off under reparenting window managers; xwininfo and the frame extents give the real ones.
+    const geometry = await run('sh', ['-c', X11_GEOMETRY, 'sh', ...listed.map(window => hex(window.handle))]).catch(() => '')
+    const placed = applyX11Geometry(listed, geometry)
+    clients = placed.clients
+    return placed.windows
   }
+  /** The content area of each X11 window as last listed, which captures and text recognition of a window cover. */
+  let clients: ReadonlyMap<number, CaptureArea> = new Map()
   /** Read or operate the controls of one window through AT-SPI; see ATSPI_CONTROLS. */
   const accessible = async (handle: number, mode: 'read' | 'find' | 'point' | 'act', ...rest: string[]): Promise<string> => {
     const window = (await windows()).find(candidate => candidate.handle === handle)
@@ -1673,6 +1732,30 @@ export function linuxBackend(
     },
     async setup() {
       return linuxSetup(parseProbe(await run('sh', ['-c', LINUX_PROBE], 30_000)), env, wayland)
+    },
+    async captureWindow(path, window, maxDimension) {
+      if (!await drawsX11(window)) return undefined
+      // ImageMagick captures the content area, without the title bar the window manager draws.
+      const content = clients.get(window.handle) ?? window
+      const scale = fitScale(content.width, content.height, maxDimension)
+      const resize = scale < 1 ? ['-resize', `${int(maxDimension)}x${int(maxDimension)}>`] : []
+      const drawn = await run('import', ['-window', hex(window.handle), ...resize, path]).then(() => true, () => false)
+      if (!drawn) return undefined
+      return { width: Math.round(content.width * scale), height: Math.round(content.height * scale), scale, x: content.x, y: content.y }
+    },
+    async ocrWindow(window) {
+      if (!await drawsX11(window)) return undefined
+      const file = join(await mkdtemp(join(tmpdir(), 'hackdev-ocr-')), 'window.png')
+      try {
+        if (!await run('import', ['-window', hex(window.handle), file]).then(() => true, () => false)) return undefined
+        const tsv = await run('tesseract', [file, '-', 'tsv']).catch((error: unknown) => {
+          throw new Error(`${String(error instanceof Error ? error.message : error)}. Reading text from the screen uses tesseract: install it with sudo apt-get install -y tesseract-ocr`, { cause: error })
+        })
+        const content = clients.get(window.handle) ?? window
+        return parseTesseractTsv(tsv, content.x, content.y)
+      } finally {
+        await rm(join(file, '..'), { recursive: true, force: true }).catch(() => {})
+      }
     },
     async ocr(area) {
       const file = join(await mkdtemp(join(tmpdir(), 'hackdev-ocr-')), 'area.png')
@@ -2214,7 +2297,11 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     if (window.minimized) await backend.window(window.handle, 'restore', signal)
     if (!window.foreground || window.minimized) await backend.window(window.handle, 'focus', signal)
     const fresh = (await backend.windows()).find(candidate => candidate.handle === window.handle) ?? window
-    return backend.ocr(fresh)
+    return backend.ocr(fresh).catch(async (error: unknown) => {
+      const drawn = backend.ocrWindow === undefined ? undefined : await backend.ocrWindow(fresh)
+      if (drawn === undefined) throw error
+      return drawn
+    })
   }
   /** A window's controls and text; when it exposes none, the text recognized on screen instead. */
   const windowText = async (window: WindowInfo, signal?: AbortSignal): Promise<string> => {
@@ -2410,13 +2497,20 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
         const drawn = captured !== undefined && !captured.foreground && backend.captureWindow !== undefined
           ? await backend.captureWindow(path, captured, maxDimension)
           : undefined
-        size = drawn ?? await backend.capture(path, area, maxDimension)
+        size = drawn ?? await backend.capture(path, area, maxDimension).catch(async (error: unknown) => {
+          // A session that cannot capture the screen (GNOME on Wayland without its screenshot tool) can still capture
+          // an X11 window as it draws itself.
+          const capture = backend.captureWindow?.bind(backend)
+          const own = captured !== undefined && capture !== undefined ? await capture(path, captured, maxDimension) : undefined
+          if (own === undefined) throw error
+          return own
+        })
         data = (await readFile(path)).toString('base64')
       } finally {
         await rm(directory, { recursive: true, force: true }).catch(() => {})
       }
-      const originX = area?.x ?? Math.min(0, ...displays.map(d => d.x))
-      const originY = area?.y ?? Math.min(0, ...displays.map(d => d.y))
+      const originX = size.x ?? area?.x ?? Math.min(0, ...displays.map(d => d.x))
+      const originY = size.y ?? area?.y ?? Math.min(0, ...displays.map(d => d.y))
       const mapping = size.scale === 1
         ? `desktop x = ${String(originX)} + image x, desktop y = ${String(originY)} + image y`
         : `desktop x = ${String(originX)} + image x / ${size.scale.toFixed(4)}, desktop y = ${String(originY)} + image y / ${size.scale.toFixed(4)}`

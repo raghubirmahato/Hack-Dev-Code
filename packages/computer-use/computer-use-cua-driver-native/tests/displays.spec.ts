@@ -274,6 +274,7 @@ describe('Linux window text and modifier clicks', () => {
   it('reads a window through AT-SPI by its process and title', async () => {
     const calls: string[][] = []
     const run: CommandRunner = async (file, args) => {
+      if (file === 'sh') return ''
       calls.push([file, ...args.slice(file === 'python3' ? 2 : 0)])
       if (file === 'wmctrl') return '0x01400007  0 4321   10 20  800 600  host  Calculator\n'
       return 'Frame: Calculator\n  Label: 56\n'

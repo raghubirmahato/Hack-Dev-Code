@@ -37,11 +37,13 @@ const COMMANDS = [
 
 /**
  * Shell script that reports, one `name=yes|no` line each, which helper commands exist, whether the ydotoold service
- * runs, whether Python can load AT-SPI, whether GNOME's accessibility setting is on, and whether the GNOME Window
+ * runs, whether XWayland passes simulated input through the desktop's remote-desktop permission, whether Python can
+ * load AT-SPI, whether GNOME's accessibility setting is on, and whether the GNOME Window
  * Calls extension answers.
  */
 export const LINUX_PROBE = `for c in ${COMMANDS.join(' ')}; do if command -v "$c" >/dev/null 2>&1; then echo "$c=yes"; else echo "$c=no"; fi; done; `
   + 'if pgrep -x ydotoold >/dev/null 2>&1; then echo ydotoold=yes; else echo ydotoold=no; fi; '
+  + 'if ps -o args= -C Xwayland 2>/dev/null | grep -q enable-ei-portal; then echo eiportal=yes; else echo eiportal=no; fi; '
   + 'if python3 -c "import gi; gi.require_version(\'Atspi\', \'2.0\'); from gi.repository import Atspi" >/dev/null 2>&1; then echo atspi=yes; else echo atspi=no; fi; '
   + 'a=$(gsettings get org.gnome.desktop.interface toolkit-accessibility 2>/dev/null); echo "a11y=$a"; '
   + 'if gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell/Extensions/Windows '
@@ -59,6 +61,9 @@ const IMAGEMAGICK: Packages = { apt: ['imagemagick'], dnf: ['ImageMagick'], pacm
 const XRANDR: Packages = { apt: ['x11-xserver-utils'], dnf: ['xrandr'], pacman: ['xorg-xrandr'], zypper: ['xrandr'] }
 const XPROP: Packages = { apt: ['x11-utils'], dnf: ['xprop'], pacman: ['xorg-xprop'], zypper: ['xprop'] }
 const TESSERACT: Packages = { apt: ['tesseract-ocr'], dnf: ['tesseract'], pacman: ['tesseract', 'tesseract-data-eng'], zypper: ['tesseract-ocr'] }
+const GRIM: Packages = { apt: ['grim', 'imagemagick'], dnf: ['grim', 'ImageMagick'], pacman: ['grim', 'imagemagick'], zypper: ['grim', 'ImageMagick'] }
+const GNOME_SCREENSHOT: Packages = { apt: ['gnome-screenshot', 'imagemagick'], dnf: ['gnome-screenshot', 'ImageMagick'], pacman: ['gnome-screenshot', 'imagemagick'], zypper: ['gnome-screenshot', 'ImageMagick'] }
+const SPECTACLE: Packages = { apt: ['kde-spectacle', 'imagemagick'], dnf: ['spectacle', 'ImageMagick'], pacman: ['spectacle', 'imagemagick'], zypper: ['spectacle', 'ImageMagick'] }
 const ATSPI: Packages = {
   apt: ['python3-gi', 'gir1.2-atspi-2.0', 'at-spi2-core'], dnf: ['python3-gobject', 'at-spi2-core'],
   pacman: ['python-gobject', 'at-spi2-core'], zypper: ['python3-gobject', 'typelib-1_0-Atspi-2_0', 'at-spi2-core'],
@@ -102,15 +107,25 @@ export function linuxSetup(
     const xwayland = (env['DISPLAY'] ?? '').length > 0
     // Without ydotoold, input goes through xdotool to X11 apps under XWayland, which include the apps the agent starts.
     const xinput = !has('ydotoold') && xwayland && has('xdotool')
+    // XWayland started with -enable-ei-portal hands simulated input to the compositor only after the person allows it.
+    const permission = xinput && probe.get('eiportal') === 'yes'
+      ? '; GNOME passes this input through its remote desktop permission, so the first input of a session shows a prompt the person must allow on screen, and keys and clicks are dropped until they do'
+      : ''
     need('Real mouse and keyboard input', (has('ydotool') && has('ydotoold')) || xinput,
-      xinput ? `xdotool through XWayland, which reaches X11 apps, including the apps the agent starts; for every app, ${YDOTOOLD_STEP}` : 'ydotool through the ydotoold service',
+      xinput ? `xdotool through XWayland, which reaches X11 apps, including the apps the agent starts${permission}; for every app, ${YDOTOOLD_STEP}` : 'ydotool through the ydotoold service',
       !has('ydotool') ? 'ydotool is missing' : 'the ydotoold service is not running, and xdotool cannot stand in without XWayland',
       has('ydotool') ? same('xdotool') : { apt: ['ydotool', 'xdotool'], dnf: ['ydotool', 'xdotool'], pacman: ['ydotool', 'xdotool'], zypper: ['ydotool', 'xdotool'] },
       YDOTOOLD_STEP)
-    const shot = ['grim', 'gnome-screenshot', 'spectacle'].find(has)
-    need('Screenshots', shot !== undefined && has('convert'), `${shot ?? ''} and ImageMagick`,
-      shot === undefined ? 'no screenshot tool (grim on wlroots, gnome-screenshot on GNOME, spectacle on KDE)' : 'ImageMagick is missing',
-      shot === undefined ? { ...same('grim'), apt: ['grim', 'imagemagick'], dnf: ['grim', 'ImageMagick'], pacman: ['grim', 'imagemagick'], zypper: ['grim', 'ImageMagick'] } : IMAGEMAGICK)
+    // Each compositor family has its own screen capture: grim only works on wlroots compositors such as Sway.
+    const gnomeDesktop = desktop.includes('gnome')
+    const kdeDesktop = desktop.includes('kde')
+    const tool = gnomeDesktop ? 'gnome-screenshot' : kdeDesktop ? 'spectacle' : 'grim'
+    const shot = has(tool) && has('convert')
+    const windowsOnly = !shot && xwayland && has('import')
+    need('Screenshots', shot || windowsOnly,
+      shot ? `${tool} and ImageMagick` : `X11 windows only, through XWayland, which include the apps the agent starts; the whole screen needs ${tool}`,
+      has(tool) ? 'ImageMagick is missing' : `${tool} is missing`,
+      has(tool) ? IMAGEMAGICK : gnomeDesktop ? GNOME_SCREENSHOT : kdeDesktop ? SPECTACLE : GRIM)
     const paste = xinput ? has('xclip') : has('wl-copy')
     need('Long text through the clipboard', paste, xinput ? 'xclip through XWayland' : 'wl-clipboard',
       `${xinput ? 'xclip' : 'wl-clipboard'} is missing; long text is typed instead`, same(xinput ? 'xclip' : 'wl-clipboard'))

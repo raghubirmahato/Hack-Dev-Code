@@ -45,12 +45,18 @@ describe.runIf(process.platform === 'linux' && process.env['HACKDEV_LIVE_DESKTOP
       expect(displays.failed).toBe(false)
       const [, width, height] = /(\d+)x(\d+) at \(/u.exec(displays.text)?.map(Number) ?? [0, 1280, 720]
 
-      expect((await call('desktop_open', { app: APP })).failed).toBe(false)
-      expect((await call('desktop_window', { action: 'wait', title: TITLE, timeout_ms: 20_000 })).failed).toBe(false)
-      const listed = await call('desktop_window', { action: 'list' })
-      const line = listed.text.split('\n').find(row => row.toLowerCase().includes(TITLE.toLowerCase()))
-      handle = Number(/handle (\d+)/u.exec(line ?? '')?.[1])
-      expect(Number.isFinite(handle) && handle > 0, `a ${TITLE} window is listed`).toBe(true)
+      // Work in the window this launch opened, never in one of the same app that was already open.
+      const before = new Set([...(await call('desktop_window', { action: 'list' })).text.matchAll(/handle (\d+)/gu)].map(match => Number(match[1])))
+      const opened = await call('desktop_open', { app: APP })
+      expect(opened.failed).toBe(false)
+      handle = Number(/New window: handle (\d+)/u.exec(opened.text)?.[1])
+      if (!Number.isFinite(handle)) {
+        expect((await call('desktop_window', { action: 'wait', title: TITLE, timeout_ms: 20_000 })).failed).toBe(false)
+        const listed = await call('desktop_window', { action: 'list' })
+        const line = listed.text.split('\n').find(row => row.toLowerCase().includes(TITLE.toLowerCase()) && !before.has(Number(/handle (\d+)/u.exec(row)?.[1])))
+        handle = Number(/handle (\d+)/u.exec(line ?? '')?.[1])
+      }
+      expect(Number.isFinite(handle) && handle > 0 && !before.has(handle), `a new ${TITLE} window opened`).toBe(true)
 
       // A known place and size, so a point outside it is easy to pick.
       expect.soft((await call('desktop_window', { action: 'move', handle, x: 80, y: 80, width: 700, height: 480 })).failed).toBe(false)

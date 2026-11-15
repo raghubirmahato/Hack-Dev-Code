@@ -33,20 +33,32 @@ describe('Linux setup report', () => {
 
   it('reports the Kali GNOME Wayland session from a live run: input and paste through XWayland without ydotoold', () => {
     // The probe of a real Kali desktop (GNOME on Wayland, XWayland running, ydotoold stopped, wl-clipboard absent).
-    const report = linuxSetup(probe(['ydotool', 'xdotool', 'xclip', 'gnome-screenshot', 'grim', 'convert', 'tesseract', 'python3', 'atspi', 'xdg-open', 'gdbus', 'apt-get'], { a11y: 'false' }), {
+    const report = linuxSetup(probe(['ydotool', 'xdotool', 'xclip', 'grim', 'import', 'convert', 'tesseract', 'python3', 'atspi', 'xdg-open', 'gdbus', 'apt-get'], { a11y: 'false', eiportal: 'yes' }), {
       XDG_SESSION_TYPE: 'wayland', XDG_CURRENT_DESKTOP: 'GNOME', DISPLAY: ':0', WAYLAND_DISPLAY: 'wayland-0',
     }, true)
     const text = formatSetup(report)
     expect(text).toContain('ready: Real mouse and keyboard input (xdotool through XWayland, which reaches X11 apps, including the apps the agent starts; '
-      + 'for every app, start the ydotool daemon: sudo ydotoold --socket-path=/tmp/.ydotool_socket')
+      + 'GNOME passes this input through its remote desktop permission, so the first input of a session shows a prompt the person must allow on screen, '
+      + 'and keys and clicks are dropped until they do; for every app, start the ydotool daemon: sudo ydotoold --socket-path=/tmp/.ydotool_socket')
     expect(text).toContain('ready: Long text through the clipboard (xclip through XWayland)')
-    expect(text).toContain('ready: Screenshots (grim and ImageMagick)')
+    // grim is installed, but it only captures wlroots compositors, not GNOME.
+    expect(text).toContain('ready: Screenshots (X11 windows only, through XWayland, which include the apps the agent starts; the whole screen needs gnome-screenshot)')
     expect(text).toContain('ready: Displays (XWayland)')
     expect(text).toContain('missing: Listing and moving every window (GNOME keeps its windows private without the Window Calls extension; '
       + 'only X11 apps are listed, which include the apps the agent starts (they open under XWayland))')
     expect(text).toContain('ready: Window text and controls by name (AT-SPI through Python; Qt apps also need assistive technologies on')
     expect(text).toContain('- install the Window Calls extension from https://extensions.gnome.org/extension/4724/window-calls/')
     expect(report.install).toBeUndefined()
+  })
+
+  it('picks the screen capture of each desktop and installs it when even window captures are impossible', () => {
+    const shots = (present: string[], env: Record<string, string>): string | undefined =>
+      linuxSetup(probe(present), { XDG_SESSION_TYPE: 'wayland', ...env }, true).checks.find(check => check.feature === 'Screenshots')?.detail
+    expect(shots(['grim', 'convert'], { SWAYSOCK: '/run/sway.sock' })).toBe('grim and ImageMagick')
+    expect(shots(['gnome-screenshot', 'convert'], { XDG_CURRENT_DESKTOP: 'GNOME' })).toBe('gnome-screenshot and ImageMagick')
+    expect(shots(['spectacle', 'convert'], { XDG_CURRENT_DESKTOP: 'KDE' })).toBe('spectacle and ImageMagick')
+    expect(shots(['grim', 'convert'], { XDG_CURRENT_DESKTOP: 'KDE' })).toBe('spectacle is missing')
+    expect(linuxSetup(probe(['apt-get']), { XDG_SESSION_TYPE: 'wayland', XDG_CURRENT_DESKTOP: 'GNOME' }, true).install).toContain('gnome-screenshot imagemagick')
   })
 
   it('needs ydotoold, or xdotool with XWayland, for input on Wayland', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { LAUNCH_SCRIPT, linuxBackend, X11_APP_ENV } from '../src/displays.ts'
+import { applyX11Geometry, LAUNCH_SCRIPT, linuxBackend, X11_APP_ENV, X11_GEOMETRY } from '../src/displays.ts'
 import { parseKeys } from '../src/keys.ts'
 import type { CommandRunner } from '../src/displays.ts'
 import { gvariantString, parseKdotoolGeometry, parseWindowCalls } from '../src/wayland.ts'
@@ -103,7 +103,9 @@ describe('GNOME on Wayland without the extension or ydotoold', () => {
       if (file === 'sh' && String(args[1]).startsWith('pgrep -x ydotoold')) return daemon ? 'yes\n' : ''
       if (file === 'sh' && args[1] === 'command -v "$1" >/dev/null 2>&1 && echo yes') return args[3] === 'xdotool' ? 'yes\n' : ''
       if (file === 'gdbus') throw new Error('GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod')
-      if (file === 'wmctrl') return '0x02a00004  0 4100   80 80  700 480  kali  Untitled 1 - Mousepad\n'
+      // As measured on Kali: the content at (80, 118) under a 38-pixel title bar, while wmctrl says (105, 181).
+      if (file === 'sh' && args[1] === X11_GEOMETRY) return '0x2a00004 80 118 0 0 38 0\n'
+      if (file === 'wmctrl') return '0x02a00004  0 4100   105 181  700 480  kali  Untitled 1 - Mousepad\n'
       if (file === 'xprop') return '_NET_CLIENT_LIST_STACKING: window id # 0x2a00004\n'
       if (file === 'xdotool' && args[0] === 'getactivewindow') return String(0x2a00004)
       sent.push(`${file} ${file === 'sh' ? args.slice(3).join(' ') : args.join(' ')}`)
@@ -119,7 +121,8 @@ describe('GNOME on Wayland without the extension or ydotoold', () => {
     expect(await backend.launch('mousepad --disable-server')).toBe('Started mousepad --disable-server as an X11 app, so its windows can be listed and operated')
     await backend.keys(parseKeys('ctrl+s'))
     await backend.pointer(100, 120, 'left', 1)
-    expect(await backend.windowAt?.(100, 120)).toBe(0x2a00004)
+    expect((await backend.windows())[0]).toMatchObject({ x: 80, y: 80, width: 700, height: 518 })
+    expect(await backend.windowAt?.(100, 90)).toBe(0x2a00004)
     expect(await backend.windowAt?.(1500, 800)).toBe(0)
     expect(sent).toEqual([
       `sh mousepad --disable-server ${X11_APP_ENV.join(' ')}`,
@@ -142,5 +145,19 @@ describe('GNOME on Wayland without the extension or ydotoold', () => {
     expect(await backend.launch('gedit')).toBe('Started gedit')
     expect(x11).toEqual(['sh gedit'])
     expect(LAUNCH_SCRIPT).toContain('set -f')
+  })
+})
+
+describe('X11 window geometry', () => {
+  it('replaces wmctrl positions with the real ones and keeps the content area for captures', () => {
+    const listed = [
+      { handle: 0x1400007, pid: 1, process: '', title: 'Mousepad', x: 1049, y: 377, width: 700, height: 480, minimized: false, foreground: true },
+      { handle: 0x1600003, pid: 2, process: '', title: 'Terminal', x: 10, y: 10, width: 300, height: 200, minimized: false, foreground: false },
+    ]
+    const placed = applyX11Geometry(listed, '0x1400007 1024 314 0 0 38 0\n0x1600003\nnot a line\n')
+    expect(placed.windows[0]).toMatchObject({ x: 1024, y: 276, width: 700, height: 518 })
+    expect(placed.windows[1]).toMatchObject({ x: 10, y: 10, width: 300, height: 200 })
+    expect(placed.clients.get(0x1400007)).toEqual({ x: 1024, y: 314, width: 700, height: 480 })
+    expect(placed.clients.has(0x1600003)).toBe(false)
   })
 })
