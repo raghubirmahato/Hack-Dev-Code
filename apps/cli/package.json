@@ -22,7 +22,10 @@
     "docs",
     "src"
   ],
-  "scripts": {},
+  "scripts": {
+    "prepack": "tsx ../../scripts/stage-dsh-docs.ts",
+    "postpack": "tsx ../../scripts/stage-dsh-docs.ts --clean"
+  },
   "license": "MIT",
   "dependencies": {
     "@hackdevcode/cordis": "workspace:~",

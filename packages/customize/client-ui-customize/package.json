@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-customize",
   "description": "Customize section in Web settings: skills, connectors and MCP servers",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },

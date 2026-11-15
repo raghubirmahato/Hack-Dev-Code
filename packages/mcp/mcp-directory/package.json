@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-mcp-directory",
   "description": "Directory of MCP servers, OAuth connectors, website sessions and skills: servers, connectors and sessions mount live as mcp-client instances; built-in skills are provided from memory and directory skills install into the user skill folder",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
