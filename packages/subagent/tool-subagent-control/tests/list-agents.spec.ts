@@ -102,11 +102,20 @@ function callTool(
   })
 }
 
-/** Wait until a continuable child released its current Activation. */
+/**
+ * Wait until a continuable child released its current Activation. The check compares a boolean: a failing
+ * `toBeUndefined()` would print the live agent, whose Context proxy throws inside the diff formatter and hides the
+ * timeout. The budget leaves room for a loaded full-suite run.
+ */
 async function waitNoActivation(ctx: Context, childId: SessionId): Promise<void> {
   await vi.waitFor(() => {
-    expect(ctx.agents.get(childId)).toBeUndefined()
-  }, { timeout: 5_000 })
+    expect(ctx.agents.get(childId) === undefined, `${childId} still holds an Activation`).toBe(true)
+  }, { timeout: 15_000 })
+}
+
+/** Wait until the adapter has received `count` model requests (compared as a number, for a readable failure). */
+async function waitRequests(adapter: GatedAdapter, count: number): Promise<void> {
+  await vi.waitFor(() => { expect(adapter.requests.length).toBe(count) }, { timeout: 15_000 })
 }
 
 describe('list_agents', () => {
@@ -310,7 +319,7 @@ describe('list_agents', () => {
       prompt: [{ type: 'text', text: 'branch work' }], parent,
       signal: testToolSignal,
     })
-    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+    await waitRequests(adapter, 1)
     const child = ctx.agents.get(started.childId)!
     const grandchild = await ctx.subagents.startActivation({ delivery: 'parent',
       provider: 'spawn',
@@ -318,12 +327,10 @@ describe('list_agents', () => {
       prompt: [{ type: 'text', text: 'leaf work' }], parent: child,
       signal: testToolSignal,
     })
-    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(2) })
+    await waitRequests(adapter, 2)
     // The creation tree remains discoverable after the intermediate instance finishes.
     releaseChild.resolve(undefined)
-    await vi.waitFor(() => {
-      expect(ctx.agents.get(started.childId)).toBeUndefined()
-    }, { timeout: 5_000 })
+    await waitNoActivation(ctx, started.childId)
 
     const result = await callTool(ctx, 'list_agents', {}, parent)
     expect(result.isError).toBe(false)
@@ -397,13 +404,13 @@ describe('list_agents', () => {
       prompt: [{ type: 'text', text: label }], parent, signal: testToolSignal,
     })).childId
     const alpha = await start('alpha task')
-    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(1) })
+    await waitRequests(adapter, 1)
     const beta = await start('beta task')
     await waitNoActivation(ctx, beta)
     const gamma = await start('gamma task')
     await waitNoActivation(ctx, gamma)
     const delta = await start('delta task')
-    await vi.waitFor(() => { expect(adapter.requests).toHaveLength(4) })
+    await waitRequests(adapter, 4)
 
     const expected = [
       'lead [inactive] — root agent',
