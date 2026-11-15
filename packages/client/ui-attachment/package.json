@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-attachment",
   "description": "Dynamic attachment presentation plugin for conversation input, message-image, and trajectory image slots",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -35,7 +35,8 @@
         "@hackdevcode/dsh-client-ui-renderer",
         "@hackdevcode/dsh-client-ui-trajectory",
         "@hackdevcode/dsh-client-ui-tool",
-        "@hackdevcode/dsh-client-ui-file-drag"
+        "@hackdevcode/dsh-client-ui-file-drag",
+        "@hackdevcode/dsh-client-ui-context-menu"
       ],
       "platform": "web"
     }
@@ -46,6 +47,7 @@
   },
   "license": "MIT",
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-client-locale": "workspace:*",
     "@hackdevcode/dsh-client-ui-chat": "workspace:*",
@@ -60,13 +62,17 @@
     "@hackdevcode/dsh-client-ui-tool": "workspace:*",
     "clsx": "^2.0.0",
     "@hackdevcode/dsh-client-ui-file-drag": "workspace:*",
-    "@hackdevcode/dsh-util-file-drag": "workspace:*"
+    "@hackdevcode/dsh-util-file-drag": "workspace:*",
+    "@hackdevcode/dsh-client-ui-context-menu": "workspace:*"
   },
   "files": [
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "peerDependencies": {
     "@hackdevcode/cordis": "workspace:~"

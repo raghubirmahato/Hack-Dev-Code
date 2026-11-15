@@ -2,14 +2,14 @@
 import { readFile } from 'node:fs/promises'
 import { Context } from '@hackdevcode/cordis'
 import Loader, { interpolate, type EntryOptions } from '@hackdevcode/cordis-plugin-loader'
-import { entryListSchema } from '@hackdevcode/cordis-plugin-include'
-import { load } from 'js-yaml'
+import { parseEntryYaml } from '@hackdevcode/cordis-plugin-include'
 import { expect, it, vi } from 'vitest'
 
-it.each(['darwin', 'win32', 'linux'])('loads the exported patch directly on %s with the native provider of that platform and Chrome control', async (platform) => {
-  const patch = load(await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8'), {
-    schema: entryListSchema,
-  }) as { insert: EntryOptions[] }[]
+it.each(['darwin', 'win32', 'linux'])('loads the exported patch directly on %s and selects its native provider', async (platform) => {
+  const patch = parseEntryYaml(await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')) as { insert: EntryOptions[] }[]
+  for (const id of ['cua-macos', 'cua-windows']) {
+    expect(patch[0]!.insert.find(row => row.id === id)?.name).toBe(`@hackdevcode/dsh-${id}`)
+  }
   const ctx = new Context()
   await ctx.plugin(Loader)
   if (!ctx.loader.internal) throw new Error('Loader module importer is unavailable')
@@ -28,9 +28,9 @@ it.each(['darwin', 'win32', 'linux'])('loads the exported patch directly on %s w
     expect(imports).toContain('@hackdevcode/dsh-cua')
     expect(imports).toContain('@hackdevcode/dsh-computer-use')
     expect(imports.includes('@hackdevcode/dsh-cua-macos')).toBe(platform === 'darwin')
+    // Windows and Linux use the cross-platform driver; the native Windows provider is opt-in.
     expect(imports.includes('@hackdevcode/dsh-computer-use-cua-driver-native')).toBe(platform !== 'darwin')
-    expect(imports).toContain('@hackdevcode/dsh-browser-use')
-    expect(imports).toContain('@hackdevcode/dsh-browser-use-chrome-devtools-mcp')
+    expect(imports.includes('@hackdevcode/dsh-cua-windows')).toBe(false)
   } finally {
     await ctx.fiber.dispose()
     imported.mockRestore()

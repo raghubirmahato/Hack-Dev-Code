@@ -4,10 +4,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import LlmRuntime from '@hackdevcode/dsh-llm'
 import * as LlmDeepSeek from '@hackdevcode/dsh-llm-deepseek-api-key'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import SessionTitleService from '@hackdevcode/dsh-session-title'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import * as FirstMessageTitleProvider from '@hackdevcode/dsh-session-title-first-prompt-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const contexts: Context[] = []
 
@@ -38,7 +39,7 @@ describe.skipIf(!process.env.DEEPSEEK_API_KEY)('first-prompt title provider with
       provider: 'deepseek-official',
       model: 'deepseek-v4-flash',
     })
-    const session = ctx.sessions.create(SessionId('real-title-provider'))
+    const session = ctx.sessions.create(brandString<SessionId>('real-title-provider'))
     session.append('turn/start', {
       turn: 1,
     })

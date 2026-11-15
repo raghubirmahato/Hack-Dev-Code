@@ -7,10 +7,11 @@ After checking the details below, click **Review deployments**, select <code>des
 | --- | --- |
 | Publication environment | <code>production</code> |
 | Version | <code>1.0.0</code> |
-| Update channel | <code>latest</code> |
+| Update channel | <code>stable</code> |
+| Staged update rollout | Everyone (not set) |
 | Platform | <code>win-x64</code> |
-| Download URL preview | <a href="https&#58;//download.example.com/dsh-desk/bin/win-x64/latest/hack-dev-code-1.0.0-win-x64.exe">https&#58;//download.example.com/dsh-desk/bin/win-x64/latest/hack-dev-code-1.0.0-win-x64.exe</a><br>Target URLs after publication; downloads are not guaranteed before approval. |
-| Update YAML | <a href="https&#58;//download.example.com/dsh-desk/feeds/win-x64/latest.yml">https&#58;//download.example.com/dsh-desk/feeds/win-x64/latest.yml</a><br>This publication updates the file; before approval it may not exist yet or may still point at an older release. |
+| Download URL preview | <a href="https&#58;//download.example.com/dsh-desk/bin/win-x64/stable/hack-dev-code-1.0.0-win-x64.exe">https&#58;//download.example.com/dsh-desk/bin/win-x64/stable/hack-dev-code-1.0.0-win-x64.exe</a><br>Target URLs after publication; downloads are not guaranteed before approval. |
+| Update YAML | <a href="https&#58;//download.example.com/dsh-desk/feeds/win-x64/stable.yml">https&#58;//download.example.com/dsh-desk/feeds/win-x64/stable.yml</a><br>This publication updates the file; before approval it may not exist yet or may still point at an older release. |
 | Packaging source | <a href="https&#58;//github.com/owner/repo/actions/runs/20/attempts/3">View packaging run #20 · attempt 3</a><br>Source: <code>dsh-v1.0.0 @ aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa</code><br>Packaging machine: <code>windows-publisher</code> |
 | Signature and notarization | EXE signature verified |
 | Git tag | <code>desktop-v1.0.0</code> |
@@ -33,8 +34,8 @@ Total: 2 files. Size and SHA-256 describe the bytes that are actually uploaded, 
 
 | File | Size | SHA-256 |
 | --- | --- | --- |
-| <a href="https&#58;//download.example.com/dsh-desk/bin/win-x64/latest/hack-dev-code-1.0.0-win-x64.exe">hack-dev-code-1.0.0-win-x64.exe</a> | 15 bytes | <code>e34210a6de4f653edf588301431c3d69a633638cbf587345cc50a7fed9f38f4c</code> |
-| <a href="https&#58;//download.example.com/dsh-desk/feeds/win-x64/latest.yml">latest.yml</a> | 15 bytes | <code>8850e6075dda0080c526269a4de29848c32c2a65e3d81f4a64ed8ce53d4b47c1</code> |
+| <a href="https&#58;//download.example.com/dsh-desk/bin/win-x64/stable/hack-dev-code-1.0.0-win-x64.exe">hack-dev-code-1.0.0-win-x64.exe</a> | 15 bytes | <code>e34210a6de4f653edf588301431c3d69a633638cbf587345cc50a7fed9f38f4c</code> |
+| <a href="https&#58;//download.example.com/dsh-desk/feeds/win-x64/stable.yml">stable.yml</a> | 15 bytes | <code>8850e6075dda0080c526269a4de29848c32c2a65e3d81f4a64ed8ce53d4b47c1</code> |
 
 </details>
 

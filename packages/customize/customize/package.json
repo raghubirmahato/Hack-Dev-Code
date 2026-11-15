@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-customize",
   "description": "Remote gateway of the Customize settings area: MCP servers, OAuth connectors and skills",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -40,7 +40,8 @@
     "lib/typert.host.js",
     "lib/typert.host.d.ts",
     "lib/typert.remote-client.js",
-    "lib/typert.remote-client.d.ts"
+    "lib/typert.remote-client.d.ts",
+    "lib/typert.remote-client.d.ts.map"
   ],
   "license": "MIT",
   "dependencies": {

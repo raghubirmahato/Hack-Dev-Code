@@ -5,11 +5,12 @@ import Loader from '@hackdevcode/cordis-plugin-loader'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import type { Agent, AgentStatus } from '@hackdevcode/dsh-agent'
 import CommandRuntime from '@hackdevcode/dsh-commands'
-import SessionStore, { foldSurface, Session, SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { foldSurface, Session, type SessionId } from '@hackdevcode/dsh-session'
 import * as commandFeedback from '@hackdevcode/dsh-command-feedback'
 import type { FeedbackRecord } from '@hackdevcode/dsh-command-feedback/types'
 import { remoteMethods } from '@hackdevcode/dsh-typert-protocol'
 import { unsupportedModel, unsupportedInbox } from '@hackdevcode/dsh-agent-loop-testkit'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const { USER_ID, getOrCreateAnonymousUserId } = vi.hoisted(() => {
   const USER_ID = '01234567-89ab-4cde-8f01-23456789abcd'
@@ -31,7 +32,7 @@ interface Harness {
 
 /** Build a live idle agent over a store-owned session, as an app's spine does. */
 function stubAgent(ctx: Context, id: string): { agent: Agent; session: Session } {
-  const session = ctx.sessions.create(SessionId(id))
+  const session = ctx.sessions.create(brandString<SessionId>(id))
   let status: AgentStatus = 'idle'
   const agent: Agent = {
     id: session.id,
@@ -138,7 +139,7 @@ describe('sessionFeedback Host Remote', () => {
 
   it('reports session-not-found for a Session no live owner carries', async () => {
     const test = await harness()
-    const missing = SessionId('no-such-session')
+    const missing = brandString<SessionId>('no-such-session')
     await expect(test.ctx.sessionFeedback.record({ sessionId: missing, text: 'lost' }))
       .resolves.toEqual({ ok: false, error: { code: 'session-not-found', sessionId: missing } })
     expect(test.session.snapshotEvents()).toEqual([])

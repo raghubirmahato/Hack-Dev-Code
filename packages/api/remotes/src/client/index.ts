@@ -6,14 +6,17 @@ export type {} from '@hackdevcode/dsh-client-product-analytics/remote'
 import agentPresetsRemote from '@hackdevcode/dsh-agent-preset-registry/remote'
 import userQuestionsRemote from '@hackdevcode/dsh-user-questions/remote'
 import commandsRemote from '@hackdevcode/dsh-commands/remote'
-import accountRemote from '@hackdevcode/dsh-api-account-controller/remote'
+import agentTeamsRemote from '@hackdevcode/dsh-agent-team/remote'
+export type {} from '@hackdevcode/dsh-agent-team/remote'
+import accountRemote from '@hackdevcode/dsh-deepseek-account/remote'
 import settingsControllerRemote from '@hackdevcode/dsh-api-settings-controller/remote'
-import officeToPdfRemote from '@hackdevcode/dsh-office-to-pdf/remote'
+import officeKitRemote from '@hackdevcode/dsh-office-kit/remote'
 import goalsRemote from '@hackdevcode/dsh-goal/remote'
 import scheduleRemote from '@hackdevcode/dsh-schedule/remote'
 import llmRemote from '@hackdevcode/dsh-llm/remote'
 import dynamicRemote from '@hackdevcode/dsh-cordis-host-runner/remote'
 import pluginManagerRemote from '@hackdevcode/dsh-plugin-manager/remote'
+import mcpManagerRemote from '@hackdevcode/dsh-mcp-manager/remote'
 import toolResultsRemote from '@hackdevcode/dsh-client-ui-trajectory/remote'
 import pluginRegistryProbeRemote from '@hackdevcode/dsh-client-ui-plugin-manager/remote'
 import pluginMarketRemote from '@hackdevcode/dsh-plugin-market/remote'
@@ -25,11 +28,14 @@ import sessionFeedbackRemote from '@hackdevcode/dsh-command-feedback/remote'
 import fileUploadsRemote from '@hackdevcode/dsh-client-file-upload/remote'
 import sessionReferencesRemote from '@hackdevcode/dsh-session-reference/remote'
 import subagentsRemote from '@hackdevcode/dsh-subagent/remote'
+import sessionStatusRemote from '@hackdevcode/dsh-client-ui-session-status/remote'
+export type {} from '@hackdevcode/dsh-client-ui-session-status/remote'
 import sessionRemote from '@hackdevcode/dsh-api-session-controller/remote'
 import jobRemote from '@hackdevcode/dsh-api-job-controller/remote'
 import workspaceRemote from '@hackdevcode/dsh-api-workspace-controller/remote'
 import terminalRemote from '@hackdevcode/dsh-api-terminal-controller/remote'
 import workspaceFilesRemote from '@hackdevcode/dsh-api-workspace-files/remote'
+import webRemote from '@hackdevcode/dsh-web/remote'
 import type { ClientRemote } from '@hackdevcode/dsh-api-gateway/client'
 
 export type { ClientRemote } from '@hackdevcode/dsh-api-gateway/client'
@@ -41,7 +47,9 @@ export type {
   PluginUpdateProgress, PluginUpdateResult, PluginUpdateStep, PluginVersion, PluginVersionList, RegistryAttempt,
   ReadOnlyReason, Registry, RestartReason,
 } from '@hackdevcode/dsh-plugin-manager/types'
+export type { McpManagedServerStatus, McpManagedServerView } from '@hackdevcode/dsh-mcp-manager/types'
 export type {} from '@hackdevcode/dsh-plugin-manager/remote'
+export type {} from '@hackdevcode/dsh-mcp-manager/remote'
 export type {} from '@hackdevcode/dsh-client-ui-plugin-manager/remote'
 export type {} from '@hackdevcode/dsh-client-ui-trajectory/remote'
 export type {} from '@hackdevcode/dsh-plugin-market/remote'
@@ -54,11 +62,12 @@ export type { CustomizeSnapshot } from '@hackdevcode/dsh-customize/types'
 export type {} from '@hackdevcode/dsh-agent-preset-registry/remote'
 export type {} from '@hackdevcode/dsh-user-questions/remote'
 export type {} from '@hackdevcode/dsh-commands/remote'
+export type {} from '@hackdevcode/dsh-web/remote'
 export type {} from '@hackdevcode/dsh-api-settings-controller/remote'
-export type {} from '@hackdevcode/dsh-api-account-controller/remote'
+export type {} from '@hackdevcode/dsh-deepseek-account/remote'
 export type {} from '@hackdevcode/dsh-goal/remote'
 export type {} from '@hackdevcode/dsh-schedule/remote'
-export type {} from '@hackdevcode/dsh-office-to-pdf/remote'
+export type {} from '@hackdevcode/dsh-office-kit/remote'
 export type {} from '@hackdevcode/dsh-llm/remote'
 export type {} from '@hackdevcode/dsh-host-plugin-inventory/remote'
 export type {} from '@hackdevcode/dsh-customize/remote'
@@ -86,6 +95,7 @@ export type { ApiRemoteForwardedEvent } from '../types.ts'
 // signatures `$on` hands to a listener, so a consumer reads the very
 // declaration the Host emits rather than a flattened restatement of it.
 export type {} from '@hackdevcode/dsh-commands/types'
+export type {} from '@hackdevcode/dsh-web/types'
 export type {} from '@hackdevcode/dsh-cordis-host-runner/types'
 export type {} from '@hackdevcode/dsh-credentials/types'
 export type {} from '@hackdevcode/dsh-llm/types'
@@ -192,13 +202,15 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = []
   try {
     for (const contribution of [
-      productAnalyticsRemote, agentPresetsRemote, commandsRemote, settingsControllerRemote, accountRemote,
+      productAnalyticsRemote, agentPresetsRemote, commandsRemote, agentTeamsRemote, settingsControllerRemote, accountRemote,
       goalsRemote, llmRemote, dynamicRemote, scheduleRemote,
-      customizeRemote, pluginInventoryRemote, pluginManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote, toolResultsRemote,
+      customizeRemote, pluginInventoryRemote, pluginManagerRemote, mcpManagerRemote, pluginMarketRemote, pluginRegistryProbeRemote,
+      toolResultsRemote,
       messageFeedbackRemote, sessionFeedbackRemote,
       fileUploadsRemote, sessionReferencesRemote,
-      permissionPresetsRemote, subagentsRemote, sessionRemote, jobRemote, workspaceRemote, workspaceFilesRemote, terminalRemote,
-      officeToPdfRemote, userQuestionsRemote,
+      permissionPresetsRemote, subagentsRemote, sessionRemote, sessionStatusRemote, jobRemote,
+      workspaceRemote, workspaceFilesRemote, terminalRemote,
+      officeKitRemote, userQuestionsRemote, webRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

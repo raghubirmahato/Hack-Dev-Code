@@ -8,7 +8,9 @@ import { expect, it, onTestFinished, vi } from 'vitest'
 import type { SpeechInput, SpeechPreparationState, SpeechProviderId } from '@hackdevcode/dsh-experimental-speech-to-text/types'
 import type {} from '@hackdevcode/dsh-experimental-speech-to-text'
 import {
-  captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, webSnapshotMode, watchConsole, type WebScaffold } from './scaffold.ts'
+  captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, webSnapshotMode, watchConsole,
+  type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage } from './support.ts'
 
 const fixture = fileURLToPath(new URL('../../../snapshots/web/fresh-round-trip/session.v3.jsonl', import.meta.url))

@@ -3,7 +3,8 @@ import { fileURLToPath } from 'node:url'
 import { chromium, type Browser } from 'playwright'
 import { expect, it, onTestFinished } from 'vitest'
 import {
-  captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage } from './support.ts'
 
 const bundle = fileURLToPath(new URL('./fixtures/plugins/fixture-input-extension', import.meta.url))

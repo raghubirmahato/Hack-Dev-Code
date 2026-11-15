@@ -1,8 +1,9 @@
 import { Context } from '@hackdevcode/cordis'
 import { LocalSpillStore } from '@hackdevcode/dsh-spill-local'
 import { LocalFileSystem } from '@hackdevcode/dsh-fs-local'
-import { SessionId } from '@hackdevcode/dsh-session'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import type { SessionId } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -34,8 +35,8 @@ it.each([false, true])('keeps concurrent physical spill files private while reta
       await fork
       const content = `physical UTF-8 \u5185\u5bb9 ${index}`
       const ref = await ctx.spillStore.saveText({
-        owner: { sessionId: SessionId('same-session') },
-        source: { kind: 'tool', toolName: 'bash', callId: ToolCallId('same-call'), label: 'result' },
+        owner: { sessionId: brandString<SessionId>('same-session') },
+        source: { kind: 'tool', toolName: 'bash', callId: brandString<ToolCallId>('same-call'), label: 'result' },
         suggestedName: 'bash.txt', content,
       })
       expect(ref.bytes).toBe(Buffer.byteLength(content))

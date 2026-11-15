@@ -1,0 +1,20 @@
+/** Original-file actions and completion feedback. */
+
+/** File-action dictionary keys. */
+export type FileActionKey = keyof typeof en
+
+/** en file-action labels. */
+export const en = {
+  'menu.finder': 'Show in Finder',
+  'menu.reveal': 'Show in folder',
+  'menu.saveAs': 'Save as…',
+  'menu.copied': 'Copied',
+  'menu.copyImage': 'Copy image',
+  'menu.download': 'Download',
+  'menu.saveFailed': 'Could not save. Check the source and destination, then retry.',
+  'menu.copyFailed': 'Could not copy. Check that the content is available, then retry.',
+  'menu.saved': 'Saved',
+  'menu.downloadStarted': 'Download started',
+  'menu.downloaded': 'Download complete',
+  'path.revealError': 'Could not show the file location. Try again.',
+}

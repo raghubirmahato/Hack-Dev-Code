@@ -122,6 +122,16 @@ describe('Assembled liveshare viewer page on a writable share', () => {
     expect(screen.queryByRole('button', { name: 'New session' })).toBeNull()
     expect(screen.queryByRole('button', { name: /^In “/u })).toBeNull()
     expect(screen.queryByRole('button', { name: /^Workspace “/u })).toBeNull()
+    const workspace = inputFixture.context().get('workspaces')?.list.getSnapshot().items[0]
+    if (workspace === undefined) throw new Error('shared Workspace is not listed')
+    const menus = inputFixture.context().get('contextMenus')
+    if (menus === undefined) throw new Error('context menus are not mounted')
+    const workspaceMenu = menus.resolve({ kind: 'workspace', value: {
+      workspaceId: workspace.workspaceId, path: workspace.path, displayTitle: workspace.title,
+    } })
+    await workspaceMenu.ready
+    expect(workspaceMenu.source.getSnapshot()).toEqual([])
+    workspaceMenu.dispose()
     expect(document.querySelector('[role="treeitem"][draggable="true"]')).toBeNull()
     // The Session's own verbs stay the owner's — the one this page may use there is the branch the
     // mode grants — so the row's menu is not a second way into the owner's Session management: it
@@ -132,6 +142,7 @@ describe('Assembled liveshare viewer page on a writable share', () => {
     expect(screen.queryByRole('menuitem', { name: 'Rename' })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: 'Archive session' })).toBeNull()
     await act(async () => { fireEvent.keyDown(document, { key: 'Escape' }) })
+    await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
 
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Stop generating' })) })
     await waitFor(() => { expect(screen.queryByRole('button', { name: 'Stop generating' })).toBeNull() })

@@ -1,9 +1,10 @@
 import { executeToolFixture } from '@hackdevcode/dsh-tool-testkit'
 import { fileURLToPath } from 'node:url'
 import { agentEvents, type Agent } from '@hackdevcode/dsh-agent'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
 import { boot, loadOverlayPatches } from '@hackdevcode/dsh-app-boot'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-skill'
 import type {} from '@hackdevcode/dsh-tools'
 import { unsupportedModel, unsupportedInbox } from '@hackdevcode/dsh-agent-loop-testkit'
@@ -25,7 +26,7 @@ const ctx = await boot('dsh-badge-snapshot', rootConfigPath, [
 ])
 
 try {
-  const agentId = SessionId('dsh-badge-snapshot')
+  const agentId = brandString<SessionId>('dsh-badge-snapshot')
   const session = ctx.sessions.create(agentId, { meta: { cwd: process.cwd() } })
   const agent: Agent = {
     ctx,
@@ -54,7 +55,7 @@ try {
     : undefined
   const summary = (await ctx.skills.list()).find(skill => skill.name === 'dsh-badge')
   const result = await executeToolFixture(ctx, {
-    callId: ToolCallId('dsh-badge-snapshot'),
+    callId: brandString<ToolCallId>('dsh-badge-snapshot'),
     name: 'skill',
     arguments: { name: 'dsh-badge' },
     signal: new AbortController().signal,

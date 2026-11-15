@@ -1,6 +1,109 @@
-# System prompt
+# System Prompt Assembly
 
-The services and events this area of Hack Dev Code adds to the Cordis context, generated from the source by `pnpm run gen-cordis-catalog`. The packages themselves are described in their own READMEs under `packages/`.
+The [system-prompt package](../../packages/core/system-prompt) owns the data exchanged between prompt contributors and one assembly call. The package [README](../../packages/core/system-prompt/README.md) documents registration, ordering, scoping, and rendering behavior; this page records the exact cross-package types that plugins implement or pass.
+
+Source: [`packages/core/system-prompt/src/index.ts`](../../packages/core/system-prompt/src/index.ts).
+
+## Assembly context
+
+`AssembleContext` identifies the scope layer one assembly resolves and may carry the explicit control signal for that request. It is merge-extensible: `dsh-agent` adds optional `agent` and `modelSelection` fields. `assembleContextFor(agent, signal)` sets the agent, scope, and signal; the loop supplies the model selection captured for the step and retained across retries, with omitted reasoning effort using adapter defaults. A bare assembly has neither scope nor signal.
+
+```ts type-equiv
+/** Merge-extensible context for one prompt assembly. */
+interface AssembleContext {
+  /**
+   * Scope whose providers and waterfall listeners participate. When absent,
+   * only global providers and subject-less listeners participate.
+   */
+  scope?: ScopeKey
+  /** Explicit control signal for the turn that requested this assembly, when any. */
+  signal?: AbortSignal
+}
+```
+
+`TOOL_APPLY_PATCH` takes order 1350 between `TOOL_EDIT` (1300) and `TOOL_GLOB` (1400).
+
+## Tool-provider result
+
+`ToolProviderResult.schemas` is the model-visible set for the current assembly. `knownNames` is the provider's pre-restriction name universe used to distinguish a configured-name typo from a known tool that is deliberately hidden in this scope.
+
+```ts type-equiv
+/** Tool schemas visible in one assembly and their pre-restriction name set. */
+interface ToolProviderResult {
+  /** The schemas this provider contributes to THIS assembly. */
+  readonly schemas: readonly ToolSchema[]
+  /** The pre-restriction name universe for config validation (defaults to `schemas`' names). */
+  readonly knownNames?: readonly string[]
+}
+```
+
+## Prompt sections
+
+The exported `PERSONA_PREFIX_SECTION` (`deployment:persona-prefix`) and `PERSONA_SUFFIX_SECTION` (`deployment:persona-suffix`) name the slots shared by global configuration and scoped contributions. Their `PromptSectionOrderName` entries are `DEPLOYMENT_PERSONA_PREFIX` and `DEPLOYMENT_PERSONA_SUFFIX`; the [package README](../../packages/core/system-prompt/README.md#configure-the-prompt) owns their placement and template configuration.
+
+`PromptSection` is a readonly same-process registration contract. Its text may be static or resolved from the current assembly context. Sections sort by ascending order and then code-unit name; repository contributors resolve the service-owned named allocation through `getSectionOrder()`. Runtime-context contributors resolve their independent allocation through `getContextOrder()`. One effective `complete` section becomes the sole prompt section after cooperative assembly. agent-loop renders the assembled sections with `renderPrompt` and commits the text as a `system/message` surface node — appended as surface node 0 on the first step, then replaced in place when the rendered text changes or, when the prepared call declares `systemPromptUpdate: 'in-history'`, appended after the cached history for non-empty updates in a continuing series — so the prompt reaches the model as a message of derived history rather than as a request field ([decision](../../.agents/notes/implemented/architecture/2026-09-02-system-prompt-as-surface-node.md); [decision rule](../../packages/core/agent-loop/README.md#understand-the-implementation)).
+
+```ts type-equiv
+/** One contributed section of the system prompt (registry input). */
+interface PromptSection {
+  /** Unique name — a duplicate registration throws (see {@link SystemPrompt.section}). */
+  readonly name: string
+  /**
+   * Sections are concatenated in ascending order. Equal orders use code-unit
+   * name order.
+   */
+  readonly order: number
+  /**
+   * Static text or a provider evaluated at each assembly with that assembly's
+   * {@link AssembleContext}. The text may reference `{{variable}}`s — they are
+   * interpolated later, by {@link renderPrompt}, unless `interpolate` is false.
+   */
+  readonly text: string | ((context: AssembleContext) => string)
+  /** Whether to interpolate prompt variables. Defaults to true; false preserves literal text. */
+  readonly interpolate?: boolean
+  /**
+   * Treat this contribution as the complete system prompt. Assembly still
+   * runs the cooperative waterfall so tools, contexts, and variables can be
+   * resolved, then restores this exact section as the sole prompt section.
+   * More than one effective complete section makes assembly fail.
+   */
+  readonly complete?: boolean
+}
+```
+
+## Dynamic prompt context
+
+`PromptContext` is the cache-safe counterpart to `PromptSection`. The assembly resolves and orders these contributions, while agent-loop logs their complete current snapshot after retained model history only when it changed or compaction removed it.
+
+```ts type-equiv
+/** Dynamic model context materialized as a durable user-role snapshot. */
+interface PromptContext {
+  /** Unique name — a duplicate registration throws (see {@link SystemPrompt.context}). */
+  readonly name: string
+  /** Contexts are joined in ascending order. */
+  readonly order: number
+  /** Static text or a provider evaluated at assembly and admission refresh. Empty text contributes nothing. */
+  readonly text: string | ((context: AssembleContext) => string)
+  /** Whether to interpolate prompt variables. Defaults to true; false preserves literal text. */
+  readonly interpolate?: boolean
+  /** Keep this operational context when optional runtime context is disabled. */
+  readonly required?: boolean
+}
+```
+
+`required: true` keeps an operational contribution when optional runtime context is suppressed. `interpolate: false` preserves literal text, including variable-like directory names. `AssembledContext` carries the resolved text and that interpolation choice into rendering.
+
+```ts type-equiv
+/** One resolved dynamic context contribution. */
+interface AssembledContext {
+  /** The contributing context's unique name. */
+  name: string
+  /** The resolved text before variable interpolation. */
+  text: string
+  /** Whether to interpolate prompt variables. Defaults to true; false preserves literal text. */
+  interpolate?: boolean
+}
+```
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

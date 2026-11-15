@@ -13,7 +13,15 @@ import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { ReplayOverrideDoc } from '@hackdevcode/dsh-llm-replay'
 import {
-  assertFixtureInventory, captureExpandedTurnProcessAria, captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  assertFixtureInventory,
+  captureExpandedTurnProcessAria,
+  captureStableAria,
+  compareOrRefreshGolden,
+  launchWebScaffold,
+  watchConsole,
+  webSnapshotMode,
+  type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/skill-user-invoke', import.meta.url))
@@ -122,7 +130,12 @@ describe.skipIf(MODE === 'record')('web e2e: user-explicit skill invocation thro
     // every later Node rebuild of the Turn (process publication, turn close).
     expect(await bubble.count()).toBe(1)
     expect(await bubble.textContent()).toBe(`/${SKILL_NAME}`)
-    expect(await page.locator('[data-chat-flow-kind="context"]').count()).toBe(0)
+    // The loaded instructions stay out of the bubble as their own collapsed Context row.
+    // The folded Turn process holds it, so match the row without requiring it to be visible.
+    const skillContext = page.locator('[data-chat-flow-kind="context"] [data-disclosure-row]')
+      .filter({ hasText: new RegExp(`^Context injection${SKILL_NAME}`) })
+    expect(await skillContext.count()).toBe(1)
+    expect(await skillContext.getAttribute('aria-expanded')).toBe('false')
     const session = scaffold.ctx.sessions.get(sessionId)
     if (session === undefined) throw new Error('skill invocation session is unavailable')
     const injected = session.snapshotEvents().flatMap(event => event.type === 'user/message'

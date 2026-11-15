@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-compaction",
   "description": "Abstract compaction service seam (ctx.compaction) for the Hack Dev Code",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -32,11 +32,13 @@
   "files": [
     "lib/index.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
-    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-commands": "workspace:*",
     "@hackdevcode/dsh-llm": "workspace:*",
     "@hackdevcode/dsh-session": "workspace:*",

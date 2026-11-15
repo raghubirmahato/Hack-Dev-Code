@@ -1,10 +1,15 @@
 // @vitest-environment jsdom
 /** Fixed decisions retain the caller's answer labels and pending-question lifetime. */
 import { cleanup, render } from '@testing-library/react'
+import { makeTranslate } from '@hackdevcode/dsh-client-test-runtime'
 import { afterEach, expect, it, vi } from 'vitest'
 import type { ApprovalCardInput } from '@hackdevcode/dsh-client-ui-approval/client'
 import { PendingQuestion, createWaterfallRequest } from '@hackdevcode/dsh-client-ui-user-questions/src/client/contract/slots.ts'
 import { ApplicationApproval, selectApplicationApproval, type ApplicationApprovalProps } from '../src/client/ApplicationApproval.tsx'
+import { en } from '../src/client/locales.ts'
+
+// English is the only product language; the other dictionaries resolve to it.
+const zh = en
 
 type AskUserQuestionItem = PendingQuestion['questions'][number]
 type ApprovalIntent = Extract<NonNullable<AskUserQuestionItem['intent']>, { kind: 'approval' }>
@@ -36,11 +41,12 @@ it.each(['allow', 'reject', 'always'] as const)('returns the exact %s option fro
   pending.attachWaterfall(request.channel)
   const factory = vi.fn((_name: string, _input: ApprovalCardInput) => null)
   render(<ApplicationApproval {...{ matched: selectApplicationApproval(pending)!, renderFactorySlot: factory,
-    resolveText: text => text.en } as ApplicationApprovalProps} />)
+    t: makeTranslate(en), resolveText: text => text.en } as ApplicationApprovalProps} />)
   const [name, card] = factory.mock.calls[0]!
   expect(name).toBe('conversation.approval.card')
   expect(card).toMatchObject({ title: 'Allow?', description: 'Scope', allowLabel: 'Task', subject: { name: 'Calculator' } })
   expect(card.canAnswer()).toBe(true)
+  expect(card.warning).toEqual({ label: zh.approvalRisks, title: zh.approvalRiskTitle, detail: zh.approvalRiskNotice })
   await ({ allow: card.onAllow, reject: card.onReject, always: card.onAlways! })[choice]()
   expect(await request.result).toEqual({ answers: [{ id: 'cua-app-access', selected: [{ allow: 'task-value', reject: 'deny-value', always: 'saved-value' }[choice]] }] })
   pending.close()
@@ -53,7 +59,7 @@ it('keeps unsupported persistence absent and uses caller text when no localized 
   const pending = new PendingQuestion('s1' as SessionId, [item])
   const factory = vi.fn((_name: string, _input: ApprovalCardInput) => null)
   const props = { matched: selectApplicationApproval(pending)!, renderFactorySlot: factory,
-    resolveText: text => text.en } as ApplicationApprovalProps
+    t: makeTranslate(en), resolveText: text => text.en } as ApplicationApprovalProps
   const view = render(<ApplicationApproval {...props} />)
   expect(factory.mock.calls[0]?.[1]).toMatchObject({ title: 'Allow?', allowLabel: 'Task' })
   expect(factory.mock.calls[0]?.[1]).not.toHaveProperty('onAlways')
@@ -73,11 +79,28 @@ it('uses the original question cancellation and refuses late approval', async ()
   pending.attachWaterfall(request.channel)
   const factory = vi.fn((_name: string, _input: ApprovalCardInput) => null)
   render(<ApplicationApproval {...{ matched: selectApplicationApproval(pending)!, renderFactorySlot: factory,
-    resolveText: text => text.en } as ApplicationApprovalProps} />)
+    t: makeTranslate(en), resolveText: text => text.en } as ApplicationApprovalProps} />)
   const card = factory.mock.calls[0]![1]
   const rejected = expect(request.result).rejects.toMatchObject({ code: 'ASK_ABORTED' })
   controller.abort()
   await rejected
   expect(card.canAnswer()).toBe(false)
   await expect(card.onAllow()).rejects.toThrow('no channel accepts an answer yet')
+})
+
+it('shows the mouse interruption and expiry with only session approval and refusal', () => {
+  const display = {
+    question: { en: 'Move pointer?', zh: '\u5141\u8bb8\u79fb\u52a8\u9f20\u6807\u6307\u9488\u5417\uff1f' },
+    detail: { en: 'Until restart', zh: '\u91cd\u542f\u540e\u5931\u6548' },
+    approve: { en: 'Allow for this session', zh: '\u672c\u4f1a\u8bdd\u5141\u8bb8' },
+  }
+  const pending = new PendingQuestion('s1' as SessionId, [{ id: 'cua-mouse-control', question: display.question.en,
+    detail: display.detail.en, intent: { kind: 'approval', approve: display.approve.en, reject: 'Deny', display } }])
+  const factory = vi.fn((_name: string, _input: ApprovalCardInput) => null)
+  render(<ApplicationApproval {...{ matched: selectApplicationApproval(pending)!, renderFactorySlot: factory,
+    t: makeTranslate(zh), resolveText: text => text.zh } as ApplicationApprovalProps} />)
+  const card = factory.mock.calls[0]![1]
+  expect(card).toMatchObject({ title: display.question.zh, description: display.detail.zh, allowLabel: display.approve.zh })
+  expect(card.onAlways).toBeUndefined()
+  expect(card.warning).toBeUndefined()
 })

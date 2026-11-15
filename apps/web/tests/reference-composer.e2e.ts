@@ -11,12 +11,26 @@ import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { createUserMessage } from '@hackdevcode/dsh-llm'
 import { abbreviateHomePath } from '@hackdevcode/dsh-util-workspace-path'
 import {
-  SESSION_FORMAT_VERSION, Session, SessionId, SessionSeq } from '@hackdevcode/dsh-session'
+  SESSION_FORMAT_VERSION,
+  Session,
+  type SessionId,
+  SessionSeq,
+} from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-session-reference/types'
 import type {} from '@hackdevcode/dsh-session-title'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, launchWebScaffold, seedSession, readPersistedEvents, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  assertFixtureInventory,
+  captureStableAria,
+  compareOrRefreshGolden,
+  launchWebScaffold,
+  seedSession,
+  readPersistedEvents,
+  watchConsole,
+  webSnapshotMode,
+  type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, pinBrowserClock, saveFailureShot, WEB_FIXTURE_TIME, writeComposerDraft } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/reference-composer', import.meta.url))
 const MENU_EXPECTED = join(SNAPSHOT_DIR, 'menu.expected.md')
@@ -46,7 +60,7 @@ async function replaceReferenceQuery(page: Page, input: Locator, text: string): 
 
 /** Build one closed source session with a stable title for reference discovery. */
 function sourceSessionFixture(): string {
-  const session = Session.create(SessionId(SOURCE_SESSION_ID))
+  const session = Session.create(brandString<SessionId>(SOURCE_SESSION_ID))
   session.append('turn/start', {
     turn: 1,
   })
@@ -77,7 +91,7 @@ function sourceSessionFixture(): string {
 
 /** Build one target log with the direct message durably before its recalled context. */
 function targetSessionFixture(): string {
-  const session = Session.create(SessionId(TARGET_SESSION_ID))
+  const session = Session.create(brandString<SessionId>(TARGET_SESSION_ID))
   session.append('turn/start', { turn: 1 })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: '@Research notes what changed?' }],
@@ -379,7 +393,7 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     expect(tripwire.warnings).toEqual([])
   })
 
-  it('renders the direct message while retaining the following recall only in the log', async () => {
+  it('renders the direct message followed by its logged recall as a collapsed Context row', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-reference-order'))
     const group = page.getByRole('treeitem', { name: /Ungrouped/ })
     await group.waitFor({ timeout: 15_000 })
@@ -392,17 +406,24 @@ describe.skipIf(MODE === 'record')('web e2e: file and session references through
     await target.waitFor({ timeout: 15_000 })
     await target.click()
     await page.locator('[data-chat-flow-kind="user"]').filter({ hasText: 'Research notes' }).waitFor({ timeout: 15_000 })
-    const events = await readPersistedEvents(scaffold, SessionId(TARGET_SESSION_ID))
+    const events = await readPersistedEvents(scaffold, brandString<SessionId>(TARGET_SESSION_ID))
     const inputs = events.filter(event => event.type === 'user/message')
     expect(inputs.map(event => event.data.source.kind)).toEqual(['user', 'session-reference'])
     expect(inputs[0]?.seq).toBeLessThan(inputs[1]!.seq)
     expect(JSON.stringify(inputs[1]?.data)).toContain('<referenced-sessions>snapshot</referenced-sessions>')
-    expect(await page.locator('[data-chat-flow-kind="context"]').count()).toBe(0)
+    const recall = page.locator('[data-chat-flow-kind="context"]')
+    expect(await recall.count()).toBe(1)
+    expect(await recall.locator('[data-context-recall-icon]').count()).toBe(1)
+    expect(await recall.locator('[aria-expanded]').getAttribute('aria-expanded')).toBe('false')
+    // The recall follows the direct message, matching their logged order.
+    expect(await page.locator('[data-chat-flow-kind="user"], [data-chat-flow-kind="context"]')
+      .evaluateAll(rows => rows.map(row => row.getAttribute('data-chat-flow-kind')))).toEqual(['user', 'context'])
 
     const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
       .split(TARGET_SESSION_ID).join('{{targetId}}')
     await compareOrRefreshGolden(ORDER_EXPECTED, snapshot, MODE)
     expect(snapshot).toContain('Research notes what changed?')
+    // The recall row folds into the settled Turn process.
     expect(snapshot).not.toContain('Session recall Research notes')
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])

@@ -10,7 +10,7 @@
 
 import type { Context } from '@hackdevcode/cordis'
 import type { JobHandle } from '@hackdevcode/dsh-jobs'
-import type { WorkflowRunId } from '@hackdevcode/dsh-workflow'
+import type { WorkflowRunId } from '@hackdevcode/dsh-workflow/types'
 
 /** Job-ring taps for the background runs the tool tracks. */
 export interface WorkflowRecordMirror {

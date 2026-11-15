@@ -75,6 +75,27 @@ Coordinator ──► [ Workers in parallel ─► Coordinator answers ─► Ve
 
 **Members that misbehave.** A live run with a 4.6B local model showed why members failed, and each cause is now handled where it starts. Members could start a mission of their own: the mission tools are now offered only to the agent the person talks to. Planning roles built the mission themselves: their prompts end with a limit, and a tool guard refuses their writes outside `.hackdev` and their `workflow`, `subagent` and `subagent_fork` calls. Members ended without a structured report: the subagent service accepts a matching report written as text, fills in list and yes/no fields left out, and reminds a member twice before it counts as failed. Gemma wrote tool calls in its own syntax, which the Ollama route now reads back as real calls. A builder copied read line numbers into a file, which `write` now strips. A rejected plan goes back to the planner that wrote it, and the worktree step runs one packaged helper command (`bin/hackdev-worktree.mjs`) instead of five git steps typed by a model.
 
+## Roundtable mode
+
+`hackdev_roundtable` is a third fixed script, for a question rather than a build: members investigate from different angles and talk on one board until they agree.
+
+```text
+Members explore ──► [ Captain steers ─► Members discuss ] × rounds ──► Captain's answer
+ own angle, first     open points to      answer, support,              agreed, disputes,
+ answer, questions    the right member    challenge, revise             dissent, confidence
+```
+
+| Member | What it does |
+|---|---|
+| Captain | Session `roundtable:captain`. After each round it reads what is new and the current answers, addresses each disagreement or unchecked claim to one member, and sets `consensus` when the answers agree in substance and no challenge is open, which ends the rounds. It writes the final answer from the whole board. |
+| Specialists | Angles `researcher`, `logician` and `contrarian`, cycled to fill `agents - 1` seats (`researcher-2` and so on). Each runs as a read-only role (the `Roundtable: ` label prefix) and keeps one conversation, `roundtable:<name>`, across rounds. |
+
+**The board.** A post has a number, an author, addressees, a kind (`finding`, `question`, `answer`, `support`, `challenge`, `revision`), an optional `ref` to an earlier post and a text. A member's prompt shows only the posts since its last turn, those addressed to it first, within `maxMemoryChars`. Every post is also a line in the run view.
+
+**Result.** `kind: 'roundtable'` with the question, answer, confidence, `consensus`, `agreed`, `disputes` (topic and resolution), `dissent`, `openQuestions`, the rounds run, the captain's per-round summaries, the members with their final confidence and the newest 200 posts. If the captain's final answer fails, the most confident member answer is returned and says whose it is.
+
+**Budget.** `(agents - 1) × rounds + rounds + 1`, capped at the engine's agent ceiling.
+
 ## Communication: the blackboard
 
 There is no free-form chat between agents. Communication is explicit, typed and auditable:

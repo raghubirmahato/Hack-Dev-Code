@@ -15,7 +15,9 @@ import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed, vi } from 'vitest'
 import type { SessionEvent } from '@hackdevcode/dsh-session'
 import {
-  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/file-upload-round', import.meta.url))

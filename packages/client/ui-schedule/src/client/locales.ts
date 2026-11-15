@@ -9,22 +9,22 @@ export const NS = 'schedule.catalog'
 
 /** English dictionary (the key-set source of truth). */
 export const en = {
-  'trigger.label': 'Reminders',
-  'list.loading': 'Loading reminders…',
-  'list.error': 'Could not load reminders.',
+  'trigger.label': 'Automation tasks',
+  'list.loading': 'Loading automation tasks…',
+  'list.error': 'Could not load automation tasks.',
   'list.retry': 'Retry',
   'delete.action': 'Delete',
   'delete.pending': 'Deleting…',
-  'delete.label': 'Delete reminder: {title}',
-  'list.open': 'Open reminder details: {title}',
-  'trigger.one': '{count} reminder',
-  'trigger.other': '{count} reminders',
-  'list.aria': 'Active reminders',
+  'delete.label': 'Delete automation task: {title}',
+  'list.open': 'Open automation task details: {title}',
+  'trigger.one': '{count} automation task',
+  'trigger.other': '{count} automation tasks',
+  'list.aria': 'Enabled automation tasks',
   'list.nextRun': 'Next run',
   'frequency.once': 'Once',
   'frequency.every': 'Every {value} {unit}',
   ...frequencyEn,
-  'mark.aria': '{count} scheduled tasks',
+  'mark.aria': '{count} automation tasks',
   'hover.more': '{count} more',
 } satisfies Record<string, string>
 

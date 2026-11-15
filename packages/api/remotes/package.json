@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-api-remotes",
   "description": "Remote BFF assembly for application-selected Host capabilities",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -49,7 +49,10 @@
     "lib/index.js",
     "lib/client.js",
     "lib/types/**/*.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "dependencies": {
     "@hackdevcode/dsh-deque": "workspace:*",
@@ -90,16 +93,19 @@
     "@hackdevcode/dsh-user-approval": "workspace:*",
     "@hackdevcode/dsh-user-questions": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
-    "zod": "4.4.3",
+    "zod": "4.6.6",
     "@hackdevcode/dsh-command-feedback": "workspace:*",
     "@hackdevcode/dsh-api-terminal-controller": "workspace:*",
     "@hackdevcode/dsh-plugin-manager": "workspace:*",
+    "@hackdevcode/dsh-mcp-manager": "workspace:*",
     "@hackdevcode/dsh-plugin-market": "workspace:*",
     "@hackdevcode/dsh-client-ui-plugin-manager": "workspace:*",
-    "@hackdevcode/dsh-office-to-pdf": "workspace:*",
-    "@hackdevcode/dsh-api-account-controller": "workspace:*",
+    "@hackdevcode/dsh-office-kit": "workspace:*",
     "@hackdevcode/dsh-deepseek-account": "workspace:*",
     "@hackdevcode/dsh-client-product-analytics": "workspace:*",
-    "@hackdevcode/dsh-client-ui-trajectory": "workspace:*"
+    "@hackdevcode/dsh-client-ui-session-status": "workspace:*",
+    "@hackdevcode/dsh-agent-team": "workspace:*",
+    "@hackdevcode/dsh-client-ui-trajectory": "workspace:*",
+    "@hackdevcode/dsh-web": "workspace:*"
   }
 }

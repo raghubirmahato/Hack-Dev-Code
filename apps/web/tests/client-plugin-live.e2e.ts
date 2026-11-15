@@ -9,7 +9,7 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, launchWebScaffold,
   seedSession, watchConsole, webSnapshotMode,
 } from './scaffold.ts'
-import { openSettings, newEnglishPage, saveFailureShot } from './support.ts'
+import { openSettings, newEnglishPage, saveFailureShot, ZH_BROWSER_LOCALE } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/plugins/fixture-live-client', import.meta.url))
 const EXPECTED = fileURLToPath(new URL('./expected/client-plugin-live', import.meta.url))
@@ -19,14 +19,14 @@ const SESSION_TITLE = 'Session action extension'
 
 async function openInventory(page: Page, url: string) {
   await page.goto(url, { waitUntil: 'load' })
-  await openSettings(page)
-  const dialog = page.getByRole('dialog', { name: 'Settings' })
-  await dialog.getByRole('button', { name: 'Built-in plugins', exact: true }).click()
-  await dialog.getByRole('searchbox', { name: 'Search plugins' }).waitFor()
+  await openSettings(page, 'zh')
+  const dialog = page.getByRole('dialog', { name: '\u8bbe\u7f6e' })
+  await dialog.getByRole('button', { name: '\u5185\u7f6e\u63d2\u4ef6', exact: true }).click()
+  await dialog.getByRole('searchbox', { name: '\u641c\u7d22\u63d2\u4ef6' }).waitFor()
   return dialog
 }
 
-it('places dynamic Session menu rows by order among the shipped ones and removes them with their fiber', async () => {
+it('keeps ordered legacy Session menu rows before Archive and removes them with their fiber', async () => {
   const scaffold = await launchWebScaffold({ extraInstallAnchors: [join(FIXTURE, 'package.json')] })
   onTestFinished(() => scaffold.close())
   const workspace = await scaffold.ctx.workspaceRegistry.create(scaffold.workspaceCwd)
@@ -42,16 +42,23 @@ it('places dynamic Session menu rows by order among the shipped ones and removes
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     const row = page.getByRole('treeitem').filter({ has: page.getByText(SESSION_TITLE, { exact: true }) })
     await row.waitFor({ timeout: 20_000 })
+    // Static library styles follow their module dependencies: dockkit imports primitives, so primitives install first.
+    const styleOwners = await page.evaluate(() => [...document.head.querySelectorAll('style[data-plugin]')].map(style => style.getAttribute('data-plugin')))
+    const primitives = styleOwners.flatMap((owner, index) => owner === '@hackdevcode/dsh-client-ui-primitives' ? [index] : [])
+    const dockkit = styleOwners.indexOf('@hackdevcode/dsh-client-ui-dockkit')
+    expect(primitives.length).toBeGreaterThan(0)
+    expect(dockkit).toBeGreaterThan(Math.max(...primitives))
     const trigger = row.getByRole('button', { name: `Session actions for ${SESSION_TITLE}` })
 
     const trailing = row.locator('[data-session-trailing]')
     const observations: { stage: string; icons: string[]; time: boolean; pinned: boolean; actions: boolean }[] = []
-    const observe = async (stage: string, iconsVisible: boolean, actionsVisible: boolean, target = row): Promise<void> => {
+    const observe = async (stage: string, iconsVisible: boolean, actionsVisible: boolean, target = row,
+      timeVisible = iconsVisible): Promise<void> => {
       const icons = target.locator('[data-session-trailing]')
       const actions = target.getByRole('button', { name: `Session actions for ${SESSION_TITLE}` })
       const time = target.locator('[class*="time"]')
       await expect.poll(() => icons.first().isVisible()).toBe(iconsVisible)
-      await expect.poll(() => time.isVisible()).toBe(iconsVisible)
+      await expect.poll(() => time.isVisible()).toBe(timeVisible)
       await expect.poll(() => actions.isVisible()).toBe(actionsVisible)
       observations.push({
         stage,
@@ -94,14 +101,16 @@ it('places dynamic Session menu rows by order among the shipped ones and removes
     await observe('menu-open', false, true)
     const menu = page.getByRole('menu')
     await menu.waitFor()
-    expect(await menu.getByRole('separator').count()).toBe(1)
+    expect(await menu.getByRole('separator').count()).toBe(3)
+    const exportRow = menu.getByRole('menuitem', { name: 'Export session', exact: true })
+    expect(await exportRow.locator('..').getByRole('separator').isVisible()).toBe(true)
     await compareOrRefreshGolden(
       SESSION_ACTION_EXPECTED,
       await captureStableAria(page, '[role="menu"]', scaffold.workspaceCwd),
       webSnapshotMode(),
     )
 
-    await menu.getByRole('menuitem', { name: 'Export session' }).press('Enter')
+    await exportRow.press('Enter')
     await expect.poll(() => menu.count()).toBe(0)
     expect(await page.evaluate(() => ({
       action: document.documentElement.dataset.sessionAction,
@@ -113,7 +122,7 @@ it('places dynamic Session menu rows by order among the shipped ones and removes
     await page.mouse.move(0, 0)
     await observe('blur', true, false)
     await page.setViewportSize({ width: 390, height: 844 })
-    await page.getByRole('button', { name: 'Open sidebar', exact: true }).first().click()
+    await page.locator('[data-shell-leading]').getByRole('button', { name: 'Open sidebar', exact: true }).click()
     await page.mouse.move(0, 0)
     await observe('narrow', true, false)
     const bounds = await row.evaluate((element) => {
@@ -133,23 +142,23 @@ it('places dynamic Session menu rows by order among the shipped ones and removes
     try {
       const touchConsole = watchConsole(touchPage)
       await touchPage.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-      await touchPage.getByRole('button', { name: 'Open sidebar', exact: true }).first().click()
+      await touchPage.locator('[data-shell-leading]').getByRole('button', { name: 'Open sidebar', exact: true }).click()
       const touchRow = touchPage.getByRole('treeitem').filter({ has: touchPage.getByText(SESSION_TITLE, { exact: true }) })
       const touchTrigger = touchRow.getByRole('button', { name: `Session actions for ${SESSION_TITLE}` })
       await touchTrigger.waitFor()
       expect(await touchPage.evaluate(() => matchMedia('(hover: hover)').matches)).toBe(false)
-      await observe('touch', true, true, touchRow)
+      await observe('touch', true, true, touchRow, false)
       expect(await touchRow.getByRole('button', { name: 'Archive session', exact: true }).isVisible()).toBe(false)
       expect(await touchRow.getByRole('button', { name: 'Pin session', exact: true }).isVisible()).toBe(false)
       await touchTrigger.tap()
       await touchPage.getByRole('menu').waitFor()
-      await observe('touch-menu-open', true, true, touchRow)
+      await observe('touch-menu-open', true, true, touchRow, false)
       await touchPage.keyboard.press('Escape')
-      await observe('touch-menu-closed', true, true, touchRow)
+      await observe('touch-menu-closed', true, true, touchRow, false)
       await touchTrigger.tap()
       await touchPage.getByRole('menuitem', { name: 'Pin session', exact: true }).tap()
-      await touchRow.getByRole('img', { name: 'Pinned', exact: true }).waitFor()
-      await observe('touch-pinned', true, true, touchRow)
+      await touchRow.getByRole('button', { name: 'Unpin session', exact: true }).waitFor()
+      await observe('touch-pinned', true, true, touchRow, false)
       const touchBounds = await touchRow.evaluate((element) => {
         const title = element.querySelector('[class*="title"]')!.getBoundingClientRect()
         const resting = element.querySelector('[class*="rowResting"]')!.getBoundingClientRect()
@@ -173,7 +182,7 @@ it('places dynamic Session menu rows by order among the shipped ones and removes
       expect(await row.evaluate(element => element === document.activeElement)).toBe(true)
       await observe('clicked-archived-row', true, false)
       await scaffold.ctx.workspaceRegistry.unarchiveSession(sessionId)
-      await observe('touch-unarchived', true, true, touchRow)
+      await observe('touch-unarchived', true, true, touchRow, false)
       expect(touchConsole.pageErrors).toEqual([])
     } finally {
       await touchPage.close()
@@ -193,13 +202,13 @@ it('places dynamic Session menu rows by order among the shipped ones and removes
     await row.hover()
     await trigger.click()
     await menu.waitFor()
-    const remainingNames = ['Pin session', 'Rename', 'Fork session', 'Archive session', 'Copy Session ID']
+    const remainingNames = ['Pin session', 'Rename', 'Mark as unread', 'Fork session', 'Copy Session ID', 'Archive session']
     const remainingItems = menu.getByRole('menuitem')
     expect(await remainingItems.count()).toBe(remainingNames.length)
     for (const [index, name] of remainingNames.entries()) {
       expect(await remainingItems.nth(index).and(menu.getByRole('menuitem', { name, exact: true })).count()).toBe(1)
     }
-    expect(await menu.getByRole('separator').count()).toBe(0)
+    expect(await menu.getByRole('separator').count()).toBe(2)
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
     await menu.getByRole('menuitem', { name: 'Copy Session ID', exact: true }).click()
     await expect.poll(() => menu.count()).toBe(0)
@@ -222,8 +231,8 @@ it('synchronizes two pages, disposes effects and restores an offline page from t
   const host = scaffold.ctx.loader.ctx.fiber.uid
   const browser = await chromium.launch()
   try {
-    const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
-    const otherContext = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+    const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
+    const otherContext = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
     const page = await context.newPage()
     const other = await otherContext.newPage()
     const consoles = [watchConsole(page), watchConsole(other)]
@@ -257,7 +266,7 @@ it('synchronizes two pages, disposes effects and restores an offline page from t
     await compareOrRefreshGolden(join(EXPECTED, 'enabled.expected.md'), await captureStableAria(page, '[data-live-client]', scaffold.workspaceCwd), webSnapshotMode())
 
     // The inventory filter is page-owned state that live composition must preserve.
-    const draft = otherInventory.getByRole('searchbox', { name: 'Search plugins' })
+    const draft = otherInventory.getByRole('searchbox', { name: '\u641c\u7d22\u63d2\u4ef6' })
     await draft.fill('unfinished-filter')
     await toggle()
     for (const target of [page, other]) {
@@ -304,7 +313,7 @@ it('keeps a failed client download local and retries without changing Host enabl
   const scaffold = await launchWebScaffold({ extraInstallAnchors: [join(FIXTURE, 'package.json')] })
   const browser = await chromium.launch()
   try {
-    const page = await browser.newPage({ locale: 'en-US' })
+    const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
     onTestFailed(() => saveFailureShot(page, 'web-e2e-client-live-retry'))
     await openInventory(page, scaffold.authenticatedUrl)
     const bundle = (url: URL) => url.pathname.startsWith('/plugins/') && url.search.includes('@fixture/live-client/client.js')
@@ -316,7 +325,7 @@ it('keeps a failed client download local and retries without changing Host enabl
     expect(await page.locator('[data-live-client]').count()).toBe(0)
     expect(scaffold.ctx.clientModules.graph().entries.some(row => row.id === '@fixture/live-client')).toBe(true)
     await page.unroute(bundle)
-    await failure.getByRole('button', { name: 'Retry this page' }).click()
+    await failure.getByRole('button', { name: '\u91cd\u8bd5\u672c\u9875\u9762\u540c\u6b65' }).click()
     await page.locator('[data-live-client]').waitFor()
     await expect.poll(() => failure.count()).toBe(0)
     expect(scaffold.ctx.loader.resolve(entryId).fiber?.state).toBe(2)
@@ -341,20 +350,20 @@ it('recovers an uncreated client entry with rebuilt factory code without navigat
   const host = scaffold.ctx.loader.ctx.fiber.uid
   const browser = await chromium.launch()
   try {
-    const page = await browser.newPage({ locale: 'en-US' })
+    const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
     onTestFailed(() => saveFailureShot(page, 'web-e2e-client-factory-rebuild'))
     const inventory = await openInventory(page, scaffold.authenticatedUrl)
-    const draft = inventory.getByRole('searchbox', { name: 'Search plugins' })
+    const draft = inventory.getByRole('searchbox', { name: '\u641c\u7d22\u63d2\u4ef6' })
     await draft.fill('unfinished-filter')
     let navigations = 0
     page.on('framenavigated', () => { navigations++ })
     const entryId = await scaffold.ctx.loader.create({ name: '@fixture/live-client' })
     const failure = page.locator('[data-client-sync-failure]')
     await failure.getByText(/fixture r0 factory failed/).waitFor()
-    const rebuilt = source.replace('Live plugin enabled', 'Live plugin r1 enabled')
+    const rebuilt = source.replace('\u52a8\u6001\u63d2\u4ef6\u5df2\u542f\u7528', '\u52a8\u6001\u63d2\u4ef6 r1 \u5df2\u542f\u7528').replace('Live plugin enabled', 'Live plugin r1 enabled')
     await writeFile(file, rebuilt)
     scaffold.ctx.clientModules.rebuilt('@fixture/live-client')
-    await page.getByText('Live plugin r1 enabled', { exact: true }).waitFor()
+    await page.getByText('\u52a8\u6001\u63d2\u4ef6 r1 \u5df2\u542f\u7528', { exact: true }).waitFor()
     await expect.poll(() => failure.count()).toBe(0)
     await compareOrRefreshGolden(join(EXPECTED, 'recovered.expected.md'), await captureStableAria(page, '[data-live-client]', scaffold.workspaceCwd), webSnapshotMode())
     expect(await draft.inputValue()).toBe('unfinished-filter')
@@ -374,11 +383,11 @@ it('reports bootstrap rebuilds without remounting the settings page or navigatin
   const host = scaffold.ctx.loader.ctx.fiber.uid
   const browser = await chromium.launch()
   try {
-    const page = await browser.newPage({ locale: 'en-US' })
+    const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
     const console = watchConsole(page)
     onTestFailed(() => saveFailureShot(page, 'web-e2e-client-bootstrap-rebuild'))
     const inventory = await openInventory(page, scaffold.authenticatedUrl)
-    const draft = inventory.getByRole('searchbox', { name: 'Search plugins' })
+    const draft = inventory.getByRole('searchbox', { name: '\u641c\u7d22\u63d2\u4ef6' })
     await draft.fill('unfinished-filter')
     const originalInput = await draft.elementHandle()
     let navigations = 0
@@ -390,7 +399,7 @@ it('reports bootstrap rebuilds without remounting the settings page or navigatin
     scaffold.ctx.clientModules.rebuilt('@hackdevcode/dsh-client-modules')
     const failure = page.locator('[data-client-sync-failure]')
     await failure.getByText(/replacing bootstrap module .* requires a page reload/).waitFor()
-    await failure.getByRole('button', { name: 'Retry this page' }).click()
+    await failure.getByRole('button', { name: '\u91cd\u8bd5\u672c\u9875\u9762\u540c\u6b65' }).click()
     await failure.getByText(/replacing bootstrap module .* requires a page reload/).waitFor()
     await compareOrRefreshGolden(join(EXPECTED, 'bootstrap-rebuild.expected.md'), await captureStableAria(page, '[data-client-sync-failure]', scaffold.workspaceCwd), webSnapshotMode())
     expect(await originalInput!.evaluate(input => input.isConnected)).toBe(true)
@@ -411,7 +420,7 @@ it('removes the client UI and resources while Host cleanup is still pending', as
   const host = scaffold.ctx.loader.ctx.fiber.uid
   const browser = await chromium.launch()
   try {
-    const page = await browser.newPage({ locale: 'en-US' })
+    const page = await browser.newPage({ locale: ZH_BROWSER_LOCALE })
     await openInventory(page, scaffold.authenticatedUrl)
     let navigations = 0
     page.on('framenavigated', () => { navigations++ })

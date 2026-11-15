@@ -3,7 +3,8 @@ import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import ComputerUse from '@hackdevcode/dsh-computer-use'
-import { ComputerUseProviderName } from '@hackdevcode/dsh-computer-use/brand'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ComputerUseProviderName } from '@hackdevcode/dsh-computer-use/types'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
 
@@ -58,7 +59,7 @@ describe('installed Cua Driver ownership', () => {
       expect(ctx.computerUse.providerName).toBe('cua-driver-mcp')
       await expect(ctx.plugin(Provider, {})).rejects.toThrow('already registered')
       expect(fake.start).toHaveBeenCalledTimes(1)
-      expect(() => ctx.computerUse.register(ComputerUseProviderName('another-driver'))).toThrow('already registered')
+      expect(() => ctx.computerUse.register(brandString<ComputerUseProviderName>('another-driver'))).toThrow('already registered')
     } finally {
       ready.resolve()
       await first

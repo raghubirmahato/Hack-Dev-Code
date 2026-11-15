@@ -1,0 +1,120 @@
+{
+  "name": "@hackdevcode/dsh-timeline",
+  "description": "Replace Todo in long-running sessions with task trees, a live progress bar, and timed reports",
+  "version": "0.2.2-rc.3",
+  "icon": "./icon.svg",
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/experimental/timeline"
+  },
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json",
+    "./src/*": "./src/*",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "icon.svg",
+    "locale/*.json",
+    "docs",
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "@hackdevcode/dsh-client-connection",
+        "@hackdevcode/dsh-client-locale",
+        "@hackdevcode/dsh-client-ui-conversation",
+        "@hackdevcode/dsh-client-ui-plugin-manager",
+        "@hackdevcode/dsh-client-ui-renderer",
+        "@hackdevcode/dsh-client-ui-session",
+        "@hackdevcode/dsh-client-ui-settings",
+        "@hackdevcode/dsh-client-ui-sidebar-right",
+        "@hackdevcode/dsh-client-ui-tool",
+        "@hackdevcode/dsh-api-session-controller"
+      ]
+    }
+  },
+  "dependencies": {
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-util-crypto": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "zod": "4.6.6"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-error": "workspace:*",
+    "@hackdevcode/dsh-scope": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-tools": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/cosmokit": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-agent-loop-testkit": "workspace:*",
+    "@hackdevcode/dsh-api-session-controller": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-locale": "workspace:*",
+    "@hackdevcode/dsh-client-store": "workspace:*",
+    "@hackdevcode/dsh-client-ui-commands": "workspace:*",
+    "@hackdevcode/dsh-client-ui-conversation": "workspace:*",
+    "@hackdevcode/dsh-client-ui-plugin-manager": "workspace:*",
+    "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
+    "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
+    "@hackdevcode/dsh-client-ui-session": "workspace:*",
+    "@hackdevcode/dsh-client-ui-settings": "workspace:*",
+    "@hackdevcode/dsh-client-ui-sidebar-right": "workspace:*",
+    "@hackdevcode/dsh-client-ui-slots": "workspace:*",
+    "@hackdevcode/dsh-client-ui-tool": "workspace:*",
+    "@hackdevcode/dsh-commands": "workspace:*",
+    "@hackdevcode/dsh-error": "workspace:*",
+    "@hackdevcode/dsh-fs": "workspace:*",
+    "@hackdevcode/dsh-fs-local": "workspace:*",
+    "@hackdevcode/dsh-scope": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/dsh-session-persistence-jsonl": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-session-title": "workspace:*",
+    "@hackdevcode/dsh-settings": "workspace:*",
+    "@hackdevcode/dsh-system-prompt": "workspace:*",
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@testing-library/react": "^16.1.0",
+    "@types/d3-time": "^3.0.4",
+    "d3-time": "3.1.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  }
+}

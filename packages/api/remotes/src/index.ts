@@ -28,6 +28,7 @@ import type {} from '@hackdevcode/dsh-permission-presets/types'
 import type {} from '@hackdevcode/dsh-settings/types'
 import type {} from '@hackdevcode/dsh-user-approval'
 import type {} from '@hackdevcode/dsh-user-questions'
+import type {} from '@hackdevcode/dsh-web/types'
 export type {} from '@hackdevcode/dsh-api-session-controller/types'
 
 export { API_REMOTE_FORWARDED_EVENTS } from './remote-events.ts'

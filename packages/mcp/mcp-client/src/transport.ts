@@ -27,7 +27,7 @@ function buildChildEnv(extra: Record<string, string>): Record<string, string> {
  *
  * @param config - Resolved plugin config discriminated on `transport`.
  * @param authProvider - OAuth sign-in for a Streamable HTTP server that asks for one; stdio ignores it.
- * @returns A connected-ready MCP Transport (stdio or Streamable HTTP).
+ * @returns an unstarted MCP transport (stdio or Streamable HTTP).
  */
 export function createTransport(config: Config, authProvider?: OAuthClientProvider): Transport {
   switch (config.transport) {

@@ -26,7 +26,7 @@ import { createMessage, createUserMessage } from '@hackdevcode/dsh-llm'
 import {
   SESSION_FORMAT_VERSION,
   Session,
-  SessionId,
+  type SessionId,
 } from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-session-title'
 import {
@@ -39,6 +39,7 @@ import {
   type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/markdown-wide-table', import.meta.url))
 const GEOMETRY_EXPECTED = fileURLToPath(
@@ -105,7 +106,7 @@ function tablesMarkdown(): string {
     `| ${LONG_CELL_MARKER} | Value |`,
     '| --- | --- |',
     `| path | ${LONG_TOKEN} |`,
-    `| Instructions | ${CJK_SENTENCE} |`,
+    `| \u8bf4\u660e | ${CJK_SENTENCE} |`,
     '',
     TAIL_MARKER,
   ].join('\n')
@@ -113,7 +114,7 @@ function tablesMarkdown(): string {
 
 /** Build one closed session fixture carrying the tables. */
 function wideTableFixture(): string {
-  const session = Session.create(SessionId('markdown-wide-table-source'))
+  const session = Session.create(brandString<SessionId>('markdown-wide-table-source'))
   const eventTimeOrigin = new Date().setHours(12, 0, 0, 0)
   session.append('turn/start', { turn: 1 })
   const user = session.append('user/message', createUserMessage({
@@ -216,8 +217,8 @@ async function awaitTableLayout(target: Page): Promise<void> {
     if (element === null) return false
     const tracks = getComputedStyle(element).gridTemplateColumns.split(' ').map(Number.parseFloat)
     const root = element.querySelector<HTMLElement>('div[data-phase]')
-    // Mirrored from ui-layout's SIDEBAR_COLLAPSED; these tests use the Host compiler face.
-    return tracks[0] === 56 && tracks.at(-1) === 0
+    // Desktop retains the rail; the mobile drawer leaves the whole width to the transcript.
+    return tracks[0] === (element.hasAttribute('data-sidebar-drawer') ? 0 : 56) && tracks.at(-1) === 0
       && element.getAnimations().every(animation =>
         animation.playState === 'finished' || animation.playState === 'idle')
       && root !== null

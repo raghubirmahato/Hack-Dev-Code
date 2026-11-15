@@ -1,7 +1,8 @@
 import { Context } from '@hackdevcode/cordis'
 import { describe, expect, it, vi } from 'vitest'
-import { AttachmentId, type ImageAttachmentRef } from '@hackdevcode/dsh-attachment'
-import { LlmAttemptId } from '@hackdevcode/dsh-llm/brand'
+import type { AttachmentId, ImageAttachmentRef } from '@hackdevcode/dsh-attachment/types'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { LlmAttemptId } from '@hackdevcode/dsh-llm/types'
 import type { StreamChunk } from '@hackdevcode/dsh-llm'
 import type {
   AssistantLiveChunkEvent, SessionEventLike, SessionEventLikeEntry,
@@ -37,7 +38,7 @@ const SID = 'stats-session' as SessionId
 
 /** One durable image the prompt fixtures attach. */
 const IMAGE: ImageAttachmentRef = {
-  attachmentId: AttachmentId('sha256:image'),
+  attachmentId: brandString<AttachmentId>('sha256:image'),
   mediaType: 'image/png',
   bytes: 12,
   width: 2,
@@ -72,7 +73,7 @@ function transient(turn: number, step: number, chunk: StreamChunk, time?: number
     type: 'assistant/live-chunk',
     seq,
     time: time ?? 1_000 + seq,
-    data: { attemptId: LlmAttemptId('attempt-1'), turn, step, chunk },
+    data: { attemptId: brandString<LlmAttemptId>('attempt-1'), turn, step, chunk },
   }
   return { type: 'transient', event: chunkEvent }
 }

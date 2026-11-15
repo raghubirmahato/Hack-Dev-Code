@@ -8,13 +8,14 @@ import { createUserMessage } from '@hackdevcode/dsh-llm'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import Loader from '@hackdevcode/cordis-plugin-loader'
-import SessionStore, { SessionSeq, SESSION_FORMAT_VERSION, SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { SessionSeq, SESSION_FORMAT_VERSION, type SessionId } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import * as JsonlSessionPersistence from '@hackdevcode/dsh-session-persistence-jsonl'
 import SqliteSessionQueryEngine, * as queryModule from '@hackdevcode/dsh-session-query-sqlite'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const temporaryDirectories: string[] = []
 
@@ -47,7 +48,7 @@ describe('dsh-session-query-sqlite real Loader path', () => {
     expect(unwrapped).toBe(SqliteSessionQueryEngine)
     const query = await ctx.plugin(unwrapped, { path: searchPath })
 
-    const id = SessionId('loader-path')
+    const id = brandString<SessionId>('loader-path')
     const writer = await ctx.sessionPersistence.create({ version: SESSION_FORMAT_VERSION, id, createdAt: 10, isSeeded: false })
     await writer.append([{
       type: 'user/message',

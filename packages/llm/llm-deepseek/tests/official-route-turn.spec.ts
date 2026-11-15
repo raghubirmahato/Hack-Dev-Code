@@ -11,6 +11,7 @@ import ToolRuntime from '@hackdevcode/dsh-tools'
 import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import * as DeepSeek from '@hackdevcode/dsh-llm-deepseek-api-key'
 import * as LlmRetry from '@hackdevcode/dsh-llm-retry'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const contexts: Context[] = []
 afterEach(async () => {
@@ -30,7 +31,7 @@ it('records the prompt and fails the request when the official endpoint has a ma
   await ctx.plugin(NativeToolExecutor)
   await ctx.plugin(AgentLoop, { agents: [] })
   await ctx.plugin(DeepSeek, {})
-  const agent = await ctx.agentLoop.create(SessionId('malformed-official-key'), { provider: 'deepseek-official', model: 'deepseek-flash' })
+  const agent = await ctx.agentLoop.create(brandString<SessionId>('malformed-official-key'), { provider: 'deepseek-official', model: 'deepseek-flash' })
   agent.followup(createUserMessage({ content: [{ type: 'text', text: 'hello' }], source: { kind: 'user' } }))
   await agent.whenIdle()
   const events = agent.session.snapshotEvents()

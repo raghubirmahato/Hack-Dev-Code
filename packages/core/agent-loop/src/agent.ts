@@ -33,7 +33,7 @@ import type { Scope } from '@hackdevcode/dsh-scope'
 import { createScope } from '@hackdevcode/dsh-scope'
 import type { EpochHeader, RequestContext, Session, SessionId, SessionSeq, TurnEndReason, UserMessage } from '@hackdevcode/dsh-session'
 import { canonicalHeader, headerEquals, ToolCallRecovery } from '@hackdevcode/dsh-session'
-import { joinContextSections, renderContextSections, renderPrompt } from '@hackdevcode/dsh-system-prompt'
+import { renderContextSections, renderPrompt } from '@hackdevcode/dsh-system-prompt'
 import type { PromptAssembly } from '@hackdevcode/dsh-system-prompt'
 import { ToolActivationError, ToolBatchExecutionError } from '@hackdevcode/dsh-tools'
 import type { ResolvedToolSet } from '@hackdevcode/dsh-tools'
@@ -209,6 +209,7 @@ export class ReactLoopAgent implements Agent {
     public readonly session: Session,
     projections: LoopProjections,
     lastTurn: number,
+    private readonly lifetimeSignal: AbortSignal,
   ) {
     this.requestSurfaceGeneration = session.surface.contentGeneration
     this.dispatch = agentEvents(loopCtx, this)
@@ -257,11 +258,15 @@ export class ReactLoopAgent implements Agent {
   }
 
   cancel(cause: AgentCancelCause, options: CancelOptions = {}): void {
-    if (!options.keepInbox) {
-      this.inbox.clear()
-      if (this.phase.kind !== 'idle') this.phase.wakeRequested = false
+    try {
+      if (!options.keepInbox) this.inbox.clear()
+    } finally {
+      // Queue persistence must not prevent cancellation of admitted work.
+      if (this.phase.kind !== 'idle') {
+        if (!options.keepInbox) this.phase.wakeRequested = false
+        this.phase.abort.abort(cause)
+      }
     }
-    if (this.phase.kind !== 'idle') this.phase.abort.abort(cause)
   }
 
   runMaintenance<T>(job: (signal: AbortSignal) => Promise<T>): Promise<T> {
@@ -296,6 +301,7 @@ export class ReactLoopAgent implements Agent {
    *   the inbox insertion so a reentrant cancel cannot reclassify it.
    */
   private wakeDriver(wakeAfterAbort = false): void {
+    if (this.lifetimeSignal.aborted) return
     if (this.phase.kind !== 'idle') {
       // Maintenance and aborted drivers cannot deliver the wake: latch it for
       // replay at convergence. Live drivers claim queued work themselves;
@@ -365,7 +371,7 @@ export class ReactLoopAgent implements Agent {
         'agent/pre-step', { messages: claimed, ...position, signal, modelSelection: selection },
         (): Promise<PreStepDecision> => {
           const sections = renderContextSections(assembly)
-          const context = this.runtimeContext.project(joinContextSections(sections), sections)
+          const context = this.runtimeContext.project(sections)
           return Promise.resolve<PreStepDecision>({
             kind: 'enter',
             messages: context === undefined ? claimed : [...claimed, context],
@@ -522,7 +528,7 @@ export class ReactLoopAgent implements Agent {
         ...assembleContextFor(this, signal), modelSelection: decision.selection,
       })
       const sections = renderContextSections(currentContext)
-      const context = this.runtimeContext.project(joinContextSections(sections), sections)
+      const context = this.runtimeContext.project(sections)
       signal.throwIfAborted()
       const startsRequestSeries = firstAttempt && decision.startsRequestSeries === true
       const commits = this.systemPrompt.project(renderedPrompt, {
@@ -633,7 +639,7 @@ export class ReactLoopAgent implements Agent {
           )
           signal.throwIfAborted()
           if (action?.kind !== 'retry') {
-            throw new LlmError(finish.failure.message, finish.failure.code, finish.failure)
+            throw LlmError.fromFailure(finish.failure)
           }
           continue
         }

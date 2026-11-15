@@ -1,4 +1,4 @@
-vi.mock('../src/web-document.ts', () => ({ authenticateWebHost: async () => 'test-cookie', serveWebDocument: vi.fn(), forwardWebRequest: vi.fn() }))
+vi.mock('../src/web-document.ts', () => ({ authenticateWebHost: async () => 'test-cookie', serveWebDocument: vi.fn(), forwardWebRequest: vi.fn(), removeLegacyHostCookies: vi.fn(async () => {}) }))
 /** Welcome startup uses the Host before transitioning to the workspace. */
 
 import { afterEach, expect, it, vi } from 'vitest'
@@ -37,7 +37,7 @@ const state = vi.hoisted(() => ({
   windowOptions: undefined as BrowserWindowConstructorOptions | undefined,
   menu: vi.fn(),
   operations: undefined as WelcomeOperations | undefined,
-  nativeTheme: { themeSource: 'system', shouldUseDarkColors: false },
+  nativeTheme: { themeSource: 'system', shouldUseDarkColors: false, on: vi.fn() },
 }))
 
 vi.mock('../src/crash-report.ts', async importOriginal => ({
@@ -86,6 +86,8 @@ vi.mock('electron', () => ({
   net: { fetch: vi.fn() },
   nativeTheme: state.nativeTheme,
   session: { defaultSession: {
+    // `on` takes the download handler; cookies are only passed to the mocked legacy cookie cleanup.
+    on: vi.fn(), cookies: {},
     setPermissionCheckHandler: vi.fn(), setPermissionRequestHandler: vi.fn(), webRequest: { onBeforeSendHeaders: vi.fn() },
   } },
   protocol: { registerSchemesAsPrivileged: vi.fn(), handle: vi.fn() },
@@ -111,6 +113,8 @@ vi.mock('../src/project-manager.ts', () => ({ DesktopProjectManager: class {
   canRecoverProfile = vi.fn(() => true)
 } }))
 vi.mock('../src/host-process.ts', () => ({
+  DesktopHostFatalError: class extends Error {},
+  DesktopHostUncleanExitError: class extends Error {},
   DesktopHostProcess: class {
     start = state.startHost
     stop = state.stopHost
@@ -122,7 +126,7 @@ vi.mock('../src/host-process.ts', () => ({
   },
 }))
 vi.mock('../src/welcome-backend.ts', () => ({
-  connectDesktopWelcome: async () => ({
+  connectDesktopWelcome: () => ({
     analyticsEnabled: async () => false,
     readLocalePreference: async () => state.preference,
     read: async () => {

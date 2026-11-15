@@ -7,13 +7,19 @@ import { readFileSync } from 'node:fs'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import * as yaml from 'js-yaml'
-import { entryListSchema } from '@hackdevcode/cordis-plugin-include'
+import { parseEntryYaml } from '@hackdevcode/cordis-plugin-include'
+import { brandString } from '@hackdevcode/dsh-brand'
 import {
-  createAssistantMessage, createMessage, createUserMessage, ToolCallId, type AssistantStreamRecord, type TokenUsage } from '@hackdevcode/dsh-llm'
+  createAssistantMessage, createMessage, createUserMessage, type ToolCallId,
+  type AssistantStreamRecord, type TokenUsage,
+} from '@hackdevcode/dsh-llm'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot } from './support.ts'
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden,
+  launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
+import {
+  connectFreshWorkspace, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot,
+} from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/client-ui-stats-panel', import.meta.url))
 const PANEL_EXPECTED = join(SNAPSHOT_DIR, 'panel.expected.md')
@@ -25,7 +31,7 @@ const MODE = webSnapshotMode()
 
 /** Overlay layer entries, for the composition guard below. */
 function profileEntries(path: string): unknown[] {
-  const parsed = yaml.load(readFileSync(path, 'utf8'), { schema: entryListSchema })
+  const parsed = parseEntryYaml(readFileSync(path, 'utf8'))
   if (!Array.isArray(parsed)) throw new Error(`profile layer at ${path} must be a list`)
   return parsed
 }
@@ -94,7 +100,7 @@ describe('web e2e: Statistics view', () => {
     agent.session.append('tool/call', {
       turn: 1,
       step: 1,
-      callId: ToolCallId('call-1'),
+      callId: brandString<ToolCallId>('call-1'),
       name: 'read',
       arguments: JSON.stringify({ file_path: '/work/notes.md' }),
     })
@@ -104,8 +110,8 @@ describe('web e2e: Statistics view', () => {
       message: createMessage({
         role: 'tool',
         content: [{ type: 'text', text: 'one\ntwo' }],
-        source: { kind: 'tool', callId: ToolCallId('call-1') },
-        toolCallId: ToolCallId('call-1'),
+        source: { kind: 'tool', callId: brandString<ToolCallId>('call-1') },
+        toolCallId: brandString<ToolCallId>('call-1'),
       }),
     }, { surfaceOp: 'append' })
     agent.session.append('step/end', { turn: 1, step: 1 })

@@ -46,6 +46,9 @@ export const coverageExemptHeavySuites: readonly CoverageExemptSuite[] = [
   },
   // Real child-process fixtures over scripts/ sources, which coverage never measures.
   { filter: 'scripts/change-scope.spec.ts', exclude: 'scripts/change-scope.spec.ts' },
+  // Repository compiler scans measure scripts/ sources only. The epoch-header
+  // suite also calls the v3-to-v4 admission guard, covered by its package tests.
+  { filter: 'scripts/gen-client-catalog.spec.ts', exclude: 'scripts/gen-client-catalog.spec.ts' },
   // Built-artifact proof. Packer/runtime src is threshold-excluded, and the
   // suite self-skips on unbuilt checkouts; the serial-windows complete
   // reference still starts this uninstrumented gate after its build gate, so

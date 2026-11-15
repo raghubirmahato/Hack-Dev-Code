@@ -25,10 +25,11 @@ import type { ContextFormed } from '@hackdevcode/dsh-llm'
 import { MAX_CUSTOM_INSTRUCTIONS_CHARS, parseCustomRules, renderCustomInstructions } from '@hackdevcode/dsh-system-prompt'
 import { HACKDEV_META, HACKDEV_REVIEW_META, HACKDEV_REVIEW_SCRIPT, HACKDEV_SCRIPT } from './script.ts'
 import { HACKDEV_SWARM_META, HACKDEV_SWARM_SCRIPT } from './swarm.ts'
-import { compactReport, renderReport } from './render.ts'
+import { HACKDEV_ROUNDTABLE_META, HACKDEV_ROUNDTABLE_SCRIPT } from './roundtable.ts'
+import { compactReport, renderReport, renderRoundtable } from './render.ts'
 import { describeHost, detectHost } from './host.ts'
 
-import type { HackDevReport } from './render.ts'
+import type { HackDevReport, RoundtableReport } from './render.ts'
 
 /**
  * The script that gives a builder its own git worktree in one command, so the agent that isolates a task runs one
@@ -50,7 +51,7 @@ const MISSION_TOOL_OPTIONS = { when: ({ agent }: { agent: Agent }) => delegation
  * integrator, the chronicler, the swarm coordinator and the worktree manager (which only runs one command). Builders,
  * gates, verifiers and the merge manager change files and are not listed.
  */
-export const READ_ONLY_ROLE = /^(?:Council: |Splitter: |Fact-checker |Integrator |Chronicler$|@coordinator: |Worktree: )/u
+export const READ_ONLY_ROLE = /^(?:Council: |Splitter: |Fact-checker |Integrator |Chronicler$|@coordinator: |Worktree: |Roundtable: )/u
 
 /** What a read-only role is told when it tries to edit a project file. */
 export const READ_ONLY_REFUSAL = 'Your role does not change the project\'s files: only notes under .hackdev may be '
@@ -95,8 +96,12 @@ declare module '@hackdevcode/dsh-llm' {
   }
 }
 
-/** "use hackdev", "call the hackdev_swarm tool", "use a swarm (hackdev_swarm)": a request for one tool by name. */
-const NAMED_TOOL = /\b(?:use|call|run|start)\s+(?:the\s+|a\s+swarm\s+\(\s*)?(hackdev(?:_swarm|_review)?)\b(?![./\\-])/iu
+/**
+ * "use hackdev", "call the hackdev_swarm tool", "use a swarm (hackdev_swarm)", "use a roundtable (hackdev_roundtable)":
+ * a request for one tool by name.
+ */
+const NAMED_TOOL = new RegExp(String.raw`\b(?:use|call|run|start)\s+(?:the\s+|a\s+(?:swarm|roundtable)\s+\(\s*)?`
+  + String.raw`(hackdev(?:_swarm|_review|_roundtable)?)\b(?![./\\-])`, 'iu')
 
 /**
  * The note for a message that asks for a mission tool by name. Small local models often do such work themselves
@@ -229,6 +234,15 @@ interface SwarmArgs {
   verifierModel?: string
 }
 
+interface RoundtableArgs {
+  question: string
+  agents?: number
+  rounds?: number
+  notes?: string
+  captainModel?: string
+  memberModel?: string
+}
+
 interface MissionArgs {
   mission: string
   maxTasks?: number
@@ -246,6 +260,7 @@ const POLICY = [
   'Hack Dev Code operating policy.',
   '- For any substantial build, feature, migration or multi-file bug-fix request, call the hackdev tool with the full mission instead of working alone: it sizes a team of specialist agents to the mission, builds in parallel waves with a shared blackboard and project map, fact-checks every claim, then runs three independent gates (syntax/logic/runtime verifier, quality and UI/UX reviewer with screenshots, security reviewer) that fix what they find, and keeps iterating until every acceptance criterion is met or the wave budget is spent. Relay its report faithfully, including unmet criteria, open issues, limitations and items needing human approval.',
   '- When the person asks for a swarm (or types /swarm), or wants a team of agents working in parallel that they can follow on one message board, call hackdev_swarm instead: a coordinator names the workers and briefs each one (what it owns, what it must not touch, what done means), the workers build in parallel and post diffs, tests and questions to the shared board, and adversarial verifiers send problems back to the worker that wrote the code. If the person names a model for the coordinator, the workers or the verifiers, pass it. Relay the coordinator\'s report and the unresolved problems faithfully.',
+  '- When the person wants a hard question answered, a decision made, an approach reviewed or a root cause found, and several independent views checked against each other would help (or asks for a roundtable, a council or a heavy/multi-agent answer, or types /roundtable), call hackdev_roundtable: a captain and specialists for facts, logic and the contrary view share findings on one board, challenge each other over a few rounds and agree on an answer; members only investigate and never change files. Pass agents 8 to 16 for a very hard question. Relay the answer, the disputes and any dissent faithfully.',
   '- For small edits you make yourself, finish by calling hackdev_review so the same three gates check the result before you declare it done.',
   '- Never claim software is finished, secure or unhackable on your own say-so: cite gate evidence, and state residual risk honestly.',
 ].join('\n')
@@ -262,6 +277,14 @@ const MISSION_DESCRIPTION = 'Run the full Hack Dev Code pipeline for one mission
   + 'checks every acceptance criterion and starts follow-up waves for unmet ones. Writes .hackdev/RUN_REPORT.md, .hackdev/PROGRESS.md, '
   + '.hackdev/PROJECT_MAP.md and long-term .hackdev/MEMORY.md. Use for any substantial build, feature or multi-file fix. '
   + 'The call blocks until the whole pipeline settles and returns an evidence-based report.'
+
+const ROUNDTABLE_DESCRIPTION = 'Put one question to a roundtable of agents that think it through together and talk until they agree: a captain '
+  + 'leads, and specialists each take an angle (facts and evidence; logic, math and code; the contrary view), with more agents staffing each '
+  + 'angle several times. Every member posts findings, questions, support and challenges to one shared board, reads what the others found, '
+  + 'answers the questions put to it and revises its answer over a few rounds; the captain puts open points to the right member and ends the '
+  + 'discussion once disagreements are settled, then writes the final answer with what was agreed, how each dispute was resolved and any '
+  + 'dissent. Members only investigate; they never change the project. Use for hard questions, decisions, reviews of an approach, root-cause '
+  + 'analysis and anything that benefits from several independent views checked against each other. The call blocks until the answer is ready.'
 
 const SWARM_DESCRIPTION = 'Run a swarm for one mission: a coordinator maps the project, names a team of workers and gives each a brief (what it owns, '
   + 'what it must not touch, what done means); the workers build in parallel, each in its own worktree when isolation is on, and coordinate only '
@@ -406,6 +429,17 @@ export function swarmBudget(maxWorkers: number, maxRounds: number, isolated: boo
   return Math.min(ENGINE_AGENT_CEILING, 3 + maxRounds * perRound + gates + 1 + 1)
 }
 
+/**
+ * Agent budget of one roundtable: each specialist runs once per round, the captain steers between rounds and writes the
+ * final answer.
+ * @param members - all members, captain included.
+ * @param rounds - discussion rounds.
+ * @returns the cap on agents the run may start.
+ */
+export function roundtableBudget(members: number, rounds: number): number {
+  return Math.min(ENGINE_AGENT_CEILING, (members - 1) * rounds + rounds + 1)
+}
+
 /** Require the configured route to mean a genuinely fresh structured child. */
 function requireFreshProvider(ctx: Context, providerName: string): SubagentProvider {
   const provider = ctx.subagents.getProvider(providerName)
@@ -457,6 +491,19 @@ export function readReport(value: unknown): HackDevReport {
     throw new Error('Hack Dev Code workflow returned a malformed report')
   }
   return value as unknown as HackDevReport
+}
+
+/**
+ * Check the shape of a roundtable script result.
+ * @param value - the script return value.
+ * @returns the report.
+ * @throws when the script returned something else.
+ */
+export function readRoundtable(value: unknown): RoundtableReport {
+  if (!isRecord(value) || value['kind'] !== 'roundtable' || typeof value['answer'] !== 'string' || !Array.isArray(value['board'])) {
+    throw new Error('Hack Dev Code roundtable returned a malformed result')
+  }
+  return value as unknown as RoundtableReport
 }
 
 const OUTPUT_PROPERTIES = {
@@ -553,6 +600,7 @@ export function apply(ctx: Context, config: Config): void {
     meta: typeof HACKDEV_META,
     scriptArgs: Record<string, JsonValue>,
     maxTotalAgents: number,
+    read: (value: unknown) => unknown = readReport,
   ): Promise<{ runId: string; agentsStarted: number; result: JsonValue }> {
     const parent = exec.agent
     if (parent === undefined) {
@@ -580,8 +628,8 @@ export function apply(ctx: Context, config: Config): void {
       settled = await run.result
       const error = stopReasonError(settled)
       if (error !== undefined) throw new Error(error)
-      const report = readReport(settled.value)
-      return { runId: run.id, agentsStarted: settled.agentsStarted, result: report as unknown as JsonValue }
+      const report = read(settled.value)
+      return { runId: run.id, agentsStarted: settled.agentsStarted, result: report as JsonValue }
     } finally {
       exec.signal.removeEventListener('abort', onAbort)
       try {
@@ -726,6 +774,66 @@ export function apply(ctx: Context, config: Config): void {
       )
     },
     presentCall: presentCall('hackdev_swarm'),
+    presentResult,
+  }), MISSION_TOOL_OPTIONS)
+
+  ctx.tools.register(defineTool({
+    name: 'hackdev_roundtable',
+    description: ROUNDTABLE_DESCRIPTION,
+    parameters: {
+      question: {
+        type: 'string',
+        required: true,
+        description: 'The question, decision or problem, with the context the members need, in the person\'s own words where possible.',
+      },
+      agents: {
+        type: 'number',
+        description: 'Members including the captain, from 2 to 16 (default 4: captain, researcher, logician, contrarian). Use 8 to 16 for a hard question.',
+      },
+      rounds: {
+        type: 'number',
+        description: 'Discussion rounds, from 1 to 4 (default 3); the captain ends earlier once the members agree.',
+      },
+      notes: { type: 'string', description: 'Optional instructions from the person for every member, such as what to focus on or avoid.' },
+      captainModel: { type: 'string', description: 'Optional model for the captain, when the person names one.' },
+      memberModel: { type: 'string', description: 'Optional model for the other members, when the person names one.' },
+    },
+    output: {
+      schema: { type: 'object', additionalProperties: false, properties: OUTPUT_PROPERTIES },
+      render: (_args, value) => [{
+        type: 'text',
+        text: renderRoundtable(value.result as unknown as RoundtableReport, resolved.maxResultChars),
+      }],
+    },
+    async execute(args: RoundtableArgs, exec) {
+      const question = args.question.trim()
+      if (question.length === 0) throw new Error('Hack Dev Code roundtable question must be a non-empty string')
+      const agents = resolveCap('agents', args.agents, 16, 2)
+      const rounds = resolveCap('rounds', args.rounds, 4, 1)
+      const pick = (asked: string | undefined, configured: string): string => (asked ?? '').trim() || configured
+      return runPipeline(
+        exec,
+        HACKDEV_ROUNDTABLE_SCRIPT,
+        HACKDEV_ROUNDTABLE_META,
+        {
+          question, agents, rounds,
+          notes: (args.notes ?? '').trim().slice(0, 2000),
+          maxParallel: resolved.maxParallel,
+          maxMemoryChars: resolved.maxMemoryChars,
+          autonomy: resolved.autonomy,
+          host: HOST_DESCRIPTION,
+          customInstructions: missionInstructions(),
+          models: {
+            planner: pick(args.captainModel, resolved.models.planner),
+            builder: pick(args.memberModel, resolved.models.builder),
+            verifier: resolved.models.verifier,
+          },
+        },
+        roundtableBudget(agents, rounds),
+        readRoundtable,
+      )
+    },
+    presentCall: (args: { question: string }): ToolCallView => ({ card: 'generic', title: 'hackdev_roundtable', rawInput: args.question }),
     presentResult,
   }), MISSION_TOOL_OPTIONS)
 

@@ -4,8 +4,9 @@ import { createSessionFormatCatalogWithChildren, historicalSessionFormatCatalog,
 import { currentSessionMessageProjections } from '../src/message-projections.ts'
 import { MESSAGE_PROJECTION_EVENT_TYPES } from '@hackdevcode/dsh-session/src/known-event-types.ts'
 import { validateInstalledCurrentSessionArtifact } from '../src/current.ts'
-import { SESSION_FORMAT_VERSION, Session, SessionId } from '@hackdevcode/dsh-session'
+import { SESSION_FORMAT_VERSION, Session, type SessionId } from '@hackdevcode/dsh-session'
 import { createUserMessage } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === 'object') {
@@ -19,7 +20,7 @@ describe('first-party Session format catalog', () => {
   it('supplies every required current message interpreter and validates its durable references', () => {
     expect(currentSessionMessageProjections.map(projection => projection.type).sort())
       .toEqual([...MESSAGE_PROJECTION_EVENT_TYPES].sort())
-    const session = Session.create(SessionId('projection-catalog'))
+    const session = Session.create(brandString<SessionId>('projection-catalog'))
     session.append('user/message', createUserMessage({ content: [{ type: 'text', text: 'no image' }], source: { kind: 'user' } }), { surfaceOp: 'append' })
     const artifact = {
       header: { ...session.header, delegationDepth: 0 }, inheritedEventCount: 0,

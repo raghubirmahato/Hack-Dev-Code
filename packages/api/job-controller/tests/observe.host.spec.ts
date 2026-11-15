@@ -4,9 +4,10 @@ import { Context } from '@hackdevcode/cordis'
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import { unsupportedModel, unsupportedInbox } from '@hackdevcode/dsh-agent-loop-testkit'
 import type { Agent } from '@hackdevcode/dsh-agent'
-import { JobId } from '@hackdevcode/dsh-jobs'
+import type { JobId } from '@hackdevcode/dsh-jobs'
+import { brandString } from '@hackdevcode/dsh-brand'
 import LocalJobRegistry from '@hackdevcode/dsh-jobs-local'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import TypertRegistry from '@hackdevcode/dsh-typert-registry'
 import { JobController } from '../src/index.ts'
 import { observeJobOutput } from '../src/observe.ts'
@@ -137,7 +138,7 @@ describe('observeJobOutput', () => {
 
     const abortUnknown = new AbortController()
     await expect(collect(
-      observeJobOutput(ctx.jobs, { jobId: JobId('bash-999') }, OBSERVE, abortUnknown.signal),
+      observeJobOutput(ctx.jobs, { jobId: brandString<JobId>('bash-999') }, OBSERVE, abortUnknown.signal),
       1,
       abortUnknown,
     )).rejects.toThrow(/unknown job/)
@@ -226,7 +227,7 @@ describe('JobController', () => {
   }
 
   async function liveOwner(ctx: Context, rawId: string): Promise<Agent> {
-    const session = ctx.sessions.create(SessionId(rawId))
+    const session = ctx.sessions.create(brandString<SessionId>(rawId))
     const owner: Agent = {
       id: session.id,
       options: {},

@@ -22,6 +22,8 @@
         id: parent
         plugins:
           - name: '@hackdevcode/dsh-tool-fs'
+            config:
+              applyPatch: true
           - name: '@hackdevcode/dsh-tool-fs-search'
             config:
               sampleOverCapGlobResults: false
@@ -30,6 +32,8 @@
               fetch: true
               searchTimeoutMs: 60000
           - name: '@hackdevcode/dsh-tool-subagent-control'
+            config:
+              interrupt: false
     - id: preset-child
       name: '@hackdevcode/dsh-agent-preset'
       config:

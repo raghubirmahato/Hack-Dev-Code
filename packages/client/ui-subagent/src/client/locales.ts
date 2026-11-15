@@ -5,6 +5,12 @@ export const NS = 'subagent'
 
 /** English dictionary (the key-set source of truth). */
 export const en = {
+  'section.title': 'Subagents',
+  'section.empty': 'No subagents',
+  'progress.completed': '{count} completed',
+  'progress.active': '{count} in progress',
+  'progress.inactive': '{count} not running',
+  'progress.external': '{count} external',
   'duration.seconds': '{seconds}s',
   'duration.minutes': '{minutes}m {seconds}s',
   'duration.hours': '{hours}h {minutes}m {seconds}s',
@@ -20,8 +26,8 @@ export const en = {
   'tokens.million': '{value}M',
   'tokens.total': '{value} tok',
   'loading.label': 'Loading subagents…',
+  'load.idle': 'Subagents not loaded',
   'load.error': 'Unable to load subagents',
-  'catalog.migrationRequired': 'Migration required',
   'retry': 'Retry',
   'mode.external': 'External task',
   'mode.oneShot': 'one-shot',
@@ -40,12 +46,12 @@ export const en = {
   'switcher.aria': 'Switch subagent: {title}',
   'tree.aria': 'Subagent sessions',
   'open.sidebar': 'Open in sidebar',
+  'open.floatWindow': 'Open in floating panel',
   'open.sidebar.aria': 'Open {label} in sidebar',
   'sidebar.chat': 'Chat',
   'readonly.oneShot.title': 'One-shot subagent record',
   'readonly.title': 'This subagent is read-only for now',
   'readonly.oneShot.body': 'One-shot tasks do not accept follow-ups; review the full execution record here.',
-  'readonly.body': 'The parent session is offline; reopen it to continue sending messages.',
 } satisfies Record<string, string>
 
 /** Key domain of the `subagent` namespace (en is the source of truth). */

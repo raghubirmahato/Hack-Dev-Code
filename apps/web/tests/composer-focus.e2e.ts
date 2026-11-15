@@ -4,7 +4,8 @@ import { join } from 'node:path'
 import { chromium, webkit, type Page } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import {
-  assertFixtureInventory, compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole, webSnapshotMode } from './scaffold.ts'
+  assertFixtureInventory, compareOrRefreshGolden, launchWebScaffold, seedSession, watchConsole, webSnapshotMode,
+} from './scaffold.ts'
 import { createChatScrollFixture } from './chat-scroll-fixture.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 

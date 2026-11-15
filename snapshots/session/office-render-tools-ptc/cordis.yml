@@ -1,10 +1,22 @@
 - insert:
+    - id: office-kit
+      name: '@hackdevcode/dsh-office-kit'
+      config:
+        outputDirectory: !!js dshHomePath('office-kit', 'outputs')
+
+    - id: tool-office
+      name: '@hackdevcode/dsh-tool-office'
+
+    - id: workspace-dependencies
+      name: '@hackdevcode/dsh-tool-workspace-dependencies'
+      config:
+        source: !!js process.cwd() + '/runtime-source'
+        root: !!js process.cwd() + '/runtime-installed'
+
     - id: skill-office
       name: '@hackdevcode/dsh-skill-office'
       config:
         assetRoot: !!js process.cwd() + '/office-skills'
-        node: !!js process.cwd() + '/office-node'
-        cli: !!js process.cwd() + '/render-cli.cjs'
 
 - id: tool-bash
   disabled: true

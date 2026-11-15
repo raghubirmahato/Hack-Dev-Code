@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-experimental-auto-review",
   "description": "Per-tool LLM authorization review for the Hack Dev Code Auto permission preset",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "icon": "./icon.svg",
   "repository": {
     "type": "git",
@@ -27,7 +27,10 @@
     "docs",
     "lib/index.js",
     "cordis.patch.yml",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
@@ -44,6 +47,7 @@
     "@hackdevcode/dsh-util-values": "workspace:*"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-agent": "workspace:*",
     "@hackdevcode/dsh-agent-instructions": "workspace:*",
     "@hackdevcode/dsh-agent-loop": "workspace:*",

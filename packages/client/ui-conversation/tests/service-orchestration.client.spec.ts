@@ -4,7 +4,7 @@
 // service's scopeOf/binding path runs against production resolution (no local
 // tag probe).
 import type { UserMessage } from '@hackdevcode/dsh-llm/types'
-import type { MessageId } from '@hackdevcode/dsh-llm/brand'
+import type { MessageId } from '@hackdevcode/dsh-llm/types'
 import { Context } from '@hackdevcode/cordis'
 import { describe, expect, it, vi } from 'vitest'
 import { makeTranslate, RemoteError, SlotTestRuntime } from '@hackdevcode/dsh-client-test-runtime'

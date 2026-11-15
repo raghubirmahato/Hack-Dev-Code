@@ -1,6 +1,134 @@
 # Compaction
 
-The services and events this area of Hack Dev Code adds to the Cordis context, generated from the source by `pnpm run gen-cordis-catalog`. The packages themselves are described in their own READMEs under `packages/`.
+The compaction seam — a [capability seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md) split like bash: Service Definition ([dsh-compaction](../../packages/compaction/compaction), `ctx.compaction`), Service Provider (a backend such as [dsh-compaction-basic](../../packages/compaction/compaction-basic)), and human Consumer ([dsh-command-compact](../../packages/compaction/command-compact)). Compaction is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A tokenizer- or template-based backend is a sibling package implementing the same interface. Unlike bash, the interface necessarily depends on `dsh-session` and `dsh-llm`: its verbs act on an agent-owned `Session`, and its durable summary event uses the `ContentBlock` vocabulary (see the [compaction capability-seam reference](../../packages/compaction/compaction/README.md)).
+
+Source: [`packages/compaction/compaction/src/types.ts`](../../packages/compaction/compaction/src/types.ts)
+
+## The `compaction/*` session events
+
+Compaction extends [`SessionEventMap`](session.md) with three event types via declaration merging. All three are **log-only** — they record the lock, summary, selected range, shadowed event seqs, token count, and model call without joining the surface. `SurfaceEventType` is deliberately NOT extended (only message-producing events reach the model), so the summary itself rides on a separate `user/message` with `surfaceOp: { op: 'replace', startSeq, endSeq }` — the only surface mutation performed by summary compaction. The [historical Agent Note](../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md) records the rationale for reusing `user/message`.
+
+| Event | Payload | Role |
+|---|---|---|
+| `compaction/start` | `{ turn }` | acquires the log-recorded lock; a number identifies the open automatic turn, while `null` identifies a standalone manual attempt |
+| `compaction/summary` | `{ summary, rawOutput?, llmStreamCall?, shadowedRange, shadowedSeqs, shadowedTokenCount, provider, model, maxTokens?, usage? }` | the safe summary projection, optional complete provider output and usage, an `llmStreamCall: true` marker when producing the result consumed exactly one call through this context's `ctx.llm.stream()` (which requires complete `rawOutput`), the shadowed surface-boundary pair (`start`/`end` seqs — a position span, not a numeric interval), the shadowed seqs in surface order, the estimated token count, and the summarize call's envelope (`provider`, `model`, plus its generation cap when one applied) — logged so the one-shot request is reconstructable from log + code (the reconstructability Agent Note); unmarked `rawOutput` does not identify the call path |
+| `compaction/end` | `{ turn, error? }` | releases the lock with the same numeric-or-null owner (`error` records an unsuccessful attempt) |
+
+The lock brackets the **whole** operation: `compaction/start` is appended first, then summarization, the `compaction/summary` record, and the `user/message` replacement all land, and only then `compaction/end`. Releasing the lock last turns a crash mid-operation into a detectable orphaned lock (a `compaction/start` with no matching `compaction/end`) rather than a `compaction/end` that falsely claims compaction finished.
+
+The markers are lock time points, not an exclusive container. An unrelated idle injection can appear between a standalone manual start and end while summarization is pending. The manual path revalidates only its selected positional span, so that injected context survives after the replacement checkpoint. A live unmatched start blocks every entry point; an unmatched start before a newer `session/end-seed` is stale evidence from a prior lifecycle and is ignored.
+
+These variants are merged inside a `declare module '@hackdevcode/dsh-session/types'` block, so — unlike the top-level types on the other subsystem pages — they are not pasted as a drift-checked ` ```ts type-equiv ` block (the `verify-type-equiv` extractor matches only top-level declarations by name). The payload table above is the catalog entry; follow the source link for the authoritative fields.
+
+<a id="image-offload"></a>
+## Image offload
+
+`compaction-image-offload` owns the `image/offload` declaration and its pure message projection. Each target identifies a current input node and exact depth-first image occurrences. The event preserves node and message identities and carries no `surfaceOp`. The [package README](../../packages/compaction/compaction-image-offload/README.md) owns recovery policy, registration, and detached replay.
+
+```ts type-equiv
+/** Exact input-image occurrences selected by one durable offload decision. */
+interface ImageOffloadTarget {
+  /** Current message-producing event containing these occurrences. */
+  seq: SessionSeq
+  /** Zero-based depth-first image indexes within the immutable message. */
+  imageIndexes: number[]
+}
+```
+
+## `CompactionResult`
+
+What a successful compaction returns to its caller: the bookkeeping-event seqs, safe summary projection, shadowed range and seqs, and estimated token count.
+
+```ts type-equiv
+/** Result of a successful compaction operation. */
+interface CompactionResult {
+  /** Stable identity shared by this compaction's complete durable lifecycle. */
+  compactionId: CompactionId
+  /** Human command that initiated this compaction, when it was manual. */
+  sourceCommandId?: CommandId
+  /** The seq of the appended `compaction/start` event. */
+  startSeq: SessionSeq
+  /** The seq of the appended `compaction/summary` event. */
+  summarySeq: SessionSeq
+  /** The seq of the appended `compaction/end` event. */
+  endSeq: SessionSeq
+  /** The summary content blocks produced by the backend. */
+  summary: ContentBlock[]
+  /**
+   * The surface-boundary pair that was shadowed: the seqs of the first
+   * (`start`) and last (`end`) surface nodes of the replaced range. A
+   * surface-POSITION span, not a numeric seq interval — after a prior replace
+   * lands a fresh high-seq summary node at an older range's position, `start`
+   * can be GREATER than `end`. {@link CompactionResult.shadowedSeqs} is the
+   * authoritative set of shadowed nodes, in surface order.
+   */
+  shadowedRange: { start: SessionSeq; end: SessionSeq }
+  /** The seqs of all shadowed surface nodes, in surface order. */
+  shadowedSeqs: SessionSeq[]
+  /** Estimated token count of the shadowed content. */
+  shadowedTokenCount: number
+}
+```
+
+## The service
+
+Automatic callers state why policy is running; implementations may treat confirmed overflow more aggressively than ordinary pressure.
+
+```ts type-equiv
+/** Why automatic policy is asking a backend to consider compaction. */
+type CompactionTrigger = 'pressure' | 'context-overflow'
+```
+
+`CompactionEngine` exposes `compactIfNeeded(agent, trigger, signal)` for automatic `pressure` or `context-overflow` policy, `compactNow(agent, signal)` for one useful idle-session reduction even below pressure, and `compactRegion(...)` for an explicit inclusive surface range. `compactNow()` runs as agent maintenance between turns, returns `null` without writing when no useful range exists, records a standalone `turn: null` bracket before summarization, and flushes a closed attempt before later queued prompts may derive from the new surface. Every backend creates its replacement `user/message` source with `compactCheckpointSource(compactionId, sourceCommandId?)`; client and wire consumers import that constructor, `CompactionCheckpointSource`, and `isCompactCheckpointSource()` from the cordis-free `@hackdevcode/dsh-compaction/checkpoint` subpath, while the package root re-exports them for host consumers. The required transaction identity correlates the replacement checkpoint, while the predicate keeps recognition independent of any one backend. Implementations must forward the supplied signal to summarization. The seam owns no pricing API: the singleton [`ctx.tokenMeter`](token-meter.md) directly owns estimation and replay, while `dsh-compaction-basic` owns retention, event sequencing, routed summarization calls, and their configuration.
+
+Expected manual failures use `ManualCompactionErrorCode`:
+
+```ts type-equiv
+/** Expected failure classes for an explicit idle-session compaction request. */
+type ManualCompactionErrorCode =
+  | 'busy'
+  | 'cancelled'
+  | 'changed'
+  | 'summary'
+  | 'commit'
+  | 'persistence'
+```
+
+`changed` and `summary` close and persist the failed attempt without a summary replacement; image omissions recorded during recovery remain effective. `commit` may follow partial mutation; `persistence` means the in-memory bracket closed but its flush failed. Cancellation remains separate and throws the exact abort reason after required cleanup.
+
+Pressure compaction runs at `agent/pre-step` against the committed request header and at `agent/request` against a changed destination before its header is logged. Unless an explicit summary target is configured, every summary in a session that holds an assistant message uses the route that produced the latest one, so a destination whose first request overflowed does not summarize its own overflow; a failed switch preserves that header and any completed reductions. Once pressure or canonical overflow qualifies, compaction-basic invokes optional [`ctx.toolResultPruner`](../../packages/compaction/compaction-tool-result-pruner/README.md) before range selection, remeasures through `ctx.tokenMeter`, and can advance the surface without a summary. Failed-request recovery runs through `agent/request-error` after the failed step closes and returns a retry action only when the surface replacement generation advances, even if later summary work throws after pruning; cancellation still wins. Region boundaries preserve tool-call/result pairing but not whole turns, allowing early closed steps of one oversized turn to compact. `dsh-compaction-basic` owns thresholds, retained-tail policy, overflow caps, and failure handling.
+
+The Service Definition exports `toolPairingBalancedBefore(session, seq)` and `toolPairingBalancedAfter(session, seq)` for the tool-call/result pairing checks before and after a seq. Both validate current surface membership and reject missing seqs and orphan results; the [package contract](../../packages/compaction/compaction/README.md#tool-pairing-boundaries) defines their cache behavior.
+
+## Tool-result pruning outcomes
+
+The optional tool-result pruning service reports each durable content replacement and the aggregate Unicode-code-point reduction. Its public result types live in [`compaction-tool-result-pruner/src/types.ts`](../../packages/compaction/compaction-tool-result-pruner/src/types.ts).
+
+```ts type-equiv
+/** Cited source event and size accounting for one landed surface replacement. */
+interface PrunedEntry {
+  /** Full-fidelity tool-result event shadowed by the replacement. */
+  readonly originalSeq: SessionSeq
+  /** Newly appended pruned tool-result event. */
+  readonly replacementSeq: SessionSeq
+  /** Tool call shared by the original and replacement. */
+  readonly callId: ToolCallId
+  /** Original text size in Unicode code points. */
+  readonly charsBefore: number
+  /** Replacement text size in Unicode code points. */
+  readonly charsAfter: number
+}
+```
+
+```ts type-equiv
+/** Aggregate outcome of one stable-surface pruning pass. */
+interface PruneResult {
+  /** Replacements in the snapshotted surface order. */
+  readonly pruned: readonly PrunedEntry[]
+  /** Total Unicode code points removed across replacements. */
+  readonly charsRemoved: number
+}
+```
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

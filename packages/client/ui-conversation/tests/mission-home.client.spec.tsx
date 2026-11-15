@@ -10,11 +10,11 @@ afterEach(cleanup)
 const t = ((key: keyof typeof en) => en[key]) as never
 
 describe('MissionTemplates', () => {
-  it('offers the four starter missions as buttons', () => {
+  it('offers the starter missions as buttons', () => {
     render(<MissionTemplates t={t} onPick={vi.fn()} />)
     const buttons = within(screen.getByTestId('mission-templates')).getAllByRole('button')
     expect(buttons.map(button => button.querySelector('span')?.textContent)).toEqual([
-      'Build an app', 'Run a swarm', 'Fix a failing test', 'Review and harden', 'Resume last mission',
+      'Build an app', 'Run a swarm', 'Ask a roundtable', 'Fix a failing test', 'Review and harden', 'Resume last mission',
     ])
   })
 

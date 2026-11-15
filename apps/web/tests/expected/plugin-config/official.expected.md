@@ -25,9 +25,7 @@
   - listitem:
     - button "View Agent teams": Agent teams
     - text: Experimental Lets the agent you talk to split a job among named teammates, track it on a shared task board, and report back with their results.
-    - status
     - switch "Enable Agent teams"
-  - listitem:
     - button "View Voice input": Voice input
     - text: Experimental Transcribe recordings locally with SenseVoice; first use requires installing dependencies.
     - status

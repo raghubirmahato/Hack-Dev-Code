@@ -17,8 +17,12 @@ import type { SessionEvent } from '@hackdevcode/dsh-session'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 import { TIMED_WAIT_PARAMETER } from '@hackdevcode/dsh-user-questions'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace, expandTurnProcesses, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot, WEB_FIXTURE_TIME } from './support.ts'
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  launchWebScaffold, recordFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
+import {
+  connectFreshWorkspace, expandTurnProcesses, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot, WEB_FIXTURE_TIME,
+} from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/question-composer', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.v3.jsonl')
@@ -541,7 +545,7 @@ describe('web e2e: resident question composer round trip', () => {
     await expect.poll(() => page.getByText('DONE', { exact: true }).count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(1)
     // Composer gone; regular input restored.
     expect(await page.locator('[data-question-key]').count()).toBe(0)
-    expect(await selectedRow.locator('[data-state="warning"]').count()).toBe(0)
+    await expect.poll(() => selectedRow.getByText('Waiting for answer', { exact: true }).count()).toBe(0)
     await expect.poll(() => page.locator('[data-composer-input]').first().isEnabled(), { timeout: 10_000 }).toBe(true)
     const reply = page.locator('[data-question-reply]')
     await reply.waitFor({ state: 'visible', timeout: 15_000 })
@@ -645,13 +649,13 @@ describe('web e2e: resident question composer round trip', () => {
       signal: controller.signal,
       questions: [{
         id: 'reasoning',
-        header: 'Reasoning level',
-        question: 'Which reasoning level for the HF provider?',
+        header: '\u786e\u8ba4\u601d\u8003\u7b49\u7ea7',
+        question: '\u9009\u62e9 HF provider \u7684\u601d\u8003\u7b49\u7ea7\uff1f',
         options: [
-          { label: 'High (high)', description: 'Prefers more thorough reasoning; usually slower and uses more tokens; requires model support.' },
-          { label: 'Medium (medium)', description: 'Balances reasoning depth and speed; requires model support.' },
-          { label: 'Low (low)', description: 'Prioritizes speed and lower token usage; requires model support.' },
-          { label: 'Check the current configuration first', description: 'First confirm which models the HF provider offers and which reasoning parameters they support, then decide.' },
+          { label: '\u9ad8\uff08high\uff09', description: '\u503e\u5411\u66f4\u5145\u5206\u7684\u63a8\u7406\uff0c\u901a\u5e38\u66f4\u6162\u3001\u6d88\u8017\u66f4\u591a token\uff0c\u9700\u6a21\u578b\u652f\u6301\u3002' },
+          { label: '\u4e2d\uff08medium\uff09', description: '\u5e73\u8861\u63a8\u7406\u6df1\u5ea6\u4e0e\u901f\u5ea6\uff1b\u9700\u6a21\u578b\u652f\u6301\u3002' },
+          { label: '\u4f4e\uff08low\uff09', description: '\u4f18\u5148\u901f\u5ea6\u4e0e\u8f83\u4f4e token \u6d88\u8017\uff1b\u9700\u6a21\u578b\u652f\u6301\u3002' },
+          { label: '\u5148\u67e5\u770b\u5f53\u524d\u914d\u7f6e', description: '\u5148\u786e\u8ba4 HF provider \u7684\u6a21\u578b\u53ca\u5176\u652f\u6301\u7684\u601d\u8003\u53c2\u6570\uff0c\u518d\u51b3\u5b9a\u3002' },
         ],
       }],
     })
@@ -661,7 +665,7 @@ describe('web e2e: resident question composer round trip', () => {
     let completed = false
     try {
       await page.setViewportSize({ width: 1328, height: 720 })
-      await composer.getByRole('heading', { name: 'Which reasoning level for the HF provider?' }).waitFor()
+      await composer.getByRole('heading', { name: '\u9009\u62e9 HF provider \u7684\u601d\u8003\u7b49\u7ea7\uff1f' }).waitFor()
       expect(await composer.getByRole('heading').evaluate(readCopy))
         .toEqual({ lines: 1, clipped: false, overflows: false, toggle: undefined })
       expect(await composer.getByRole('button', { name: 'Expand', exact: true }).count()).toBe(0)
@@ -681,9 +685,9 @@ describe('web e2e: resident question composer round trip', () => {
       expect(rows).toEqual(Array.from({ length: 4 }, () => ({
         sameLine: true, fontSize: '13px', lineHeight: '20px', maskImage: 'none',
       })))
-      await composer.getByRole('radio', { name: 'Medium (medium)' }).click()
+      await composer.getByRole('radio', { name: '\u4e2d\uff08medium\uff09' }).click()
       await composer.getByRole('button', { name: 'Submit', exact: true }).click()
-      expect(await outcome).toEqual({ value: { answers: [{ id: 'reasoning', selected: ['Medium (medium)'] }] } })
+      expect(await outcome).toEqual({ value: { answers: [{ id: 'reasoning', selected: ['\u4e2d\uff08medium\uff09'] }] } })
       completed = true
     } finally {
       controller.abort()

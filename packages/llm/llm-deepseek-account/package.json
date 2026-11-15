@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-llm-deepseek-account",
   "description": "DeepSeek account provider authentication and discovery",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -25,7 +25,10 @@
   "files": [
     "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "dependencies": {
@@ -41,6 +44,7 @@
     "@hackdevcode/cordis-plugin-loader": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/dsh-llm": "workspace:*",
     "@hackdevcode/dsh-llm-deepseek": "workspace:*",

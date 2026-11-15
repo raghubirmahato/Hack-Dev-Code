@@ -5,8 +5,9 @@
  */
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
 import { Context } from '@hackdevcode/cordis'
-import { JobId } from '@hackdevcode/dsh-jobs/brand'
-import { SessionId } from '@hackdevcode/dsh-session/types'
+import type { JobId } from '@hackdevcode/dsh-jobs/types'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { SessionId } from '@hackdevcode/dsh-session/types'
 import { describe, expect, it } from 'vitest'
 import { SlotRegistry } from '@hackdevcode/dsh-client-ui-renderer/client'
 import { stubConfigForm } from '@hackdevcode/dsh-client-test-runtime'
@@ -85,19 +86,19 @@ describe('ui-jobs browser half', () => {
     if (inject === undefined) throw new Error('job-list entry registered no inject face')
     const face = inject()
     expect(face.hooks.jobs).toBeDefined()
-    const release = face.watchRows(SessionId('session'))
+    const release = face.watchRows(brandString<SessionId>('session'))
     expect(watched).toEqual(['session'])
     release()
-    const stopper = face.observe(SessionId('session'), JobId('bash-1'))
+    const stopper = face.observe(brandString<SessionId>('session'), brandString<JobId>('bash-1'))
     expect(observed).toEqual([['session', 'bash-1']])
     stopper()
 
     // The kill control routes through the job service with the row's session
     // and reports the admission verdict.
     killResult = { ok: true }
-    await expect(face.killJob(SessionId('sess-live'), 'bash-3')).resolves.toBe(true)
+    await expect(face.killJob(brandString<SessionId>('sess-live'), 'bash-3')).resolves.toBe(true)
     killResult = { ok: false }
-    await expect(face.killJob(SessionId('sess-live'), 'bash-4')).resolves.toBe(false)
+    await expect(face.killJob(brandString<SessionId>('sess-live'), 'bash-4')).resolves.toBe(false)
     expect(kills).toEqual([['sess-live', 'bash-3'], ['sess-live', 'bash-4']])
   })
 

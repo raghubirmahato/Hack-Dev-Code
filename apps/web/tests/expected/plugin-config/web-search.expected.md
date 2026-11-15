@@ -3,22 +3,40 @@
 - paragraph: Set up the DeepSeek search provider.
 - text: Use the new Web Search API
 - switch "Use the new Web Search API" [checked]
-- paragraph:
+- heading "网页搜索与获取" [level=3]
+- paragraph: 选择网页搜索与网页获取使用的提供方。
+- region "网页搜索提供方":
+  - heading "网页搜索提供方" [level=4]
+  - button "网页搜索提供方 DeepSeek Search API": DeepSeek Search API
+  - paragraph: 会产生费用，由「计费方式」选定的账号或 API Key 支付。
+  - paragraph:
+    - link "网页搜索与获取指南":
+      - /url: https://api-docs.deepseek.com/zh-cn/guides/search
+  - text: 每次搜索结果数
+  - textbox "每次搜索结果数":
+    - /placeholder: ""
+    - text: "10"
+  - paragraph: 每次搜索返回的结果条数，1–50，默认 10。
+  - text: 计费方式
+  - button "计费方式 自动": 自动
+  - paragraph: 跟随当前会话的 DeepSeek 账号或 API Key；会话用其他模型时，优先用 API Key，没有则用已登录账号。
+- region "网页获取提供方":
+  - heading "网页获取提供方" [level=4]
+  - button "网页获取提供方 DeepSeek Fetch API": DeepSeek Fetch API
+  - paragraph: 无法访问内网和本机。会产生费用，由「计费方式」选定的账号或 API Key 支付。
+  - text: 计费方式
+  - button "计费方式 自动": 自动
+  - paragraph: 跟随当前会话的 DeepSeek 账号或 API Key；会话用其他模型时，优先用 API Key，没有则用已登录账号。
   - text: Off by default: search runs through DeepSeek Messages. For the new Web Search API's features and pricing, see the 
   - link "Search & Fetch guide":
     - /url: https://api-docs.deepseek.com/guides/search
 - text: API Key No key is configured; only conversations using a DeepSeek Account model can search, through the default endpoint.
-- textbox "API Key"
 - paragraph: Stored outside the settings file. Leave blank to keep the current key.
 - text: Search / Fetch API base URL Overridden
 - button "Reset to default"
 - textbox "Search / Fetch API base URL":
-  - /placeholder: ""
-  - text: https://search-api.test/api/v1/tools
 - paragraph: Include the API prefix, such as https://api.deepseek.com/v1/tools. The provider appends /search or /fetch. Leave blank to restore the default.
 - text: Results per search
 - textbox "Results per search":
-  - /placeholder: ""
-  - text: "10"
 - paragraph: Results returned per query: an integer from 1 to 50, default 10. This controls result count, not search calls. web_search keeps no more sources than its own result limit.
 - button "Save" [disabled]

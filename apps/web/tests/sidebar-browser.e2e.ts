@@ -7,7 +7,13 @@ import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@hackdevcode/dsh-agent'
 import {
-  assertFixtureInventory, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  assertFixtureInventory,
+  compareOrRefreshGolden,
+  launchWebScaffold,
+  watchConsole,
+  webSnapshotMode,
+  type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/lifecycle-chrome/session.v3.jsonl', import.meta.url))

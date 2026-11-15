@@ -1,5 +1,6 @@
+import { brandString } from '@hackdevcode/dsh-brand'
 import {
-  ToolCallId, createMessage, createToolResultMessage, createUserMessage,
+  type ToolCallId, createMessage, createToolResultMessage, createUserMessage,
 } from '@hackdevcode/dsh-llm'
 import { SessionSeq } from '@hackdevcode/dsh-session/types'
 // Minimal SessionEvent builders for orchestration tests (shape mirrors what the
@@ -71,7 +72,7 @@ export const ev = {
         turn,
         step,
         message: createToolResultMessage({
-          callId: ToolCallId(callId),
+          callId: brandString<ToolCallId>(callId),
           content: text(body),
           isError: false,
         }),

@@ -6,7 +6,7 @@
  */
 
 import type { Context } from '@hackdevcode/cordis'
-import { defineTool } from '@hackdevcode/dsh-tools'
+import { ToolArgsError, defineTool } from '@hackdevcode/dsh-tools'
 import type { DiffCallView, DiffResultView, ToolResult } from '@hackdevcode/dsh-tools'
 import type { FsWriteOutcome } from '@hackdevcode/dsh-fs'
 import type {} from '@hackdevcode/dsh-fs'
@@ -46,7 +46,7 @@ export function stripReadLineNumbers(content: string): string {
  * @returns the camelCased input; `content` loses only line numbers copied from `read` output.
  */
 export function parseWriteArgs(args: { file_path: string; content: string }): { filePath: string; content: string } {
-  if (args.file_path.trim().length === 0) throw new Error('file_path must be a non-empty string')
+  if (args.file_path.trim().length === 0) throw new ToolArgsError(['file_path must be a non-empty string'])
   return { filePath: args.file_path, content: stripReadLineNumbers(args.content) }
 }
 
@@ -88,7 +88,7 @@ export function applyWriteTool(ctx: Context, sandbox: FsSandboxController): void
     order: ctx.systemPrompt.getSectionOrder('TOOL_WRITE'),
     text: ({ scope }) => ctx.tools.get('write', scope) === undefined
       ? ''
-      : 'Read an existing file before overwriting it with write (the default fs-observation-policy requires it)'
+      : 'Read an existing file before overwriting it with write'
         + (ctx.tools.get('edit', scope) === undefined ? '' : ' and prefer edit for targeted changes')
         + '.',
   })

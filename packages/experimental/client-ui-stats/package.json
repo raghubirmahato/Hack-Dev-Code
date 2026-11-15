@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-experimental-client-ui-stats",
   "description": "Per-turn and per-step context, timing, cache, and tool-cost table contributed as an experimental conversation View",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -47,8 +47,10 @@
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-agent-team": "workspace:*",
     "@hackdevcode/dsh-api-session-controller": "workspace:*",
     "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-client-locale": "workspace:*",
     "@hackdevcode/dsh-client-store": "workspace:*",
     "@hackdevcode/dsh-client-test-runtime": "workspace:*",
@@ -74,6 +76,9 @@
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ]
 }

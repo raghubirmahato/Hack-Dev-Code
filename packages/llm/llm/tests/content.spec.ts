@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { AttachmentId, ImageVariantId } from '@hackdevcode/dsh-attachment'
+import type { AttachmentId, ImageVariantId } from '@hackdevcode/dsh-attachment/types'
 import type { AttachmentStore, ImageMediaType } from '@hackdevcode/dsh-attachment'
+import { brandString } from '@hackdevcode/dsh-brand'
 import {
-  ToolCallId,
+  type ToolCallId,
   contentHasFile,
   countRequestImages,
   omitOldestImages,
@@ -29,7 +30,7 @@ function image(bytes: number, offloaded?: true): Extract<ContentBlock, { type: '
   return {
     type: 'image',
     attachment: {
-      attachmentId: AttachmentId(`sha256:${'a'.repeat(64)}`),
+      attachmentId: brandString<AttachmentId>(`sha256:${'a'.repeat(64)}`),
       mediaType: 'image/png',
       bytes,
       width: 1,
@@ -45,12 +46,12 @@ describe('requiredImageOffload traversal', () => {
     const messages = [
       createUserMessage({ content: [{ type: 'text', text: 'before' }, image(1)], source }),
       createToolResultMessage({
-        callId: ToolCallId('shot'),
+        callId: brandString<ToolCallId>('shot'),
         content: [{ type: 'text', text: 'x' }, image(2)],
         isError: false,
       }),
       createToolResultMessage({
-        callId: ToolCallId('second'),
+        callId: brandString<ToolCallId>('second'),
         content: [image(4)],
         isError: false,
       }),
@@ -85,7 +86,7 @@ describe('projectOffloadedImages', () => {
   it('replaces marked user and tool occurrences with route placeholders', () => {
     const messages = [
       createToolResultMessage({
-        callId: ToolCallId('shot'),
+        callId: brandString<ToolCallId>('shot'),
         content: [image(3, true)],
         isError: false,
       }),
@@ -99,7 +100,7 @@ describe('projectOffloadedImages', () => {
 
   it('keeps unchanged tool content while replacing a later image', () => {
     const unchanged = createToolResultMessage({
-      callId: ToolCallId('text-only'),
+      callId: brandString<ToolCallId>('text-only'),
       content: [{ type: 'text', text: 'kept' }],
       isError: false,
     })
@@ -142,7 +143,7 @@ describe('requiredImageOffload', () => {
 describe('model-facing image access', () => {
   it('describes the request preview, immutable normalized path, and source uncertainty', () => {
     const attachment = {
-      attachmentId: AttachmentId(`sha256:${'b'.repeat(64)}`),
+      attachmentId: brandString<AttachmentId>(`sha256:${'b'.repeat(64)}`),
       mediaType: 'image/png' as const,
       bytes: 4_000,
       width: 2048,
@@ -151,7 +152,7 @@ describe('model-facing image access', () => {
     }
     const access = { readonlyPath: '/tmp/.dsh/attachments/v1/objects/bb/object' }
     const version = {
-      variantId: ImageVariantId(`sha256:${'c'.repeat(64)}`),
+      variantId: brandString<ImageVariantId>(`sha256:${'c'.repeat(64)}`),
       attachment,
       data: Uint8Array.of(1),
       mediaType: 'image/png' as const,
@@ -197,7 +198,7 @@ describe('model-facing image access', () => {
 
   it('names each occurrence from its own reference when one prepared version is shared', () => {
     const attachment = {
-      attachmentId: AttachmentId(`sha256:${'b'.repeat(64)}`),
+      attachmentId: brandString<AttachmentId>(`sha256:${'b'.repeat(64)}`),
       mediaType: 'image/png' as const,
       bytes: 4_000,
       width: 8,
@@ -205,7 +206,7 @@ describe('model-facing image access', () => {
       name: 'second.png',
     }
     const version = {
-      variantId: ImageVariantId(`sha256:${'c'.repeat(64)}`),
+      variantId: brandString<ImageVariantId>(`sha256:${'c'.repeat(64)}`),
       attachment,
       data: Uint8Array.of(1),
       mediaType: 'image/png' as const,
@@ -222,7 +223,7 @@ describe('model-facing image access', () => {
 
   it('keeps a useful omission identity with and without a local path', () => {
     const ref = {
-      attachmentId: AttachmentId(`sha256:${'d'.repeat(64)}`),
+      attachmentId: brandString<AttachmentId>(`sha256:${'d'.repeat(64)}`),
       mediaType: 'image/jpeg' as const,
       bytes: 10,
       width: 10,
@@ -245,7 +246,7 @@ describe('model-facing image access', () => {
     ['image/gif', '.gif'],
   ] as const)('names the writable extension for %s', (mediaType, suffix) => {
     const ref = {
-      attachmentId: AttachmentId(`sha256:${'e'.repeat(64)}`),
+      attachmentId: brandString<AttachmentId>(`sha256:${'e'.repeat(64)}`),
       mediaType,
       bytes: 1,
       width: 1,
@@ -257,7 +258,7 @@ describe('model-facing image access', () => {
 
   it('rejects a media type that escaped the closed union at runtime', () => {
     const ref = {
-      attachmentId: AttachmentId(`sha256:${'e'.repeat(64)}`),
+      attachmentId: brandString<AttachmentId>(`sha256:${'e'.repeat(64)}`),
       mediaType: 'image/tiff' as unknown as ImageMediaType,
       bytes: 1,
       width: 1,
@@ -273,7 +274,7 @@ describe('projectImagesForTextModel', () => {
     const messages = [createUserMessage({ content: [{ type: 'text', text: 'plain' }], source })]
     expect(projectImagesForTextModel(messages)).toBe(messages)
     const results = [createToolResultMessage({
-      callId: ToolCallId('plain-result'),
+      callId: brandString<ToolCallId>('plain-result'),
       content: messages[0]!.content,
       isError: false,
     })]
@@ -283,7 +284,7 @@ describe('projectImagesForTextModel', () => {
   it('replaces direct images while retaining unaffected messages', () => {
     const plain = createUserMessage({ content: [{ type: 'text', text: 'plain' }], source })
     const unchangedTool = createToolResultMessage({
-      callId: ToolCallId('text-only'),
+      callId: brandString<ToolCallId>('text-only'),
       content: [{ type: 'text', text: 'unchanged' }],
       isError: false,
     })
@@ -292,7 +293,7 @@ describe('projectImagesForTextModel', () => {
       source,
     })
     const visualTool = createToolResultMessage({
-      callId: ToolCallId('nested-image'),
+      callId: brandString<ToolCallId>('nested-image'),
       content: [
         { type: 'text', text: 'before' },
         image(3),
@@ -321,7 +322,7 @@ describe('file projection', () => {
     return {
       type: 'file',
       attachment: {
-        attachmentId: AttachmentId(`sha256:${'ab'.repeat(32)}`),
+        attachmentId: brandString<AttachmentId>(`sha256:${'ab'.repeat(32)}`),
         name,
         bytes: 42,
       },
@@ -383,7 +384,7 @@ describe('file projection', () => {
         source,
       }),
       createToolResultMessage({
-        callId: ToolCallId('call-3'),
+        callId: brandString<ToolCallId>('call-3'),
         content: [fileBlock('nested.csv')],
         isError: false,
       }),
@@ -447,10 +448,46 @@ describe('projectToolUpdates', () => {
 
     const projected = projectToolUpdates([prompt, added, duplicate, removed, restored], [deferred], mode, history)
 
-    expect(projected.tools).toEqual([deferred])
+    expect(projected.tools).toEqual(mode === 'in-history' ? [deferred] : [search])
     expect(projected.messages).toEqual(mode === 'in-history'
       ? [prompt, added, removed, restored]
-      : [prompt, added])
+      : [prompt])
+  })
+
+  it.each([false, true])('rebuilds when adding the first tools to an empty set (removed=%s)', (removed) => {
+    const removal = developer([{ type: 'tool-removal', toolName: 'search' }])
+    const added = developer([{ type: 'tool-addition', toolName: 'fetch' }, { type: 'text', text: 'Keep this guidance.' }])
+    const later = developer([{ type: 'tool-addition', toolName: 'search' }])
+    const history: ToolHistory = {
+      tools: removed ? [search] : [],
+      updates: [
+        ...removed ? [{ messageId: removal.id, additions: [] }] : [],
+        { messageId: added.id, additions: [fetch] },
+        { messageId: later.id, additions: [search] },
+      ],
+    }
+    const messages = [prompt, ...removed ? [removal] : [], added, prompt, later]
+    const saved = JSON.stringify({ messages, history })
+    const projected = projectToolUpdates(messages, [fetch, search], 'addition-only', history)
+    expect(projected.tools).toEqual([fetch, { ...search, deferLoading: true }])
+    expect(roles(projected.messages)).toEqual([
+      [{ type: 'text', text: 'Keep this guidance.' }],
+      [{ type: 'tool-addition', toolName: 'search' }],
+    ])
+    expect(JSON.stringify({ messages, history })).toBe(saved)
+    const inHistory = projectToolUpdates(messages, [fetch, search], 'in-history', history)
+    expect(roles(inHistory.messages)).toContainEqual(added.content)
+  })
+
+  it('keeps additions deferred when an unactivated deferred declaration already exists', () => {
+    const deferred = { ...search, deferLoading: true as const }
+    const added = developer([{ type: 'tool-addition', toolName: 'fetch' }])
+    const messages = [prompt, added]
+    const projected = projectToolUpdates(messages, [deferred, fetch], 'addition-only', {
+      tools: [deferred], updates: [{ messageId: added.id, additions: [fetch] }],
+    })
+    expect(projected.tools).toEqual([deferred, { ...fetch, deferLoading: true }])
+    expect(projected.messages).toBe(messages)
   })
 
   it('uses current declarations without updates when history is missing or the prefix omits an update', () => {
@@ -503,9 +540,8 @@ describe('projectToolUpdates', () => {
     expect(projected.tools).toEqual([])
     expect(projected.messages).toEqual([prompt, prompt, prompt])
     const partial = projectToolUpdates([prompt, swapped, prompt], [fetch], 'addition-only', { tools: [search], updates: [history.updates[0]!] })
-    expect(partial.tools).toEqual([{ ...fetch, deferLoading: true }])
-    expect(partial.messages[1]).not.toBe(swapped)
-    expect(roles(partial.messages)).toEqual([[{ type: 'tool-addition', toolName: 'fetch' }]])
+    expect(partial.tools).toEqual([fetch])
+    expect(partial.messages).toEqual([prompt, prompt])
   })
 
   it('re-offers an unchanged restored tool through its recorded blocks', () => {
@@ -523,8 +559,8 @@ describe('projectToolUpdates', () => {
       [{ type: 'tool-addition', toolName: 'search' }],
     ])
     const additionOnly = projectToolUpdates(messages, [search, fetch], 'addition-only', history)
-    expect(additionOnly.tools).toEqual([search, fetch])
-    expect(roles(additionOnly.messages)).toEqual([])
+    expect(additionOnly.tools).toEqual([fetch, { ...search, deferLoading: true }])
+    expect(roles(additionOnly.messages)).toEqual([[{ type: 'tool-addition', toolName: 'search' }]])
   })
 
   it('declares a deferred tool once across removal and re-addition', () => {
@@ -542,6 +578,83 @@ describe('projectToolUpdates', () => {
     expect(roles(inHistory.messages)).toHaveLength(3)
     const additionOnly = projectToolUpdates(messages, [search, fetch], 'addition-only', history)
     expect(roles(additionOnly.messages)).toEqual([[{ type: 'tool-addition', toolName: 'fetch' }]])
+  })
+
+  it('rebases on a baseline removal and defers additions after the reset', () => {
+    const later = { name: 'later', description: 'Later', parameters: {} }
+    const added = developer([{ type: 'tool-addition', toolName: 'fetch' }, { type: 'text', text: 'Keep this guidance.' }])
+    const removed = developer([{ type: 'tool-removal', toolName: 'search' }, { type: 'text', text: 'Keep this too.' }])
+    const next = developer([{ type: 'tool-addition', toolName: 'later' }])
+    const history: ToolHistory = { tools: [search], updates: [
+      { messageId: added.id, additions: [fetch] }, { messageId: removed.id, additions: [] },
+      { messageId: next.id, additions: [later] },
+    ] }
+    const messages = [prompt, added, prompt, removed, prompt, next]
+    const saved = JSON.stringify({ messages, history })
+    const projected = projectToolUpdates(messages, [fetch, later], 'addition-only', history)
+    expect(projected.tools).toEqual([fetch, { ...later, deferLoading: true }])
+    expect(roles(projected.messages)).toEqual([
+      [{ type: 'text', text: 'Keep this guidance.' }], [{ type: 'text', text: 'Keep this too.' }],
+      [{ type: 'tool-addition', toolName: 'later' }],
+    ])
+    expect(projected.messages.at(-1)).toBe(next)
+    expect(JSON.stringify({ messages, history })).toBe(saved)
+  })
+
+  it.each([false, true])('rebuilds after removing a later-activated tool (replacement=%s)', (replace) => {
+    const replacement = { name: 'replacement', description: 'Replacement', parameters: {} }
+    const retained = { name: 'retained', description: 'Retained', parameters: {} }
+    const later = { name: 'later', description: 'Later', parameters: {} }
+    const added = developer([{ type: 'tool-addition', toolName: 'fetch' }, { type: 'tool-addition', toolName: 'retained' }])
+    const swapped = developer([
+      ...replace ? [{ type: 'tool-addition' as const, toolName: 'replacement' }] : [],
+      { type: 'tool-removal', toolName: 'fetch' },
+    ])
+    const next = developer([{ type: 'tool-addition', toolName: 'later' }])
+    const history: ToolHistory = { tools: [search], updates: [
+      { messageId: added.id, additions: [fetch, retained] },
+      { messageId: swapped.id, additions: replace ? [replacement] : [] },
+      { messageId: next.id, additions: [later] },
+    ] }
+    const active = [search, retained, ...replace ? [replacement] : [], later]
+    const projected = projectToolUpdates([prompt, added, prompt, swapped, next], active, 'addition-only', history)
+    expect(projected.tools).toEqual([search, retained, ...replace ? [replacement] : [], { ...later, deferLoading: true }])
+    expect(projected.messages[0]).toBe(prompt)
+    expect(roles(projected.messages)).toEqual([[{ type: 'tool-addition', toolName: 'later' }]])
+  })
+
+  it.each([false, true])('preserves explicitly deferred baseline activation across a reset (activated=%s)', (activated) => {
+    const deferred = { name: 'pending', description: 'Pending', parameters: {}, deferLoading: true as const }
+    const activate = developer([{ type: 'tool-addition', toolName: 'pending' }])
+    const swapped = developer([{ type: 'tool-removal', toolName: 'search' }, { type: 'tool-addition', toolName: 'fetch' }])
+    const history: ToolHistory = { tools: [search, deferred], updates: [
+      ...activated ? [{ messageId: activate.id, additions: [deferred] }] : [],
+      { messageId: swapped.id, additions: [fetch] },
+    ] }
+    const messages = [prompt, ...activated ? [activate] : [], swapped]
+    const projected = projectToolUpdates(messages, [fetch, deferred], 'addition-only', history)
+    expect(projected.tools).toEqual([
+      { name: 'pending', description: 'Pending', parameters: {}, ...activated ? {} : { deferLoading: true } }, fetch,
+    ])
+    expect(roles(projected.messages)).toEqual([])
+    const reoffered = developer([{ type: 'tool-addition', toolName: 'pending' }])
+    const later = projectToolUpdates([...messages, reoffered], [fetch, deferred], 'addition-only', {
+      tools: history.tools, updates: [...history.updates, { messageId: reoffered.id, additions: [deferred] }],
+    })
+    expect(later.tools).toEqual(projected.tools)
+    expect(roles(later.messages)).toEqual(activated ? [] : [[{ type: 'tool-addition', toolName: 'pending' }]])
+  })
+
+  it('uses each rebuilt baseline to detect subsequent replacements', () => {
+    const replacement = { name: 'replacement', description: 'Replacement', parameters: {} }
+    const first = developer([{ type: 'tool-removal', toolName: 'search' }, { type: 'tool-addition', toolName: 'fetch' }])
+    const second = developer([{ type: 'tool-removal', toolName: 'fetch' }, { type: 'tool-addition', toolName: 'replacement' }])
+    const history: ToolHistory = { tools: [search], updates: [
+      { messageId: first.id, additions: [fetch] }, { messageId: second.id, additions: [replacement] },
+    ] }
+    const projected = projectToolUpdates([prompt, first, prompt, second], [replacement], 'addition-only', history)
+    expect(projected.tools).toEqual([replacement])
+    expect(roles(projected.messages)).toEqual([])
   })
 })
 

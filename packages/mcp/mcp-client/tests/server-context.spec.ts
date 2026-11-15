@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import SystemPrompt, { renderPrompt } from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import McpResources from '@hackdevcode/dsh-mcp-resources'
 import { createScope } from '@hackdevcode/dsh-scope'
 import { registerServerContext } from '../src/server-context.ts'
@@ -39,7 +40,7 @@ describe('MCP server context', () => {
     expect(renderPrompt(await ctx.systemPrompt.assemble())).not.toContain('MCP server: docs')
     const result = await executeToolFixture(ctx, {
       name: 'list_mcp_resources', arguments: { server: 'docs' },
-      callId: ToolCallId('disposed-resource'), signal: new AbortController().signal,
+      callId: brandString<ToolCallId>('disposed-resource'), signal: new AbortController().signal,
     })
     expect(result.isError).toBe(true)
   })

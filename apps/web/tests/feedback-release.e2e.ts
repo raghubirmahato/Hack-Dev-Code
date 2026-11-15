@@ -11,7 +11,10 @@ import { chromium } from 'playwright'
 import type { SessionEvent, SessionId } from '@hackdevcode/dsh-session'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
-  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureExpandedTurnProcessAria, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, readPersistedEvents, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureExpandedTurnProcessAria, captureStableAria,
+  compareOrRefreshGolden, fixtureUserPrompts,
+  launchWebScaffold, readPersistedEvents, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/feedback-release', import.meta.url))

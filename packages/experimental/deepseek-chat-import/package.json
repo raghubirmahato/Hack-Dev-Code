@@ -1,0 +1,132 @@
+{
+  "name": "@hackdevcode/dsh-deepseek-chat-import",
+  "description": "Import DeepSeek chat exports as stored Sessions in a chosen Workspace",
+  "version": "0.2.2-rc.3",
+  "icon": "./icon.svg",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/experimental/deepseek-chat-import"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./remote": {
+      "types": "./lib/typert.remote-client.d.ts",
+      "default": "./lib/typert.remote-client.js"
+    },
+    "./typert": {
+      "types": "./lib/typert.host.d.ts",
+      "default": "./lib/typert.host.js"
+    },
+    "./types": {
+      "types": "./lib/types/types.d.ts"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./locale/*.json": "./locale/*.json"
+  },
+  "files": [
+    "icon.svg",
+    "locale/*.json",
+    "docs",
+    "lib/index.js",
+    "lib/client.js",
+    "cordis.patch.yml",
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "lib/typert.host.js",
+    "lib/typert.host.d.ts",
+    "lib/typert.remote-client.js",
+    "lib/typert.remote-client.d.ts",
+    "lib/typert.remote-client.d.ts.map",
+    "src"
+  ],
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-typert-protocol": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "fflate": "^0.8.2",
+    "zod": "4.6.6"
+  },
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-title": "workspace:*",
+    "@hackdevcode/dsh-tool-web": "workspace:*"
+  },
+  "devDependencies": {
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/cordis-plugin-include": "workspace:~",
+    "@hackdevcode/cordis-plugin-loader": "workspace:~",
+    "@hackdevcode/dsh-agent": "workspace:*",
+    "@hackdevcode/dsh-agent-loop-testkit": "workspace:*",
+    "@hackdevcode/dsh-api-remote-access": "workspace:*",
+    "@hackdevcode/dsh-api-session-controller": "workspace:*",
+    "@hackdevcode/dsh-api-workspace-controller": "workspace:*",
+    "@hackdevcode/dsh-attachment": "workspace:*",
+    "@hackdevcode/dsh-client-connection": "workspace:*",
+    "@hackdevcode/dsh-client-locale": "workspace:*",
+    "@hackdevcode/dsh-client-test-runtime": "workspace:*",
+    "@hackdevcode/dsh-client-ui-conversation": "workspace:*",
+    "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
+    "@hackdevcode/dsh-client-ui-renderer": "workspace:*",
+    "@hackdevcode/dsh-client-ui-sidebar": "workspace:*",
+    "@hackdevcode/dsh-client-ui-slots": "workspace:*",
+    "@hackdevcode/dsh-client-ui-workspace": "workspace:*",
+    "@hackdevcode/dsh-llm": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-session-persistence": "workspace:*",
+    "@hackdevcode/dsh-session-persistence-jsonl": "workspace:*",
+    "@hackdevcode/dsh-session-projection": "workspace:*",
+    "@hackdevcode/dsh-session-projection-cache": "workspace:*",
+    "@hackdevcode/dsh-session-title": "workspace:*",
+    "@hackdevcode/dsh-storage": "workspace:*",
+    "@hackdevcode/dsh-storage-domain": "workspace:*",
+    "@hackdevcode/dsh-storage-json": "workspace:*",
+    "@hackdevcode/dsh-tool-web": "workspace:*",
+    "@hackdevcode/dsh-typert-registry": "workspace:*",
+    "@hackdevcode/dsh-util-values": "workspace:*",
+    "@hackdevcode/dsh-web": "workspace:*",
+    "@hackdevcode/dsh-workspace": "workspace:*",
+    "@testing-library/react": "^16.3.3",
+    "clsx": "^2.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@hackdevcode/dsh-api-remote-access",
+        "@hackdevcode/dsh-api-session-controller",
+        "@hackdevcode/dsh-client-locale",
+        "@hackdevcode/dsh-client-ui-renderer",
+        "@hackdevcode/dsh-client-ui-sidebar",
+        "@hackdevcode/dsh-client-ui-workspace"
+      ],
+      "platform": "web"
+    }
+  }
+}

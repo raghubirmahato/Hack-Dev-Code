@@ -1,5 +1,5 @@
 ---
-description: "The Hack Dev Code mission pipeline: the hackdev, hackdev_swarm and hackdev_review tools that run fixed multi-agent build, swarm and gate-review workflows."
+description: "The Hack Dev Code mission pipeline: the hackdev, hackdev_swarm, hackdev_roundtable and hackdev_review tools that run fixed multi-agent build, swarm, discussion and gate-review workflows."
 kind: "package-reference"
 ---
 
@@ -7,7 +7,7 @@ kind: "package-reference"
 
 ## Summary
 
-Three tools for the lead agent. `hackdev` runs a mission end to end: a council plans a team, specialist builders work in parallel waves, a fact-checker re-runs their evidence, gates verify, review and harden the result, and an integrator iterates until every acceptance criterion is met. `hackdev_swarm` runs a swarm: a coordinator briefs named workers that build in parallel and coordinate through one shared message board, while verifiers send problems back to the worker that wrote the code. `hackdev_review` runs only the gates on existing work. The full design is in [docs/hack-dev-code.md](../../../docs/hack-dev-code.md).
+Four tools for the lead agent. `hackdev` runs a mission end to end: a council plans a team, specialist builders work in parallel waves, a fact-checker re-runs their evidence, gates verify, review and harden the result, and an integrator iterates until every acceptance criterion is met. `hackdev_swarm` runs a swarm: a coordinator briefs named workers that build in parallel and coordinate through one shared message board, while verifiers send problems back to the worker that wrote the code. `hackdev_roundtable` answers a question: a captain and specialists for facts, logic and the contrary view share one board, challenge each other by post number for a few rounds and agree on an answer. `hackdev_review` runs only the gates on existing work. The full design is in [docs/hack-dev-code.md](../../../docs/hack-dev-code.md).
 
 ## Table of Contents
 
@@ -55,9 +55,10 @@ Mount the tool where agents run, with the workflow engine and subagents availabl
 
 | File | Role |
 |---|---|
-| [src/index.ts](src/index.ts) | Config, prompt sections, agent budgets and the three tool registrations |
+| [src/index.ts](src/index.ts) | Config, prompt sections, agent budgets and the four tool registrations |
 | [src/script.ts](src/script.ts) | The shared script library (blackboard, gates, worktrees, chronicle), the task vocabulary, and the mission and review scripts the workflow engine runs |
 | [src/swarm.ts](src/swarm.ts) | The swarm script: coordinator, message board, rounds of named workers and verifiers, monitor rule, final report |
+| [src/roundtable.ts](src/roundtable.ts) | The roundtable script: captain and specialist angles, shared board, discussion rounds with early consensus, final answer |
 | [src/render.ts](src/render.ts) | The report returned to the lead agent and the card data |
 | [src/host.ts](src/host.ts) | Host facts placed in agent prompts |
 
@@ -80,7 +81,7 @@ Roles that plan, check or report (the council, the splitter, the fact-checker, t
 
 #### What the model sees
 
-Three tool definitions, `hackdev` (a `mission` plus optional caps on tasks, waves and fix rounds), `hackdev_swarm` (a `mission`, optional caps on workers and rounds, `review`, `notes` and a model per role) and `hackdev_review` (a `mission`, optional `focus` and fix-round cap), and a policy prompt section explaining when to use them. A call returns one bounded report: the plan, each task's outcome, gate verdicts with findings, unmet criteria and the files written.
+Four tool definitions, `hackdev` (a `mission` plus optional caps on tasks, waves and fix rounds), `hackdev_swarm` (a `mission`, optional caps on workers and rounds, `review`, `notes` and a model per role), `hackdev_roundtable` (a `question`, optional `agents`, `rounds`, `notes` and a model for the captain and the members) and `hackdev_review` (a `mission`, optional `focus` and fix-round cap), and a policy prompt section explaining when to use them. A build call returns one bounded report: the plan, each task's outcome, gate verdicts with findings, unmet criteria and the files written; a roundtable returns the answer, agreements, disputes and the board.
 
 #### Token effect
 

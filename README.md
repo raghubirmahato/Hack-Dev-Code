@@ -32,6 +32,7 @@ Hack Dev Code ships as a desktop app for Windows and macOS, a Web UI, a command 
 | **Coding** | Reads, writes and edits files, runs shell commands (PowerShell or Bash), searches with `glob`, `grep` and a ranked `code_search` over definitions, and keeps a to-do list that it finishes before it reports back. |
 | **Missions** | The `hackdev` tool turns one request into a planned project: an analyst, a scout and a planner size a team, specialist builders work in parallel, and three independent gates verify, review (including real screenshots of the UI) and secure the result. |
 | **Swarm** | The `hackdev_swarm` tool turns one prompt into a named team: a coordinator briefs each worker, the workers build in parallel and talk only through one shared message board, and adversarial verifiers send problems back to the worker that wrote the code. |
+| **Roundtable** | The `hackdev_roundtable` tool answers one hard question with a captain and specialists for facts, logic and the contrary view. They share findings on one board, question and challenge each other by post number for up to four rounds, and the captain writes the agreed answer with what is still disputed. |
 | **Desktop control** | Launches apps by name, lists and reads windows through UI Automation (Windows) or AT-SPI (Linux), acts on numbered controls, reads text with OCR, clicks, drags, scrolls, types and presses shortcuts with real input, across every monitor. |
 | **Browser** | A built-in browser pane in the desktop app, plus agent control of Chrome through Chrome DevTools, with a persistent profile so sign-ins stay. |
 | **Models** | Local models through Ollama, listed straight from your Ollama install; DeepSeek and any OpenAI-compatible provider through an API key. No account or sign-in. Add several keys per provider and requests rotate through them. |
@@ -39,7 +40,7 @@ Hack Dev Code ships as a desktop app for Windows and macOS, a Web UI, a command 
 | **Undo and resume** | **Undo** on your newest message takes that prompt back: the conversation returns to just before it, the files the agent changed since are put back, and the prompt waits in the message box so you can edit it and send it again. Undo again to go back further; the undone conversation is archived, not deleted. A dropped connection is waited out (about half an hour by default) and the task carries on at the same step, and a stopped or cut-off turn has a **Continue** button. |
 | **Everywhere you work** | Desktop app, Web UI, CLI, VS Code extension and a GitHub Action. |
 
-The agent runtime is the upstream DeepSeek Harness: the same agent loop, subagents and workflow engine, with desktop control, local models and the Customize area added on top.
+The agent runtime is the upstream DeepSeek Harness: the same agent loop, subagents and workflow engine, with desktop control, local models and the Customize area added on top. It includes every upstream change up to the 0.2.2-rc.3 release candidate of 13 November 2026, among them Agent Teams task boards, the Timeline task tree, Office document tools, the MCP server manager, the terminal panel and the Windows computer-use provider.
 
 ---
 
@@ -122,6 +123,8 @@ The desktop tools work on Windows and on Linux with X11 or Wayland; macOS uses i
 
 Pass `then_read: true` to `desktop_element`, `desktop_keys`, `desktop_type` or a `desktop_pointer` click and the result also says what the window in front shows afterwards, so an action and its check take one call instead of two.
 
+Pass `expect` to any input tool or sequence step and the call checks its own outcome: it waits until the window shows a text (`{"text": "Saved"}`), a window opens or closes (`{"window_title": "Save As"}`), or the window's text changes (`{"changed": true}`), and fails with what is in front instead when that does not happen, so a sequence stops before it acts on the wrong window. `retries` (up to 3) repeats a click, key press, scroll or drag that did not take; typing, launching, opening and toggling are never repeated. When an input action fails or is cancelled, the modifier keys and mouse button it may have left pressed are released.
+
 Anything left pressed is released when the tools unload. While the agent is working on the desktop, the screen is kept awake so an idle lock does not interrupt it. Apps running as administrator are reached by running Hack Dev Code as administrator (or through its one-time administrator helper).
 
 **Chrome.** The agent drives Chrome through Chrome DevTools: pages, forms, scripts, screenshots and clicks. To let it use the Chrome you already have open, enable remote debugging at `chrome://inspect/#remote-debugging` and set the `chrome` row to `mode: connect`.
@@ -188,6 +191,19 @@ flowchart TB
 | Monitor | Ends a swarm that has gone quiet (the same workers woken again with no file changed) instead of spending the remaining rounds. |
 
 You can name a model for the coordinator, the workers and the verifiers in your prompt, add notes for everyone, and ask for the three gates to review the merged result. The board shows live in the run view while the swarm works, the whole board is written to `.hackdev/swarm/BOARD.md`, and the result card shows the members and the newest posts. A woken worker continues its own conversation and is told only what is new on the board. Every worker is a full agent, so a swarm uses far more model quota than one conversation.
+
+### Roundtable
+
+Ask for a roundtable ("use a roundtable to answer ...") when a question needs more than one line of thought: a design choice, a bug with several suspects, a claim to check. A roundtable answers; it does not change your files.
+
+| Member | Role |
+|---|---|
+| Captain | Reads the board after each round, puts every open point to the member best placed to settle it, ends the discussion early once the answers agree, and writes the final answer. |
+| Researcher | Facts and evidence: reads the project, searches, fetches pages, and backs each claim with a path, a command's output or a URL. |
+| Logician | Logic, math and code: works the problem step by step and runs small commands or tests to see how the code really behaves. |
+| Contrarian | The contrary view: hidden assumptions, edge cases and better alternatives, conceded as soon as evidence settles them. |
+
+Choose 2 to 16 agents (default 4) and 1 to 4 rounds (default 3); with more agents each angle is staffed again. Every post is a `finding`, `question`, `answer`, `support`, `challenge` or `revision`, addressed to `@name` or `@all`, and may point at the post it is about. Each member keeps its conversation across rounds and reads only what is new. The result shows the answer with its confidence, what the members agreed, each dispute and how it was settled, any remaining dissent and open questions, and the board.
 
 ---
 ## Permissions and safety

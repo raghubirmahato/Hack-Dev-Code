@@ -5,7 +5,8 @@ import type { SessionEvent, SessionLogOffset as SessionLogOffsetType } from '@ha
 import type { ProjectionDefinition } from '@hackdevcode/dsh-session-projection'
 import type {} from '@hackdevcode/dsh-agent/types'
 import type {} from '@hackdevcode/dsh-tool-executor-ptc/types'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
 import type { ContentBlock, ToolSchema } from '@hackdevcode/dsh-llm'
 import type { AskUserQuestionAnswerItem, AskUserQuestionItem, AskUserQuestionOption, PendingUserQuestion, SettledUserQuestion, UserQuestionProjectionView } from './types.ts'
 
@@ -77,7 +78,7 @@ const questionSchema = z.object({
 }))
 
 const pendingQuestionsSchema: z.ZodType<readonly PendingUserQuestion[]> = z.array(z.object({
-  callId: z.string().min(1).transform(ToolCallId),
+  callId: z.string().min(1).transform(brandString<ToolCallId>),
   questions: z.array(questionSchema).min(1),
   state: z.enum(['open', 'continued']),
 }).strict()).superRefine((active, context) => {
@@ -97,7 +98,7 @@ const answerSchema = z.object({
 }))
 
 const settledQuestionsSchema: z.ZodType<readonly SettledUserQuestion[]> = z.array(z.object({
-  callId: z.string().min(1).transform(ToolCallId),
+  callId: z.string().min(1).transform(brandString<ToolCallId>),
   answers: z.array(answerSchema),
 }).strict())
 

@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-config-editor",
   "description": "Persist plugin configuration through profile patches and Loader reconciliation",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -25,7 +25,10 @@
   "files": [
     "locale/*.json",
     "lib/index.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
@@ -37,15 +40,13 @@
   },
   "dependencies": {
     "@hackdevcode/dsh-atomic-write": "workspace:*",
-    "yaml": "^2.8.1",
-    "js-yaml": "^4.3.2"
+    "yaml": "^2.8.1"
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/cordis-plugin-loader": "workspace:~",
     "@hackdevcode/dsh-hmr": "workspace:*",
     "@hackdevcode/cordis-plugin-include": "workspace:~",
-    "@types/js-yaml": "^4.0.9",
     "@hackdevcode/dsh-app-boot": "workspace:*"
   },
   "peerDependenciesMeta": {

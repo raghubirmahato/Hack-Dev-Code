@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-tool-hackdev",
   "description": "Hack Dev Code mission tools: planning council, parallel builders with shared memory, and verifier, quality/UX and security gates",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },

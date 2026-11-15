@@ -10,12 +10,13 @@ import { zstdCompressSync } from 'node:zlib'
 import type { Browser, Page, Request as BrowserRequest } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { SESSION_FORMAT_VERSION, SessionId } from '@hackdevcode/dsh-session'
+import { SESSION_FORMAT_VERSION, type SessionId } from '@hackdevcode/dsh-session'
 import {
   acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, parseSeedFixture, realizeSeedFixture, renderSeedFixture, seedSession, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
 import { openSettings, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot, WEB_FIXTURE_TIME } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/message-actions', import.meta.url))
 // Borrowed read-only: this scenario needs any settled user+assistant pair, not
@@ -342,7 +343,7 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-performance-usage'))
     const stats = page.locator('[data-composer-stat]')
     const statsText = async (): Promise<string> => (await stats.allTextContents()).join(' ')
-    await openSettings(page)
+    await openSettings(page, 'en')
     const dialog = page.getByRole('dialog', { name: 'Settings', exact: true })
     const row = dialog.getByText('Performance & usage', { exact: true }).locator('../..')
     await row.getByRole('button', { name: 'Detailed', exact: true }).click()
@@ -357,7 +358,7 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
     await compareOrRefreshGolden(join(SNAPSHOT_DIR, 'compact.expected.md'), await captureStableAria(page, '[data-composer-dock]', scaffold.workspaceCwd), MODE)
     const warningStart = tripwire.warnings.length
     await page.reload()
-    await openSettings(page)
+    await openSettings(page, 'en')
     await row.getByRole('button', { name: 'Compact', exact: true }).waitFor()
     acknowledgeReloadConnectionLoss(tripwire, warningStart)
     await row.getByRole('button', { name: 'Compact', exact: true }).click()
@@ -439,7 +440,7 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
 
   it.skipIf(MODE === 'record')('forks an unopened current-format Session from its sidebar row', async () => {
     onTestFailed(() => saveFailureShot(page, 'screenshots/non-migrating-session-reads/current-cold-fork'))
-    const id = SessionId('message-actions-current-cold')
+    const id = brandString<SessionId>('message-actions-current-cold')
     await seedSession(scaffold, completedTailFixture(await readFile(SEED, 'utf8')), id)
     const warningStart = tripwire.warnings.length
     await page.reload({ waitUntil: 'load' })
@@ -459,7 +460,7 @@ describe('web e2e: message IconActions and clocks on settled history', () => {
 
   it.skipIf(MODE === 'record')('guides only a migration-required sidebar fork to opening its source', async () => {
     onTestFailed(() => saveFailureShot(page, 'screenshots/non-migrating-session-reads/migration-required-fork'))
-    const id = SessionId('message-actions-needs-migration')
+    const id = brandString<SessionId>('message-actions-needs-migration')
     const [header, ...events] = realizeSeedFixture(scaffold, await readFile(SEED, 'utf8'), id).trimEnd().split('\n')
       .map((line): Record<string, unknown> => JSON.parse(line) as Record<string, unknown>)
     expect(header?.version).toBe(3)

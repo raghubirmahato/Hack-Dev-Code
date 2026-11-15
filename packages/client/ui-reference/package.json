@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-reference",
   "description": "Unified Web @file and @session reference source",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -36,7 +36,8 @@
         "@hackdevcode/dsh-client-ui-conversation",
         "@hackdevcode/dsh-client-ui-renderer",
         "@hackdevcode/dsh-client-ui-input-trigger",
-        "@hackdevcode/dsh-client-ui-sidebar-right"
+        "@hackdevcode/dsh-client-ui-sidebar-right",
+        "@hackdevcode/dsh-client-ui-context-menu"
       ],
       "platform": "web"
     }
@@ -50,6 +51,7 @@
     "@hackdevcode/cordis": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-api-remotes": "workspace:*",
     "@hackdevcode/dsh-api-session-controller": "workspace:*",
     "@hackdevcode/dsh-client-connection": "workspace:*",
@@ -66,12 +68,16 @@
     "@hackdevcode/dsh-typert-protocol": "workspace:*",
     "@hackdevcode/dsh-util-workspace-path": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
-    "@hackdevcode/dsh-client-ui-sidebar-right": "workspace:*"
+    "@hackdevcode/dsh-client-ui-sidebar-right": "workspace:*",
+    "@hackdevcode/dsh-client-ui-context-menu": "workspace:*"
   },
   "files": [
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ]
 }

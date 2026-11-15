@@ -4,12 +4,13 @@ import { describe, expect, onTestFinished, vi } from 'vitest'
 import type {
   SessionReference, SessionReferenceSource, SessionRetainInfo,
 } from '@hackdevcode/dsh-api-session-controller/client'
-import { SessionId } from '@hackdevcode/dsh-session/types'
+import type { SessionId } from '@hackdevcode/dsh-session/types'
 import { RemoteError } from '@hackdevcode/dsh-typert-protocol'
 import { ok, type RemoteMock } from '@hackdevcode/dsh-remote-mock'
 import { createClientTest, webApp, type TestClient } from '@hackdevcode/dsh-client-test-runtime/src/assembly/index.ts'
 import { ClientSessions } from '../src/client/sessions/service.ts'
 import { FOLLOW, followScript, type HistoryAnswer } from './remote/session.client.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 declare module '@hackdevcode/dsh-api-session-controller/client' {
   interface SessionReferenceSourceMap {
@@ -20,7 +21,7 @@ declare module '@hackdevcode/dsh-api-session-controller/client' {
 
 const viewSource: SessionReferenceSource = 'referenceTestView'
 const workSource: SessionReferenceSource = 'referenceTestWork'
-const ID = SessionId('reference-session')
+const ID = brandString<SessionId>('reference-session')
 const EMPTY_HISTORY = ok({ cursor: -1, records: [], hasMore: false })
 const it = createClientTest({ roster: webApp.closure(['@hackdevcode/dsh-api-gateway']) })
 

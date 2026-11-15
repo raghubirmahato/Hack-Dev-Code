@@ -18,7 +18,8 @@ export const PROTECTED_PLUGINS: ReadonlySet<string> = new Set([
 ])
 
 /**
- * Built-in profile bundles and persistent terminals, which have no plugin manager page.
+ * Built-in profile bundles, persistent terminals, the standalone worktree tool, and the Computer Use MCP profile
+ * bundle, which have no plugin manager page.
  * Their Host availability and activation stay intact.
  */
 export const HIDDEN_BUNDLES: ReadonlySet<string> = new Set([
@@ -29,6 +30,8 @@ export const HIDDEN_BUNDLES: ReadonlySet<string> = new Set([
   '@hackdevcode/dsh-acp-app',
   '@hackdevcode/dsh-sdk-minimal',
   '@hackdevcode/dsh-experimental-terminal-bundle',
+  '@hackdevcode/dsh-experimental-tool-worktree',
+  '@hackdevcode/dsh-cua-mcp',
 ])
 
 /**
@@ -36,7 +39,6 @@ export const HIDDEN_BUNDLES: ReadonlySet<string> = new Set([
  * this list, decides whether a bundle appears on the main list.
  */
 export const EXTENSION_BUNDLES: readonly string[] = [
-  '@hackdevcode/dsh-experimental-agent-team-profile',
   '@hackdevcode/dsh-experimental-voice-input-bundle',
   '@hackdevcode/dsh-experimental-plugin-market-bundle',
   '@hackdevcode/dsh-experimental-auto-review',
@@ -50,12 +52,13 @@ export const MORE_BUNDLES: readonly string[] = [
   '@hackdevcode/dsh-personalized-recommendations',
   '@hackdevcode/dsh-experimental-inspector-profile',
   '@hackdevcode/dsh-cua-bundle',
-  '@hackdevcode/dsh-experimental-tool-worktree',
+  '@hackdevcode/dsh-timeline',
   '@hackdevcode/dsh-experimental-cot-translation-bundle',
   '@hackdevcode/dsh-experimental-session-search',
   '@hackdevcode/dsh-experimental-session-titles-bundle',
   '@hackdevcode/dsh-experimental-badge-skill-bundle',
   '@hackdevcode/dsh-experimental-ralph-bundle',
+  '@hackdevcode/dsh-deepseek-chat-import',
   '@hackdevcode/dsh-subagent-codex',
   '@hackdevcode/dsh-subagent-claude-code',
 ]
@@ -64,7 +67,8 @@ export const MORE_BUNDLES: readonly string[] = [
 export const EXPERIMENTAL_BUNDLES: ReadonlySet<string> = new Set([
   '@hackdevcode/dsh-personalized-recommendations',
   '@hackdevcode/dsh-cua-bundle',
-  '@hackdevcode/dsh-experimental-agent-team-profile',
+  '@hackdevcode/dsh-cua-mcp',
+  '@hackdevcode/dsh-timeline',
   '@hackdevcode/dsh-experimental-voice-input-bundle',
   '@hackdevcode/dsh-experimental-auto-review',
   '@hackdevcode/dsh-experimental-inspector-profile',
@@ -77,4 +81,5 @@ export const EXPERIMENTAL_BUNDLES: ReadonlySet<string> = new Set([
   '@hackdevcode/dsh-experimental-ralph-bundle',
   '@hackdevcode/dsh-experimental-plugin-market-bundle',
   '@hackdevcode/dsh-experimental-liveshare',
+  '@hackdevcode/dsh-deepseek-chat-import',
 ])

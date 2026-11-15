@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-hackdev",
   "description": "Web card for Hack Dev Code missions and gate reviews: tasks, gate verdicts, issues and items needing human approval",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },

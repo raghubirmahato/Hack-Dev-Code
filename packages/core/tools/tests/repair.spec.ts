@@ -87,7 +87,7 @@ describe('error help', () => {
     expect(similarToolNames('desktop-windows', names)).toEqual(['desktop_window'])
     expect(similarToolNames('teleport', names)).toEqual([])
     // A name with no Latin letters or digits is never suggested for everything.
-    expect(similarToolNames('reed', ['mcp__srv__工具', 'read'])).toEqual(['read'])
+    expect(similarToolNames('reed', ['mcp__srv__\u5de5\u5177', 'read'])).toEqual(['read'])
   })
 })
 

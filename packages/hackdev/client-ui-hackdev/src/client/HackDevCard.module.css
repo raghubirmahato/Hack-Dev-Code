@@ -235,7 +235,7 @@
   flex-direction: column;
   gap: 2px;
   padding-left: 8px;
-  border-left: 2px solid var(--dsw-alias-border-l3);
+  border-left: 2px solid var(--dsw-alias-label-tertiary);
 }
 
 .post[data-kind='problem'] {

@@ -45,7 +45,7 @@ describe('assembled todo surfaces', () => {
     mountAssembledApp()
 
     const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
-    fireEvent.click(await within(tree).findByText('Fixture history session'))
+    fireEvent.click(await within(tree).findByText('Fixture \u5386\u53f2\u4f1a\u8bdd'))
     // The todo turn is the fixture's last, so wait for its keyed row rather
     // than for chat content in general.
     const row = await waitFor(() => {

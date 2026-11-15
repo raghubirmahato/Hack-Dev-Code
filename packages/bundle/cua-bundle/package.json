@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-cua-bundle",
   "description": "Computer use for the whole desktop and Chrome: apps, windows, mouse, keyboard and browser pages",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "icon": "./icon.svg",
   "publishConfig": {
     "access": "public"
@@ -30,7 +30,10 @@
     "docs",
     "lib/index.js",
     "cordis.patch.yml",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "dsh": {
@@ -57,10 +60,10 @@
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/cordis-plugin-include": "workspace:~",
-    "js-yaml": "^4.2.0",
     "@hackdevcode/cordis-plugin-loader": "workspace:~"
   },
   "optionalDependencies": {
-    "@hackdevcode/dsh-cua-macos": "workspace:*"
+    "@hackdevcode/dsh-cua-macos": "workspace:*",
+    "@hackdevcode/dsh-cua-windows": "workspace:*"
   }
 }

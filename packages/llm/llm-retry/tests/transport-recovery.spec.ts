@@ -9,9 +9,10 @@ import { mountAgentLoopTestDependencies } from '@hackdevcode/dsh-agent-loop-test
 import * as LlmDeepSeek from '@hackdevcode/dsh-llm-deepseek-api-key'
 import type { MockLlmBehavior, MockLlmServer } from '@hackdevcode/dsh-llm-mock-server'
 import { startMockLlmServer } from '@hackdevcode/dsh-llm-mock-server'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import type { SessionEvent } from '@hackdevcode/dsh-session'
 import * as Retry from '../src/index.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 let context: Context | undefined
 const servers: Promise<MockLlmServer>[] = []
@@ -103,7 +104,7 @@ describe('bounded retry through the real DeepSeek HTTP/SSE adapter', () => {
   it('recovers from a true refused connection after the endpoint starts during backoff', async () => {
     const port = await unusedPort()
     context = await harness(`http://127.0.0.1:${port}`, { initialDelayMs: 100 })
-    const agent = await context.agentLoop.create(SessionId('wire-refused'), {
+    const agent = await context.agentLoop.create(brandString<SessionId>('wire-refused'), {
       provider: 'deepseek-official',
       model: 'mock-model',
     })
@@ -138,7 +139,7 @@ describe('bounded retry through the real DeepSeek HTTP/SSE adapter', () => {
       successText: 'recovered response',
     })
     context = await harness(server.baseURL)
-    const agent = await context.agentLoop.create(SessionId(`wire-${behavior}`), {
+    const agent = await context.agentLoop.create(brandString<SessionId>(`wire-${behavior}`), {
       provider: 'deepseek-official',
       model: 'mock-model',
     })
@@ -169,7 +170,7 @@ describe('bounded retry through the real DeepSeek HTTP/SSE adapter', () => {
       successText: 'recovered from empty',
     })
     context = await harness(server.baseURL)
-    const agent = await context.agentLoop.create(SessionId('wire-empty'), {
+    const agent = await context.agentLoop.create(brandString<SessionId>('wire-empty'), {
       provider: 'deepseek-official',
       model: 'mock-model',
     })
@@ -197,7 +198,7 @@ describe('bounded retry through the real DeepSeek HTTP/SSE adapter', () => {
       chunkSize: 100,
     })
     context = await harness(server.baseURL)
-    const agent = await context.agentLoop.create(SessionId('wire-partial-eof'), {
+    const agent = await context.agentLoop.create(brandString<SessionId>('wire-partial-eof'), {
       provider: 'deepseek-official',
       model: 'mock-model',
     })
@@ -240,7 +241,7 @@ describe('bounded retry through the real DeepSeek HTTP/SSE adapter', () => {
     // the stalled attempt and the mock server's immediate successful response.
     context = await harness(server.baseURL, { streamIdleTimeoutMs: 1_000 })
     phase = 'creating agent'
-    const agent = await context.agentLoop.create(SessionId('wire-stall'), {
+    const agent = await context.agentLoop.create(brandString<SessionId>('wire-stall'), {
       provider: 'deepseek-official',
       model: 'mock-model',
     })
@@ -275,7 +276,7 @@ describe('bounded retry through the real DeepSeek HTTP/SSE adapter', () => {
       ))
     })
     context = await harness(server.baseURL, { streamIdleTimeoutMs: 1_000 })
-    const agent = await context.agentLoop.create(SessionId('wire-ignored-abort'), {
+    const agent = await context.agentLoop.create(brandString<SessionId>('wire-ignored-abort'), {
       provider: 'deepseek-official',
       model: 'mock-model',
     })
@@ -294,7 +295,7 @@ describe('bounded retry through the real DeepSeek HTTP/SSE adapter', () => {
       apiKey: 'mock-key',
     })
     context = await harness(server.baseURL)
-    const agent = await context.agentLoop.create(SessionId('wire-exhausted'), {
+    const agent = await context.agentLoop.create(brandString<SessionId>('wire-exhausted'), {
       provider: 'deepseek-official',
       model: 'mock-model',
     })

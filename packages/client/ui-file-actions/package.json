@@ -1,0 +1,77 @@
+{
+  "name": "@hackdevcode/dsh-client-ui-file-actions",
+  "description": "Original-file saving and image clipboard actions for Web and Desktop",
+  "version": "0.2.2-rc.3",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hack-dev-code/hack-dev-code.git",
+    "directory": "packages/client/ui-file-actions"
+  },
+  "type": "module",
+  "main": "lib/index.js",
+  "types": "lib/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./lib/types/index.d.ts",
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "types": "./lib/types/client/index.d.ts",
+      "default": "./lib/client.js"
+    },
+    "./src/*": "./src/*",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./types": {
+      "types": "./lib/types/types.d.ts"
+    }
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@hackdevcode/dsh-client-locale",
+        "@hackdevcode/dsh-client-ui-context-menu",
+        "@hackdevcode/dsh-api-workspace-files",
+        "@hackdevcode/dsh-api-session-controller"
+      ],
+      "platform": "web"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "watch": "tsdown --watch"
+  },
+  "license": "MIT",
+  "peerDependencies": {
+    "@hackdevcode/cordis": "workspace:~"
+  },
+  "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "react": "^18.2.0",
+    "@hackdevcode/dsh-client-ui-primitives": "workspace:*",
+    "@hackdevcode/cordis": "workspace:~",
+    "@hackdevcode/dsh-client-ui-slots": "workspace:*",
+    "@hackdevcode/dsh-api-session-controller": "workspace:*",
+    "@hackdevcode/dsh-client-test-runtime": "workspace:*",
+    "@hackdevcode/dsh-util-file-drag": "workspace:*",
+    "@hackdevcode/dsh-client-locale": "workspace:*",
+    "@hackdevcode/dsh-client-ui-context-menu": "workspace:*",
+    "@hackdevcode/dsh-api-workspace-files": "workspace:*",
+    "@hackdevcode/dsh-session": "workspace:*",
+    "@hackdevcode/dsh-util-workspace-path": "workspace:*",
+    "mime": "^4.1.0",
+    "@hackdevcode/dsh-client-ui-renderer": "workspace:*"
+  },
+  "files": [
+    "locale/*.json",
+    "lib/index.js",
+    "lib/client.js",
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
+  ]
+}

@@ -15,8 +15,9 @@ import {
   type NormalizeContext,
 } from '@hackdevcode/dsh-session-snapshot'
 import { LOADER_SMOKE_TEST_TIMEOUT_MS, runLoaderSmoke } from '@hackdevcode/dsh-loader-smoke'
-import { createMessage, createUserMessage, ReasoningEffortId } from '@hackdevcode/dsh-llm'
-import { SessionSeq, SESSION_FORMAT_VERSION, SessionId, type SessionEvent, type SessionHeader } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
+import { createMessage, createUserMessage, type ReasoningEffortId } from '@hackdevcode/dsh-llm'
+import { SessionSeq, SESSION_FORMAT_VERSION, type SessionId, type SessionEvent, type SessionHeader } from '@hackdevcode/dsh-session'
 import * as JsonlSessionPersistence from '@hackdevcode/dsh-session-persistence-jsonl'
 import { describe, expect, it } from 'vitest'
 
@@ -30,7 +31,7 @@ const childExpected = join(fixtureDir, 'child.expected.jsonl')
 const configPath = fileURLToPath(new URL('../subagent-inheritance-snapshot.patch.yml', import.meta.url))
 const binScript = fileURLToPath(new URL('../../../../../../packages/test-support/loader-smoke/tests/fixtures/headless-driver.ts', import.meta.url))
 const tsconfigPath = fileURLToPath(new URL('../../../../../../tsconfig.json', import.meta.url))
-const sessionId = SessionId('subagent-inheritance-parent')
+const sessionId = brandString<SessionId>('subagent-inheritance-parent')
 const refreshing = process.env.DSH_SNAPSHOT === 'refresh'
 const task = 'Delegate the write probe to a subagent.'
 
@@ -75,7 +76,7 @@ async function seedReadOnlyParent(root: string, cwd: string): Promise<void> {
           config: {
             provider: 'deepseek-official',
             model: 'deepseek-v4-flash',
-            reasoningEffort: ReasoningEffortId('low'),
+            reasoningEffort: brandString<ReasoningEffortId>('low'),
           },
         },
         reason: 'initial',

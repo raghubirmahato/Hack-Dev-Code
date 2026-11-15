@@ -15,7 +15,9 @@ import type { SessionEvent } from '@hackdevcode/dsh-session'
 import type { WebTerminalId } from '@hackdevcode/dsh-api-terminal-controller/types'
 import type {} from '@hackdevcode/dsh-api-terminal-controller'
 import {
-  assertFinalWorkspaceSnapshot, assertFixtureInventory, fixtureUserPrompts, launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  assertFinalWorkspaceSnapshot, assertFixtureInventory, fixtureUserPrompts, launchWebScaffold, recordFixture,
+  watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot, writeComposerDraft } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/permission-policy-context', import.meta.url))

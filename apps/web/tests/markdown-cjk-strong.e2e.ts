@@ -1,34 +1,42 @@
+import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import { createMessage, createUserMessage } from '@hackdevcode/dsh-llm'
-import { SESSION_FORMAT_VERSION, Session, SessionId } from '@hackdevcode/dsh-session'
+import { SESSION_FORMAT_VERSION, Session, type SessionId } from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-session-title'
 import {
+  assertFixtureInventory,
+  captureStableAria,
+  compareOrRefreshGolden,
   launchWebScaffold,
   seedSession,
   watchConsole,
+  webSnapshotMode,
   type WebScaffold,
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot, WEB_FIXTURE_TIME } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
+const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/markdown-cjk-strong', import.meta.url))
+const UI_EXPECTED = fileURLToPath(new URL('./expected/markdown-cjk-strong/ui.expected.md', import.meta.url))
+const MODE = webSnapshotMode()
 const SEED_ID = 'markdown-cjk-strong-web-e2e'
 const DONE = 'CJK_STRONG_DONE'
-/** CJK cases stay escaped so the file is English, while rendering still exercises wide-character punctuation. */
 const CASES = [
-  ['**\u6ce8\u610f\uff1a**Content', '\u6ce8\u610f\uff1a', '\u6ce8\u610f\uff1a\u5185\u5bb9'],
-  ['**Notice:**Content', 'Notice:', 'Notice:Content'],
+  ['**\u6ce8\u610f\uff1a**\u5185\u5bb9', '\u6ce8\u610f\uff1a', '\u6ce8\u610f\uff1a\u5185\u5bb9'],
+  ['**Notice:**\u5185\u5bb9', 'Notice:', 'Notice:\u5185\u5bb9'],
   ['**\u4e8b\u4ef6\u4e2d\u95f4\u4ef6\uff08waterfall\uff09**\u5b9e\u73b0', '\u4e8b\u4ef6\u4e2d\u95f4\u4ef6\uff08waterfall\uff09', '\u4e8b\u4ef6\u4e2d\u95f4\u4ef6\uff08waterfall\uff09\u5b9e\u73b0'],
   ['**\u4e8b\u4ef6\u4e2d\u95f4\u4ef6(waterfall)**\u5b9e\u73b0', '\u4e8b\u4ef6\u4e2d\u95f4\u4ef6(waterfall)', '\u4e8b\u4ef6\u4e2d\u95f4\u4ef6(waterfall)\u5b9e\u73b0'],
   ['**\u53e5\u53f7\u3002**\u540e\u7eed', '\u53e5\u53f7\u3002', '\u53e5\u53f7\u3002\u540e\u7eed'],
   ['**Period.**\u540e\u7eed', 'Period.', 'Period.\u540e\u7eed'],
-  ['**\u63d0\u9192\uff01**Continue', '\u63d0\u9192\uff01', '\u63d0\u9192\uff01\u7ee7\u7eed'],
-  ['**Warning!**Continue', 'Warning!', 'Warning!Continue'],
+  ['**\u63d0\u9192\uff01**\u7ee7\u7eed', '\u63d0\u9192\uff01', '\u63d0\u9192\uff01\u7ee7\u7eed'],
+  ['**Warning!**\u7ee7\u7eed', 'Warning!', 'Warning!\u7ee7\u7eed'],
 ] as const
 
 /** Build one settled assistant reply covering CJK-adjacent strong punctuation boundaries. */
 function markdownFixture(): string {
-  const session = Session.create(SessionId('markdown-cjk-strong-source'))
+  const session = Session.create(brandString<SessionId>('markdown-cjk-strong-source'))
   session.append('turn/start', { turn: 1 })
   const user = session.append('user/message', createUserMessage({
     content: [{ type: 'text', text: 'Render adjacent CJK strong emphasis.' }],
@@ -101,7 +109,7 @@ describe('web e2e: CJK-adjacent Markdown strong emphasis', () => {
     await scaffold?.close()
   })
 
-  it('renders punctuation-terminated strong spans before adjacent CJK text', async () => {
+  it.skipIf(MODE === 'record')('renders punctuation-terminated strong spans before adjacent CJK text', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-markdown-cjk-strong'))
     const groupRow = page.locator('[role="treeitem"]').first()
     await groupRow.waitFor({ timeout: 15_000 })
@@ -117,7 +125,42 @@ describe('web e2e: CJK-adjacent Markdown strong emphasis', () => {
     for (const [, , paragraph] of CASES) {
       expect(await page.getByText(paragraph, { exact: true }).count()).toBe(1)
     }
+
+    const viewport = page.viewportSize()!
+    try {
+      for (const size of [{ width: 390, height: 844 }, { width: 951, height: 669 }, { width: 669, height: 951 }]) {
+        await page.setViewportSize(size)
+        expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('-webkit-text-size-adjust')))
+          .toBe('100%')
+        expect(await strong.evaluateAll(elements => elements.map(element => getComputedStyle(element).fontSize)))
+          .toEqual(CASES.map(() => '14px'))
+      }
+      const restoreFont = await page.evaluateHandle(() => {
+        const style = document.body.style
+        const before = style.getPropertyValue('--dsh-content-font-size')
+        const priority = style.getPropertyPriority('--dsh-content-font-size')
+        style.setProperty('--dsh-content-font-size', '18px')
+        return () => {
+          if (before) style.setProperty('--dsh-content-font-size', before, priority)
+          else style.removeProperty('--dsh-content-font-size')
+        }
+      })
+      try {
+        expect(await strong.evaluateAll(elements => elements.map(element => getComputedStyle(element).fontSize)))
+          .toEqual(CASES.map(() => '18px'))
+      } finally {
+        await restoreFont.evaluate((restore) => { restore() })
+        await restoreFont.dispose()
+      }
+    } finally {
+      await page.setViewportSize(viewport)
+    }
+
+    const snapshot = (await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd))
+      .split(SEED_ID).join('{{seededId}}')
+    await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['ui.expected.md'])
   }, 60_000)
 })

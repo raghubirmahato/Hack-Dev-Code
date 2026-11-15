@@ -1,5 +1,6 @@
 /** Pure image-card derivation from raw result content and metadata. @module */
-import type { AttachmentId, ImageAttachmentRef, ImageMediaType } from '@hackdevcode/dsh-attachment'
+import type { AttachmentId } from '@hackdevcode/dsh-attachment/types'
+import type { ImageAttachmentRef, ImageMediaType } from '@hackdevcode/dsh-attachment'
 import type { ToolCallBlock } from './tool-call-model.ts'
 import { parsedToolCall } from './raw-tool-call.ts'
 

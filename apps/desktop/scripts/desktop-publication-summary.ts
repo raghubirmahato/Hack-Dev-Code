@@ -1,7 +1,10 @@
 /** Render the verified publication plan for GitHub's native deployment reviewers. */
+import { load } from 'js-yaml'
+import { z } from 'zod'
 import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import type { DesktopRetainedSource } from './desktop-release-store.ts'
+import { desktopWebsiteInstallerUrl } from '@hackdevcode/dsh-desktop-publisher/desktop-auto-update-environment.mjs'
+import type { DesktopRetainedSource } from '@hackdevcode/dsh-desktop-publisher/desktop-release-store.ts'
 import type { DesktopUploadPlan } from './desktop-upload-plan.ts'
 
 function text(value: string): string {
@@ -18,10 +21,11 @@ function link(url: string, label = url): string { return `<a href="${text(url)}"
  * @param plan Validated upload plan; YAML contents are the bytes that will be uploaded.
  * @param approval Digest bound to the approved manifest and upload plan.
  * File SHA-256 hex supports `shasum -a 256` on downloads; upload reconciliation separately uses SHA-512 base64.
+ * @param uploadWebsite Whether the selected operation also replaces the production website installer.
  * @returns GitHub-flavored Markdown with final URLs and upload-byte fingerprints, without credentials or local paths.
  */
 export async function desktopPublicationSummary(
-  source: DesktopRetainedSource, plan: DesktopUploadPlan, approval: string,
+  source: DesktopRetainedSource, plan: DesktopUploadPlan, approval: string, uploadWebsite: boolean,
 ): Promise<string> {
   const origin = new URL(plan.publicUrl).origin
   const url = (key: string) => `${origin}/${key.split('/').map(encodeURIComponent).join('/')}`
@@ -46,9 +50,15 @@ export async function desktopPublicationSummary(
     row('Publication environment', code(plan.environment)),
     row('Version', code(plan.version)),
     row('Update channel', code(source.channel)),
+    ...feeds.map((feed) => {
+      const metadata = z.object({ stagingPercentage: z.number().optional() }).parse(load(feed.contents!))
+      return row('Staged update rollout', metadata.stagingPercentage === undefined ? 'Everyone (not set)' : `${metadata.stagingPercentage}%`)
+    }),
     row('Platform', code(plan.target)),
     ...(plan.environment === 'test' ? [row('Test release ID', `${code(source.testReleaseId!)}<br>Random prefix for the test download path that makes the URL harder to guess; consecutive upgrade tests must reuse the same value.`)] : []),
     row('Download URL preview', `${installers.map(file => link(url(file.key))).join('<br>')}<br>Target URLs after publication; downloads are not guaranteed before approval.`),
+    ...(uploadWebsite && plan.environment === 'production' ? [row('Website installer',
+      `${link(desktopWebsiteInstallerUrl(plan.target))}<br>Replaced with version ${code(plan.version)}; the existing installer is overwritten with no downgrade protection; the website upload and refresh run in a later job that may need its own approval.`)] : []),
     row('Update YAML', `${feeds.map(file => link(url(file.key))).join('<br>')}<br>This publication updates the file; before approval it may not exist yet or may still point at an older release.`),
     row('Packaging source', `${link(runUrl, `View packaging run #${source.runId} · attempt ${source.attempt}`)}<br>Source: ${code(`${source.sourceRef} @ ${source.commit}`)}<br>Packaging machine: ${code(source.runnerName)}`),
     row('Signature and notarization', plan.target === 'win-x64' ? 'EXE signature verified' : 'DMG verified<br>App inside the ZIP verified'),

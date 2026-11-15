@@ -13,7 +13,7 @@ import type {
 import type { ClientRemote, DirectoryListing } from '@hackdevcode/dsh-api-remotes/client'
 import { RemoteError } from '@hackdevcode/dsh-client-test-runtime'
 import type { RemoteResult } from '@hackdevcode/dsh-api-remotes/client'
-import { SessionId } from '@hackdevcode/dsh-session/types'
+import type { SessionId } from '@hackdevcode/dsh-session/types'
 import { LayoutController } from '@hackdevcode/dsh-client-ui-layout/client'
 import type { MainPanelId } from '@hackdevcode/dsh-client-ui-layout/client'
 import { LocaleRuntime } from '@hackdevcode/dsh-client-locale/client'
@@ -23,8 +23,9 @@ import { DirectoryBrowseError, UiWorkspaceService } from '../src/client/navigati
 import { en } from '../src/client/locales.ts'
 import { createWorkspaceViewStore, FLAT_SESSION_ORDER_KEY } from '../src/client/stores.ts'
 import { UNGROUPED_KEY } from '../src/client/tree.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
-const sid = (id: string): SessionId => SessionId(id)
+const sid = (id: string): SessionId => brandString<SessionId>(id)
 const wid = (id: string): WorkspaceId => id as WorkspaceId
 
 const contexts: Context[] = []

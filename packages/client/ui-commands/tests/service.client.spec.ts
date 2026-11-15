@@ -9,8 +9,8 @@
  */
 import { Context } from '@hackdevcode/cordis'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import type { CommandResult } from '@hackdevcode/dsh-commands/types'
-import { CommandDefinitionId } from '@hackdevcode/dsh-commands/brand'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { CommandDefinitionId, CommandResult } from '@hackdevcode/dsh-commands/types'
 import { scopeOf } from '@hackdevcode/dsh-api-session-controller/client'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 import { RemoteError, TestRemote, TestSessions } from '@hackdevcode/dsh-client-test-runtime'
@@ -322,7 +322,7 @@ describe('candidates', () => {
   it('localizes canonical built-in and contribution descriptions on every candidate request', async () => {
     let locale = 'xx'
     const commands: CommandDescriptor[] = [
-      { definitionId: CommandDefinitionId('@hackdevcode/dsh-command-compact'), name: 'compact', description: 'Compact older conversation history' },
+      { definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-command-compact'), name: 'compact', description: 'Compact older conversation history' },
       { name: 'goal', description: 'scoped goal override' },
       { name: 'custom', description: 'plugin-authored copy' },
     ]
@@ -359,12 +359,12 @@ describe('candidates', () => {
   describe('menu presentation (design doc for #3567)', () => {
     /** First-party definitions plus an unrelated command, in Host registration order. */
     const SHIPPED: CommandDescriptor[] = [
-      { definitionId: CommandDefinitionId('@hackdevcode/dsh-command-compact'), name: 'compact', description: 'Compact older conversation history' },
-      { definitionId: CommandDefinitionId('@hackdevcode/dsh-session-log-export'), name: 'export', description: 'Download this Session log as a ZIP archive' },
-      { definitionId: CommandDefinitionId('@hackdevcode/dsh-command-feedback'), name: 'feedback', description: 'Record feedback about this session', input: { hint: '<text>' } },
-      { definitionId: CommandDefinitionId('@hackdevcode/dsh-command-goal'), name: 'goal', description: 'Set or view the goal for a long-running task', input: { hint: '<objective>', attachments: true } },
-      { definitionId: CommandDefinitionId('@hackdevcode/dsh-permission-presets'), name: 'permission', description: 'Switch the permission preset (sandbox mode + approval policy)', input: { hint: '<preset>' } },
-      { definitionId: CommandDefinitionId('@hackdevcode/dsh-plan-mode'), name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', attachments: true } },
+      { definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-command-compact'), name: 'compact', description: 'Compact older conversation history' },
+      { definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-session-log-export'), name: 'export', description: 'Download this Session log as a ZIP archive' },
+      { definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-command-feedback'), name: 'feedback', description: 'Record feedback about this session', input: { hint: '<text>' } },
+      { definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-command-goal'), name: 'goal', description: 'Set or view the goal for a long-running task', input: { hint: '<objective>', attachments: true } },
+      { definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-permission-presets'), name: 'permission', description: 'Switch the permission preset (sandbox mode + approval policy)', input: { hint: '<preset>' } },
+      { definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-plan-mode'), name: 'plan', description: 'Enter or leave plan mode', input: { hint: '[off|message]', attachments: true } },
       { name: 'deploy', description: 'third-party command' },
     ]
     const Glyph = () => null

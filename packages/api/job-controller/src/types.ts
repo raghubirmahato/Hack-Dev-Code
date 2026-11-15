@@ -5,7 +5,7 @@
  * @module @hackdevcode/dsh-api-job-controller/types
  */
 
-import type { JobId } from '@hackdevcode/dsh-jobs/brand'
+import type { JobId } from '@hackdevcode/dsh-jobs/types'
 import type { JobChunk, JobView } from '@hackdevcode/dsh-jobs/view'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 

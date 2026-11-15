@@ -6,8 +6,12 @@ import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type { SessionEvent } from '@hackdevcode/dsh-session'
 import {
-  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot } from './support.ts'
+  assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
+import {
+  connectFreshWorkspace, newEnglishPage, pinBrowserClock, pinHostClock, saveFailureShot,
+} from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/question-composer-recommended', import.meta.url))
 const FIXTURE = join(SNAPSHOT_DIR, 'session.v4.jsonl')

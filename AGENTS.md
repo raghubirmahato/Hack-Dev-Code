@@ -24,6 +24,9 @@ pnpm run start:web                    # Web UI at http://127.0.0.1:3080
 ```
 
 ## Rules
+- **Error handling:** use typed, structured failures and localized, actionable reports. Coded errors and expected tool failures use `HarnessError`. Define handling ownership, containment, and failure guarantees; stop dependent work and visibly report untrusted state or unknown outcomes. Follow [dsh-error-handling](.agents/skills/dsh-error-handling/SKILL.md).
+- **An empty `catch` names the error** and why; keep its `try` to one statement ([checker](scripts/verify-empty-catch.ts)).
+- **UI changes:** use [dsh-client-ui-ux](.agents/skills/dsh-client-ui-ux/SKILL.md) as the design and review entry point; load its references only as needed.
 
 - **English only.** All code, comments, UI text, docs and test data are in English. Test samples that need wide characters use `\uXXXX` escapes.
 - **No secrets.** Never write an API key into a file, test, prompt or log. Use `DEEPSEEK_API_KEY` or the credential store.

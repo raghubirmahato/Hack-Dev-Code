@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { chromium, type Locator, type Page, type Route } from 'playwright'
 import { expect, it } from 'vitest'
 import { launchWebScaffold, captureStableAria, compareOrRefreshGolden, webSnapshotMode, watchConsole, type WebScaffold } from './scaffold.ts'
+import { ZH_BROWSER_LOCALE } from './support.ts'
 
 async function invalidInputStyles(page: Page, input: Locator) {
   const styles = []
@@ -84,7 +85,7 @@ it('cancels installation, retries and highlights the enabled plugin at 40% alpha
         setInterval(() => {}, 1000);
         });
       `)
-      const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, locale: 'en-US' })
+      const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, locale: ZH_BROWSER_LOCALE })
       const tripwire = watchConsole(page)
       // Hold request delivery and the real Host's cancellation reply independently.
       // Cancellation reaches the Host before the install it names.
@@ -107,20 +108,20 @@ it('cancels installation, retries and highlights the enabled plugin at 40% alpha
       await page.clock.install()
       await page.goto(scaffold.authenticatedUrl)
       await page.waitForSelector('[class*="frame"]')
-      if (await page.getByRole('dialog', { name: 'Settings' }).count() > 0) await page.keyboard.press('Escape')
-      await page.getByRole('navigation', { name: 'Global panels' }).getByRole('button', { name: 'Plugins', exact: true }).click()
+      if (await page.getByRole('dialog', { name: '\u8bbe\u7f6e' }).count() > 0) await page.keyboard.press('Escape')
+      await page.getByRole('navigation', { name: '\u5168\u5c40\u9762\u677f' }).getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
       const panel = page.locator('[data-plugin-panel]')
-      await panel.getByRole('button', { name: 'Add plugin', exact: true }).click()
+      await panel.getByRole('button', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true }).click()
       // The dialog is named after its current screen, so it is found by role alone.
       const dialog = page.getByRole('dialog')
       await dialog.getByRole('textbox').fill('slow-package')
-      await dialog.getByRole('button', { name: /^Registry/ }).click()
+      await dialog.getByRole('button', { name: /^\u5b89\u88c5\u6e90/ }).click()
       const registryMenu = page.locator('[data-install-registry]')
-      const customAddress = registryMenu.getByRole('textbox', { name: 'Custom address', exact: true })
+      const customAddress = registryMenu.getByRole('textbox', { name: '\u81ea\u5b9a\u4e49\u5730\u5740', exact: true })
       await customAddress.fill('invalid-registry')
       await page.keyboard.press('Escape')
       await registryMenu.waitFor({ state: 'hidden' })
-      await dialog.getByRole('button', { name: 'Install', exact: true }).click()
+      await dialog.getByRole('button', { name: '\u5b89\u88c5', exact: true }).click()
       await customAddress.waitFor({ state: 'visible' })
       await expect.poll(() => customAddress.evaluate(element => document.activeElement === element)).toBe(true)
       expect(await customAddress.getAttribute('aria-invalid')).toBe('true')
@@ -129,7 +130,7 @@ it('cancels installation, retries and highlights the enabled plugin at 40% alpha
       await registryMenu.getByRole('radio').first().check()
       await page.keyboard.press('Escape')
       await registryMenu.waitFor({ state: 'hidden' })
-      const packageName = dialog.getByRole('textbox', { name: 'Package name or address', exact: true })
+      const packageName = dialog.getByRole('textbox', { name: '\u5305\u540d\u6216\u5730\u5740', exact: true })
       await packageName.fill('./relative')
       await packageName.press('Enter')
       await expect.poll(() => packageName.getAttribute('aria-invalid')).toBe('true')
@@ -137,27 +138,27 @@ it('cancels installation, retries and highlights the enabled plugin at 40% alpha
       await compareOrRefreshGolden(fileURLToPath(new URL('./expected/plugin-install-cancel/invalid-registry.expected.md', import.meta.url)),
         `${invalidRegistryAria}\n\n${JSON.stringify({ registry: registryStyles, packageName: packageStyles }, null, 2)}`, webSnapshotMode())
       await packageName.fill('slow-package')
-      await dialog.getByRole('button', { name: 'Install', exact: true }).click()
-      await dialog.getByText('Preparing installation…', { exact: true }).waitFor()
+      await dialog.getByRole('button', { name: '\u5b89\u88c5', exact: true }).click()
+      await dialog.getByText('\u6b63\u5728\u51c6\u5907\u5b89\u88c5…', { exact: true }).waitFor()
       await compareOrRefreshGolden(fileURLToPath(new URL('./expected/plugin-install-cancel/preparing.expected.md', import.meta.url)),
         await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
-      await dialog.getByRole('button', { name: 'Cancel install and close', exact: true }).click()
+      await dialog.getByRole('button', { name: '\u53d6\u6d88\u5b89\u88c5\u5e76\u5173\u95ed', exact: true }).click()
       await dialog.waitFor({ state: 'hidden' })
       await cancellationArrived.promise
-      await panel.getByRole('button', { name: 'View installation', exact: true }).click()
-      await dialog.getByText('Stopping installation…', { exact: true }).first().waitFor()
+      await panel.getByRole('button', { name: '\u67e5\u770b\u5b89\u88c5\u4efb\u52a1', exact: true }).click()
+      await dialog.getByText('\u6b63\u5728\u505c\u6b62\u5b89\u88c5…', { exact: true }).first().waitFor()
       await page.keyboard.press('Escape')
       await dialog.waitFor({ state: 'hidden' })
       cancellationReply.resolve(undefined)
-      await page.getByText('Installation status is unconfirmed. View the installation for details.', { exact: true }).waitFor()
-      await panel.getByRole('button', { name: 'View installation', exact: true }).click()
-      await dialog.getByText('Installation status unconfirmed', { exact: true }).waitFor()
+      await page.getByText('\u5b89\u88c5\u72b6\u6001\u6682\u672a\u786e\u8ba4\uff0c\u8bf7\u67e5\u770b\u5b89\u88c5\u4efb\u52a1\u4e86\u89e3\u8be6\u60c5\u3002', { exact: true }).waitFor()
+      await panel.getByRole('button', { name: '\u67e5\u770b\u5b89\u88c5\u4efb\u52a1', exact: true }).click()
+      await dialog.getByText('\u5b89\u88c5\u72b6\u6001\u5c1a\u672a\u786e\u8ba4', { exact: true }).waitFor()
       await compareOrRefreshGolden(fileURLToPath(new URL('./expected/plugin-install-cancel/unconfirmed.expected.md', import.meta.url)),
         await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
       await page.locator('[role="presentation"] > [aria-hidden="true"]').click({ position: { x: 5, y: 5 } })
       await dialog.waitFor({ state: 'hidden' })
       delivery.resolve(undefined)
-      await page.getByText('Installation cancelled; the plugin is not enabled, and downloaded files may remain', { exact: true }).waitFor()
+      await page.getByText('\u5df2\u53d6\u6d88\u5b89\u88c5\uff0c\u63d2\u4ef6\u672a\u542f\u7528\uff0c\u4e0b\u8f7d\u7684\u6587\u4ef6\u53ef\u80fd\u4fdd\u7559', { exact: true }).waitFor()
       expect(await readFile(manifestPath, 'utf8')).toBe(manifest)
       expect(await readFile(lockPath, 'utf8')).toBe('original lockfile\n')
       cancelInstallRoute = route => route.continue()
@@ -173,19 +174,19 @@ it('cancels installation, retries and highlights the enabled plugin at 40% alpha
           activeReplySettled.resolve(undefined)
         }
       }
-      await panel.getByRole('button', { name: 'Add plugin', exact: true }).click()
+      await panel.getByRole('button', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true }).click()
       await dialog.getByRole('textbox').fill('slow-package')
-      await dialog.getByRole('button', { name: 'Install', exact: true }).click()
+      await dialog.getByRole('button', { name: '\u5b89\u88c5', exact: true }).click()
       // The check passed: the running screen names the package and folds pnpm's output behind the details.
-      await dialog.getByText('Version 1.0.0', { exact: true }).waitFor()
-      await dialog.getByRole('button', { name: 'Show install details', exact: true }).click()
+      await dialog.getByText('\u7248\u672c 1.0.0', { exact: true }).waitFor()
+      await dialog.getByRole('button', { name: '\u67e5\u770b\u5b89\u88c5\u8be6\u60c5', exact: true }).click()
       await dialog.getByText('Waiting for package download', { exact: true }).waitFor()
       loseActiveReply.resolve(undefined)
-      await dialog.getByRole('button', { name: 'Check installation status', exact: true }).waitFor()
-      await dialog.getByRole('button', { name: 'Cancel install', exact: true }).click()
+      await dialog.getByRole('button', { name: '\u6838\u5bf9\u5b89\u88c5\u72b6\u6001', exact: true }).waitFor()
+      await dialog.getByRole('button', { name: '\u53d6\u6d88\u5b89\u88c5', exact: true }).click()
       // The Host's confirmation returns the dialog to the spec and says so in a toast.
       await dialog.getByRole('textbox').waitFor()
-      await page.getByText('Installation cancelled; the plugin is not enabled, and downloaded files may remain', { exact: true }).waitFor()
+      await page.getByText('\u5df2\u53d6\u6d88\u5b89\u88c5\uff0c\u63d2\u4ef6\u672a\u542f\u7528\uff0c\u4e0b\u8f7d\u7684\u6587\u4ef6\u53ef\u80fd\u4fdd\u7559', { exact: true }).waitFor()
       expect(await readFile(manifestPath, 'utf8')).toBe(manifest)
       expect(await readFile(lockPath, 'utf8')).toBe('original lockfile\n')
       expect(await dialog.getByRole('textbox').inputValue()).toBe('slow-package')
@@ -206,16 +207,16 @@ it('cancels installation, retries and highlights the enabled plugin at 40% alpha
         console.log('Retry completed');
         });
       `)
-      await dialog.getByRole('button', { name: 'Install', exact: true }).click()
-      await dialog.getByRole('button', { name: 'Enable now', exact: true }).waitFor()
-      await dialog.getByRole('button', { name: 'Show install details', exact: true }).click()
+      await dialog.getByRole('button', { name: '\u5b89\u88c5', exact: true }).click()
+      await dialog.getByRole('button', { name: '\u7acb\u5373\u542f\u7528', exact: true }).waitFor()
+      await dialog.getByRole('button', { name: '\u67e5\u770b\u5b89\u88c5\u8be6\u60c5', exact: true }).click()
       await dialog.getByText('Retry completed', { exact: true }).waitFor()
       expect(JSON.parse(await readFile(manifestPath, 'utf8'))).toMatchObject({ dependencies: { 'slow-package': '1.0.0' } })
       // Freeze the real highlight's expiry timer and CSS first frame independently.
       await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1000))
       const pausedHighlight = await page.addStyleTag({ content: '[data-plugin-highlight] { animation-play-state: paused !important; }' })
       try {
-        await dialog.getByRole('button', { name: 'Enable now', exact: true }).click()
+        await dialog.getByRole('button', { name: '\u7acb\u5373\u542f\u7528', exact: true }).click()
         await dialog.waitFor({ state: 'hidden' })
         const card = panel.locator('[data-plugin-package="slow-package"][data-plugin-highlight]')
         await card.waitFor({ state: 'visible' })
@@ -259,20 +260,20 @@ it('cancels installation, retries and highlights the enabled plugin at 40% alpha
         await page.emulateMedia({ colorScheme: null, reducedMotion: null })
         await page.clock.resume()
       }
-      await panel.getByRole('button', { name: 'Add plugin', exact: true }).click()
+      await panel.getByRole('button', { name: '\u6dfb\u52a0\u63d2\u4ef6', exact: true }).click()
       await dialog.getByRole('textbox').fill('recovered-package')
       installBundleRoute = async (route) => {
         await route.fetch()
         await route.abort('failed')
       }
-      await dialog.getByRole('button', { name: 'Install', exact: true }).click()
-      await dialog.getByText('Installation result unavailable', { exact: true }).waitFor()
+      await dialog.getByRole('button', { name: '\u5b89\u88c5', exact: true }).click()
+      await dialog.getByText('\u672a\u80fd\u83b7\u53d6\u5b89\u88c5\u7ed3\u679c', { exact: true }).waitFor()
       await compareOrRefreshGolden(fileURLToPath(new URL('./expected/plugin-install-cancel/unknown.expected.md', import.meta.url)),
         await captureStableAria(page, '[role="dialog"]', scaffold.workspaceCwd), webSnapshotMode())
       expect(JSON.parse(await readFile(manifestPath, 'utf8'))).toMatchObject({ dependencies: { 'recovered-package': '1.0.0' } })
-      await dialog.getByRole('button', { name: 'Back to editing', exact: true }).click()
+      await dialog.getByRole('button', { name: '\u8fd4\u56de\u7f16\u8f91', exact: true }).click()
       await dialog.getByRole('textbox').fill('another-package')
-      expect(await dialog.getByRole('button', { name: 'Install', exact: true }).isEnabled()).toBe(true)
+      expect(await dialog.getByRole('button', { name: '\u5b89\u88c5', exact: true }).isEnabled()).toBe(true)
       expect(tripwire.pageErrors).toEqual([])
     } finally {
       delivery.resolve(undefined)

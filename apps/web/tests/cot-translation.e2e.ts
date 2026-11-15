@@ -9,8 +9,12 @@ import { pluginRecordOf, SessionSeq, type SessionEvent } from '@hackdevcode/dsh-
 import { chromium, type Browser } from 'playwright'
 import { expect, it, onTestFailed, onTestFinished } from 'vitest'
 import {
-  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, readPersistedEvents, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { expandOwningTurnProcess, PLUGIN_TOGGLE_SETTLE_MS, saveFailureShot, connectFreshWorkspace } from './support.ts'
+  acknowledgeReloadConnectionLoss, assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
+  launchWebScaffold, readPersistedEvents, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
+import {
+  connectFreshWorkspaceZh, expandOwningTurnProcess, PLUGIN_TOGGLE_SETTLE_MS, saveFailureShot, ZH_BROWSER_LOCALE,
+} from './support.ts'
 
 const BUNDLE_NAME = '@hackdevcode/dsh-experimental-cot-translation-bundle'
 const BUNDLE = fileURLToPath(new URL('../../../packages/experimental/cot-translation-bundle', import.meta.url))
@@ -19,10 +23,10 @@ const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/lifecycle-chrome/s
 const EXPECTED = fileURLToPath(new URL('./expected/cot-translation', import.meta.url))
 const MODE = webSnapshotMode()
 const ORIGINAL = 'The user wants me to reply with a single word. Let me comply.'
-const GOOGLE_TRANSLATION = 'The user asked me to reply with one word. I will comply.'
-const BING_TRANSLATION = 'The user asked me to reply with one word.'
-const SECOND_TRANSLATION = 'The user is asking for a one-word reply.'
-const THIRD_TRANSLATION = 'The user would like an answer with a single word.'
+const GOOGLE_TRANSLATION = '\u7528\u6237\u8ba9\u6211\u53ea\u56de\u590d\u4e00\u4e2a\u8bcd\u3002\u6211\u4f1a\u7167\u505a\u3002'
+const BING_TRANSLATION = '\u7528\u6237\u8981\u6c42\u6211\u56de\u590d\u4e00\u4e2a\u5355\u8bcd\u3002'
+const JAPANESE_TRANSLATION = '\u30e6ー\u30b6ー\u306f\u5358\u8a9e\u4e00\u3064\u3067\u306e\u8fd4\u7b54\u3092\u6c42\u3081\u3066\u3044\u307e\u3059\u3002'
+const GERMAN_TRANSLATION = 'Der Nutzer möchte eine Antwort mit einem einzigen Wort.'
 
 /** Translation records are the only additions permitted beside the recorded conversation. */
 function isTranslationRecord(event: SessionEvent): boolean {
@@ -105,7 +109,7 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
       return
     }
     if (fail) { response.writeHead(503); response.end(); return }
-    const translated = target === 'ja' ? SECOND_TRANSLATION : target === 'de' ? THIRD_TRANSLATION
+    const translated = target === 'ja' ? JAPANESE_TRANSLATION : target === 'de' ? GERMAN_TRANSLATION
       : provider === 'google' ? GOOGLE_TRANSLATION : BING_TRANSLATION
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(JSON.stringify(provider === 'google'
@@ -154,7 +158,7 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
   resources.scaffold = scaffold
   const browser = await chromium.launch()
   resources.browser = browser
-  const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: 'en-US', timezoneId: 'Asia/Shanghai' })
+  const context = await browser.newContext({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE, timezoneId: 'Asia/Shanghai' })
   const page = await context.newPage()
   const settings = await context.newPage()
   const consoles = [watchConsole(page), watchConsole(settings)]
@@ -163,7 +167,7 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
     await saveFailureShot(settings, 'web-e2e-cot-translation-settings')
   })
   await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-  await connectFreshWorkspace(page, scaffold.workspaceCwd)
+  await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
   const prompts = fixtureUserPrompts(await readFile(FIXTURE, 'utf8'))
   expect(prompts).toHaveLength(1)
   const prompt = prompts[0]
@@ -190,9 +194,9 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
   const recordedModelHistory = session.deriveMessages(), recordedRequestHeader = session.requestHeader()
 
   await settings.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-  await settings.getByRole('button', { name: 'Plugins', exact: true }).click()
+  await settings.getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
   const panel = settings.locator('[data-plugin-panel]')
-  await panel.getByRole('button', { name: 'More', exact: true }).click()
+  await panel.getByRole('button', { name: '\u66f4\u591a', exact: true }).click()
   const card = panel.locator(`[data-plugin-package="${BUNDLE_NAME}"]`)
   const toggle = card.getByRole('switch')
   await toggle.waitFor()
@@ -200,16 +204,16 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
   await toggle.click()
   await expect.poll(() => toggle.getAttribute('aria-checked'), { timeout: PLUGIN_TOGGLE_SETTLE_MS }).toBe('true')
   await card.getByRole('button').first().click()
-  const provider = panel.getByLabel('Translation service', { exact: true })
-  const target = panel.getByLabel('Target language', { exact: true })
+  const provider = panel.getByLabel('\u7ffb\u8bd1\u670d\u52a1', { exact: true })
+  const target = panel.getByLabel('\u76ee\u6807\u8bed\u8a00', { exact: true })
   await provider.waitFor()
   expect(await provider.inputValue()).toBe('bing')
   expect(await target.inputValue()).toBe('auto')
-  await panel.getByText('Expanded reasoning is sent to the selected service. It may contain private code or conversation details.', { exact: true }).waitFor()
+  await panel.getByText('\u5c55\u5f00\u7684\u601d\u8003\u5185\u5bb9\u4f1a\u53d1\u9001\u7ed9\u6240\u9009\u7ffb\u8bd1\u670d\u52a1\uff0c\u53ef\u80fd\u5305\u542b\u79c1\u6709\u4ee3\u7801\u6216\u5bf9\u8bdd\u7ec6\u8282\u3002', { exact: true }).waitFor()
   await panel.getByText(`v${bundleVersion}`, { exact: true }).waitFor()
   await panel.getByText(bundleVersion, { exact: true }).waitFor()
   // The bundle's detail document is shown between its components and its source.
-  await panel.locator('[data-detail-document]').getByRole('img', { name: 'An expanded Think row translated into English, with a View original button', exact: true }).waitFor()
+  await panel.locator('[data-detail-document]').getByRole('img', { name: '\u5c55\u5f00\u7684\u601d\u8003\u884c\u4ece\u82f1\u6587\u7ffb\u8bd1\u6210\u4e2d\u6587\uff0c\u5e76\u663e\u793a“\u67e5\u770b\u539f\u6587”\u6309\u94ae', exact: true }).waitFor()
   await compareOrRefreshGolden(join(EXPECTED, 'preferences.expected.md'),
     await captureStableAria(settings, '[data-plugin-panel]', scaffold.workspaceCwd, {
       replacements: [[BUNDLE, '{{bundle}}'], [bundleVersion, '{{version}}']],
@@ -228,7 +232,7 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
     return [style.fontFamily, style.fontSize, style.fontWeight, style.lineHeight, style.color, style.padding, style.margin]
   })
   const translatedTypography = await typography()
-  const originalAction = body.getByRole('button', { name: 'View original', exact: true })
+  const originalAction = body.getByRole('button', { name: '\u67e5\u770b\u539f\u6587', exact: true })
   await composer.focus()
   await page.mouse.move(0, 0)
   await expect.poll(() => originalAction.evaluate(element => getComputedStyle(element).opacity)).toBe('1')
@@ -240,8 +244,8 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
   expect(await body.getAttribute('data-translation-view')).toBe('original')
   expect(await typography()).toEqual(translatedTypography)
   await page.mouse.move(0, 0)
-  const translationAction = body.getByRole('button', { name: 'View translation', exact: true })
-  const titleBox = await reasoning.getByRole('button', { name: 'Think', exact: true }).boundingBox()
+  const translationAction = body.getByRole('button', { name: '\u67e5\u770b\u8bd1\u6587', exact: true })
+  const titleBox = await reasoning.getByRole('button', { name: '\u601d\u8003', exact: true }).boundingBox()
   const actionBox = await translationAction.boundingBox()
   if (titleBox === null || actionBox === null) throw new Error('Reasoning title and translation action must be visible')
   expect(actionBox.y).toBeGreaterThanOrEqual(titleBox.y + titleBox.height)
@@ -289,7 +293,7 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
   await provider.selectOption('google')
   await target.fill('zh')
   expect(calls).toHaveLength(1)
-  const save = panel.getByRole('button', { name: 'Save', exact: true })
+  const save = panel.getByRole('button', { name: '\u4fdd\u5b58', exact: true })
   await save.click()
   await expect.poll(() => save.isDisabled()).toBe(true)
   await body.getByText(GOOGLE_TRANSLATION, { exact: true }).waitFor()
@@ -301,7 +305,7 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
   await save.click()
   await expect.poll(() => save.isDisabled()).toBe(true)
   await expect.poll(() => body.getAttribute('data-translation-state')).toBe('failed')
-  await body.getByText('Translation failed. Showing the original.', { exact: true }).waitFor()
+  await body.getByText('\u7ffb\u8bd1\u6682\u4e0d\u53ef\u7528\uff0c\u5df2\u663e\u793a\u539f\u6587', { exact: true }).waitFor()
   await body.getByText(ORIGINAL, { exact: true }).waitFor()
   expect(await body.getAttribute('data-translation-view')).toBe('original')
   expect(calls[2]).toEqual({ provider: 'google', text: ORIGINAL, target: 'ja', hasAuthorization: false, hasCookie: false })
@@ -309,8 +313,8 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
   await compareOrRefreshGolden(join(EXPECTED, 'failure.expected.md'),
     await captureStableAria(page, '[data-variant="think"]', scaffold.workspaceCwd), MODE)
   fail = false
-  await body.getByRole('button', { name: 'Retry', exact: true }).click()
-  await body.getByText(SECOND_TRANSLATION, { exact: true }).waitFor()
+  await body.getByRole('button', { name: '\u91cd\u8bd5', exact: true }).click()
+  await body.getByText(JAPANESE_TRANSLATION, { exact: true }).waitFor()
   await expect.poll(() => body.getAttribute('data-translation-state')).toBe('ready')
   expect(calls).toHaveLength(4)
   expect(calls[3]).toEqual({ provider: 'google', text: ORIGINAL, target: 'ja', hasAuthorization: false, hasCookie: false })
@@ -335,13 +339,13 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
   await pending.settled
   expect(pending.response.headersSent).toBe(false)
   expect(pending.response.writableFinished).toBe(false)
-  expect(await reasoning.getByText(SECOND_TRANSLATION, { exact: true }).count()).toBe(0)
+  expect(await reasoning.getByText(JAPANESE_TRANSLATION, { exact: true }).count()).toBe(0)
   await reasoning.locator('[data-disclosure-row]').first().click()
-  await body.getByText(THIRD_TRANSLATION, { exact: true }).waitFor()
+  await body.getByText(GERMAN_TRANSLATION, { exact: true }).waitFor()
   await expect.poll(() => body.getAttribute('data-translation-state')).toBe('ready')
   expect(calls).toHaveLength(6)
 
-  await panel.getByRole('button', { name: 'Back to Experimental plugins', exact: true }).click()
+  await panel.getByRole('button', { name: '\u8fd4\u56de \u5b9e\u9a8c\u6027\u63d2\u4ef6', exact: true }).click()
   await toggle.click()
   await expect.poll(() => toggle.getAttribute('aria-checked'), { timeout: PLUGIN_TOGGLE_SETTLE_MS }).toBe('false')
   await body.waitFor({ state: 'detached' })
@@ -363,8 +367,8 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
   expect(results.map(event => event.data)).toEqual([
     { requestSeq: translationRecords[0]?.seq, text: BING_TRANSLATION },
     { requestSeq: translationRecords[2]?.seq, text: GOOGLE_TRANSLATION },
-    { requestSeq: translationRecords[5]?.seq, text: SECOND_TRANSLATION },
-    { requestSeq: translationRecords[8]?.seq, text: THIRD_TRANSLATION },
+    { requestSeq: translationRecords[5]?.seq, text: JAPANESE_TRANSLATION },
+    { requestSeq: translationRecords[8]?.seq, text: GERMAN_TRANSLATION },
   ])
   for (const result of results) {
     const data = pluginRecordOf(result)?.data
@@ -375,7 +379,7 @@ it.skipIf(MODE === 'record')('persists Bing reasoning translation across reopen 
     expect(request?.seq).toBeLessThan(result.seq)
   }
   const modelLog = JSON.stringify(recordedModelHistory)
-  for (const translated of [GOOGLE_TRANSLATION, BING_TRANSLATION, SECOND_TRANSLATION, THIRD_TRANSLATION]) {
+  for (const translated of [GOOGLE_TRANSLATION, BING_TRANSLATION, JAPANESE_TRANSLATION, GERMAN_TRANSLATION]) {
     expect(modelLog).not.toContain(translated)
   }
   expect(fixtureErrors).toEqual([])

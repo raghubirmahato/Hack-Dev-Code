@@ -1,12 +1,13 @@
 import AgentRegistry from '@hackdevcode/dsh-agent'
 import { Context } from '@hackdevcode/cordis'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import LlmRuntime, { createUserMessage, LlmAdapter, ReasoningEffortId, ToolCallId } from '@hackdevcode/dsh-llm'
+import LlmRuntime, { createUserMessage, LlmAdapter, type ReasoningEffortId, type ToolCallId } from '@hackdevcode/dsh-llm'
 import type { GenerateOptions, LlmResolvedModelInfo, StreamChunk } from '@hackdevcode/dsh-llm'
-import SessionStore, { Session, SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { Session, type SessionId } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { SessionTitleProviderId } from '@hackdevcode/dsh-session-title/types'
 import SessionTitleService, {
-  SessionTitleProviderId,
   type SessionTitleUserMessage,
 } from '@hackdevcode/dsh-session-title'
 import * as providerPlugin from '@hackdevcode/dsh-session-title-all-prompts-llm'
@@ -30,7 +31,7 @@ class RecordingAdapter extends LlmAdapter {
       name: model,
       ...efforts === undefined || floor === undefined
         ? {}
-        : { reasoning: { efforts: efforts.map(id => ({ id: ReasoningEffortId(id), name: id })) } },
+        : { reasoning: { efforts: efforts.map(id => ({ id: brandString<ReasoningEffortId>(id), name: id })) } },
     })
   }
 
@@ -129,7 +130,7 @@ describe('all-messages LLM title provider', () => {
   it('anchors currentTitle only for an accepted provider title and keeps initial generation otherwise', async () => {
     const { ctx, adapter } = await harness()
 
-    const fallbackSession = ctx.sessions.create(SessionId('all-source-fallback'))
+    const fallbackSession = ctx.sessions.create(brandString<SessionId>('all-source-fallback'))
     const fallbackMessage = appendHumanPrompt(fallbackSession, 'Growing tomatoes and basil on the balcony')
     await ctx.sessionTitle.refresh(fallbackSession)
     const fallbackOptions = adapter.requests.at(-1)!
@@ -138,7 +139,7 @@ describe('all-messages LLM title provider', () => {
     ]))
     expect(fallbackOptions.system).toBe(SYSTEM_BASE)
 
-    const userSession = ctx.sessions.create(SessionId('all-source-user'))
+    const userSession = ctx.sessions.create(brandString<SessionId>('all-source-user'))
     const userMessage = appendHumanPrompt(userSession, 'Growing tomatoes and basil on the balcony')
     ctx.sessionTitle.rename(userSession, 'User title')
     await ctx.sessionTitle.refresh(userSession)
@@ -153,12 +154,12 @@ describe('all-messages LLM title provider', () => {
     ]))
     expect(revisionOptions.system).toBe(SYSTEM_WITH_TITLE)
 
-    const foreignSession = ctx.sessions.create(SessionId('all-source-foreign'))
+    const foreignSession = ctx.sessions.create(brandString<SessionId>('all-source-foreign'))
     const foreignMessage = appendHumanPrompt(foreignSession, 'Growing tomatoes and basil on the balcony')
     foreignSession.append('session/title', {
       title: 'Previous provider title',
       messageSeqs: [foreignMessage.seq],
-      source: { kind: 'provider', provider: SessionTitleProviderId('previous-provider') },
+      source: { kind: 'provider', provider: brandString<SessionTitleProviderId>('previous-provider') },
     })
     await ctx.sessionTitle.refresh(foreignSession)
     const foreignOptions = adapter.requests.at(-1)!
@@ -169,7 +170,7 @@ describe('all-messages LLM title provider', () => {
   })
 
   it('includes seeded history and the latest prompt while inheriting the logged request route', async () => {
-    const seeded = Session.create(SessionId('seed-source'))
+    const seeded = Session.create(brandString<SessionId>('seed-source'))
     seeded.append('turn/start', { turn: 1 })
     const inherited = seeded.append('user/message', createUserMessage({
       content: [{ type: 'text', text: 'inherited prompt' }], source: { kind: 'user' },
@@ -180,7 +181,7 @@ describe('all-messages LLM title provider', () => {
     seeded.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 
     const { ctx, adapter } = await harness(INHERITED_LLM_CONFIG)
-    const session = ctx.sessions.create(SessionId('all-plugin'), {
+    const session = ctx.sessions.create(brandString<SessionId>('all-plugin'), {
       seed: seeded.snapshotEvents(),
       inheritedEventCount: seeded.seq,
       meta: { parentSession: seeded.id, isSeeded: true },
@@ -222,7 +223,7 @@ describe('all-messages LLM title provider', () => {
     const adapter = new RecordingAdapter()
     ctx.llm.registerAdapter(['title-route'], adapter)
     await ctx.plugin(providerPlugin, LLM_CONFIG)
-    const session = ctx.sessions.create(SessionId('absent-current-title'))
+    const session = ctx.sessions.create(brandString<SessionId>('absent-current-title'))
     const message = appendHumanPrompt(session, 'Tom')
 
     await ctx.sessionTitle.refresh(session)
@@ -233,12 +234,12 @@ describe('all-messages LLM title provider', () => {
 
   it('selects the route least supported reasoning effort for its own model calls', async () => {
     const { ctx, adapter } = await harness(LLM_CONFIG, ALL_TITLE_SCRIPT, ['low', 'high'])
-    const session = ctx.sessions.create(SessionId('all-floor-effort'))
+    const session = ctx.sessions.create(brandString<SessionId>('all-floor-effort'))
     appendHumanPrompt(session, 'first prompt')
 
     await ctx.sessionTitle.refresh(session)
 
-    expect(adapter.requests[0]?.reasoningEffort).toBe(ReasoningEffortId('low'))
+    expect(adapter.requests[0]?.reasoningEffort).toBe(brandString<ReasoningEffortId>('low'))
   })
 
   it.each([
@@ -253,7 +254,7 @@ describe('all-messages LLM title provider', () => {
       ...deltas.map((text): StreamChunk => ({ type: 'text-delta', index: 0, text })),
       { type: 'finish', reason: { kind: 'stop' } },
     ])
-    const session = ctx.sessions.create(SessionId(`all-parse-${title}`))
+    const session = ctx.sessions.create(brandString<SessionId>(`all-parse-${title}`))
     appendHumanPrompt(session, 'first prompt')
 
     await ctx.sessionTitle.refresh(session)
@@ -267,7 +268,7 @@ describe('all-messages LLM title provider', () => {
       { type: 'text-delta', index: 0, text: 'Title from text' },
       { type: 'finish', reason: { kind: 'tool-calls' } },
     ])
-    const toolCallsSession = toolCalls.ctx.sessions.create(SessionId('all-tool-calls-finish'))
+    const toolCallsSession = toolCalls.ctx.sessions.create(brandString<SessionId>('all-tool-calls-finish'))
     appendHumanPrompt(toolCallsSession, 'first prompt')
     await expect(toolCalls.ctx.sessionTitle.refresh(toolCallsSession)).rejects.toThrow(/output must contain text only/)
 
@@ -276,7 +277,7 @@ describe('all-messages LLM title provider', () => {
       { type: 'text-delta', index: 0, text: 'Partial title' },
       { type: 'finish', reason: { kind: 'max-tokens' } },
     ])
-    const maxTokensSession = maxTokens.ctx.sessions.create(SessionId('all-max-tokens-finish'))
+    const maxTokensSession = maxTokens.ctx.sessions.create(brandString<SessionId>('all-max-tokens-finish'))
     appendHumanPrompt(maxTokensSession, 'first prompt')
     await expect(maxTokens.ctx.sessionTitle.refresh(maxTokensSession)).rejects.toThrow(/reached maxOutputTokens/)
   })
@@ -284,10 +285,10 @@ describe('all-messages LLM title provider', () => {
   it('rejects tool-call blocks and a successful response with no text', async () => {
     const tool = await harness(LLM_CONFIG, [
       { type: 'block-start', index: 0, blockType: 'tool-call' },
-      { type: 'tool-call-delta', index: 0, id: ToolCallId('title-tool'), name: 'unexpected', argumentsDelta: '{}' },
+      { type: 'tool-call-delta', index: 0, id: brandString<ToolCallId>('title-tool'), name: 'unexpected', argumentsDelta: '{}' },
       { type: 'finish', reason: { kind: 'stop' } },
     ])
-    const toolSession = tool.ctx.sessions.create(SessionId('all-tool'))
+    const toolSession = tool.ctx.sessions.create(brandString<SessionId>('all-tool'))
     appendHumanPrompt(toolSession, 'first prompt')
     await expect(tool.ctx.sessionTitle.refresh(toolSession)).rejects.toThrow(/output must contain text only/)
 
@@ -296,7 +297,7 @@ describe('all-messages LLM title provider', () => {
       { type: 'reasoning-delta', index: 0, text: 'no final title' },
       { type: 'finish', reason: { kind: 'stop' } },
     ])
-    const reasoningSession = reasoning.ctx.sessions.create(SessionId('all-reasoning'))
+    const reasoningSession = reasoning.ctx.sessions.create(brandString<SessionId>('all-reasoning'))
     appendHumanPrompt(reasoningSession, 'first prompt')
     await expect(reasoning.ctx.sessionTitle.refresh(reasoningSession)).rejects.toThrow(/produced no text/)
   })
@@ -317,7 +318,7 @@ describe('all-messages LLM title provider', () => {
       { type: 'text-delta', index: 0, text: 'Growing tomatoes and basil' },
       { type: 'finish', reason: { kind: 'stop' } },
     ])
-    const session = ctx.sessions.create(SessionId('all-stability'))
+    const session = ctx.sessions.create(brandString<SessionId>('all-stability'))
     const first = appendHumanPrompt(session, 'I want to grow tomatoes and basil on my balcony; please give me starter advice.')
     await ctx.sessionTitle.refresh(session)
     expect(ctx.sessionTitle.get(session)?.title).toBe('Growing tomatoes and basil')

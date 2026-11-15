@@ -8,8 +8,6 @@ export type JobKey = keyof typeof en
 
 /** English dictionary (the key-set source of truth). */
 export const en = {
-  'count.live.one': '{count} background job running',
-  'count.live.other': '{count} background jobs running',
   'count.idle.one': '{count} background job',
   'count.idle.other': '{count} background jobs',
   'list.aria': 'Background jobs',

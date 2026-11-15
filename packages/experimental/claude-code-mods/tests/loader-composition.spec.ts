@@ -15,13 +15,14 @@ import CommandRuntime from '@hackdevcode/dsh-commands'
 import LocalFileSystem from '@hackdevcode/dsh-fs-local'
 import WorkingDirectory from '@hackdevcode/dsh-working-directory'
 import LlmRuntime, { createUserMessage } from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
 import { defineContentToolFixture } from '@hackdevcode/dsh-tool-testkit'
 import * as ClaudeCodeMods from '../src/index.ts'
 import { MockAdapter, textResponse, toolCallResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 // Keep workspace imports in Vitest's source graph even when the config has a package scope.
 vi.mock('@hackdevcode/cordis-plugin-loader/src/resolve.ts', () => ({ createResolve: () => undefined }))
@@ -81,7 +82,7 @@ it('loads from cordis.yml, counts the model\'s tool calls, and answers /tally th
     name: 'echo', description: 'echo', parameters: { command: { type: 'string' } },
     async execute(args) { return [{ type: 'text', text: `ran ${args.command}` }] },
   }))
-  const agent = await context.agentLoop.create(SessionId('composed'), { provider: 'mock', model: 'mock' })
+  const agent = await context.agentLoop.create(brandString<SessionId>('composed'), { provider: 'mock', model: 'mock' })
   expect(context.commands.list(agent).map(command => command.name)).toEqual(['tally'])
   agent.followup(createUserMessage({ content: [{ type: 'text', text: 'list the files here' }], source: { kind: 'user' } }))
   await agent.whenIdle()

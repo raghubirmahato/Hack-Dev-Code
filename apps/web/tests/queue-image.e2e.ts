@@ -15,7 +15,9 @@ import { afterEach, describe, expect, it, onTestFailed } from 'vitest'
 import { deriveReplayScript, parseSessionLog, type ReplayEntry } from '@hackdevcode/dsh-llm-replay'
 import type { SessionEvent } from '@hackdevcode/dsh-session'
 import {
-  captureStableAria, compareOrRefreshGolden, launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  captureStableAria, compareOrRefreshGolden,
+  launchWebScaffold, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/queued-image', import.meta.url))

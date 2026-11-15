@@ -54,7 +54,7 @@ describe.skipIf(mode === 'record')('web e2e: independent-writer Excel previews',
     await column.locator('[data-sidebar-right-guide-entry="files"]').click()
     await column.locator('[data-files-state="tree"]').waitFor()
     await column.locator('[data-files-reload]').click()
-    const files = column.locator('[data-dockkit-tab]').filter({ has: page.getByText('Files', { exact: true }) })
+    const toggle = column.locator('[data-files-navigator-toggle]:visible')
     const preview = column.locator('[data-textpreview-url]')
     const excel = preview.locator('[data-excel-preview]')
     const sheets = excel.locator('.luckysheet-sheets-item-name')
@@ -62,10 +62,12 @@ describe.skipIf(mode === 'record')('web e2e: independent-writer Excel previews',
     const rows = ['# Independent-writer Excel previews', '']
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'], { origin: new URL(page.url()).origin })
     for (const name of [...excelOpcCases, ...excelOpeningCases, ...excelXmlCases]) {
-      await files.click()
-      await column.locator('[data-files-entry="file"]').getByRole('button', { name: `${name}.xlsx`, exact: true }).click()
+      // The first file replaces the files page; later ones open from the pane's navigator.
+      // The files page always shows its tree and draws no toggle.
+      if (await toggle.count() > 0 && await toggle.getAttribute('aria-expanded') !== 'true') await toggle.click()
+      await column.locator('[data-files-navigator]:visible [data-files-entry="file"]').getByRole('button', { name: `${name}.xlsx`, exact: true }).click()
       await expect.poll(async () => (await preview.getAttribute('data-textpreview-url'))?.endsWith(`/${name}.xlsx`)).toBe(true)
-      await sheets.getByText('Data', { exact: true }).waitFor()
+      await sheets.getByText('\u6570\u636e', { exact: true }).waitFor()
       await excel.locator('.fortune-sheet-overlay').click({ position: { x: 70, y: 30 } })
       await expect.poll(() => excel.locator('.fortune-fx-input').innerText()).toBe('Item')
       await page.keyboard.press('ControlOrMeta+C')
@@ -78,9 +80,9 @@ describe.skipIf(mode === 'record')('web e2e: independent-writer Excel previews',
           : name === 'orphan-drawing' ? 'conditional formatting' : 'charts, conditional formatting'
         expect(await notice.innerText()).toBe(`This preview does not support ${features} in this workbook. Open it in a system application for the full experience.`)
       }
-      rows.push(`- ${name}.xlsx: Data opened; Item copied`)
+      rows.push(`- ${name}.xlsx: \u6570\u636e opened; Item copied`)
     }
-    expect(await sheets.getByText('Hidden page', { exact: true }).isVisible()).toBe(false)
+    expect(await sheets.getByText('\u9690\u85cf\u9875', { exact: true }).isVisible()).toBe(false)
     const warning = await notice.innerText()
     expect(warning).toBe('This preview does not support charts, images, shapes, conditional formatting in this workbook. Open it in a system application for the full experience.')
     rows.push('- Relocated workbook: hidden sheet omitted', `- Relocated workbook notice: ${warning}`)

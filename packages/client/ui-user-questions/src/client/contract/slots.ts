@@ -1,7 +1,7 @@
 /** Question composer props and one pending Remote waterfall response. */
 import type { InjectFace, PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore } from '@hackdevcode/dsh-client-ui-slots'
 // The client module declares the conversation.composer SlotMap entry required by PropsRuntime.
-import type { ToolCallId } from '@hackdevcode/dsh-llm/brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import type { SessionId } from '@hackdevcode/dsh-session/types'
 import type {
   AskUserQuestionAnswer, AskUserQuestionAnswerItem, AskUserQuestionItem, UserQuestionState,

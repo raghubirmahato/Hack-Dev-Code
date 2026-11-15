@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import Schema from '@hackdevcode/schemastery'
 import {
+  LLM_FAILURE_CODES,
   resolveRetryPolicy,
   retryBudget,
+  RETRY_CODE_CHOICES,
   RetryPolicySchema,
 } from '@hackdevcode/dsh-llm'
 import type { RetryPolicyConfig } from '@hackdevcode/dsh-llm'
@@ -98,6 +101,43 @@ describe('provider retry policy', () => {
     expect(() => {
       resolveRetryPolicy(config as unknown as RetryPolicyConfig, 'provider.retryPolicy')
     }).toThrow(message)
+  })
+
+  it.each<[string, RetryPolicyConfig]>([
+    ['a zero delay', { mode: 'always', backoff: { initialDelayMs: 0 } }],
+    ['an empty code list', { mode: 'normal', retryableCodes: [] }],
+    ['a blank code', { mode: 'normal', retryableCodes: [''] }],
+  ])('declares the resolver bound on %s in the schema', (_name, config) => {
+    expect(() => RetryPolicySchema(config)).toThrow()
+  })
+
+  it('accepts the smallest values inside the schema bounds and still defaults the codes', () => {
+    expect(RetryPolicySchema({ mode: 'normal', retryableCodes: ['X'], backoff: { initialDelayMs: Number.MIN_VALUE } }))
+      .toMatchObject({ retryableCodes: ['X'], backoff: { initialDelayMs: Number.MIN_VALUE } })
+    expect(RetryPolicySchema({ mode: 'normal' })).toMatchObject({
+      retryableCodes: ['EMPTY_RESPONSE', 'RATE_LIMIT', 'STREAM_CLOSED', 'SERVER', 'TIMEOUT', 'TRANSPORT'],
+    })
+  })
+
+  it('publishes the retry choices through the serialized schema and still admits other codes', () => {
+    const restored = new Schema(JSON.parse(JSON.stringify(RetryPolicySchema.toJSON())) as Schema<RetryPolicyConfig>)
+    const normal = restored.list?.find(branch => branch.dict?.['mode']?.value === 'normal')
+    const item = normal?.dict?.['retryableCodes']?.inner
+    const choices = item?.list?.flatMap((branch): unknown[] => {
+      const value: unknown = branch.value
+      return branch.type === 'const' ? [value] : []
+    })
+    expect(choices).toEqual([...RETRY_CODE_CHOICES])
+    expect(RETRY_CODE_CHOICES).toEqual(
+      Object.keys(LLM_FAILURE_CODES).filter(code => 'retryChoice' in LLM_FAILURE_CODES[code as keyof typeof LLM_FAILURE_CODES]),
+    )
+    expect(restored({ mode: 'normal', retryableCodes: ['SERVER', 'Overloaded_529'] }))
+      .toMatchObject({ retryableCodes: ['SERVER', 'Overloaded_529'] })
+    expect(() => restored({ mode: 'normal', retryableCodes: [''] })).toThrow()
+    // A stream the provider dropped mid-reply is retried by default, like a transport failure.
+    expect(RETRY_CODE_CHOICES).toContain('STREAM_CLOSED')
+    const defaults = resolveRetryPolicy(undefined, 'provider.retryPolicy')
+    expect(defaults.mode === 'normal' ? defaults.retryableCodes : []).toContain('STREAM_CLOSED')
   })
 })
 

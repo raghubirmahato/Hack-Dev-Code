@@ -10,10 +10,10 @@ import { Context } from '@hackdevcode/cordis'
 import z from '@hackdevcode/schemastery'
 import type { Agent } from '@hackdevcode/dsh-agent'
 import type { ContentBlock } from '@hackdevcode/dsh-llm'
-import { TerminalSessionId } from '@hackdevcode/dsh-terminal'
+import { brandString } from '@hackdevcode/dsh-brand'
 import type { TerminalSendOperation, TerminalSendResult, TerminalSessionId as TerminalSessionIdType, TerminalSignal } from '@hackdevcode/dsh-terminal'
 import type {} from '@hackdevcode/dsh-jobs'
-import { defineTool } from '@hackdevcode/dsh-tools'
+import { defineTool, ToolArgsError, ToolContextUnavailableError } from '@hackdevcode/dsh-tools'
 import type { ToolDefinition } from '@hackdevcode/dsh-tools'
 import { sendSource } from './background.ts'
 import { boundTerminalText, renderList, renderRead, renderSend, renderSpawn } from './render.ts'
@@ -118,15 +118,20 @@ const BACKGROUND_JOB_OUTPUT_SCHEMA = {
 } as const
 
 function requireAgent(agent: Agent | undefined): Agent {
-  if (agent === undefined) throw new Error('terminal tools require an initiating agent')
+  if (agent === undefined) throw new ToolContextUnavailableError('terminal tools require an initiating agent')
   return agent
+}
+
+/** The cancellation for a foreground send the caller cancelled; the tool registry records it as `ABORTED`. */
+function sendAborted(): DOMException {
+  return new DOMException('terminal send aborted', 'AbortError')
 }
 
 function sessionId(args: SessionArgs): TerminalSessionIdType {
   if (args.sessionId.length === 0) {
-    throw new Error('sessionId must be a non-empty string')
+    throw new ToolArgsError(['sessionId must be a non-empty string'])
   }
-  return TerminalSessionId(args.sessionId)
+  return brandString<TerminalSessionIdType>(args.sessionId)
 }
 
 function textResult(text: string, maxBytes: number): ContentBlock[] {
@@ -183,7 +188,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       render: (_args, value) => [{ type: 'text', text: renderSpawn(value, maxResultBytes) }],
     },
     async execute(args: SpawnArgs, exec) {
-      if (args.type.length === 0) throw new Error('type must be a non-empty string')
+      if (args.type.length === 0) throw new ToolArgsError(['type must be a non-empty string'])
       const owner = requireAgent(exec.agent)
       const cwd = await ctx.workingDirectory.ensure(owner, exec.signal)
       const result = await ctx.terminals.spawn(owner, {
@@ -253,9 +258,9 @@ export function apply(ctx: Context, config: Config = {}): void {
       const id = sessionId(args)
       const request = { text: args.text, submit: args.submit ?? true }
       if (args.run_in_background === true) {
-        if (!enableRunInBackground) throw new Error('background terminal sends are disabled by tool-terminal configuration')
+        if (!enableRunInBackground) throw new ToolArgsError(['run_in_background is disabled by tool-terminal configuration (enableRunInBackground: false)'])
         const jobs = ctx.get('jobs')
-        if (jobs === undefined) throw new Error('background terminal sends require @hackdevcode/dsh-jobs and @hackdevcode/dsh-tool-jobs')
+        if (jobs === undefined) throw new ToolContextUnavailableError('background terminal sends require @hackdevcode/dsh-jobs and @hackdevcode/dsh-tool-jobs')
         let cancelRequested = false
         let operation: TerminalSendOperation | undefined
         const jobId = jobs.start({
@@ -284,7 +289,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       }
       const operation = ctx.terminals.startSend(owner, id, { ...request, signal: exec.signal })
       const result = await operation.done
-      if (exec.signal.aborted) throw new Error('terminal send aborted')
+      if (exec.signal.aborted) throw sendAborted()
       return { kind: 'foreground' as const, ...result }
     },
     presentCall(args) {

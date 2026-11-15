@@ -15,7 +15,7 @@ import { Context } from '@hackdevcode/cordis'
 import LlmRuntime from '@hackdevcode/dsh-llm'
 import { createUserMessage, LlmAdapter } from '@hackdevcode/dsh-llm'
 import type { GenerateOptions, StreamChunk } from '@hackdevcode/dsh-llm'
-import SessionStore, { SessionId } from '@hackdevcode/dsh-session'
+import SessionStore, { type SessionId } from '@hackdevcode/dsh-session'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime from '@hackdevcode/dsh-tools'
 import AgentRegistry, { type Agent } from '@hackdevcode/dsh-agent'
@@ -23,6 +23,7 @@ import AgentRegistry, { type Agent } from '@hackdevcode/dsh-agent'
 import AgentLoop from '@hackdevcode/dsh-agent-loop'
 import SessionProjectionRegistry from '@hackdevcode/dsh-session-projection'
 import fc from 'fast-check'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 /** A never-exhausting adapter: every model call returns the same short reply. */
 class EchoAdapter extends LlmAdapter {
@@ -115,7 +116,7 @@ describe('agent loop scheduling properties', () => {
       async (texts) => {
         const ctx = await harness()
         try {
-          const agent = await ctx.agentLoop.create(SessionId('a'), { provider: 'mock', model: 'mock' })
+          const agent = await ctx.agentLoop.create(brandString<SessionId>('a'), { provider: 'mock', model: 'mock' })
           const { seen: trace } = recordStatus(ctx, agent)
           const idle = nextIdle(ctx, agent)
           // Send all in one synchronous tick: they queue before the loop wakes.
@@ -143,7 +144,7 @@ describe('agent loop scheduling properties', () => {
       async (texts) => {
         const ctx = await harness()
         try {
-          const agent = await ctx.agentLoop.create(SessionId('a'), { provider: 'mock', model: 'mock' })
+          const agent = await ctx.agentLoop.create(brandString<SessionId>('a'), { provider: 'mock', model: 'mock' })
           for (const text of texts) {
             const idle = nextIdle(ctx, agent)
             agent.followup(createUserMessage({ content: [{ type: 'text', text }], source: { kind: 'user' } }))
@@ -168,7 +169,7 @@ describe('agent loop scheduling properties', () => {
       async (steps) => {
         const ctx = await harness()
         try {
-          const agent = await ctx.agentLoop.create(SessionId('a'), { provider: 'mock', model: 'mock' })
+          const agent = await ctx.agentLoop.create(brandString<SessionId>('a'), { provider: 'mock', model: 'mock' })
           // Capture before each send; the last waiter covers the final turn, and
           // awaiting an already-settled earlier waiter is harmless.
           let lastIdle: Promise<void> | undefined

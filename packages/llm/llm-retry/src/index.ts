@@ -13,7 +13,8 @@ import type { Agent, RequestErrorAction } from '@hackdevcode/dsh-agent'
 import type { LlmFailure, ResolvedRetryPolicy } from '@hackdevcode/dsh-llm'
 import { retryBudget } from '@hackdevcode/dsh-llm'
 import type {} from '@hackdevcode/dsh-session-projection'
-import { RetryId } from './brand.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { RetryId } from './brand.ts'
 import type { LlmRetryEventData } from './types.ts'
 
 export type { LlmRetryEventData, LlmRetryStartedEventData } from './types.ts'
@@ -221,7 +222,7 @@ export async function apply(ctx: Context, config: Config = {}, internals: RetryI
     const previousRetry = previous?.retry ?? 0
     if (policy.mode === 'normal' && previousRetry >= retryBudget(policy, failure.code)) return next()
     const retry = previousRetry + 1
-    const retryId = previous?.retryId ?? RetryId(randomUUID())
+    const retryId = previous?.retryId ?? brandString<RetryId>(randomUUID())
     let delayMs: number
     if (failure.providerRetryAfterMs !== undefined
       && Number.isFinite(failure.providerRetryAfterMs)

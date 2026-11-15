@@ -5,6 +5,8 @@
  * popupSelect shell's copy.
  */
 
+import { builtinCommandTokens } from '@hackdevcode/dsh-commands/builtin'
+
 /** The command namespace key union. */
 export type CommandKey = keyof typeof en
 
@@ -24,12 +26,12 @@ export const en = {
   'description.compact': 'Compact older conversation history',
   'description.permission': 'Switch the permission preset (sandbox mode + approval policy)',
   'description.export': 'Download this Session log as a ZIP archive',
-  'token.goal': 'goal',
-  'token.plan': 'plan',
-  'token.feedback': 'feedback',
-  'token.compact': 'compact',
-  'token.permission': 'permission',
-  'token.export': 'export',
+  'token.goal': builtinCommandTokens.en.goal,
+  'token.plan': builtinCommandTokens.en.plan,
+  'token.feedback': builtinCommandTokens.en.feedback,
+  'token.compact': builtinCommandTokens.en.compact,
+  'token.permission': builtinCommandTokens.en.permission,
+  'token.export': builtinCommandTokens.en.export,
   'search.placeholder': 'Search…',
   'search.aria': 'Filter options',
   'status.loading': 'Loading options…',

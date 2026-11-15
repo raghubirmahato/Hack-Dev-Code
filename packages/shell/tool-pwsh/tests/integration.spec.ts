@@ -18,7 +18,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { Context } from '@hackdevcode/cordis'
-import { ToolCallId } from '@hackdevcode/dsh-llm'
+import type { ToolCallId } from '@hackdevcode/dsh-llm'
+import { brandString } from '@hackdevcode/dsh-brand'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import ToolRuntime, { TOOL_ABORTED } from '@hackdevcode/dsh-tools'
 import LocalJobRegistry from '@hackdevcode/dsh-jobs-local'
@@ -44,7 +45,7 @@ let callCounter = 0
 function call(name: string, args: unknown, agentObj?: object, signal?: AbortSignal) {
   return executeToolFixture(ctx, {
     signal: signal ?? testToolSignal,
-    callId: ToolCallId(`it-${++callCounter}`),
+    callId: brandString<ToolCallId>(`it-${++callCounter}`),
     name,
     arguments: args,
     ...agentObj ? { agent: agentObj as never } : {},

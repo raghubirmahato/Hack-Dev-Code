@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { AttachmentId } from '@hackdevcode/dsh-attachment'
+import type { AttachmentId } from '@hackdevcode/dsh-attachment/types'
 import type { ContentBlock, MessageId, ToolCallId } from '@hackdevcode/dsh-llm'
 import type { SessionEvent, SessionSeq } from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-session-title'

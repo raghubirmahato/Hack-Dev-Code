@@ -16,10 +16,13 @@ export interface ProductPackagePolicy {
  * Optional integrations may be reached by an optional bundle without becoming default capabilities.
  */
 export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolicy>> = {
+  'packages/host/authentication-desktop': { category: 'optional', reason: 'Mounted by the private Desktop Host with its parent-process credential, outside default Web profiles.' },
   'packages/core/agent-tool-presentation': { category: 'optional', reason: 'Deprecated selector retained for existing executor configurations.' },
   'packages/client/ui-settings-account': { category: 'optional', reason: 'DeepSeek account pages, shipped switched off; models are configured with API keys.' },
   'packages/fs/fs-observation-policy': { category: 'optional', reason: 'Read-before-write guard, shipped switched off; a deployment may enable its row.' },
   'packages/llm/llm-deepseek-account': { category: 'optional', reason: 'DeepSeek account sign-in, shipped switched off; a deployment may enable its row.' },
+  'packages/client/script-realm': { category: 'optional', reason: 'Script environment provider registry for explicitly selected Client integrations.' },
+  'packages/client/script-realm-iframe': { category: 'optional', reason: 'Iframe execution provider registered only by an explicitly selected Client plugin.' },
   'packages/lsp/lsp': { category: 'optional', reason: 'Service definition for deployment-configured language servers.' },
   'packages/lsp/lsp-stdio': { category: 'optional', reason: 'Requires an explicit server list and language-server executables.' },
   'packages/lsp/tool-lsp': { category: 'optional', reason: 'Model tools selected together with a configured LSP provider.' },
@@ -33,8 +36,6 @@ export const PRODUCT_PACKAGE_POLICY: Readonly<Record<string, ProductPackagePolic
   'packages/subagent/subagent-claude-code': { category: 'optional', reason: 'Separately installed native Claude Code agent integration.' },
   'packages/subagent/subagent-codex': { category: 'optional', reason: 'Separately installed native Codex agent integration.' },
   'packages/subagent/subagent-dsh-sdk': { category: 'optional', reason: 'Requires an explicitly configured external DSH home.' },
-  'packages/web/web-search-exa': { category: 'optional', reason: 'Alternative search provider requiring its own API credentials.' },
-  'packages/web/web-search-perplexity': { category: 'optional', reason: 'Alternative search provider requiring its own API credentials.' },
   'packages/context/tmux-context': { category: 'optional', reason: 'Context contribution requiring a tmux pane.' },
   'packages/fs/tool-str-replace-editor': { category: 'optional', reason: 'Explicit alternative to the default filesystem editing tools.' },
   'packages/sdk/client': { category: 'sdk', reason: 'Published TypeScript embedding client runs in the consumer process.' },

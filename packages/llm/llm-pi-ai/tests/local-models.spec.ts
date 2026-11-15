@@ -182,7 +182,7 @@ describe('tool calls written as text', () => {
       yield { type: 'done', reason: 'stop', message: done }
     }
     const out: StreamChunk[] = []
-    for await (const chunk of toStreamChunks(feed(), 32_768, undefined, 'qwen3:8b', inlineTools)) out.push(chunk)
+    for await (const chunk of toStreamChunks(feed(), 32_768, undefined, 'qwen3:8b', undefined, inlineTools)) out.push(chunk)
     return out
   }
 

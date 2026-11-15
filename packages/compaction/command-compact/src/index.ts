@@ -4,7 +4,8 @@
  */
 
 import type { Context } from '@hackdevcode/cordis'
-import { CommandDefinitionId } from '@hackdevcode/dsh-commands/brand'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { CommandDefinitionId } from '@hackdevcode/dsh-commands/types'
 import { ManualCompactionError } from '@hackdevcode/dsh-compaction'
 import type { CommandInvocation, CommandResult } from '@hackdevcode/dsh-commands'
 
@@ -99,7 +100,7 @@ export function apply(ctx: Context): void {
     // invocation can enter while already-started handler promises quiesce.
     yield async () => { await Promise.allSettled(active) }
     yield ctx.commands.register({
-      definitionId: CommandDefinitionId('@hackdevcode/dsh-command-compact'),
+      definitionId: brandString<CommandDefinitionId>('@hackdevcode/dsh-command-compact'),
       name: 'compact',
       description: 'Compact older conversation history',
       handler,

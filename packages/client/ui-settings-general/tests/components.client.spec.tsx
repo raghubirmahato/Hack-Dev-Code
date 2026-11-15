@@ -1,16 +1,19 @@
 // @vitest-environment jsdom
+import { contextMenuHook } from '@hackdevcode/dsh-client-test-runtime'
 import type { GlobalStandardProps } from '@hackdevcode/dsh-client-ui-slots'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { allowAllAccess, bindSnapshotSelector, RemoteError } from '@hackdevcode/dsh-client-test-runtime'
 import type { GeneralSectionComponentProps } from '../src/client/GeneralSection.tsx'
 import { GeneralSection } from '../src/client/GeneralSection.tsx'
 import { CloseLabel, HeaderContent, TriggerContent } from '../src/client/chrome.tsx'
 import type { TriggerContentProps } from '../src/client/chrome.tsx'
 import { SettingsDocumentAction } from '../src/client/SettingsDocumentAction.tsx'
+import { DesktopChannelRow, DesktopChannelToast } from '../src/client/DesktopChannelRow.tsx'
+import { DesktopChannelSource } from '../src/client/desktop-channel-source.ts'
+import type { DesktopChannelChangeResult, DesktopChannelState } from '../src/types.ts'
 import { DeveloperToolsRow } from '../src/client/DeveloperToolsRow.tsx'
 import { CustomInstructionsRow } from '../src/client/CustomInstructionsRow.tsx'
-import { previewRules } from '../src/client/custom-rules.ts'
 import { createSnapshotStore } from '@hackdevcode/dsh-client-store'
 import { SettingsDescribeMirror } from '@hackdevcode/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { SettingsDocumentStore } from '../src/client/settings-document-store.ts'
@@ -25,6 +28,9 @@ function derivedDocumentStore(remote: object) {
   return new SettingsDocumentStore(ctx, new SettingsDescribeMirror(ctx))
 }
 import { en } from '../src/client/locales.ts'
+
+// English is the only product language; the other dictionaries resolve to it.
+const zh = en
 import { CurrentVersionRow } from '../src/client/CurrentVersionRow.tsx'
 import { DesktopUpdateBadge } from '../src/client/DesktopUpdateIndicator.tsx'
 import { HostReleasePrompt, type HostReleasePromptProps } from '../src/client/HostReleasePrompt.tsx'
@@ -45,6 +51,7 @@ const kit = {
   useSessions: unusedHook, useSessionStatus,
   usePanelInfo, useSessionRetainInfo: () => undefined, useResource, useWorkspaces: unusedHook,
   ...allowAllAccess,
+  useContextMenu: contextMenuHook(),
 }
 
 describe('Desktop collapsed update badge', () => {
@@ -70,6 +77,12 @@ describe('Desktop collapsed update badge', () => {
     state = { failed: false, opening: false, presentation: { phase: 'error', failure: 'install' } }
     view.rerender(<DesktopUpdateBadge {...props} />)
     expect(screen.getByRole('img', { name: en['desktop.update.retry'] })).toBeTruthy()
+    state = { failed: false, opening: false, presentation: { phase: 'idle', configurationError: 'format' } }
+    view.rerender(<DesktopUpdateBadge {...props} />)
+    expect(screen.getByRole('img', { name: en['desktop.channel.unavailable'] })).toBeTruthy()
+    state = { ...state, presentation: { phase: 'idle' } }
+    view.rerender(<DesktopUpdateBadge {...props} />)
+    expect(screen.queryByRole('img')).toBeNull()
     for (const value of ['connecting', 'disconnected'] as const) {
       connection = value
       view.rerender(<DesktopUpdateBadge {...props} />)
@@ -337,45 +350,114 @@ describe('Host release change confirmation', () => {
   })
 })
 
-describe('custom instruction rules in Settings', () => {
-  it('counts rules live, previews them numbered, and saves with ctrl+enter', async () => {
-    const state = createSnapshotStore('')
-    const save = vi.fn(async (text: string) => { state.set(text); return true })
-    // Fills in {name} parameters the way the real locale chain does.
-    const tp = ((key: string, params?: Record<string, unknown>) => Object.entries(params ?? {})
-      .reduce((text, [name, value]) => text.replaceAll(`{${name}}`, String(value)), (en as Record<string, string>)[key] ?? key)) as typeof t
-    render(<CustomInstructionsRow {...kit} t={tp} useCustomInstructions={bindSnapshotSelector(state)} limit={200} save={save} />)
-    const box = screen.getByRole('textbox', { name: 'Custom instructions' })
-    expect(screen.getByText('0 rules')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Preview rules' }).hasAttribute('disabled')).toBe(true)
-    fireEvent.change(box, { target: { value: '- Use tabs\n- Never add dependencies' } })
-    expect(screen.getByText('2 rules')).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'Preview rules' }))
-    const preview = screen.getByRole('list', { name: 'Rules as agents receive them' })
-    expect([...preview.querySelectorAll('li')].map(item => item.textContent)).toEqual(['Use tabs', 'Never add dependencies'])
-    fireEvent.click(screen.getByRole('button', { name: 'Hide preview' }))
-    expect(screen.queryByRole('list', { name: 'Rules as agents receive them' })).toBeNull()
-    fireEvent.change(box, { target: { value: 'Only one rule' } })
-    expect(screen.getByText('1 rule')).toBeTruthy()
-    fireEvent.keyDown(box, { key: 'Enter', ctrlKey: true })
-    expect(save).toHaveBeenCalledWith('Only one rule')
-    await waitFor(() => { expect(screen.getByRole('status').textContent).toBe('Saved') })
-  })
+
+it('shows channel load errors and waits for an explicit selection to settle', async () => {
+  let state: { state?: DesktopChannelState; failed: boolean; pending?: 'stable' } = { failed: false }
+  const pending = Promise.withResolvers<undefined>()
+  const select = vi.fn(() => pending.promise)
+  const props = { ...kit, t, select, useChannel: bindSnapshotSelector(createSnapshotStore(state)) }
+  const view = render(<DesktopChannelRow {...props} />)
+  const control = screen.getByRole('button', { name: 'Update channel' })
+  expect(control.hasAttribute('disabled')).toBe(true)
+  state = { failed: true }
+  view.rerender(<DesktopChannelRow {...props} useChannel={bindSnapshotSelector(createSnapshotStore(state))} />)
+  expect(screen.getByRole('alert').textContent).toBe(en['desktop.channel.readError'])
+  state = { failed: false, state: { channel: null, packagedChannel: 'nightly', changing: false, error: 'format' } }
+  view.rerender(<DesktopChannelRow {...props} useChannel={bindSnapshotSelector(createSnapshotStore(state))} />)
+  expect(control.textContent).toContain('Configuration unavailable')
+  fireEvent.click(control)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Stable' }))
+  expect(select).toHaveBeenCalledWith('stable')
+  state = { ...state, pending: 'stable' }
+  view.rerender(<DesktopChannelRow {...props} useChannel={bindSnapshotSelector(createSnapshotStore(state))} />)
+  expect(control.textContent).toBe('Stable')
+  expect(control.getAttribute('aria-busy')).toBe('true')
+  pending.resolve(undefined)
+  state = { failed: false, state: { channel: 'stable', packagedChannel: 'nightly', changing: false } }
+  view.rerender(<DesktopChannelRow {...props} useChannel={bindSnapshotSelector(createSnapshotStore(state))} />)
+  expect(control.textContent).toBe('Stable')
+  fireEvent.click(control)
+  fireEvent.keyDown(document, { key: 'Escape' })
+  await waitFor(() => { expect(screen.queryByRole('menu')).toBeNull() })
+  fireEvent.click(control)
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Development' }))
+  await waitFor(() => { expect(select).toHaveBeenLastCalledWith('nightly') })
+  state = { failed: false, state: { channel: 'nightly', packagedChannel: 'nightly', changing: true } }
+  view.rerender(<DesktopChannelRow {...props} useChannel={bindSnapshotSelector(createSnapshotStore(state))} />)
+  expect(control.hasAttribute('disabled')).toBe(true)
+  state = { ...state, state: { ...state.state!, changing: false } }
+  view.rerender(<DesktopChannelRow {...props} useChannel={bindSnapshotSelector(createSnapshotStore(state))} />)
+  await waitFor(() => { expect(control.textContent).toBe('Development') })
 })
 
-// The same expectations as the Host renderer's spec (system-prompt tests/custom-instructions.spec.ts), so the
-// Settings preview shows exactly the rules agents receive.
-describe('custom rules preview', () => {
-  it('splits lines, list items and continuations like the Host renderer', () => {
-    expect(previewRules('- Use TypeScript.\n* Prefer tabs\n\n1. Never add dependencies\n2) Explain briefly\n   with one example')).toEqual([
-      'Use TypeScript.', 'Prefer tabs', 'Never add dependencies', 'Explain briefly with one example',
-    ])
-    expect(previewRules('\u2022 Bullet rule\r\n\u2022 Second')).toEqual(['Bullet rule', 'Second'])
-  })
+it('keeps the failure toast after Settings unmounts and rolls back the remounted selector', async () => {
+  const state: DesktopChannelState = { channel: 'nightly', packagedChannel: 'nightly', changing: false }
+  const reply = Promise.withResolvers<DesktopChannelChangeResult>()
+  const source = new DesktopChannelSource({ get: async () => state, set: () => reply.promise, subscribe: () => () => {} })
+  const useChannel = bindSnapshotSelector(source.store)
+  const select = (channel: 'nightly' | 'stable') => source.select(channel)
+  const row = render(<DesktopChannelRow {...kit} t={t} useChannel={useChannel} select={select} />)
+  const toast = render(<DesktopChannelToast openConfiguration={() => {}} {...kit} t={t} useChannel={useChannel}
+    dismiss={(sequence) => { source.dismissNotice(sequence) }} />)
+  try {
+    await waitFor(() => { expect(screen.getByRole('button', { name: 'Update channel' }).textContent).toBe('Development') })
+    fireEvent.click(screen.getByRole('button', { name: 'Update channel' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Stable' }))
+    expect(screen.getByRole('button', { name: 'Update channel' }).textContent).toBe('Stable')
+    expect(screen.getByRole('button', { name: 'Update channel' }).getAttribute('aria-busy')).toBe('true')
+    row.unmount()
+    reply.resolve({ kind: 'failed', state, reason: 'permission' })
+    await waitFor(() => { expect(screen.getByRole('alert').textContent).toBe('Could not save: permission denied') })
+    render(<DesktopChannelRow {...kit} t={t} useChannel={useChannel} select={select} />)
+    expect(screen.getByRole('button', { name: 'Update channel' }).textContent).toBe('Development')
+  } finally { source.dispose(); toast.unmount() }
+})
 
-  it('splits one paragraph into sentences and keeps abbreviations inside them', () => {
-    expect(previewRules('Use TypeScript and tabs. Never add dependencies without asking. Explain trade-offs, e.g. Speed vs size.'))
-      .toEqual(['Use TypeScript and tabs.', 'Never add dependencies without asking.', 'Explain trade-offs, e.g. Speed vs size.'])
-    expect(previewRules('   ')).toEqual([])
+it('dismisses a successful channel toast after its display lifetime', async () => {
+  vi.useFakeTimers()
+  const dismiss = vi.fn()
+  const store = createSnapshotStore<import('../src/client/desktop-channel-source.ts').DesktopChannelSnapshot>({
+    failed: false, notice: { sequence: 7, outcome: 'applied' },
   })
+  const view = render(<DesktopChannelToast openConfiguration={() => {}} {...kit} t={t}
+    useChannel={bindSnapshotSelector(store)} dismiss={dismiss} />)
+  try {
+    expect(screen.getByRole('alert').textContent).toBe('Update channel changed')
+    await act(async () => { await vi.advanceTimersByTimeAsync(4000) })
+    expect(dismiss).toHaveBeenCalledWith(7)
+  } finally { view.unmount(); vi.useRealTimers() }
+})
+
+
+it('keeps the settings-file notification for ten seconds with a details action', async () => {
+  vi.useFakeTimers()
+  const dismiss = vi.fn()
+  const openConfiguration = vi.fn()
+  const store = createSnapshotStore<import('../src/client/desktop-channel-source.ts').DesktopChannelSnapshot>({
+    failed: false, notice: { sequence: 8, outcome: 'configuration' },
+  })
+  const view = render(<DesktopChannelToast {...kit} t={t} useChannel={bindSnapshotSelector(store)}
+    dismiss={dismiss} openConfiguration={openConfiguration} />)
+  try {
+    expect(screen.getByRole('alert').querySelector('svg')).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'View details' }))
+    expect(openConfiguration).toHaveBeenCalledOnce()
+    await act(async () => { await vi.advanceTimersByTimeAsync(10_000) })
+    expect(dismiss).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
+    expect(dismiss).toHaveBeenCalledWith(8)
+  } finally { view.unmount(); vi.useRealTimers() }
+})
+
+it('uses the concise Chinese configuration error for the settings notification', () => {
+  expect(zh['desktop.channel.result.configuration']).toBe('Settings file error; updates are paused')
+})
+
+it('labels uncertain settings saves without claiming they were not written', () => {
+  expect(zh['desktop.channel.result.uncertain']).toBe('Settings save error')
+})
+
+it('does not describe a saved selection that failed to apply as unsaved', () => {
+  expect(zh['desktop.channel.result.apply']).toBe('Settings save error')
+  expect(en['desktop.channel.result.apply']).toBe('Settings save error')
 })

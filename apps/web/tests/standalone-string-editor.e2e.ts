@@ -6,7 +6,9 @@ import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import type {} from '@hackdevcode/dsh-tools'
 import {
-  assertFinalWorkspaceSnapshot, assertFixtureInventory, captureExpandedTurnProcessAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, recordFixture, selectedSessionFixture, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
+  assertFinalWorkspaceSnapshot, assertFixtureInventory, captureExpandedTurnProcessAria, compareOrRefreshGolden,
+  fixtureUserPrompts, launchWebScaffold, recordFixture, selectedSessionFixture, watchConsole, webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
 import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
 
 const DIR = fileURLToPath(new URL('../../../snapshots/web/optional-string-editor', import.meta.url))

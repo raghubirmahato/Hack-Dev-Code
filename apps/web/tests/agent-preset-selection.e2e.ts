@@ -16,7 +16,7 @@ import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
 import {
-  SESSION_FORMAT_VERSION, SessionId as sessionId, type SessionEvent, type SessionHeader, type SessionId,
+  SESSION_FORMAT_VERSION, type SessionId as sessionId, type SessionEvent, type SessionHeader, type SessionId,
 } from '@hackdevcode/dsh-session'
 import { SUBAGENT_DESCRIPTOR_VERSION } from '@hackdevcode/dsh-subagent'
 import { createSystemMessage, createUserMessage } from '@hackdevcode/dsh-llm'
@@ -27,6 +27,7 @@ import {
 import { openSettings,
   connectFreshWorkspace, newEnglishPage, saveFailureShot, writeComposerDraft,
 } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 const SNAPSHOT_DIR = fileURLToPath(new URL('./expected/agent-preset-selection', import.meta.url))
 const HERO_EXPECTED = join(SNAPSHOT_DIR, 'hero.expected.md')
@@ -35,7 +36,7 @@ const HEADER_EXPECTED = join(SNAPSHOT_DIR, 'header.expected.md')
 const MODE = webSnapshotMode()
 const SEED_ID = 'agent-preset-selection-web-e2e'
 const SEED_TIME = 1784974100000
-const SEEDED_CHILD_ID = sessionId('agent-preset-selection-child')
+const SEEDED_CHILD_ID = brandString<sessionId>('agent-preset-selection-child')
 const SEEDED_CHILD_CREATED_AT = 1784974100100
 /** A project skill only a preset that mounts `skill-filesystem` can discover. */
 const SKILL_NAME = 'preset-catalog-demo'
@@ -257,7 +258,7 @@ describe('web e2e: agent-preset selection', () => {
     await page.getByRole('button', { name: 'Standard mode', exact: true }).click()
     await page.getByRole('menuitem', { name: /^Minimal mode/ }).click()
     await page.getByRole('button', { name: 'Minimal mode', exact: true }).waitFor()
-    await openSettings(page)
+    await openSettings(page, 'en')
     const dialog = page.getByRole('dialog', { name: 'Settings' })
     const codingTools = dialog.getByRole('switch', { name: 'Show coding view' })
     await codingTools.click()
@@ -267,7 +268,7 @@ describe('web e2e: agent-preset selection', () => {
     await page.getByRole('button', { name: 'Standard mode', exact: true }).waitFor({ timeout: 10_000 })
     await expect.poll(() => livePreset(scaffold)).toBe('standard')
 
-    await openSettings(page)
+    await openSettings(page, 'en')
     await codingTools.click()
     await expect.poll(() => codingTools.getAttribute('aria-checked')).toBe('true')
     await dialog.getByRole('button', { name: 'Agent presets' }).click()
@@ -361,7 +362,7 @@ describe('web e2e: agent-preset selection', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-disabled'))
     await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('standard')
 
-    await openSettings(page)
+    await openSettings(page, 'en')
     const dialog = page.getByRole('dialog', { name: 'Settings' })
     await dialog.getByRole('button', { name: 'Agent presets' }).click()
     await dialog.getByRole('button', { name: 'Set as new task default: Minimal mode' }).click()
@@ -400,7 +401,7 @@ describe('web e2e: agent-preset selection', () => {
     await newConversation.waitFor()
     await page.getByRole('button', { name: 'Standard mode', exact: true }).waitFor()
 
-    await openSettings(page)
+    await openSettings(page, 'en')
     const reopened = page.getByRole('dialog', { name: 'Settings' })
     await reopened.getByRole('button', { name: 'General', exact: true }).click()
     const reopenedDeveloperTools = reopened.getByRole('switch', { name: 'Show coding view' })

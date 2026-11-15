@@ -54,7 +54,7 @@ flowchart LR
   cfg --> plugin_dsh_base_settings
   plugin_dsh_base_authorization["authorization<br/>@hackdevcode/dsh-authorization"]
   cfg --> plugin_dsh_base_authorization
-  plugin_dsh_base_deepseek_account["deepseek-account<br/>@hackdevcode/dsh-deepseek-account-platform"]
+  plugin_dsh_base_deepseek_account["deepseek-account<br/>@hackdevcode/dsh-deepseek-account"]
   cfg --> plugin_dsh_base_deepseek_account
   plugin_dsh_base_credentials["credentials<br/>@hackdevcode/dsh-credentials-local"]
   cfg --> plugin_dsh_base_credentials
@@ -140,6 +140,10 @@ flowchart LR
   cfg --> plugin_dsh_base_command_compact
   plugin_dsh_base_subagent["subagent<br/>@hackdevcode/dsh-subagent"]
   cfg --> plugin_dsh_base_subagent
+  plugin_dsh_base_agent_team["agent-team<br/>@hackdevcode/dsh-agent-team"]
+  cfg --> plugin_dsh_base_agent_team
+  plugin_dsh_base_tool_agent_team["tool-agent-team<br/>@hackdevcode/dsh-tool-agent-team"]
+  cfg --> plugin_dsh_base_tool_agent_team
   plugin_dsh_base_subagent_spawn_in_process["subagent-spawn-in-process<br/>@hackdevcode/dsh-subagent-spawn-in-process"]
   cfg --> plugin_dsh_base_subagent_spawn_in_process
   plugin_dsh_base_subagent_fork_in_process["subagent-fork-in-process<br/>@hackdevcode/dsh-subagent-fork-in-process"]
@@ -230,7 +234,7 @@ flowchart LR
 | `config-editor` | `@hackdevcode/dsh-config-editor` |
 | `settings` | `@hackdevcode/dsh-settings` |
 | `authorization` | `@hackdevcode/dsh-authorization` |
-| `deepseek-account` | `@hackdevcode/dsh-deepseek-account-platform` |
+| `deepseek-account` | `@hackdevcode/dsh-deepseek-account` |
 | `credentials` | `@hackdevcode/dsh-credentials-local` |
 | `llm-pi-ai` | `@hackdevcode/dsh-llm-pi-ai` |
 | `session-persistence-jsonl` | `@hackdevcode/dsh-session-persistence-jsonl` |
@@ -273,6 +277,8 @@ flowchart LR
 | `compaction-basic` | `@hackdevcode/dsh-compaction-basic` |
 | `command-compact` | `@hackdevcode/dsh-command-compact` |
 | `subagent` | `@hackdevcode/dsh-subagent` |
+| `agent-team` | `@hackdevcode/dsh-agent-team` |
+| `tool-agent-team` | `@hackdevcode/dsh-tool-agent-team` |
 | `subagent-spawn-in-process` | `@hackdevcode/dsh-subagent-spawn-in-process` |
 | `subagent-fork-in-process` | `@hackdevcode/dsh-subagent-fork-in-process` |
 | `tool-subagent-control` | `@hackdevcode/dsh-tool-subagent-control` |

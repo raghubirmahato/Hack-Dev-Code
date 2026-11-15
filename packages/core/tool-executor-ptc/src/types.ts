@@ -4,7 +4,7 @@
  * @module @hackdevcode/dsh-tool-executor-ptc/types
  */
 
-import type { ToolCallId } from '@hackdevcode/dsh-llm/brand'
+import type { ToolCallId } from '@hackdevcode/dsh-llm/types'
 import type { ContentBlock } from '@hackdevcode/dsh-llm/types'
 import type { JsonValue } from '@hackdevcode/dsh-util-values'
 
@@ -64,7 +64,7 @@ declare module '@hackdevcode/dsh-session/types' {
 
 declare module '@hackdevcode/dsh-llm' {
   interface MessageSourceMap {
-    /** Images deferred from a successful PTC subcall's final result. */
+    /** PTC context, including deferred subcall images and host environment-reset notices. */
     'ptc-mode': { kind: 'ptc-mode' }
   }
 }

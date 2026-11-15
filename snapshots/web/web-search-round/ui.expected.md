@@ -12,6 +12,9 @@
 - status: Completed
 - button "Completed in {{duration}}" [expanded]
 - button "Searched the web" [expanded]
+- button "Context injection runtime-context"
+- button "Context injection skill-catalog"
+- button "Context injection time-context"
 - button "Search Hack Dev Code snapshot search, Hack Dev Code multi-query search"
 - paragraph: SEARCH_DONE
 - button "Copy"

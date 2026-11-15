@@ -33,8 +33,7 @@ import { expect } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
 import { DSH_LAUNCH_ENVIRONMENT_KEY, type LaunchEnvironmentSnapshot } from '@hackdevcode/dsh-launch-environment'
 import Loader from '@hackdevcode/cordis-plugin-loader'
-import { entryListSchema, type PatchOptions } from '@hackdevcode/cordis-plugin-include'
-import yaml from 'js-yaml'
+import { stringifyEntryYaml, type PatchOptions } from '@hackdevcode/cordis-plugin-include'
 import {
   captureExpectedWorkspaceSnapshot,
   captureWorkspaceSnapshot,
@@ -59,6 +58,7 @@ import {
   type NormalizeContext,
 } from '@hackdevcode/dsh-session-snapshot'
 import type { Profile, ProfileContext } from '@hackdevcode/dsh-app-boot'
+import type { PresetDefinition } from '@hackdevcode/dsh-agent-preset-registry'
 import { dshHomePath } from '@hackdevcode/dsh-home-paths'
 import { LlmAdapter } from '@hackdevcode/dsh-llm'
 import type {
@@ -74,7 +74,7 @@ import type { SessionFormatEvent } from '@hackdevcode/dsh-session-format'
 import { sessionFormatCatalog } from '@hackdevcode/dsh-session-format-catalog'
 import {
   SESSION_FORMAT_VERSION,
-  SessionId,
+  type SessionId,
   type Session,
   type SessionEvent,
   type SessionHeader,
@@ -86,6 +86,7 @@ import type {} from '@hackdevcode/dsh-agent'
 import { provideCmdline } from '@hackdevcode/dsh-cmdline'
 import { startPrefixProxy, type PrefixProxy } from './prefix-proxy.ts'
 import { REPO_ROOT, requireBuilt, requireDist } from './support.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 type AppBoot = typeof import('@hackdevcode/dsh-app-boot')
 let builtAppBoot: AppBoot | undefined
@@ -116,9 +117,11 @@ export const SCAFFOLD_DEFAULTS_BUNDLE = 'dsh-web-scaffold-defaults'
 export const WELCOME_NOTICE_ACK_FIELD = 'welcomeNoticeVersion'
 export const WELCOME_NOTICE_VERSION = '2026-09-28.1'
 export const WELCOME_NOTICE_COPY = {
-  title: 'Preview Notice',
-  body: 'Hack Dev Code 0.2 is still in preview, and many areas need continued improvement and refinement. We welcome feedback and suggestions from all developers and users. The new desktop app now targets a broad range of users, while developer-related advanced features can be enabled in the settings. Hack Dev Code’s product features and plugin APIs are expected to continue rapid iteration and evolution, and will gradually stabilize over time.\n\nWe look forward to exploring the limits of intelligence together with users and developers around the world, building on open-source, reusable, and composable infrastructure. We welcome everyone to bring their ideas to life with Hack Dev Code and participate in the community to enrich the plugin ecosystem.',
-  continueLabel: 'Continue',
+  zh: {
+    title: '\u9884\u89c8\u7248\u8bf4\u660e',
+    body: 'Hack Dev Code \u76ee\u524d\u7684 0.2 \u7248\u672c\u4ecd\u5904\u4e8e\u9884\u89c8\u9636\u6bb5\uff0c\u8fd8\u6709\u8bb8\u591a\u5730\u65b9\u9700\u8981\u6301\u7eed\u6539\u8fdb\u548c\u6253\u78e8\uff0c\u5e0c\u671b\u542c\u53d6\u5e7f\u5927\u5f00\u53d1\u8005\u548c\u7528\u6237\u7684\u53cd\u9988\u5efa\u8bae\u3002\u73b0\u5728\uff0c\u65b0\u7684\u684c\u9762\u7aef\u9762\u5411\u5e7f\u6cdb\u7528\u6237\uff0c\u5f00\u53d1\u8005\u76f8\u5173\u7684\u8fdb\u9636\u529f\u80fd\u53ef\u5728\u914d\u7f6e\u4e2d\u5f00\u542f\u4f7f\u7528\u3002\u9884\u8ba1 Hack Dev Code \u7684\u4ea7\u54c1\u529f\u80fd\u4ee5\u53ca\u63d2\u4ef6 API \u90fd\u4f1a\u7ee7\u7eed\u5feb\u901f\u8fed\u4ee3\u3001\u6301\u7eed\u6f14\u5316\uff0c\u5e76\u9010\u6e10\u8d8b\u4e8e\u7a33\u5b9a\u3002\n\n\u6211\u4eec\u671f\u5f85\u4e0e\u5168\u7403\u7528\u6237\u548c\u5f00\u53d1\u8005\u4e00\u8d77\uff0c\u5728\u5f00\u6e90\u3001\u53ef\u590d\u7528\u3001\u53ef\u7ec4\u5408\u7684\u57fa\u7840\u8bbe\u65bd\u4e4b\u4e0a\uff0c\u5171\u540c\u63a2\u7d22\u667a\u80fd\u4e0a\u9650\u3002\u6b22\u8fce\u5927\u5bb6\u7528 Hack Dev Code \u5c06\u60f3\u6cd5\u53d8\u6210\u73b0\u5b9e\uff0c\u4e0e\u793e\u533a\u4e00\u8d77\u4e30\u5bcc\u63d2\u4ef6\u751f\u6001\u3002',
+    continueLabel: '\u7ee7\u7eed',
+  },
 } as const
 
 /** Snapshot mode for the lane, from $DSH_SNAPSHOT (same vocabulary as the other snapshot suites). */
@@ -393,29 +396,25 @@ export interface LaunchOptions {
   welcomeNoticePending?: boolean
   /** Leave first-use Workspace initialization eligible; ordinary scenarios start after the default was removed. */
   firstUse?: boolean
-  /**
-   * Patch the shipped DeepSeek search row to a deterministic endpoint and
-   * credential reference. Browser search scenarios keep the real provider and
-   * credentials seam while avoiding external search traffic and ambient keys.
-   */
+  /** Pin the legacy Messages search endpoint and credential reference. */
   deepSeekSearch?: {
-    /** Anthropic-compatible base URL; the provider appends `/messages`. */
+    /** Anthropic-compatible base URL; `/messages` is appended. */
     baseURL?: string
-    /** Credential reference resolved by the shipped search provider. */
+    /** Credential reference read for each search. */
     apiKeyEnv: string
   }
   /**
-   * Patch the shipped DeepSeek Search and Fetch API row to a deterministic
-   * endpoint and credential reference, optionally selecting both providers as
-   * the settings switch does.
+   * Give both sections of the shipped DeepSeek Search and Fetch API row their
+   * own credential reference and, when given, endpoint, so neither follows the
+   * conversation's DeepSeek credential. Browser search scenarios keep the real
+   * providers and credentials seam while avoiding external search traffic and
+   * ambient keys.
    */
   deepSeekWebApi?: {
-    /** Search and Fetch API base URL; the providers append `/search` or `/fetch`. */
-    baseURL: string
-    /** Credential reference resolved by both providers. */
+    /** Base URL of both sections; omitted uses the official base. The providers append `/search` or `/fetch`. */
+    baseURL?: string
+    /** Credential reference of both sections. */
     apiKeyEnv: string
-    /** Select `deepseek-search-api` and `deepseek-fetch-api` in place of the shipped selection. */
-    select?: boolean
   }
   /** Preset selection default and additional declarative definitions for this scenario. */
   agentPresets?: {
@@ -525,14 +524,14 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
   const workspaceCwd = await realpath(await mkdtemp(join(workspaceParent, workspacePrefix)))
   // Isolated harness home: the settings/credentials rows resolve $DSH_HOME
   // paths at load, and an in-process boot must NEVER touch the developer's
-  // real ~/.hackdevcode document or credential file.
+  // real ~/.dsh document or credential file.
   const harnessHome = options.harnessHome ?? join(workspaceCwd, '.dsh-home')
   // Skill discovery is model-visible input, and its roots now resolve inside a
   // PRESET — a subtree this lane's include patches cannot reach, because the
   // roster mounts it directly per session rather than as a row of the booted
   // tree. The row's documented fallback is the environment, so pin that: the
   // whole scaffold lifetime, not just the boot, since presets mount when a
-  // session is created. Without this a developer's real ~/.hackdevcode/skills silently
+  // session is created. Without this a developer's real ~/.dsh/skills silently
   // enters replay requests and goldens while CI sees none. `DSH_HOME` follows
   // the resolved harness home so a scaffold sharing another's home — the
   // cross-port persistence scenario — pins the same roots the settings and
@@ -607,7 +606,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     // First-use initialization must create directories only inside this scaffold's temporary world.
     { id: 'workspace-controller', config: { documentsDirectory: join(workspaceCwd, 'Documents') } },
     // Skill discovery is model-visible input. Pin every host-level root inside
-    // the owned temp world so ~/.hackdevcode, ~/.agents, and a bundled-root env setting
+    // the owned temp world so ~/.dsh, ~/.agents, and a bundled-root env setting
     // cannot change replay requests or conversation goldens. Project roots stay
     // enabled against the same empty temp workspace, preserving the real seam.
     {
@@ -651,11 +650,11 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       },
     },
     // The bundle's web-runtime row resolves the same built dist under test
-    // (apps/web IS @hackdevcode/dsh-web-frontend); native browser opening and the
-    // URL line are disabled because this scaffold owns its Playwright browser.
+    // (apps/web IS @hackdevcode/dsh-web-frontend). The scaffold captures the real
+    // WebApp-published login URL; Playwright owns browser opening.
     // Preserve the composed surface-context choice because a patch replaces
     // the row's complete config.
-    { id: 'web-runtime', config: { openBrowser: false, printUrl: false, surfaceContext } },
+    { id: 'web-runtime', config: { surfaceContext, openBrowser: false, printUrl: true } },
     ...publicHost === undefined && options.remoteAuthority === undefined
       ? []
       : [{
@@ -687,23 +686,41 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       { id: 'agent-preset-registry', config: { default: options.agentPresets.default } },
       { insert: (options.agentPresets.definitions ?? []).map(config => ({ id: `preset-${config.id}`, name: '@hackdevcode/dsh-agent-preset', config })) },
     ],
-    ...options.deepSeekSearch === undefined
-      ? []
-      : [{
-        id: 'web-search-deepseek',
-        config: {
-          apiKeyEnv: options.deepSeekSearch.apiKeyEnv,
-          ...options.deepSeekSearch.baseURL === undefined ? {} : { baseURL: options.deepSeekSearch.baseURL },
-        },
-      }],
     ...options.deepSeekWebApi === undefined ? [] : [
-      { id: 'web-deepseek-api', config: { apiKeyEnv: options.deepSeekWebApi.apiKeyEnv, baseURL: options.deepSeekWebApi.baseURL } },
-      ...options.deepSeekWebApi.select === true
-        ? [{ id: 'web', config: { searchProvider: 'deepseek-search-api', fetchProvider: 'deepseek-fetch-api' } }]
-        : [],
+      {
+        id: 'web-deepseek-api',
+        config: {
+          searchApiKeyEnv: options.deepSeekWebApi.apiKeyEnv,
+          fetchApiKeyEnv: options.deepSeekWebApi.apiKeyEnv,
+          ...options.deepSeekWebApi.baseURL === undefined ? {} : {
+            searchBaseURL: options.deepSeekWebApi.baseURL, fetchBaseURL: options.deepSeekWebApi.baseURL,
+          },
+        },
+      },
     ],
+    ...options.deepSeekSearch === undefined ? [] : [{
+      id: 'web-search-deepseek',
+      config: {
+        apiKeyEnv: options.deepSeekSearch.apiKeyEnv,
+        ...options.deepSeekSearch.baseURL === undefined ? {} : { baseURL: options.deepSeekSearch.baseURL },
+      },
+    }],
     { id: 'llm-deepseek', disabled: mode !== 'record' && !maskDeepSeekCredential },
   ]
+
+  // Recorded standard sessions pin the optional patch tool in their request headers.
+  if (options.replayFixture !== undefined || options.compareReplaySession === true) {
+    const config = composedRows.find(row => row.id === 'preset-standard')!.config as PresetDefinition
+    overlayPatches.push({
+      id: 'preset-standard',
+      config: {
+        ...config,
+        plugins: config.plugins.map(plugin => plugin.id === 'tool-fs'
+          ? { ...plugin, config: { ...plugin.config, applyPatch: true } }
+          : plugin),
+      },
+    })
+  }
 
   // Live fields use a shared deployment layer; process-specific ports and roots stay in CLI overlays.
   const formEntries = new Set(['agent-default-model', 'agent-preset-registry', 'llm-deepseek', 'llm-pi-ai',
@@ -748,7 +765,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
         throw new Error(`web scaffold extra install anchor has no package name: ${anchor}`)
       }
       const packageDir = dirname(anchor)
-      // A real profile already has each bundle installed by `hackdev plugin add`.
+      // A real profile already has each bundle installed by `dsh plugin add`.
       // Reproduce that link so a private bundle can import its own plugin.
       const installedLink = join(profileDir, 'node_modules', manifest.name)
       await mkdir(dirname(installedLink), { recursive: true })
@@ -775,7 +792,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
     let profileContext: ProfileContext
     {
       // A real profile: the shipped web bundles plus each fixture package,
-      // installed the way `hackdev plugin add` leaves them.
+      // installed the way `dsh plugin add` leaves them.
       const dependencies: Record<string, string> = {}
       const bundles = ['@hackdevcode/dsh-base', '@hackdevcode/dsh-web-app', ...options.profile?.bundles ?? []]
       for (const entry of options.profile?.packages ?? []) {
@@ -790,7 +807,7 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       const fixtureDir = join(profileDir, 'node_modules', SCAFFOLD_DEFAULTS_BUNDLE)
       await mkdir(fixtureDir, { recursive: true })
       await writeFile(join(fixtureDir, 'package.json'), JSON.stringify({ name: SCAFFOLD_DEFAULTS_BUNDLE, version: '1.0.0', dsh: { bundle: { patch: 'cordis.patch.yml' } } }))
-      await writeFile(join(fixtureDir, 'cordis.patch.yml'), yaml.dump(formDefaults, { schema: entryListSchema }))
+      await writeFile(join(fixtureDir, 'cordis.patch.yml'), stringifyEntryYaml(formDefaults))
       bundles.push(SCAFFOLD_DEFAULTS_BUNDLE)
       dependencies[SCAFFOLD_DEFAULTS_BUNDLE] = `file:${fixtureDir}`
       initProfile(profileDir, bundles)
@@ -826,9 +843,37 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       resolution,
     })
     await ctx.plugin(Loader)
-    await mountRootInclude(ctx, rootConfig, readProfilePatches('dsh', profileContext))
-    await ctx.loader.await()
-    await auditStartupEntries(ctx, 'web e2e scaffold')
+    // Scaffold boots already own process.cwd() exclusively within their test worker.
+    // Capture only this listener's login line, and restore console on failed boot too.
+    const startupLogin = Promise.withResolvers<URL>()
+    let startupLoginUrl: URL
+    const originalLog = console.log
+    console.log = (...args: unknown[]) => {
+      const line = args.length === 1 && typeof args[0] === 'string' ? args[0] : ''
+      const match = /^hackdev web: (http:\/\/127\.0\.0\.1:\d+\/\?token=[A-Za-z0-9_-]+)$/u.exec(line)
+      if (match !== null) {
+        const url = new URL(match[1]!)
+        const boundPort = ctx.get('webServer')?.port
+        if (boundPort !== undefined && url.port === String(boundPort)) {
+          startupLogin.resolve(url)
+          return
+        }
+      }
+      originalLog(...args)
+    }
+    let startupTimer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await mountRootInclude(ctx, rootConfig, readProfilePatches('dsh', profileContext))
+      await ctx.loader.await()
+      await auditStartupEntries(ctx, 'web e2e scaffold')
+      startupTimer = setTimeout(() => {
+        startupLogin.reject(new Error('web e2e scaffold: token plugin did not publish its login URL'))
+      }, 10_000)
+      startupLoginUrl = await startupLogin.promise
+    } finally {
+      clearTimeout(startupTimer)
+      console.log = originalLog
+    }
     if (options.developerTools !== undefined) {
       await ctx.settings.update('ui-settings', { enabled: options.developerTools })
     }
@@ -912,7 +957,9 @@ export async function launchWebScaffold(options: LaunchOptions = {}): Promise<We
       publicProxy.setTarget(port)
       baseUrl = `http://${publicHost}:${String(publicProxy.port)}${publicPrefix}`
     }
-    authenticatedUrl = ctx.connection.authenticatedUrl(baseUrl)
+    const browserLoginUrl = new URL(baseUrl)
+    browserLoginUrl.search = startupLoginUrl.search
+    authenticatedUrl = browserLoginUrl.href
     // Chromium resolves *.localhost itself; Node may not. Both scaffold
     // listeners bind loopback, including the optional prefix proxy.
     const loginUrl = new URL(authenticatedUrl)
@@ -1466,7 +1513,7 @@ export async function seedSession(
   const createdAt = options.createdAt ?? Date.now() - 60_000
   const meta: SessionHeader = {
     version: SESSION_FORMAT_VERSION,
-    id: SessionId(id),
+    id: brandString<SessionId>(id),
     createdAt,
     isSeeded: false,
     cwd: scaffold.workspaceCwd,
@@ -1566,7 +1613,7 @@ export async function readPersistedEvents(scaffold: WebScaffold, id: SessionId):
  * closing quote, where the bucket is always last.
  */
 const ARIA_AGE =
-  /(?:now|\d+min|\d+h|\d+d|\d+mo|\d+y|\d+minutes|\d+hours)(?=")/g
+  /(?:now|\d+min|\d+h|\d+d|\d+mo|\d+y|\u521a\u521a|\d+\u5206\u949f|\d+\u5c0f\u65f6|\d+\u5929|\d+\u4e2a\u6708|\d+\u5e74)(?=")/g
 
 function normalizeAria(snapshot: string, workspaceCwd: string, age: boolean): string {
   // The session heading renders the workspace's basename, not the full
@@ -1584,10 +1631,6 @@ function normalizeAria(snapshot: string, workspaceCwd: string, age: boolean): st
       duration => duration.startsWith('~') ? duration : '{{duration}}',
     )
     .replace(/\b\d[\d,]*(?:\.\d+)? ms\b/g, '{{duration}}')
-    .replace(
-      /\d+(?:hours\d+Minute\d+Second|Minute\d+Second|(?:\.\d+)?Second)/g,
-      '{{duration}}',
-    )
     .replace(/\d+(?:\.\d+)?(?= tok\/s(?!\w))/g, '{{throughput}}')
     // Seeded compaction prices realized file paths, whose length differs
     // between local worktrees and CI scratch directories.
@@ -1595,7 +1638,8 @@ function normalizeAria(snapshot: string, workspaceCwd: string, age: boolean): st
     // Session summaries and Message IconActions clocks cross calendar
     // boundaries; collapse every shape so goldens stay stable across them.
     .replace(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z/g, '{{timestamp}}')
-
+    .replace(/\d{4}\u5e74\d{1,2}\u6708\d{1,2}\u65e5 \d{2}:\d{2}/g, '{{clock}}')
+    .replace(/\d{1,2}\u6708\d{1,2}\u65e5 \d{2}:\d{2}/g, '{{clock}}')
     .replace(/(?<!\d)\d{1,2}:\d{2}:\d{2}(?:\.\d+)?(?:\s*[AP]M)?(?!\d)/gi, '{{clock}}')
     .replace(/(?<!\d)\d{2}:\d{2}(?!\d)/g, '{{clock}}')
 }
@@ -1752,10 +1796,12 @@ export async function assertFixtureInventory(dir: string, expected: string[]): P
 
 /**
  * Console tripwires: reconnect/gap-repair self-healing or a pageerror must
- * fail the scenario, not mask a dead wire behind eventual consistency.
+ * fail the scenario, not mask a dead wire behind eventual consistency. A boot
+ * audit warning fails it too: the product boot tolerates inactive optional
+ * entries, but every e2e composition must activate completely.
  */
 export interface WebConsoleTripwire {
-  /** Console warnings matching reconnect/gap-repair/discontinuity copy. */
+  /** Console warnings matching reconnect/gap-repair/discontinuity copy or the boot audit's inactive-entry warning. */
   warnings: string[]
   /** Uncaught page errors. */
   pageErrors: string[]
@@ -1771,7 +1817,7 @@ export function watchConsole(page: Page): WebConsoleTripwire {
   const pageErrors: string[] = []
   page.on('console', (message) => {
     const text = message.text()
-    if (/connection lost|gap repair|discontinuous/i.test(text)) warnings.push(text)
+    if (/connection lost|gap repair|discontinuous|web boot: warning/i.test(text)) warnings.push(text)
   })
   page.on('pageerror', (error) => { pageErrors.push(String(error)) })
   return { warnings, pageErrors }

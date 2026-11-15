@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-client-ui-deliverables",
   "description": "Changed-files card with per-file comparison tabs, delivery cards, and clickable final-response file references for Web",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -37,7 +37,8 @@
         "@hackdevcode/dsh-client-ui-renderer",
         "@hackdevcode/dsh-client-ui-sidebar-right",
         "@hackdevcode/dsh-client-ui-tool",
-        "@hackdevcode/dsh-client-ui-settings"
+        "@hackdevcode/dsh-client-ui-settings",
+        "@hackdevcode/dsh-client-ui-context-menu"
       ],
       "platform": "web"
     }
@@ -51,6 +52,7 @@
     "@hackdevcode/cordis": "workspace:~"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-api-remotes": "workspace:*",
     "@hackdevcode/dsh-client-connection": "workspace:*",
     "@hackdevcode/dsh-client-locale": "workspace:*",
@@ -80,13 +82,17 @@
     "@hackdevcode/dsh-fs-local": "workspace:*",
     "@hackdevcode/dsh-agent": "workspace:*",
     "@hackdevcode/dsh-sandbox-policy": "workspace:*",
-    "@hackdevcode/dsh-client-ui-settings": "workspace:*"
+    "@hackdevcode/dsh-client-ui-settings": "workspace:*",
+    "@hackdevcode/dsh-client-ui-context-menu": "workspace:*"
   },
   "files": [
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "dependencies": {
     "@hackdevcode/dsh-typert-protocol": "workspace:*"

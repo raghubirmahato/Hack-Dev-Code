@@ -33,7 +33,6 @@ export const en = {
   quotaTitle: 'No balance available',
   quotaDescription: 'Hack Dev Code cannot start a new task with this account when no balance is available. Would you like to top up? You can also top up later in Settings → Account.',
   quotaTopUp: 'Top up',
-  bonusNoticeTitle: 'Bonus credited',
 } as const
 
 /** Account locale keys. */

@@ -9,7 +9,7 @@
 
 import { Context, Service } from '@hackdevcode/cordis'
 import type { Session, SessionSeq } from '@hackdevcode/dsh-session'
-import type { CommandId } from '@hackdevcode/dsh-commands/brand'
+import type { CommandId } from '@hackdevcode/dsh-commands/types'
 import type { CompactionResult } from './types.ts'
 import type { CompactionCheckpointSource } from './checkpoint.ts'
 

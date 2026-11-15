@@ -7,7 +7,7 @@ import { chromium, type Browser } from 'playwright'
 import type {} from '@hackdevcode/dsh-ptc-runtime'
 import { expect, it, onTestFinished } from 'vitest'
 import { captureStableAria, compareOrRefreshGolden, launchWebScaffold, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { connectFreshWorkspace } from './support.ts'
+import { connectFreshWorkspaceZh, ZH_BROWSER_LOCALE } from './support.ts'
 
 it('disables unsupported bundles, shows the Host restriction, and refuses direct activation without changing PTC', async () => {
   const root = await mkdtemp(join(tmpdir(), 'bundle-platform-web-'))
@@ -21,14 +21,14 @@ it('disables unsupported bundles, shows the Host restriction, and refuses direct
   await writeFile(join(root, 'package.json'), JSON.stringify({ name, version: '1.0.0', dsh: { bundle: {
     patch: './cordis.patch.yml', platforms: [process.platform === 'darwin' ? 'win32' : 'darwin'],
   } } }))
-  await writeFile(join(root, 'cordis.patch.yml'), '- id: ptc-runtime\n  config:\n    executionMode: persistent-in-memory\n')
+  await writeFile(join(root, 'cordis.patch.yml'), '- id: ptc-runtime\n  config:\n    executionMode: persistent-in-memory\n    replScoped: false\n')
   const scaffold = owned.scaffold = await launchWebScaffold({ profile: { packages: [{ dir: root }] } })
   const browser = owned.browser = await chromium.launch()
-  const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: 'en-US' })
+  const page = await browser.newPage({ viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE })
   await page.goto(scaffold.authenticatedUrl)
-  await connectFreshWorkspace(page, scaffold.workspaceCwd)
-  await page.getByRole('navigation', { name: 'Global panels' }).getByRole('button', { name: 'Plugins', exact: true }).click()
-  const reason = 'This plugin does not support the operating system running DSH.'
+  await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
+  await page.getByRole('navigation', { name: '\u5168\u5c40\u9762\u677f' }).getByRole('button', { name: '\u63d2\u4ef6', exact: true }).click()
+  const reason = '\u6b64\u63d2\u4ef6\u4e0d\u652f\u6301\u8fd0\u884c DSH \u7684\u4e3b\u673a\u64cd\u4f5c\u7cfb\u7edf'
   const card = page.locator(`[data-plugin-package="${name}"]`)
   await card.getByText(reason, { exact: true }).waitFor()
   expect(await card.getByRole('switch').isEnabled()).toBe(false)
@@ -42,10 +42,11 @@ it('disables unsupported bundles, shows the Host restriction, and refuses direct
   expect(beforeRuntime).toBeTypeOf('number')
   expect(scaffold.ctx.ptcRuntime.programFormat).toBe('function-body')
   const names = [name]
-  await page.locator('[data-plugin-panel]').getByRole('button', { name: 'More', exact: true }).click()
+  await page.locator('[data-plugin-panel]').getByRole('button', { name: '\u66f4\u591a', exact: true }).click()
   const cua = page.locator('[data-plugin-package="@hackdevcode/dsh-cua-bundle"]')
-  expect(await cua.count()).toBe(0)
-  if (process.platform !== 'darwin') {
+  const cuaSupported = process.platform === 'darwin' || process.platform === 'win32'
+  expect(await cua.count()).toBe(cuaSupported ? 1 : 0)
+  if (!cuaSupported) {
     expect((await scaffold.ctx.pluginManager.listBundles()).find(bundle => bundle.name === '@hackdevcode/dsh-cua-bundle'))
       .toMatchObject({ listedByDefault: false, enabled: false, error: { code: 'unsupported-platform' } })
     names.push('@hackdevcode/dsh-cua-bundle')

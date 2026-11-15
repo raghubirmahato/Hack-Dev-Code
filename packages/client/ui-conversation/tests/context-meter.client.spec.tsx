@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { makeTranslate } from '@hackdevcode/dsh-client-test-runtime'
 import { en as commonEn } from '@hackdevcode/dsh-client-locale/src/locales/index.ts'
 import { ContextMeter, type ContextMeterProps } from '../src/client/skeleton/ContextMeter.tsx'
@@ -64,6 +64,20 @@ describe('ContextMeter', () => {
     // Clicking the trigger again toggles the panel shut.
     fireEvent.click(trigger)
     expect(view.queryByRole('dialog')).toBeNull()
+  })
+
+  it('renders its reading tooltip outside the composer subtree', () => {
+    vi.useFakeTimers()
+    try {
+      const view = meter({ contextPressure: { pressureTokens: 32_000, contextWindow: 128_000 } })
+      fireEvent.pointerEnter(view.getByRole('button', { name: '25% of context used' }))
+      act(() => { vi.advanceTimersByTime(200) })
+      const tooltip = view.getByRole('tooltip')
+      expect(view.container.contains(tooltip)).toBe(false)
+      expect(document.body.contains(tooltip)).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('draws no bar segment at zero occupancy', () => {

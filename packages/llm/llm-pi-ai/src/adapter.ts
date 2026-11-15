@@ -45,7 +45,6 @@ import {
   LlmError,
   omitOldestImages,
   QUOTA_EXCEEDED_CODE,
-  ReasoningEffortId,
   waitForKey,
 } from '@hackdevcode/dsh-llm'
 import type {
@@ -62,6 +61,7 @@ import type {
   ToolSchema,
 } from '@hackdevcode/dsh-llm'
 import type { AttachmentStore, ImageAttachmentRef } from '@hackdevcode/dsh-attachment'
+import { brandString } from '@hackdevcode/dsh-brand'
 import { idleWatchdog, timeoutOf } from '@hackdevcode/dsh-timeout'
 import { DEFAULT_CONTEXT_WINDOW } from './config.ts'
 import type { ResolvedPiAiProviderProfile } from './config.ts'
@@ -70,6 +70,9 @@ import { adoptForeignGeminiHistory } from './gemini-history.ts'
 import { conversationUpdates, createModels, getSupportedThinkingLevels } from './models.ts'
 import { OllamaContext, isLocalModelServer, isOllamaRoute } from './ollama-context.ts'
 import { toStreamChunks } from './stream.ts'
+import { bindThinkingToPrefix } from './prefix-binding.ts'
+import type { PrefixDigests } from './prefix-binding.ts'
+import type { PiAiRequestHeaderContext } from './types.ts'
 
 /**
  * Initially active declaration added to an Anthropic request whose projected
@@ -145,6 +148,18 @@ export interface PiAiAdapterOptions {
    * every request no matter how often the human signed in.
    */
   auth: PiAiAuthInjection
+  /**
+   * Synchronously prepare this call's headers before SDK dispatch. The input
+   * contains a fresh copy of profile headers; attribution is enforced afterward.
+   * Omission preserves profile headers. Throws fail the call with REQUEST_HEADERS
+   * before inference I/O. Do not retain or mutate headers after returning.
+   * Non-TypeError messages become public diagnostics and must exclude secrets;
+   * TypeError details and non-Error values are replaced with safe guidance.
+   * @param request - immutable routing metadata from the prepared call.
+   * @param headers - request-owned headers initialized from the profile.
+   * @returns headers to pass to pi-ai after applying Harness attribution.
+   */
+  prepareHeaders?: (request: PiAiRequestHeaderContext, headers: Headers) => Headers
   /** Resolve the optional durable attachment service at request time. */
   resolveAttachments?: () => AttachmentStore | undefined
   /** Bridge one attachment reference into the current model-tool execution world. */
@@ -154,6 +169,13 @@ export interface PiAiAdapterOptions {
    * conversion because its stored replay state is unusable by this build.
    */
   onReplayDegrade?: (detail: { provider: string; model: string; reason: string }) => void
+  /**
+   * Observe one request that sent replayed assistant messages without their
+   * signed Anthropic thinking because the request prefix changed or was never
+   * recorded. Stale messages stay omitted, so later requests of the
+   * conversation report them again.
+   */
+  onThinkingOmitted?: (detail: { provider: string; model: string; count: number }) => void
 }
 
 /** The two auth injectables a pi-ai collection is built with. */
@@ -246,21 +268,50 @@ function reasoningInfo(
   return {
     reasoning: {
       efforts: levels.map(level => ({
-        id: ReasoningEffortId(level),
+        id: brandString<ReasoningEffortIdType>(level),
         name: `${level.charAt(0).toUpperCase()}${level.slice(1)}`,
       })),
-      ...defaultLevel === undefined ? {} : { defaultEffort: ReasoningEffortId(defaultLevel) },
+      ...defaultLevel === undefined ? {} : { defaultEffort: brandString<ReasoningEffortIdType>(defaultLevel) },
     },
   }
 }
 
-/** Merge deployment headers while removing case-insensitive attribution collisions. */
-function requestHeaders(headers: Readonly<Record<string, string>> | undefined): Record<string, string> {
-  const attribution = attributionHeaders()
-  const reserved = new Set(Object.keys(attribution).map(name => name.toLowerCase()))
-  return {
-    ...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase()))),
-    ...attribution,
+/** Native header TypeErrors can echo credentials; other plugin errors own their public message. */
+function requestHeaderDiagnostic(error: unknown): string {
+  if (error instanceof TypeError) {
+    return 'TypeError during header preparation; check the contributing plugin\'s header names, values, and configuration'
+  }
+  return error instanceof Error
+    ? error.message
+    : 'the contributing plugin threw a non-Error value; throw an Error with a safe diagnostic'
+}
+
+/** Prepare request-owned headers without allowing contributors to replace attribution. */
+function requestHeaders(
+  configured: Readonly<Record<string, string>> | undefined,
+  options: GenerateOptions<string>,
+  baseURL: string,
+  prepare: PiAiAdapterOptions['prepareHeaders'],
+): Record<string, string> {
+  try {
+    const initial = new Headers()
+    // Profile aliases overwrite case-insensitively; the Headers constructor appends them.
+    for (const [name, value] of Object.entries(configured ?? {})) initial.set(name, value)
+    const request: PiAiRequestHeaderContext = Object.freeze({
+      provider: options.provider,
+      model: options.model,
+      baseURL,
+      ...options.sessionId === undefined ? {} : { sessionId: options.sessionId },
+      ...options.purpose === undefined ? {} : { purpose: options.purpose },
+    })
+    const headers = prepare === undefined ? initial : prepare(request, initial)
+    for (const [name, value] of Object.entries(attributionHeaders())) headers.set(name, value)
+    return Object.fromEntries(headers)
+  } catch (error) {
+    throw new LlmError(
+      `pi-ai request header preparation failed for provider "${options.provider}": ${requestHeaderDiagnostic(error)}`,
+      'REQUEST_HEADERS', { cause: error },
+    )
   }
 }
 
@@ -462,18 +513,29 @@ export class PiAiAdapter extends LlmAdapter {
       const onReplayDegrade = (reason: string): void => {
         this.config.onReplayDegrade?.({ provider: options.provider, model: options.model, reason })
       }
-      const buildContext = async (source: typeof request) => attachments === undefined
-        ? toPiContext(source, undefined, onReplayDegrade, updates.systemPromptUpdate === 'in-history')
-        : await toPiContext({ ...source, signal: watchdog.signal }, {
-          attachments,
-          resolveImageAccess: ref => this.config.resolveImageAccess?.(attachments, ref),
-          maxRequestImageBytes: profile.maxRequestImageBytes,
-          requestImagePolicy: {
-            maxPixels: profile.requestImagePixelBudget,
-            maxBytes: profile.requestImageMaxBytes,
-          },
-        }, onReplayDegrade, updates.systemPromptUpdate === 'in-history')
-      let context = await buildContext(request)
+      const manualThinking = model.reasoning && reasoning !== undefined && reasoning !== 'off'
+        && (model as Model<'anthropic-messages'>).compat?.forceAdaptiveThinking !== true
+      // Built again when images have to be dropped from the history, so the replay digest always matches the request.
+      const buildContext = async (source: typeof request): Promise<ReturnType<typeof bindThinkingToPrefix>> => {
+        const prefixDigests: PrefixDigests = new Map()
+        const converted = attachments === undefined
+          ? toPiContext(source, undefined, onReplayDegrade, updates.systemPromptUpdate === 'in-history', prefixDigests)
+          : await toPiContext({ ...source, signal: watchdog.signal }, {
+            attachments,
+            resolveImageAccess: ref => this.config.resolveImageAccess?.(attachments, ref),
+            maxRequestImageBytes: profile.maxRequestImageBytes,
+            maxRequestImages: profile.maxRequestImages,
+            imageOffloadCountQuantum: profile.imageOffloadCountQuantum,
+            requestImagePolicy: {
+              maxPixels: profile.requestImagePixelBudget,
+              maxBytes: profile.requestImageMaxBytes,
+            },
+          }, onReplayDegrade, updates.systemPromptUpdate === 'in-history', prefixDigests)
+        return bindThinkingToPrefix(converted, model.api, prefixDigests, manualThinking, (count) => {
+          this.config.onThinkingOmitted?.({ provider: options.provider, model: options.model, count })
+        })
+      }
+      let { context, digest } = await buildContext(request)
       let imageMessages: readonly RequestMessage[] = request.messages
       let imageOmissions = 0
       // One attempt per usable key: a provider refusal before any content arrives swaps the key and
@@ -503,14 +565,14 @@ export class PiAiAdapter extends LlmAdapter {
           signal: watchdog.signal,
           // Profile headers are deployment-owned; attribution names are
           // Harness-owned and therefore win collisions.
-          headers: requestHeaders(profile.headers),
+          headers: requestHeaders(profile.headers, options, model.baseUrl, this.config.prepareHeaders),
         })
         // Replay data names the model that actually answered, so its signatures go back to that model on later steps.
         // A locally served model may write its tool calls into the answer as text; they are read back as tool calls.
         const inlineTools = model.api === 'openai-completions' && isLocalModelServer(model.baseUrl, options.provider) && tools.length > 0
           ? new Set(tools.map(tool => tool.name))
           : undefined
-        const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id, inlineTools)[Symbol.asyncIterator]()
+        const iterator = toStreamChunks(events, model.contextWindow, options.signal, model.id, digest, inlineTools)[Symbol.asyncIterator]()
         let exhausted = false
         const retryKeys: string[] = []
         try {
@@ -550,7 +612,7 @@ export class PiAiAdapter extends LlmAdapter {
               imageOmissions += 1
               const dropped = Math.max(1, Math.ceil(countRequestImages(imageMessages) / 2))
               imageMessages = omitOldestImages(imageMessages, dropped, IMAGE_OMITTED_NOTE)
-              context = await buildContext({ ...request, messages: [...imageMessages] })
+              ;({ context, digest } = await buildContext({ ...request, messages: [...imageMessages] }))
               await watchdog.next(iterator)
               exhausted = true
               retryKeys.push(apiKey ?? '')

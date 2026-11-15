@@ -11,18 +11,21 @@ import type { ChangesSummary } from '@hackdevcode/dsh-client-ui-deliverables/src
 import { deriveReplayScript, parseSessionLog } from '@hackdevcode/dsh-llm-replay'
 import { PartialArguments } from '@hackdevcode/dsh-util-values'
 import {
-  assertFinalWorkspaceSnapshot, captureExpandedTurnProcessAria, compareOrRefreshGolden, fixtureUserPrompts, launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold } from './scaffold.ts'
-import { openSettings, expandOwningTurnProcess, connectFreshWorkspace } from './support.ts'
+  assertFinalWorkspaceSnapshot, captureExpandedTurnProcessAria, compareOrRefreshGolden,
+  fixtureUserPrompts, launchWebScaffold, recordFixture, watchConsole,
+  webSnapshotMode, type WebScaffold,
+} from './scaffold.ts'
+import { openSettings, connectFreshWorkspaceZh, expandOwningTurnProcess, ZH_BROWSER_LOCALE } from './support.ts'
 
 const DIR = fileURLToPath(new URL('../../../snapshots/web/changed-files-turn', import.meta.url))
 const FIXTURE = join(DIR, 'session.v3.jsonl')
 const MODE = webSnapshotMode()
-const PROMPT = 'Without listing the directory first, do four things: change the heading "Example project" in intro.md to "Project notes", create src/util.ts exporting an add function that sums two numbers, create app.local with the line mode=demo, and finally append a line done to notes.txt with bash.'
+const PROMPT = '\u4e0d\u7528\u5148\u67e5\u770b\u76ee\u5f55\uff0c\u76f4\u63a5\u505a\u56db\u4ef6\u4e8b\uff1a\u628a intro.md \u91cc\u7684\u6807\u9898\u300c\u793a\u4f8b\u9879\u76ee\u300d\u6539\u6210\u300c\u9879\u76ee\u8bf4\u660e\u300d\uff0c\u65b0\u5efa src/util.ts \u5bfc\u51fa\u4e00\u4e2a\u4e24\u6570\u76f8\u52a0\u7684 add \u51fd\u6570\uff0c\u65b0\u5efa app.local \u5199\u4e00\u884c mode=demo\uff0c\u6700\u540e\u7528 bash \u5728 notes.txt \u672b\u5c3e\u8ffd\u52a0\u4e00\u884c done\u3002'
 
 /** Seed a committed repository so the turn's own edits are the only difference between its snapshots; `*.local` stays ignored. */
 async function seedRepository(cwd: string): Promise<void> {
   await mkdir(cwd, { recursive: true })
-  await writeFile(join(cwd, 'intro.md'), '# Example project\n\nA repository used for demonstration.\n')
+  await writeFile(join(cwd, 'intro.md'), '# \u793a\u4f8b\u9879\u76ee\n\n\u4e00\u4e2a\u7528\u4e8e\u6f14\u793a\u7684\u4ed3\u5e93\u3002\n')
   await writeFile(join(cwd, 'notes.txt'), 'start\n')
   await writeFile(join(cwd, '.gitignore'), '*.local\n')
   const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=seed@example.com', '-c', 'user.name=seed', '-c', 'commit.gpgsign=false', ...args], { cwd, stdio: 'ignore' })
@@ -81,13 +84,13 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
     await seedRepository(join(scaffold.workspaceCwd, 'workspace'))
     browser = await chromium.launch()
     const context = await browser.newContext({
-      viewport: { width: 1680, height: 1000 }, locale: 'en-US', timezoneId: 'Asia/Shanghai',
+      viewport: { width: 1680, height: 1000 }, locale: ZH_BROWSER_LOCALE, timezoneId: 'Asia/Shanghai',
     })
     page = await context.newPage()
     tripwire = watchConsole(page)
     await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]')
-    await connectFreshWorkspace(page, scaffold.workspaceCwd)
+    await connectFreshWorkspaceZh(page, scaffold.workspaceCwd)
   })
 
   afterAll(async () => {
@@ -202,20 +205,20 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
     expect(await header.getByRole('tablist').count()).toBe(0)
     const compactHeight = await header.evaluate(element => element.getBoundingClientRect().height)
     expect(compactHeight).toBeLessThan(60)
-    await openSettings(page)
-    const settings = page.getByRole('dialog', { name: 'Settings' })
-    await settings.getByRole('switch', { name: 'Show coding view' }).click()
-    await expect.poll(() => settings.getByRole('switch', { name: 'Show coding view' }).getAttribute('aria-checked')).toBe('true')
-    await settings.getByRole('button', { name: 'Close', exact: true }).click()
+    await openSettings(page, 'zh')
+    const settings = page.getByRole('dialog', { name: '\u8bbe\u7f6e' })
+    await settings.getByRole('switch', { name: '\u663e\u793a\u4ee3\u7801\u5de5\u4f5c\u89c6\u56fe' }).click()
+    await expect.poll(() => settings.getByRole('switch', { name: '\u663e\u793a\u4ee3\u7801\u5de5\u4f5c\u89c6\u56fe' }).getAttribute('aria-checked')).toBe('true')
+    await settings.getByRole('button', { name: '\u5173\u95ed', exact: true }).click()
     await header.getByRole('tablist').waitFor({ state: 'visible' })
     expect(await header.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThan(compactHeight)
     await card.waitFor({ state: 'visible' })
-    expect(await card.getByText('Edited 4 files', { exact: true }).count()).toBe(1)
+    expect(await card.getByText('\u5df2\u7f16\u8f91 4 \u4e2a\u6587\u4ef6', { exact: true }).count()).toBe(1)
     expect(await card.getByRole('listitem').count()).toBe(4)
-    expect(await card.getByRole('button', { name: 'Show all 4 changed files' }).count()).toBe(0)
+    expect(await card.getByRole('button', { name: '\u5c55\u5f00\u5168\u90e8 4 \u4e2a\u6539\u52a8\u6587\u4ef6' }).count()).toBe(0)
     // The header and every row open the turn's review in the Sidebar, with or without a Host desktop.
-    expect(await card.getByRole('button', { name: 'Review this turn’s changes in the sidebar' }).count()).toBe(1)
-    expect(await card.getByRole('button', { name: 'View changes to notes.txt' }).count()).toBe(1)
+    expect(await card.getByRole('button', { name: '\u5728\u4fa7\u8fb9\u680f\u67e5\u770b\u672c\u8f6e\u6539\u52a8' }).count()).toBe(1)
+    expect(await card.getByRole('button', { name: '\u67e5\u770b notes.txt \u7684\u6539\u52a8' }).count()).toBe(1)
     const geometry = await card.evaluate((element) => {
       const requiredElement = <T extends Element>(value: T | null | undefined, name: string): T => {
         if (value === null || value === undefined) throw new Error(`changed-files layout is missing ${name}`)
@@ -269,7 +272,7 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
 
   it('previews a single column with a scrollable path and no file notes or hunk headers', async () => {
     const card = page.locator('[data-changed-files]')
-    const row = card.getByRole('button', { name: 'View changes to notes.txt' })
+    const row = card.getByRole('button', { name: '\u67e5\u770b notes.txt \u7684\u6539\u52a8' })
     const preview = page.locator('[data-changes-hover-preview]')
     const entrance = hoverOpacityTransition(page, false)
     await row.hover()
@@ -312,7 +315,7 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
     const review = page.locator('[data-changes-review]')
     await review.locator('[data-review-file="notes.txt"]').waitFor({ state: 'visible' })
     await review.locator('[data-review-view="unified"]').waitFor({ state: 'visible' })
-    await card.getByRole('button', { name: 'View changes to src/util.ts' }).hover()
+    await card.getByRole('button', { name: '\u67e5\u770b src/util.ts \u7684\u6539\u52a8' }).hover()
     await preview.locator('[data-diff-code]').first().waitFor({ state: 'visible' })
     expect(await preview.locator('[data-review-view="unified"]').count()).toBe(1)
     expect(await preview.locator('[data-diff-note]').isVisible()).toBe(false)
@@ -344,11 +347,11 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
       root.locator('[data-diff-line]').evaluateAll(lines => lines.map(line => `${line.getAttribute('data-diff-line')}:${line.textContent}`))
     const review = column.locator('[data-changes-review]')
     // The header lands on the first listed file; a row lands on its own.
-    await card.getByRole('button', { name: 'Review this turn’s changes in the sidebar' }).click()
+    await card.getByRole('button', { name: '\u5728\u4fa7\u8fb9\u680f\u67e5\u770b\u672c\u8f6e\u6539\u52a8' }).click()
     await review.locator('[data-review-file="app.local"]').waitFor({ state: 'visible' })
-    await card.getByRole('button', { name: 'View changes to notes.txt' }).click()
+    await card.getByRole('button', { name: '\u67e5\u770b notes.txt \u7684\u6539\u52a8' }).click()
     await review.locator('[data-review-file="notes.txt"]').waitFor({ state: 'visible' })
-    expect(await column.locator('[data-dockkit-tab]').filter({ hasText: 'Review · turn 1' }).count()).toBe(1)
+    expect(await column.locator('[data-dockkit-tab]').filter({ hasText: '\u7b2c 1 \u8f6e\u6539\u52a8' }).count()).toBe(1)
     await review.locator('[data-review-view="unified"]').waitFor({ state: 'visible' })
     const compareTool = review.locator('[data-review-tool="split"]')
     const wrapTool = review.locator('[data-review-tool="wrap"]')
@@ -440,7 +443,7 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
     expect(addedRule.numberLeft).toBeCloseTo(rightContextRule.numberLeft, 1)
     expect(addedRule.textLeft).toBeCloseTo(rightContextRule.textLeft, 1)
     // The ignored file has no snapshot; its comparison comes from the copies captured around the write call.
-    await review.getByRole('button', { name: 'Choose the file to review' }).click()
+    await review.getByRole('button', { name: '\u9009\u62e9\u8981\u67e5\u770b\u7684\u6587\u4ef6' }).click()
     const selectedAlignment = await page.getByRole('menuitem').filter({ hasText: 'notes.txt' }).evaluate((row) => {
       const center = (element: Element) => {
         const rect = element.getBoundingClientRect()
@@ -459,11 +462,11 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
     await review.locator('[data-review-file="app.local"]').waitFor({ state: 'visible' })
     await expect.poll(() => drawn(review)).toEqual(['add:1+mode=demo'])
     expect(await compareTool.getAttribute('aria-pressed')).toBe('true')
-    expect(await review.getByText('Created in this turn').count()).toBe(1)
+    expect(await review.getByText('\u672c\u8f6e\u65b0\u5efa\u7684\u6587\u4ef6').count()).toBe(1)
     // A mixed comparison uses the tab's retained split preference.
-    await card.getByRole('button', { name: 'View changes to intro.md' }).click()
+    await card.getByRole('button', { name: '\u67e5\u770b intro.md \u7684\u6539\u52a8' }).click()
     await review.locator('[data-review-file="intro.md"]').waitFor({ state: 'visible' })
-    expect(await column.locator('[data-dockkit-tab]').filter({ hasText: 'Review · turn 1' }).count()).toBe(1)
+    expect(await column.locator('[data-dockkit-tab]').filter({ hasText: '\u7b2c 1 \u8f6e\u6539\u52a8' }).count()).toBe(1)
     await review.locator('[data-review-view="split"]').waitFor({ state: 'visible' })
     expect(await compareTool.getAttribute('aria-pressed')).toBe('true')
     const deletedLine = review.locator('[data-diff-side="left"] [data-diff-line="del"]').first()
@@ -500,8 +503,8 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
     expect(await compareTool.locator('svg').evaluate(icon => getComputedStyle(icon).transform)).toBe('none')
     await compareTool.click()
     await review.locator('[data-review-view="split"]').waitFor({ state: 'visible' })
-    await expect.poll(() => drawn(review.locator('[data-diff-side="left"]'))).toEqual(['del:1# Example project', 'context:2', 'context:3A repository used for demonstration.'])
-    expect(await drawn(review.locator('[data-diff-side="right"]'))).toEqual(['del:1# Project notes', 'context:2', 'context:3A repository used for demonstration.'])
+    await expect.poll(() => drawn(review.locator('[data-diff-side="left"]'))).toEqual(['del:1# \u793a\u4f8b\u9879\u76ee', 'context:2', 'context:3\u4e00\u4e2a\u7528\u4e8e\u6f14\u793a\u7684\u4ed3\u5e93\u3002'])
+    expect(await drawn(review.locator('[data-diff-side="right"]'))).toEqual(['del:1# \u9879\u76ee\u8bf4\u660e', 'context:2', 'context:3\u4e00\u4e2a\u7528\u4e8e\u6f14\u793a\u7684\u4ed3\u5e93\u3002'])
     // Constrain the recorded three-row diff to exercise unequal horizontal ranges and classic scrollbars.
     const scrollLayout = await page.addStyleTag({ content: `
       [data-changes-review] { height: 120px !important; }
@@ -539,9 +542,9 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
     } finally {
       await scrollLayout.evaluate(element => element.parentNode!.removeChild(element))
     }
-    await review.getByRole('button', { name: 'Line wrap' }).click()
+    await review.getByRole('button', { name: '\u81ea\u52a8\u6362\u884c' }).click()
     await review.locator('[data-review-view][data-review-wrap]').waitFor({ state: 'visible' })
-    await expect.poll(() => drawn(review)).toEqual(['del:1# Example project1# Project notes', 'context:22', 'context:3A repository used for demonstration.3A repository used for demonstration.'])
+    await expect.poll(() => drawn(review)).toEqual(['del:1# \u793a\u4f8b\u9879\u76ee1# \u9879\u76ee\u8bf4\u660e', 'context:22', 'context:3\u4e00\u4e2a\u7528\u4e8e\u6f14\u793a\u7684\u4ed3\u5e93\u30023\u4e00\u4e2a\u7528\u4e8e\u6f14\u793a\u7684\u4ed3\u5e93\u3002'])
     const wrappedAddition = review.locator('[data-diff-line="del"] > span').nth(1)
     const wrappedAdditionRule = await wrappedAddition.evaluate((cell) => {
       const number = cell.children[0]
@@ -564,7 +567,7 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
 
   it.skipIf(MODE === 'record')('keeps the file menu aligned while dragging the floating review', async () => {
     const column = page.locator('[data-rightbar-col]')
-    const tab = column.locator('[data-dockkit-tab]').filter({ hasText: 'Review · turn 1' })
+    const tab = column.locator('[data-dockkit-tab]').filter({ hasText: '\u7b2c 1 \u8f6e\u6539\u52a8' })
     const tabBox = await tab.boundingBox()
     if (tabBox === null) throw new Error('review tab is not rendered')
     await page.mouse.move(tabBox.x + 6, tabBox.y + tabBox.height / 2)
@@ -576,7 +579,7 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
     }
     const floating = page.locator('[data-dockkit-float]').filter({ has: page.locator('[data-changes-review]') })
     await floating.waitFor({ state: 'visible' })
-    const selector = floating.getByRole('button', { name: 'Choose the file to review' })
+    const selector = floating.getByRole('button', { name: '\u9009\u62e9\u8981\u67e5\u770b\u7684\u6587\u4ef6' })
     await selector.click()
     const menu = page.getByRole('menu')
     await menu.waitFor({ state: 'visible' })
@@ -612,7 +615,7 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
 
   it('keeps edge gestures inside either diff column and accepts reverse scrolling', async () => {
     const review = page.locator('[data-changes-review]')
-    await review.getByRole('button', { name: 'Line wrap' }).click()
+    await review.getByRole('button', { name: '\u81ea\u52a8\u6362\u884c' }).click()
     const body = review.locator('[data-review-view="split"]:not([data-review-wrap])')
     await body.waitFor({ state: 'visible' })
     // A scrollable parent makes escaped edge gestures observable without native trackpad rebound.
@@ -624,7 +627,7 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
     onTestFinished(async () => {
       await layout.evaluate(element => element.parentNode!.removeChild(element))
       await body.evaluate((element) => { element.scrollTo(0, 0) })
-      await review.getByRole('button', { name: 'Line wrap' }).click()
+      await review.getByRole('button', { name: '\u81ea\u52a8\u6362\u884c' }).click()
     })
     const input = await page.context().newCDPSession(page)
     try {
@@ -680,7 +683,7 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
       hunks: [{ oldStart: 1, oldLines: 1, newStart: 1, newLines: 2, lines: ['-before', '+after', '+extra'] }],
     } }))
     await preview.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-    await preview.locator('[data-changed-files]').getByRole('button', { name: 'View changes to notes.txt' }).click()
+    await preview.locator('[data-changed-files]').getByRole('button', { name: '\u67e5\u770b notes.txt \u7684\u6539\u52a8' }).click()
     const review = preview.locator('[data-changes-review]')
     await review.locator('[data-review-view="split"]').waitFor({ state: 'visible' })
     const emptyRowLayout = await preview.addStyleTag({ content: `
@@ -739,9 +742,9 @@ describe('web e2e: a git workspace turn ends with its changed files', () => {
       } })
     })
     await preview.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
-    await preview.locator('[data-changed-files]').getByRole('button', { name: 'Review this turn’s changes in the sidebar' }).click()
+    await preview.locator('[data-changed-files]').getByRole('button', { name: '\u5728\u4fa7\u8fb9\u680f\u67e5\u770b\u672c\u8f6e\u6539\u52a8' }).click()
     const review = preview.locator('[data-changes-review]')
-    const selector = review.getByRole('button', { name: 'Choose the file to review' })
+    const selector = review.getByRole('button', { name: '\u9009\u62e9\u8981\u67e5\u770b\u7684\u6587\u4ef6' })
     const label = selector.locator('[data-path-label]')
     const layout = await preview.addStyleTag({ content: '[data-sidebar-right-panel] { width: 340px !important; }' })
     const resize = async (width: number) => {

@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh",
   "description": "dsh CLI: profile launch, plugin management, and configuration inspection",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -16,8 +16,16 @@
   },
   "files": [
     "lib/*.js",
-    "lib/types/*.d.ts"
+    "lib/*.js.map",
+    "lib/types/*.d.ts",
+    "lib/types/*.d.ts.map",
+    "docs",
+    "src"
   ],
+  "scripts": {
+    "prepack": "tsx ../../scripts/stage-dsh-docs.ts",
+    "postpack": "tsx ../../scripts/stage-dsh-docs.ts --clean"
+  },
   "license": "MIT",
   "dependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -38,7 +46,6 @@
     "@hackdevcode/dsh-compaction-basic": "workspace:*",
     "@hackdevcode/dsh-compaction-tool-result-pruner": "workspace:*",
     "@hackdevcode/dsh-cordis-client-runner": "workspace:*",
-    "@hackdevcode/dsh-experimental-agent-team-profile": "workspace:*",
     "@hackdevcode/dsh-experimental-inspector-profile": "workspace:*",
     "@hackdevcode/dsh-fs-local": "workspace:*",
     "@hackdevcode/dsh-goal": "workspace:*",
@@ -108,11 +115,15 @@
     "@hackdevcode/dsh-experimental-session-search": "workspace:*",
     "@hackdevcode/dsh-experimental-tool-worktree": "workspace:*",
     "@hackdevcode/dsh-cua-bundle": "workspace:*",
+    "@hackdevcode/dsh-cua-mcp": "workspace:*",
+    "@hackdevcode/dsh-timeline": "workspace:*",
     "@hackdevcode/dsh-experimental-plugin-market-bundle": "workspace:*",
     "@hackdevcode/dsh-personalized-recommendations": "workspace:*",
-    "@hackdevcode/dsh-experimental-forge-bundle": "workspace:*"
+    "@hackdevcode/dsh-experimental-forge-bundle": "workspace:*",
+    "@hackdevcode/dsh-deepseek-chat-import": "workspace:*"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-skill-badge": "workspace:*",
     "@hackdevcode/dsh-webhook-github": "workspace:*",
     "@hackdevcode/dsh-webhook": "workspace:*",
@@ -128,9 +139,8 @@
     "@hackdevcode/dsh-bash-local": "workspace:*",
     "@hackdevcode/dsh-credentials-local": "workspace:*",
     "@hackdevcode/dsh-deepseek-llm-api-extensions": "workspace:*",
-    "@hackdevcode/dsh-experimental-agent-team": "workspace:*",
-    "@hackdevcode/dsh-experimental-ptc-runtime-python": "workspace:*",
-    "@hackdevcode/dsh-experimental-tool-agent-team": "workspace:*",
+    "@hackdevcode/dsh-agent-team": "workspace:*",
+    "@hackdevcode/dsh-tool-agent-team": "workspace:*",
     "@hackdevcode/dsh-fs-observation-policy": "workspace:*",
     "@hackdevcode/dsh-fs-sandbox": "workspace:*",
     "@hackdevcode/dsh-host-frontend-static": "workspace:*",

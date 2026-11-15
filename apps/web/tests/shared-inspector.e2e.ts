@@ -87,6 +87,13 @@ it('toggles bottom DevTools from the page and iframe without a selected Session'
 
 it.each([
   {
+    locale: 'zh-CN', file: 'zh', plugins: '\u63d2\u4ef6', open: '\u67e5\u770b \u5f00\u53d1\u8005\u5de5\u5177', bundle: '\u5f00\u53d1\u8005\u5de5\u5177',
+    description: experimentalBundleDescription('inspector-profile', 'zh'),
+    inspector: 'NodeJS \u8bca\u65ad', inspectorDescription: '\u6309 Ctrl/Cmd+Shift+. \u5728\u5e95\u90e8\u9762\u677f\u6253\u5f00 Chrome DevTools \u8fdb\u884c\u5f00\u53d1\u8c03\u8bd5',
+    session: '\u4f1a\u8bdd\u6570\u636e\u8bca\u65ad', sessionDescription: '\u5728\u4f1a\u8bdd\u4fa7\u8fb9\u680f\u542f\u7528\u5f53\u524d\u4f1a\u8bdd\u7684\u539f\u59cb\u6570\u636e\u548c\u804a\u5929\u5206\u7ec4\u6570\u636e\u5206\u6790\u529f\u80fd',
+    openSidebar: '\u6253\u5f00\u53f3\u4fa7\u8fb9\u680f', sidebarDescription: '\u5728\u4fa7\u8fb9\u680f\u5206\u6790\u5f53\u524d\u4f1a\u8bdd\u539f\u59cb\u65e5\u5fd7\u548c\u804a\u5929\u5206\u7ec4\u6570\u636e',
+  },
+  {
     locale: 'en-US', file: 'en', plugins: 'Plugins', open: 'View Developer tools', bundle: 'Developer tools',
     description: experimentalBundleDescription('inspector-profile', 'en'),
     inspector: 'NodeJS inspector', inspectorDescription: 'Press Ctrl/Cmd+Shift+. to open Chrome DevTools in the bottom panel for development and debugging.',
@@ -144,7 +151,7 @@ it.each([
     `  description: ${await sessionGuide.getByText(copy.sidebarDescription, { exact: true }).innerText()}`,
     `- NodeJS bottom: ${await bottomTitle.innerText()}`)
   await sessionGuide.click()
-  await page.getByRole('table', { name: 'Raw log', exact: true }).waitFor()
+  await page.getByRole('table', { name: copy.locale === 'zh-CN' ? '\u539f\u59cb\u6570\u636e' : 'Raw log', exact: true }).waitFor()
   await compareOrRefreshGolden(fileURLToPath(new URL(`./expected/shared-inspector/metadata-${copy.file}.expected.md`, import.meta.url)),
     snapshot.join('\n'), webSnapshotMode())
 })

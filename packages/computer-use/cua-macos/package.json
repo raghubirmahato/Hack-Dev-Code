@@ -1,7 +1,7 @@
 {
   "name": "@hackdevcode/dsh-cua-macos",
   "description": "macOS native provider for shared Computer Use application and window objects",
-  "version": "0.2.2-alpha.2",
+  "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
   },
@@ -26,15 +26,23 @@
     "locale/*.json",
     "lib/index.js",
     "native/bin",
+    "cua-helper.json",
     "native/Package.swift",
+    "native/Info.plist",
+    "native/DSHComputerUse.icns",
+    "native/build_app.py",
     "native/Sources",
     "native/tests/swift",
     "native/tests/test_swift.py",
     "native/LICENSE.cua-driver",
+    "native/LICENSE.computer-use-icon",
     "native/upstream.json",
     "native/README.md",
     "native/protocol.schema.json",
-    "lib/types/**/*.d.ts"
+    "lib/types/**/*.d.ts",
+    "lib/types/**/*.d.ts.map",
+    "lib/**/*.js.map",
+    "src"
   ],
   "license": "MIT",
   "peerDependencies": {
@@ -47,11 +55,13 @@
     "@hackdevcode/dsh-user-questions": "workspace:*"
   },
   "dependencies": {
-    "zod": "^4.4.3",
-    "@hackdevcode/dsh-atomic-write": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "zod": "4.6.6",
     "@hackdevcode/dsh-cua": "workspace:*"
   },
   "devDependencies": {
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "ajv": "^8.20.0",
     "@hackdevcode/dsh-working-directory": "workspace:*",
     "@hackdevcode/cordis": "workspace:~",
     "@hackdevcode/cordis-plugin-include": "workspace:~",
@@ -90,7 +100,8 @@
     "@hackdevcode/dsh-storage-domain": "workspace:*"
   },
   "scripts": {
-    "build:native": "swift build --package-path native --configuration release"
+    "build:native": "xcrun python3 native/build_app.py",
+    "build:icon": "node native/generate_icon.mjs"
   },
   "os": [
     "darwin"

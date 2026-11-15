@@ -1,0 +1,253 @@
+/**
+ * Value exports that plugin entries already had when verify-plugin-entry-exports started enforcing the plugin entry
+ * rule in docs/defensive-patterns/package-surface.md. Each line records existing debt, not an approved exception. The
+ * gate passes a listed export and fails a line when its package has no plugin entry, when its export list is empty or
+ * repeats a name, or when it names an export the entry no longer reports, so removing an export removes its line in
+ * the same change. A line added after the gate's introduction is an exception under the rule, and the rule requires
+ * the domain owner's confirmation for it.
+ */
+export const EXISTING_PLUGIN_ENTRY_EXPORTS = {
+  '@hackdevcode/dsh-acp-app': ['ACP_APP_STARTUP_SERVICE'],
+  '@hackdevcode/dsh-action-cards': ['Config', 'isPluginStopping'],
+  '@hackdevcode/dsh-agent': [
+    'AgentModel', 'agentCarrier', 'agentEvents', 'assembleContextFor', 'emitAgentEvent', 'foldConsumedWork',
+    'installModelSelection', 'modelSelectionProjectionDefinition',
+  ],
+  '@hackdevcode/dsh-agent-instructions': [
+    'discoverBaselineInstructionFiles', 'loadBaselineInstructions', 'renderAgentInstructions',
+  ],
+  '@hackdevcode/dsh-agent-loop': ['CONFIGURED_AGENT_IDENTITIES_KEY', 'DEFAULT_MAX_PARALLEL_TOOL_CALLS'],
+  '@hackdevcode/dsh-agent-preset-registry': [
+    'agentPresetProjectionDefinition', 'auditRows', 'entryListProblem', 'leakedServices',
+  ],
+  '@hackdevcode/dsh-agent-team': ['TeamId', 'TeamMessageId', 'TeamTaskId'],
+  '@hackdevcode/dsh-api-remote-access': ['REMOTE_ACCESS_SNAPSHOT_KEY'],
+  '@hackdevcode/dsh-api-remotes': ['API_REMOTE_FORWARDED_EVENTS'],
+  '@hackdevcode/dsh-attachment-local': [
+    'DEFAULT_IMAGE_COMPRESSION_CONCURRENCY', 'DEFAULT_MAX_IMAGES_PER_MESSAGE', 'DEFAULT_MAX_IMAGE_BYTES',
+    'DEFAULT_MAX_IMAGE_DIMENSION', 'DEFAULT_MAX_IMAGE_PIXELS', 'DEFAULT_MAX_MESSAGE_IMAGE_BYTES',
+    'DEFAULT_NORMALIZED_IMAGE_MAX_BYTES', 'DEFAULT_NORMALIZED_IMAGE_MAX_DIMENSION',
+    'DEFAULT_NORMALIZED_IMAGE_MAX_PIXELS', 'MAX_IMAGE_COMPRESSION_CONCURRENCY', 'canPassThroughNormalization',
+    'commitPreparedImageFile', 'normalizeImage', 'prepareImageFile', 'readImageFile', 'readRequestImageFile',
+    'requestImageVariantId', 'saveImageFile', 'validateImageFile',
+  ],
+  '@hackdevcode/dsh-bash-local': ['ENV_OVERRIDES', 'assertServiceableBashConfig'],
+  '@hackdevcode/dsh-client-connection': [
+    'API_PATH', 'CONNECT_PATH', 'Peer', 'RpcId', 'clientRequestSchema', 'rpcErrorSchema', 'rpcIdSchema',
+    'rpcMessageSchema', 'rpcResultSchema', 'serverResponseSchema', 'transportError',
+  ],
+  '@hackdevcode/dsh-client-hmr': ['EVENTS_ENDPOINT'],
+  '@hackdevcode/dsh-client-locale': ['LOCALE_IDS', 'LOCALE_PREFERENCE_FIELD', 'LOCALE_SETTINGS_NAMESPACE'],
+  '@hackdevcode/dsh-client-modules': ['bootInjections', 'orderByModuleGraph', 'stripClientSuffix'],
+  '@hackdevcode/dsh-client-ui-chat': [
+    'CHAT_SETTINGS_NAMESPACE', 'DEFAULT_TRANSCRIPT_VIEW_MODE', 'LEGACY_EXPANDED_TRANSCRIPT_VIEW_MODE',
+    'LEGACY_TRANSCRIPT_VIEW_MODE', 'TRANSCRIPT_VIEW_FIELD', 'TRANSCRIPT_VIEW_MODES',
+  ],
+  '@hackdevcode/dsh-client-ui-conversation': [
+    'BUSY_ENTER_BEHAVIORS', 'BUSY_ENTER_FIELD', 'CONVERSATION_SETTINGS_NAMESPACE', 'DEFAULT_BUSY_ENTER_BEHAVIOR',
+  ],
+  '@hackdevcode/dsh-client-ui-theme': [
+    'DEFAULT_FONT_SIZE', 'DEFAULT_PREFERENCE', 'FONT_SIZE_FIELD', 'FONT_SIZE_MAX', 'FONT_SIZE_MIN', 'THEME_PREFERENCES',
+    'THEME_PREFERENCE_FIELD', 'THEME_SETTINGS_NAMESPACE',
+  ],
+  '@hackdevcode/dsh-command-feedback': ['FEEDBACK_CATEGORIES', 'recordFeedback'],
+  '@hackdevcode/dsh-commands': ['CommandDefinitionId', 'CommandId', 'name', 'parseCommand'],
+  '@hackdevcode/dsh-compaction-tool-result-pruner': ['DEFAULTS', 'PRUNE_MARKER', 'codePointLength', 'resolveConfig'],
+  '@hackdevcode/dsh-cordis-host-runner': [
+    'ApprovalRequestId', 'CordisDynamicPackageId', 'CordisDynamicPluginId', 'CordisDynamicPluginRunId',
+  ],
+  '@hackdevcode/dsh-credentials-local': [
+    'CREDENTIALS_FILENAME', 'DOCUMENT_VERSION', 'parseCredentialsDocument', 'renderFlatLayoutMigration', 'resolveSpec',
+  ],
+  '@hackdevcode/dsh-cua': ['CuaConfig', 'installCua'],
+  '@hackdevcode/dsh-cua-macos': ['GUIDANCE'],
+  '@hackdevcode/dsh-experimental-claude-code-mods': [
+    'DEFAULT_TOOL_ALIASES', 'KNOWN_EVENTS', 'MODS_API_VERSION', 'SERVED_EVENTS', 'defineMod',
+  ],
+  '@hackdevcode/dsh-experimental-forge': ['changeRequestKey'],
+  '@hackdevcode/dsh-experimental-inspector': ['resolveInspectorOptions', 'startInspector'],
+  '@hackdevcode/dsh-experimental-worktree': [
+    'CREATED_RECORD', 'createdWorktreeSchema', 'generatedWorktreeName', 'worktreeProjection',
+  ],
+  '@hackdevcode/dsh-goal': [
+    'GOAL_CHANGE_VERSION', 'GoalId', 'applyGoalProjection', 'decodeGoalChange', 'foldGoal', 'goalChangeRef',
+    'goalProjectionDefinition',
+  ],
+  '@hackdevcode/dsh-goal-round-driver': ['renderGoalRoundPrompt'],
+  '@hackdevcode/dsh-host-directory-picker-auto': [
+    'BACKEND_PACKAGES', 'SURFACE_PACKAGES', 'canExecute', 'hasLinuxChooserBinary', 'resolveDirectoryPickerBackend',
+  ],
+  '@hackdevcode/dsh-host-directory-picker-browse': ['boundedInsert', 'fullyQualified', 'raceAbort'],
+  '@hackdevcode/dsh-host-directory-picker-native': ['pickNativeDirectory'],
+  '@hackdevcode/dsh-host-plugin-inventory': ['pluginEntryId', 'readPluginInventory'],
+  '@hackdevcode/dsh-host-product-telemetry-otel': ['Config'],
+  '@hackdevcode/dsh-host-webserver': [
+    'bindUrlHost', 'isLoopbackHost', 'isWildcardHost', 'normalizeBindAddress', 'renderIndexInjections',
+  ],
+  '@hackdevcode/dsh-jobs-local': ['TASK_WAIT_TIMEOUT'],
+  '@hackdevcode/dsh-llm': [
+    'ACCOUNT_QUOTA_EXCEEDED_CODE', 'APP_IDENTITY', 'AssistantStreamAccumulator', 'BlockAssembler',
+    'CONTEXT_SUMMARY_MAX_CHARS', 'CONTEXT_WINDOW_EXCEEDED_CODE', 'EMPTY_RESPONSE_CODE', 'IMAGE_OFFLOAD_REQUIRED_CODE',
+    'INVALID_CREDENTIAL_CODE', 'LLM_FAILURE_CODES', 'LlmAdapter', 'LlmAttemptId', 'MessageId', 'ProviderRequestId',
+    'QUOTA_EXCEEDED_CODE', 'RETRY_CODE_CHOICES', 'ReasoningEffortId', 'RetryPolicySchema', 'ToolCallId',
+    'assembleAssistantStream', 'assertUsableApiKey', 'assistantStreamChunks', 'assistantStreamFirstTokenTime',
+    'assistantStreamHasVisibleContent', 'assistantStreamHasVisibleText', 'attributionHeaders', 'boundContextSummary',
+    'callConfigEquals', 'chunkHasVisibleText', 'contentHasFile', 'contentHasImage', 'createAssistantMessage',
+    'createDeveloperMessage', 'createMessage', 'createSystemMessage', 'createToolResultMessage', 'createUserMessage',
+    'errorChain', 'expandAssistantStream', 'fileHandleText', 'freezeMessage', 'isAgentLoopRequest',
+    'isContextWindowExceededError', 'isHarnessError', 'isQuotaExceededError', 'isTokenDelta', 'isVisibleChunk',
+    'joinAssistantStreamText', 'lastAssistantStreamChunk', 'markAgentLoopRequest', 'normalizeApiKey',
+    'offloadedImageText', 'projectFilesToText', 'projectImagesForTextModel', 'projectOffloadedImages',
+    'projectToolUpdates', 'requestImageHandleText', 'requiredImageOffload', 'resolveImageAttachmentAccess',
+    'resolveRetryPolicy', 'runFirstTokenTime', 'runFirstVisibleTime', 'textOnlyImageText', 'userAgent',
+  ],
+  '@hackdevcode/dsh-llm-deepseek-account': ['plainAccountOptions', 'resolveAccountOptions'],
+  '@hackdevcode/dsh-llm-deepseek-api-key': ['plainOptions', 'resolveAdapterOptions'],
+  '@hackdevcode/dsh-llm-pi-ai': ['PiAiAdapter', 'supportedProtocols'],
+  '@hackdevcode/dsh-llm-replay': [
+    'deriveReplayScript', 'installLlmReplay', 'loadReplayScript', 'loadSessionScripts', 'parseSessionHeader',
+    'parseSessionLog', 'prepareSessionSnapshotFixtureForComparison', 'resolveScriptedEntry',
+  ],
+  '@hackdevcode/dsh-llm-retry': ['RetryId'],
+  '@hackdevcode/dsh-lsp': ['LspProviderId', 'finalExtension'],
+  '@hackdevcode/dsh-mcp-client': [
+    'ReconnectSchema', 'SERVER_NAME_PATTERN', 'assertTemplateSyntax', 'connectionStatusOf', 'createMcpToolDefinition',
+    'probeServer', 'resolveReconnectPolicy',
+  ],
+  '@hackdevcode/dsh-office-kit': ['Config', 'OfficeKitGeneration', 'OfficeKitKey', 'OfficeSourceKey'],
+  '@hackdevcode/dsh-permission-presets': ['AUTO_PRESET', 'CUSTOM_PRESET'],
+  '@hackdevcode/dsh-persona': ['PERSONA_PREFIX_SECTION', 'PERSONA_SUFFIX_SECTION'],
+  '@hackdevcode/dsh-plan-mode': ['EXIT_PLAN_MODE', 'planProjectionDefinition', 'resolveConfig'],
+  '@hackdevcode/dsh-plugin-manager': ['classifyInstallFailure', 'parseInstallSpec', 'pinnedGitOrigin'],
+  '@hackdevcode/dsh-pwsh-local': [
+    'ENCODING_PREAMBLE', 'ENV_OVERRIDES', 'assertServiceablePwshConfig', 'candidatePwshPaths', 'resolvePwshPath',
+  ],
+  '@hackdevcode/dsh-sandbox-policy': ['SANDBOX_MODES', 'setSandboxMode'],
+  '@hackdevcode/dsh-schedule': [
+    'DEFAULT_LIST_LIMIT', 'MAX_LIST_LIMIT', 'MAX_TITLE_LENGTH', 'MIN_EVERY_INTERVAL_SECONDS', 'REQUIRED_TITLE_MESSAGE',
+    'ScheduleId', 'canonicalizeCronExpression', 'createAfterScheduleRecord', 'createAtScheduleRecord',
+    'createCronScheduleRecord', 'createDailyScheduleRecord', 'createEveryScheduleRecord', 'createWeeklyScheduleRecord',
+    'decodeScheduleRecord', 'formatScheduleLocalTime', 'isRecurringScheduleRecord', 'normalizeWeekdays',
+    'parseCronInput', 'parseWeeklyInput', 'renderRecurringReminderBatchFraming', 'renderReminderFraming',
+    'resolveCronOccurrence', 'resolveDailyOccurrence', 'resolveEveryOccurrence', 'resolveRecurringOccurrence',
+    'resolveWeeklyOccurrence', 'scheduleDomain', 'scheduleTitle', 'weeklyTime',
+  ],
+  '@hackdevcode/dsh-sdk-app': ['SDK_APP_STARTUP_SERVICE'],
+  '@hackdevcode/dsh-sdk-jsonrpc-server': ['HarnessSdkJsonRpcServer'],
+  '@hackdevcode/dsh-session': [
+    'KNOWN_SESSION_EVENT_TYPES', 'SESSION_FORMAT_VERSION', 'Session', 'SessionId', 'SessionLogOffset',
+    'SessionPreparation', 'SessionSeq', 'TOOL_NOT_STARTED', 'TOOL_OUTCOME_UNKNOWN', 'ToolCallRecovery',
+    'adoptSessionEvent', 'appendPluginRecord', 'buildForkSeed', 'canonicalHeader', 'decodeSeqRanges',
+    'deriveEventMessage', 'encodeSeqRanges', 'foldRequestHeader', 'foldSurface', 'headerEquals',
+    'interruptedTurnClosers', 'isAppendSurfaceEvent', 'isReplacementSurfaceEvent', 'isSurfaceEligibleType',
+    'isSurfaceEvent', 'pluginRecordOf', 'snapshotSessionEvent',
+  ],
+  '@hackdevcode/dsh-session-log-deepseek': ['acceptedThrough'],
+  '@hackdevcode/dsh-session-log-export': [
+    'DEFAULT_SESSION_LOG_COMPRESSION_LEVEL', 'SESSION_LOG_EXPORT_PATH', 'SESSION_LOG_FILENAME', 'flushLiveSessionLog',
+    'formatSessionMarkdown', 'readSessionLogText', 'serializeSessionLog', 'sessionLogExportDeps',
+    'sessionLogZipEntries', 'sessionLogZipFilename', 'streamSessionLogZip',
+  ],
+  '@hackdevcode/dsh-session-persistence-jsonl': ['JsonlCompressionSchema'],
+  '@hackdevcode/dsh-session-projection-cache': [
+    'Config', 'checkpointIdentity', 'checkpointRecord', 'checkpointRow', 'projectionCacheDomainSpec',
+  ],
+  '@hackdevcode/dsh-session-query-sqlite': [
+    'SESSION_QUERY_SQLITE_APPLICATION_ID', 'SESSION_QUERY_SQLITE_DEFAULT_LIMIT', 'SESSION_QUERY_SQLITE_MAX_LIMIT',
+    'SESSION_QUERY_SQLITE_PATH_KEY', 'SESSION_QUERY_SQLITE_SCHEMA_VERSION', 'SESSION_QUERY_SQLITE_SNIPPET_CHARS',
+  ],
+  '@hackdevcode/dsh-session-reference': [
+    'DEFAULT_CANDIDATE_LIMIT', 'DEFAULT_MAX_REFERENCE_BYTES', 'MAX_REFERENCES', 'SESSION_REFERENCE_SCHEME',
+    'decodeSessionReferenceUri', 'encodeSessionReferenceUri', 'formatSessionReferenceMention',
+    'parseSessionReferenceText',
+  ],
+  '@hackdevcode/dsh-session-telemetry-otel': [
+    'Config', 'DEFAULT_SHUTDOWN_TIMEOUT_MILLIS', 'DEFAULT_TELEMETRY_MODE', 'SessionTelemetryMode',
+  ],
+  '@hackdevcode/dsh-session-title': [
+    'SessionTitleProviderId', 'fallbackSessionTitle', 'foldSessionTitle', 'normalizeSessionTitle',
+    'titleProjectionDefinition', 'truncateTitleUtf8',
+  ],
+  '@hackdevcode/dsh-settings': ['redactSecrets'],
+  '@hackdevcode/dsh-skill': [
+    'BUNDLED_SKILL_RANK', 'escapeText', 'isModelInvocable', 'isSkillName', 'isUserInvocable', 'renderSkillContent',
+  ],
+  '@hackdevcode/dsh-skill-filesystem': ['FileSystemSkillProvider'],
+  '@hackdevcode/dsh-spill-local': [
+    'DEFAULT_ROOT_PREFIX', 'discoverDefaultRoots', 'encodeSegment', 'isErrno', 'privateRoot', 'saveTextFile',
+    'sessionDir', 'sweepSpillRoots',
+  ],
+  '@hackdevcode/dsh-storage': ['BackendRegistry', 'UNIT_NAME_RE', 'storageBackendServiceKey'],
+  '@hackdevcode/dsh-storage-domain': ['DomainFacility', 'defineDomain', 'descriptorOf', 'domainTable'],
+  '@hackdevcode/dsh-storage-json': ['JsonStorageBackend'],
+  '@hackdevcode/dsh-storage-sqlite': ['STORAGE_SQLITE_SCHEMA_VERSION', 'SqliteStorageBackend'],
+  '@hackdevcode/dsh-subagent': [
+    'AssistantOutputFold', 'NO_START_CAPABILITIES', 'ROOT_AGENT_NAME', 'STRUCTURED_OUTPUT_TOOL',
+    'SUBAGENT_DESCRIPTOR_VERSION', 'SubagentRunId', 'appendDelegatedPolicyOverrides', 'applyChildComposition',
+    'assertPositiveFinite', 'assertSubagentMaxDepth', 'assertUsableCwd', 'captureDelegatedPolicyOverrides',
+    'childSessionMeta', 'delegationDepthOf', 'finalAssistantOutput', 'foldSubagentDescriptor',
+    'parentAgentOptionsForDelegation', 'resolveChildAgentOptions', 'resolveChildDepth', 'settleRunResult',
+    'snapshotSubagentDescriptor', 'subprocessRunHandle',
+  ],
+  '@hackdevcode/dsh-system-prompt': [
+    'PERSONA_PREFIX_SECTION', 'PERSONA_SUFFIX_SECTION', 'TOOL_ORDER_REST', 'joinContextSections',
+    'renderContextSections', 'renderContextSnapshot', 'renderPrompt',
+  ],
+  '@hackdevcode/dsh-terminal': ['TerminalSessionId'],
+  '@hackdevcode/dsh-terminal-bash': ['BashTerminalBackend', 'PWSH_PROMPT_SETUP'],
+  '@hackdevcode/dsh-terminal-panel': ['GUIDANCE'],
+  '@hackdevcode/dsh-tool-call-timeout-policy': ['TOOL_TIMEOUT'],
+  '@hackdevcode/dsh-tool-executor-native': ['NativeToolExecutor'],
+  '@hackdevcode/dsh-tool-executor-ptc': ['PtcExecutor', 'jsonSchemaToTs', 'renderToolsSdk'],
+  '@hackdevcode/dsh-tool-fs-search': [
+    'GLOB_MAX_RESULTS', 'GLOB_VCS_EXCLUDES', 'GREP_MAX_LINE_BYTES', 'GREP_MAX_MATCHES', 'RAW_OUTPUT_MAX_BYTES',
+    'SEARCH_GRACE_MS', 'SEARCH_META_MAX_BYTES', 'SEARCH_STDERR_MAX_BYTES', 'SEARCH_TIMEOUT_MS', 'applyGlobTool',
+    'applyGrepTool', 'buildGlobCommand', 'buildGrepCommand', 'formatGlobOutput', 'formatGrepMatches',
+    'formatGrepOutput', 'parseGlobArgs', 'parseGrepArgs', 'parseGrepMatches', 'presentGlobCall', 'presentGlobResult',
+    'presentGrepCall', 'presentGrepResult', 'previewLine', 'resolveRgPath', 'runRipgrep', 'sampleAcrossTopLevel',
+    'toWorkdirRelative', 'trySaveFormattedResult',
+  ],
+  '@hackdevcode/dsh-tool-lsp': [
+    'DEFAULT_LSP_TOOL_TIMEOUT_MS', 'DEFAULT_MAX_LOCATIONS', 'DEFAULT_MAX_RESULT_CHARS', 'LSP_OPERATIONS',
+    'LSP_PROMPT_TEXT', 'formatHover', 'formatLocations', 'parseLspArgs', 'presentLspCall', 'renderUri',
+  ],
+  '@hackdevcode/dsh-tool-session-query': ['DEFAULT_MAX_SEARCH_RESULTS', 'DEFAULT_SEARCH_TIMEOUT_MS'],
+  '@hackdevcode/dsh-tool-terminal': ['DEFAULT_MAX_RESULT_BYTES', 'MIN_MAX_RESULT_BYTES'],
+  '@hackdevcode/dsh-tool-web': [
+    'DEFAULT_FETCH_MAX_OUTPUT_CHARS', 'DEFAULT_WEB_TOOL_TIMEOUT_MS', 'WEB_SEARCH_MAX_QUERIES', 'WEB_SEARCH_MAX_RESULTS',
+    'applyWebFetchTool', 'applyWebSearchTool', 'fetchMetaFromResult', 'fetchMetaFromValue', 'formatFetchOutput',
+    'formatSearchOutput', 'parseFetchArgs', 'presentFetchCall', 'presentFetchResult', 'presentSearchCall',
+    'presentSearchResult', 'searchMetaFromResult', 'searchMetaFromValue',
+  ],
+  '@hackdevcode/dsh-tool-workspace-dependencies': [
+    'copyPrimaryRuntime', 'installPrimaryRuntime', 'parsePrimaryRuntime', 'primaryRuntimePythonAliases',
+    'readPrimaryRuntime', 'resolvePrimaryRuntime', 'workspaceDependencyPaths',
+  ],
+  '@hackdevcode/dsh-tools': [
+    'RUN_CODE_NAME', 'TOOL_ABORTED', 'TOOL_ABORTED_BEFORE_DISPATCH', 'assertObjectJsonSchema',
+    'assertSupportedJsonSchema', 'defineTool', 'isJsonSchemaRecord', 'isPlainJsonArray', 'isPlainJsonRecord',
+    'parameterSchemaSpecToJsonSchema', 'projectToolSchema', 'validateArgs', 'validateJsonSchemaValue',
+    'valueSchemaSpecToJsonSchema',
+  ],
+  '@hackdevcode/dsh-typert-loader': ['TYPERT_HOST_EXPORT', 'validateTypertManifest'],
+  '@hackdevcode/dsh-typert-registry': ['typertEndpoint', 'typertKey', 'typertPackageKey'],
+  '@hackdevcode/dsh-user-approval': ['APPROVAL_POLICIES', 'ApprovalRequestId', 'setApprovalPolicy'],
+  '@hackdevcode/dsh-user-questions': ['TIMED_WAIT_PARAMETER', 'isTimedAskUserQuestionSchema'],
+  '@hackdevcode/dsh-web-app': ['internals'],
+  '@hackdevcode/dsh-web-deepseek-api': [
+    'DEEPSEEK_DEFAULT_COUNT', 'DEEPSEEK_FETCH_API_PROVIDER_ID', 'DEEPSEEK_SEARCH_API_PROVIDER_ID',
+    'DEEPSEEK_SEARCH_REQUESTS_PER_SECOND', 'DEEPSEEK_WEB_API_BASE_URL', 'DeepSeekFetchApiProvider',
+    'DeepSeekSearchApiProvider', 'mapSearchResponse',
+  ],
+  '@hackdevcode/dsh-web-fetch-http': ['DEFAULT_USER_AGENT', 'HttpFetchProvider', 'LOCAL_FETCH_PROVIDER_ID'],
+  '@hackdevcode/dsh-web-search-deepseek': [
+    'DEEPSEEK_DEFAULT_API_VERSION', 'DEEPSEEK_DEFAULT_BASE_URL', 'DEEPSEEK_DEFAULT_MAX_TOKENS',
+    'DEEPSEEK_DEFAULT_MAX_USES', 'DEEPSEEK_DEFAULT_MODEL', 'DEEPSEEK_PROVIDER_ID', 'DeepSeekSearchProvider',
+    'WEB_SEARCH_DEEPSEEK_SETTINGS_NAMESPACE',
+  ],
+  '@hackdevcode/dsh-webhook': ['WebhookDeliveryId', 'WebhookRuleId', 'WebhookSourceId'],
+  '@hackdevcode/dsh-workflow-ptc': ['materializeFromRealm', 'validateMeta'],
+  '@hackdevcode/dsh-workspace': [
+    'WorkspaceId', 'realpathNormalize', 'workspaceDomainSpec', 'workspaceDomainState', 'workspaceRecord',
+  ],
+} as const satisfies Readonly<Record<string, readonly string[]>>

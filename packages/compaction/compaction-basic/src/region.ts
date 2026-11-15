@@ -7,15 +7,16 @@
 
 import { randomUUID } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
+import { brandString } from '@hackdevcode/dsh-brand'
+import type { CompactionId } from '@hackdevcode/dsh-compaction/types'
 import {
-  CompactionId,
   ManualCompactionError,
   compactCheckpointSource,
   toolPairingBalancedAfter,
   toolPairingBalancedBefore,
 } from '@hackdevcode/dsh-compaction'
 import type { CompactionResult } from '@hackdevcode/dsh-compaction'
-import type { CommandId } from '@hackdevcode/dsh-commands/brand'
+import type { CommandId } from '@hackdevcode/dsh-commands/types'
 import { createUserMessage, errorChain } from '@hackdevcode/dsh-llm'
 import type { Message, UserMessage } from '@hackdevcode/dsh-llm'
 import type { TokenMeasurement, TokenMeter } from '@hackdevcode/dsh-token-meter'
@@ -201,7 +202,7 @@ export async function compactSurfaceRegion(
     owner = entryState.openTurn
   }
 
-  const compactionId = CompactionId(randomUUID())
+  const compactionId = brandString<CompactionId>(randomUUID())
   const lifecycle = {
     compactionId,
     ...options.sourceCommandId === undefined ? {} : { sourceCommandId: options.sourceCommandId },

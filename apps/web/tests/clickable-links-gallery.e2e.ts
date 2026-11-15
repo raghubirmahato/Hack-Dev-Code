@@ -21,8 +21,9 @@ import { fileURLToPath } from 'node:url'
 import type { Browser, Page } from 'playwright'
 import { chromium } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it, onTestFailed } from 'vitest'
-import { ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@hackdevcode/dsh-llm'
-import { SESSION_FORMAT_VERSION, Session, SessionId } from '@hackdevcode/dsh-session'
+import { brandString } from '@hackdevcode/dsh-brand'
+import { type ToolCallId, createAssistantMessage, createToolResultMessage, createUserMessage } from '@hackdevcode/dsh-llm'
+import { SESSION_FORMAT_VERSION, Session, type SessionId } from '@hackdevcode/dsh-session'
 import type { JsonValue } from '@hackdevcode/dsh-util-values'
 import type {} from '@hackdevcode/dsh-session-title'
 import {
@@ -210,7 +211,7 @@ const CALLS: GalleryCall[] = [
  *   the tripwire stays clean; the varying origin is tokenized in the golden).
  */
 function galleryFixture(imageUrl: string): string {
-  const session = Session.create(SessionId('clickable-links-gallery-source'))
+  const session = Session.create(brandString<SessionId>('clickable-links-gallery-source'))
   session.append('turn/start', { turn: 1 })
   const user = session.append('user/message', createUserMessage({
     content: text('Assemble the link gallery: write the report and styles, inspect the sources, and summarize.'),
@@ -224,7 +225,7 @@ function galleryFixture(imageUrl: string): string {
   session.append('step/start', { turn: 1, step: 1 })
   const calls = CALLS.map((call, index) => ({
     ...call,
-    callId: ToolCallId(`gallery-${String(index)}`),
+    callId: brandString<ToolCallId>(`gallery-${String(index)}`),
     argsJson: JSON.stringify(call.args),
   }))
   session.append('assistant/message', {
@@ -536,7 +537,7 @@ describe('web e2e: clickable links gallery', () => {
     await markdown.locator(`a[href="${HTTP_URL}"]`).click()
     await expect.poll(() => browserAddress.inputValue()).toBe(HTTP_URL)
 
-    await openSettings(page)
+    await openSettings(page, 'en')
     await page.getByRole('button', { name: 'In-App Sidebar', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Default Browser', exact: true }).click()
     await expect.poll(() => scaffold.ctx.settings.describe().find(row => row.ns === 'ui-chat')?.value).toMatchObject({ linkOpening: 'new-tab' })
@@ -553,7 +554,7 @@ describe('web e2e: clickable links gallery', () => {
     }
 
     await page.reload()
-    await openSettings(page)
+    await openSettings(page, 'en')
     await page.getByRole('button', { name: 'Default Browser', exact: true }).click()
     await page.getByRole('menuitem', { name: 'In-App Sidebar', exact: true }).click()
     await expect.poll(() => scaffold.ctx.settings.describe().find(row => row.ns === 'ui-chat')?.value).toMatchObject({ linkOpening: 'sidebar' })

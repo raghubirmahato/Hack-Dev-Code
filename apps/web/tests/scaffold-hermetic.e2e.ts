@@ -3,9 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it } from 'vitest'
 import type {} from '@hackdevcode/dsh-skill'
-import { SessionId } from '@hackdevcode/dsh-session'
+import type { SessionId } from '@hackdevcode/dsh-session'
 import type {} from '@hackdevcode/dsh-agent-preset-registry'
 import { launchWebScaffold, type WebScaffold } from './scaffold.ts'
+import { brandString } from '@hackdevcode/dsh-brand'
 
 async function writeSkill(root: string, name: string): Promise<void> {
   const bundle = join(root, name)
@@ -45,7 +46,7 @@ it('isolates replay skill discovery from every ambient host root', async () => {
     // agent's view — the same scope the `skills/list` Remote resolves for a
     // browser request about a session.
     const handle = await ctx.agents.create({
-      sessionId: SessionId('hermetic-skills'),
+      sessionId: brandString<SessionId>('hermetic-skills'),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx).then(() => undefined),
     })
     try {
