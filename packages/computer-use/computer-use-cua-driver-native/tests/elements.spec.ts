@@ -204,7 +204,20 @@ describe('desktop_element', () => {
     const type = fakeDesktop({ act: 'TYPE 300 400' })
     await mount(type.backend)
     expect((await call('desktop_element', { action: 'set_value', index: 2, value: 'a.txt' })).isError).toBe(false)
-    expect(type.actions).toEqual(['act 10 [2] set_value a.txt', 'pointer 300,400 left x1', 'keys ctrl+a', 'type a.txt'])
+    // Focusing through accessibility did not take here, so the field is clicked.
+    expect(type.actions).toEqual(['act 10 [2] set_value a.txt', 'act 10 [2] focus', 'pointer 300,400 left x1', 'keys ctrl+a', 'type a.txt'])
+  })
+
+  it('focuses a field through accessibility instead of clicking it when it takes no direct value', async () => {
+    const field = fakeDesktop({ act: 'TYPE 300 400' })
+    field.backend.elementAction = async (handle, index, action, value) => {
+      field.actions.push(`act ${String(handle)} [${String(index)}] ${action}${value === undefined ? '' : ` ${value}`}`)
+      return action === 'focus' ? 'Edit "Your name" @(300,400) (focused)' : 'TYPE 300 400'
+    }
+    await mount(field.backend)
+    const result = await call('desktop_element', { action: 'set_value', index: 2, value: 'Ada' })
+    expect(result.text).toContain('takes no direct value, so it was focused, its text selected and \\"Ada\\" typed')
+    expect(field.actions).toEqual(['act 10 [2] set_value Ada', 'act 10 [2] focus', 'keys ctrl+a', 'type Ada'])
   })
 
   it('clicks text recognized on screen when a window exposes no matching control', async () => {

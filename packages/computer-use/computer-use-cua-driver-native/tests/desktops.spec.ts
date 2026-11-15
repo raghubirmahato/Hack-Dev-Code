@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { applyX11Geometry, LAUNCH_SCRIPT, launchWords, linuxBackend, parsePsNames, X11_APP_ENV, X11_GEOMETRY } from '../src/displays.ts'
+import { accessibleLaunch, ACCESSIBLE_APP_ENV, applyX11Geometry, LAUNCH_SCRIPT, launchWords, linuxBackend, parsePsNames, X11_APP_ENV, X11_GEOMETRY } from '../src/displays.ts'
 import { parseKeys } from '../src/keys.ts'
 import type { CommandRunner } from '../src/displays.ts'
 import { gvariantString, parseKdotoolGeometry, parseWindowCalls } from '../src/wayland.ts'
+import { PORTAL_PROMPT } from '../src/atspi.ts'
 
 describe('GNOME Shell through the Window Calls extension', () => {
   it('unwraps the GVariant string gdbus prints', () => {
@@ -97,19 +98,26 @@ describe('KWin through kdotool', () => {
 
 describe('GNOME on Wayland without the extension or ydotoold', () => {
   /** A GNOME Wayland session with XWayland, one X11 Mousepad window, and ydotoold stopped or running. */
-  function session(daemon: boolean, covered = { pointer: false, keyboard: false }): { run: CommandRunner; sent: string[] } {
+  function session(
+    daemon: boolean, covered = { pointer: false, keyboard: false, popup: false }, portal = { prompt: 'NONE', afterInput: 'NONE' },
+  ): { run: CommandRunner; sent: string[] } {
     const sent: string[] = []
     const run: CommandRunner = async (file, args) => {
       if (file === 'sh' && String(args[1]).startsWith('pgrep -x ydotoold')) return daemon ? 'yes\n' : ''
       if (file === 'sh' && args[1] === 'command -v "$1" >/dev/null 2>&1 && echo yes') return args[3] === 'xdotool' ? 'yes\n' : ''
       if (file === 'gdbus') throw new Error('GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod')
+      // GNOME's consent prompt: showing from the start, or appearing once input has been sent.
+      if (file === 'python3' && args[1] === PORTAL_PROMPT) return sent.some(line => line.startsWith('xdotool mousemove_relative')) ? portal.afterInput : portal.prompt
+      if (file === 'sh' && String(args[1]).startsWith('ps -o args= -C Xwayland')) return 'yes\n'
       // As measured on Kali: the content at (80, 118) under a 38-pixel title bar, while wmctrl says (105, 181).
       if (file === 'sh' && args[1] === X11_GEOMETRY) return '0x2a00004 80 118 0 0 38 0\n'
       if (file === 'ps') return ' 4100 mousepad\n'
       if (file === 'wmctrl' && args[0] === '-lpG') return '0x02a00004  0 4100   105 181  700 480  kali  Untitled 1 - Mousepad\n'
       if (file === 'xprop') return '_NET_CLIENT_LIST_STACKING: window id # 0x2a00004\n'
       // The shell (GNOME's placeholder window) has the keyboard, or Mousepad does.
-      if (file === 'xdotool' && args[0] === 'getactivewindow') return String(covered.keyboard ? 0x400003 : 0x2a00004)
+      if (file === 'xdotool' && args[0] === 'getactivewindow') return String(covered.popup ? 0x2a00099 : covered.keyboard ? 0x400003 : 0x2a00004)
+      // Mousepad's own popup belongs to its process; GNOME's placeholder window to none of the listed ones.
+      if (file === 'xdotool' && args[0] === 'getwindowpid') return args[1] === String(0x2a00099) ? '4100\n' : ''
       // X reports the root window under the pointer where a native Wayland window covers the point.
       if (file === 'xwininfo') return 'xwininfo: Window id: 0x2e9 (the root window) (has no name)\n'
       if (file === 'xdotool' && args[0] === 'getmouselocation') return `X=100\nY=120\nSCREEN=0\nWINDOW=${String(covered.pointer ? 0x2e9 : 0x2a00002)}\n`
@@ -132,7 +140,10 @@ describe('GNOME on Wayland without the extension or ydotoold', () => {
     // A move asks for the outer size, title bar included; wmctrl sets the content size.
     await backend.place(0x2a00004, 80, 80, 700, 480)
     expect(sent).toEqual([
-      `sh mousepad --disable-server ${X11_APP_ENV.join(' ')}`,
+      `sh mousepad --disable-server ${[...X11_APP_ENV, ...ACCESSIBLE_APP_ENV].join(' ')}`,
+      // The first input after a quiet spell is preceded by the nudge that would make GNOME ask for consent.
+      'xdotool mousemove_relative -- 1 0',
+      'xdotool mousemove_relative -- -1 0',
       'xdotool key --clearmodifiers ctrl+s',
       'xdotool mousemove --sync 100 120',
       'xdotool click --repeat 1 1',
@@ -142,12 +153,12 @@ describe('GNOME on Wayland without the extension or ydotoold', () => {
   })
 
   it('presses nothing where a window X cannot see covers the point, and types nothing while the shell has the keyboard', async () => {
-    const pointer = session(false, { pointer: true, keyboard: false })
+    const pointer = session(false, { pointer: true, keyboard: false, popup: false })
     const covered = linuxBackend(pointer.run, env)
     await expect(covered.pointer(100, 120, 'left', 1)).rejects.toThrow('at (100, 120) a window these tools cannot see is on top')
     await expect(covered.drag(100, 120, 300, 120, 'left')).rejects.toThrow('the pointer moved there but nothing was pressed')
-    expect(pointer.sent).toEqual(['xdotool mousemove --sync 100 120', 'xdotool mousemove --sync 300 120'])
-    const keyboard = session(false, { pointer: false, keyboard: true })
+    expect(pointer.sent).toEqual(['xdotool mousemove_relative -- 1 0', 'xdotool mousemove_relative -- -1 0', 'xdotool mousemove --sync 100 120', 'xdotool mousemove --sync 300 120'])
+    const keyboard = session(false, { pointer: false, keyboard: true, popup: false })
     const elsewhere = linuxBackend(keyboard.run, env)
     await expect(elsewhere.keys(parseKeys('ctrl+a'))).rejects.toThrow('the keyboard is with a window these tools cannot reach')
     await expect(elsewhere.type('secret', false)).rejects.toThrow('nothing was typed')
@@ -162,11 +173,39 @@ describe('GNOME on Wayland without the extension or ydotoold', () => {
     expect(sent).toEqual(['ydotool key 29:1 31:1 31:0 29:0'])
   })
 
+  it('types into an app\'s own popup, which the window list leaves out', async () => {
+    const popup = session(false, { pointer: false, keyboard: false, popup: true })
+    const backend = linuxBackend(popup.run, env)
+    await backend.keys(parseKeys('ctrl+a'))
+    expect(popup.sent).toContain('xdotool key --clearmodifiers ctrl+a')
+  })
+
+  it('sends nothing while GNOME is asking for consent, and reports input that made it ask', async () => {
+    const asking = session(false, { pointer: false, keyboard: false, popup: false }, { prompt: 'PROMPT Remote desktop', afterInput: 'PROMPT Remote desktop' })
+    const held = linuxBackend(asking.run, env)
+    await expect(held.keys(parseKeys('ctrl+s'))).rejects.toThrow('GNOME is asking the person to allow remote interaction ("Remote desktop"); until they answer')
+    await expect(held.type('secret', false)).rejects.toThrow('so nothing was pressed or typed')
+    expect(asking.sent).toEqual([])
+    // After a quiet spell a one-pixel nudge goes first; when that makes GNOME ask, the real key is never sent.
+    const first = session(false, { pointer: false, keyboard: false, popup: false }, { prompt: 'NONE', afterInput: 'PROMPT Remote desktop' })
+    const now = linuxBackend(first.run, env)
+    await expect(now.keys(parseKeys('ctrl+s'))).rejects.toThrow('GNOME is asking the person to allow remote interaction ("Remote desktop")')
+    expect(first.sent).toEqual(['xdotool mousemove_relative -- 1 0', 'xdotool mousemove_relative -- -1 0'])
+    expect(await now.inputHint?.()).toContain('the input is held until they answer and then delivered to whatever window has focus')
+  })
+
+  it('explains that GNOME may hold input back until the person allows it', async () => {
+    const backend = linuxBackend(session(false).run, env)
+    expect(await backend.inputHint?.()).toContain('holds simulated keys and clicks until the person allows remote interaction in a prompt on the screen')
+    const x11 = linuxBackend(async () => '', { XDG_SESSION_TYPE: 'x11', DISPLAY: ':0' })
+    expect(await x11.inputHint?.()).toBeUndefined()
+  })
+
   it('starts apps natively where the compositor lists them, and on X11', async () => {
     const x11: string[] = []
     const backend = linuxBackend(async (file, args) => { x11.push(`${file} ${args.slice(3).join(' ')}`); return '' }, { XDG_SESSION_TYPE: 'x11', DISPLAY: ':0' })
     expect(await backend.launch('gedit')).toBe('Started gedit')
-    expect(x11).toEqual(['sh gedit'])
+    expect(x11).toEqual([`sh gedit ${ACCESSIBLE_APP_ENV.join(' ')}`])
     expect(LAUNCH_SCRIPT).toContain('set -f')
   })
 })
@@ -195,5 +234,31 @@ describe('naming apps on Linux', () => {
     expect(launchWords('mousepad --disable-server')).toEqual(['mousepad'])
     expect(launchWords('/usr/bin/gnome-text-editor /tmp/notes.txt')).toEqual(['gnome', 'text', 'editor'])
     expect(launchWords('Visual Studio Code')).toEqual(['visual', 'studio', 'code'])
+  })
+})
+
+describe('readable apps', () => {
+  it('asks Chromium-based browsers for their web page contents, once', () => {
+    expect(accessibleLaunch('google-chrome --user-data-dir=/tmp/x')).toBe('google-chrome --user-data-dir=/tmp/x --force-renderer-accessibility')
+    expect(accessibleLaunch('/usr/bin/chromium')).toBe('/usr/bin/chromium --force-renderer-accessibility')
+    expect(accessibleLaunch('brave-browser --force-renderer-accessibility')).toBe('brave-browser --force-renderer-accessibility')
+    expect(accessibleLaunch('mousepad')).toBe('mousepad')
+    expect(accessibleLaunch('google-chrome-sandbox')).toBe('google-chrome-sandbox')
+  })
+})
+
+describe('listing windows while they change', () => {
+  it('reads the list again when a window closes while wmctrl reads it', async () => {
+    let reads = 0
+    const backend = linuxBackend(async (file, args) => {
+      if (file === 'wmctrl' && args[0] === '-lpG') {
+        reads++
+        if (reads === 1) throw new Error('X Error of failed request:  BadWindow (invalid Window parameter)')
+        return '0x01400007  0 42     0    0    800  600  host Report\n'
+      }
+      return ''
+    }, { XDG_SESSION_TYPE: 'x11', DISPLAY: ':0' })
+    expect((await backend.windows()).map(window => window.title)).toEqual(['Report'])
+    expect(reads).toBe(2)
   })
 })

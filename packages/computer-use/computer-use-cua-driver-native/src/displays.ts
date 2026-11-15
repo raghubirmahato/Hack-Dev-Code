@@ -18,7 +18,7 @@ import { defineTool } from '@hackdevcode/dsh-tools'
 import { parseKeys } from './keys.ts'
 import type { Chord } from './keys.ts'
 import { checkedExpectation, describeExpectation, waitForChange, waitForStable } from './verify.ts'
-import { ATSPI_HELPERS, atspiArgs } from './atspi.ts'
+import { ATSPI_HELPERS, atspiArgs, PORTAL_PROMPT } from './atspi.ts'
 import { formatSetup, LINUX_PROBE, linuxSetup, parseProbe, WINDOWS_PROBE, windowsSetup } from './setup.ts'
 import type { SetupReport } from './setup.ts'
 import type { CheckedExpectation, Expectation } from './verify.ts'
@@ -154,6 +154,11 @@ export interface DisplayBackend {
   windowAt?(x: number, y: number): Promise<number | undefined>
   /** Which desktop features work in this session and what is missing for the rest. */
   setup?(): Promise<SetupReport>
+  /**
+   * Why sent input may not have arrived, where the desktop can hold it back (GNOME's remote interaction permission),
+   * or undefined.
+   */
+  inputHint?(): Promise<string | undefined>
   /** Stop helper processes. */
   close(): void
 }
@@ -1377,8 +1382,33 @@ export function linuxDragArgs(fromX: number, fromY: number, toX: number, toY: nu
 export const LAUNCH_SCRIPT = 'app="$1"; shift; vars="$*"; set -f; set -- $app; '
   + 'if command -v "$1" >/dev/null 2>&1; then env $vars setsid -f "$@" >/dev/null 2>&1; else env $vars gtk-launch "$app"; fi'
 
-/** Settings that make GTK, Qt, SDL, Firefox and Electron apps open as X11 apps under XWayland. */
-export const X11_APP_ENV: readonly string[] = ['GDK_BACKEND=x11', 'QT_QPA_PLATFORM=xcb', 'SDL_VIDEODRIVER=x11', 'MOZ_ENABLE_WAYLAND=0', 'ELECTRON_OZONE_PLATFORM_HINT=x11']
+/**
+ * Settings that make apps open as X11 apps under XWayland: GTK, Qt, SDL and Firefox through their own switches, and
+ * Chromium-based browsers and Electron apps, which follow the session, by hiding the Wayland display from them.
+ */
+export const X11_APP_ENV: readonly string[] = [
+  '-u', 'WAYLAND_DISPLAY', 'XDG_SESSION_TYPE=x11', 'GDK_BACKEND=x11', 'QT_QPA_PLATFORM=xcb', 'SDL_VIDEODRIVER=x11', 'MOZ_ENABLE_WAYLAND=0',
+  'ELECTRON_OZONE_PLATFORM_HINT=x11',
+]
+
+/** Settings that make Chromium-based and Qt apps expose their controls through AT-SPI, which they skip unless asked. */
+export const ACCESSIBLE_APP_ENV: readonly string[] = ['ACCESSIBILITY_ENABLED=1', 'QT_ACCESSIBILITY=1']
+
+/** Chromium-based browsers, which expose web page contents to AT-SPI only with --force-renderer-accessibility. */
+const CHROMIUM_BROWSERS = new RegExp(`^(?:${[
+  'google-chrome(?:-stable|-beta|-unstable)?', 'chromium(?:-browser)?', 'brave(?:-browser)?', 'microsoft-edge(?:-stable|-beta|-dev)?',
+  'vivaldi(?:-stable)?', 'opera',
+].join('|')})$`, 'u')
+
+/**
+ * The launch command with what makes its windows readable: Chromium-based browsers get --force-renderer-accessibility.
+ * @param command - the command as asked for.
+ * @returns the command to run.
+ */
+export function accessibleLaunch(command: string): string {
+  const program = command.trim().split(/\s+/u)[0]?.split('/').at(-1) ?? ''
+  return CHROMIUM_BROWSERS.test(program) && !command.includes('--force-renderer-accessibility') ? `${command.trim()} --force-renderer-accessibility` : command.trim()
+}
 
 /** Shell script that pastes $1 through the clipboard and restores the earlier clipboard text; prints PASTED. */
 export const LINUX_PASTE = 'command -v xclip >/dev/null 2>&1 || exit 3; '
@@ -1548,6 +1578,46 @@ export function linuxBackend(
    */
   const throughXWayland = async (): Promise<boolean> => wayland && await useXdotool()
   let rootWindow: Promise<number> | undefined
+  /** Whether XWayland passes simulated input through the remote desktop permission (-enable-ei-portal). */
+  let gated: Promise<boolean> | undefined
+  const isGated = async (): Promise<boolean> => {
+    if (!await throughXWayland()) return false
+    gated ??= run('sh', ['-c', 'ps -o args= -C Xwayland 2>/dev/null | grep -q enable-ei-portal && echo yes']).then(out => out.trim() === 'yes', () => false)
+    return gated
+  }
+  /** The title of a prompt the desktop portal is showing, or undefined. */
+  const portalPrompt = async (): Promise<string | undefined> => {
+    const out = await run('python3', ['-c', PORTAL_PROMPT], 5000).catch(() => 'NONE')
+    const line = out.split(/\r?\n/u).find(row => row.startsWith('PROMPT '))
+    return line?.slice('PROMPT '.length).trim()
+  }
+  /** When simulated input was last sent, to tell the first input after a quiet spell. */
+  let lastInput = 0
+  /**
+   * Run one input step where GNOME may hold simulated input for the person's consent. GNOME asks when input first
+   * arrives after its permission lapsed, then holds that input and delivers it, once allowed, to whatever window has
+   * focus by then. So nothing is sent while its prompt shows, and after a quiet spell a one-pixel pointer nudge goes
+   * first: if that makes GNOME ask, only the nudge is held and the real input is not sent.
+   */
+  const consented = async <T>(send: () => Promise<T>): Promise<T> => {
+    if (!await isGated()) return send()
+    const refuse = (prompt: string): Error => new Error(`GNOME is asking the person to allow remote interaction ("${prompt}"); until they answer, simulated keys and clicks are held and delivered later to whatever window has focus then, so nothing was pressed or typed. Ask them to answer it (denying discards what is held), then continue.`)
+    const asking = await portalPrompt()
+    if (asking !== undefined) throw refuse(asking)
+    if (Date.now() - lastInput > CONSENT_QUIET_MS) {
+      await run('xdotool', ['mousemove_relative', '--', '1', '0']).catch(() => '')
+      await run('xdotool', ['mousemove_relative', '--', '-1', '0']).catch(() => '')
+      lastInput = Date.now()
+      await new Promise(resolve => setTimeout(resolve, CONSENT_SETTLE_MS))
+      const asked = await portalPrompt()
+      if (asked !== undefined) throw refuse(asked)
+    }
+    try {
+      return await send()
+    } finally {
+      lastInput = Date.now()
+    }
+  }
   /**
    * Move the pointer, then make sure an X11 window is under it: X reports the root window where a native Wayland
    * window (or the shell's panel) covers the point, and a press there would land in that window instead.
@@ -1570,9 +1640,13 @@ export function linuxBackend(
   const keyboardAtX11 = async (): Promise<void> => {
     if (!await throughXWayland()) return
     const active = Number((await run('xdotool', ['getactivewindow']).catch(() => '')).trim())
-    if (!(await windows()).some(window => window.handle === active)) {
-      throw new Error('the keyboard is with a window these tools cannot reach (a native Wayland app or the shell), so nothing was typed; bring one of the listed windows to the front first')
-    }
+    const listed = await windows()
+    if (listed.some(window => window.handle === active)) return
+    // An app's popups and bubbles (a browser's sign-in bubble, a menu) are X11 windows of its own that the window list
+    // leaves out: they count when they belong to the process of a listed window.
+    const owner = Number.isFinite(active) && active > 0 ? Number((await run('xdotool', ['getwindowpid', String(active)]).catch(() => '')).trim()) : 0
+    if (owner > 0 && listed.some(window => window.pid === owner)) return
+    throw new Error('the keyboard is with a window these tools cannot reach (a native Wayland app or the shell), so nothing was typed; bring one of the listed windows to the front first')
   }
   /** Run xdotool with its arguments when input goes through it, else ydotool with the other set. */
   const tool = async (ydotool: readonly string[], xdotool: readonly string[], signal?: AbortSignal, timeoutMs?: number): Promise<string> =>
@@ -1596,7 +1670,18 @@ export function linuxBackend(
       }
     }
     const active = await run('xdotool', ['getactivewindow']).then(out => Number(out.trim()), () => undefined)
-    const listed = parseWmctrl(await helper('wmctrl', ['-lpG']), active)
+    // A window that closes while wmctrl reads the list makes it fail with BadWindow: read the list again.
+    let listing = ''
+    for (let attempt = 1; ; attempt++) {
+      try {
+        listing = await helper('wmctrl', ['-lpG'])
+        break
+      } catch (error) {
+        if (attempt >= 3 || !/BadWindow/u.test(String(error instanceof Error ? error.message : error))) throw error
+        await new Promise(resolve => setTimeout(resolve, 100))
+      }
+    }
+    const listed = parseWmctrl(listing, active)
     if (listed.length === 0) return listed
     // wmctrl's positions are off under reparenting window managers; xwininfo and the frame extents give the real ones.
     const geometry = await run('sh', ['-c', X11_GEOMETRY, 'sh', ...listed.map(window => hex(window.handle))]).catch(() => '')
@@ -1651,105 +1736,119 @@ export function linuxBackend(
       return { width: Math.round((area?.width ?? 0) * scale), height: Math.round((area?.height ?? 0) * scale), scale }
     },
     async pointer(x, y, button, count, modifiers, signal) {
-      if (!await useXdotool()) {
-        if (button !== 'none' && modifiers !== undefined) await helper('ydotool', ydotoolHoldArgs(modifiers.x11, true), signal)
-        try {
-          await ydoMove(x, y, signal)
-          if (button !== 'none') {
-            await helper('ydotool', ['click', '--repeat', String(count), '--next-delay', '60', ydotoolClickCode(button, 'click')], signal)
+      await consented(async () => {
+        if (!await useXdotool()) {
+          if (button !== 'none' && modifiers !== undefined) await helper('ydotool', ydotoolHoldArgs(modifiers.x11, true), signal)
+          try {
+            await ydoMove(x, y, signal)
+            if (button !== 'none') {
+              await helper('ydotool', ['click', '--repeat', String(count), '--next-delay', '60', ydotoolClickCode(button, 'click')], signal)
+            }
+          } finally {
+            if (button !== 'none' && modifiers !== undefined) await helper('ydotool', ydotoolHoldArgs(modifiers.x11, false))
           }
-        } finally {
-          if (button !== 'none' && modifiers !== undefined) await helper('ydotool', ydotoolHoldArgs(modifiers.x11, false))
+          return
         }
-        return
-      }
-      const held = button === 'none' || modifiers === undefined ? [] : modifiers.x11.split('+')
-      const press = button === 'none' ? [] : [
-        ...held.flatMap(key => ['keydown', key]),
-        'click', '--repeat', String(count), X11_BUTTONS[button],
-        ...held.toReversed().flatMap(key => ['keyup', key]),
-      ]
-      if (await throughXWayland()) {
-        await pointAtX11(x, y, signal)
-        if (press.length > 0) await helper('xdotool', press, signal)
-        return
-      }
-      await helper('xdotool', ['mousemove', '--sync', int(x), int(y), ...press], signal)
+        const held = button === 'none' || modifiers === undefined ? [] : modifiers.x11.split('+')
+        const press = button === 'none' ? [] : [
+          ...held.flatMap(key => ['keydown', key]),
+          'click', '--repeat', String(count), X11_BUTTONS[button],
+          ...held.toReversed().flatMap(key => ['keyup', key]),
+        ]
+        if (await throughXWayland()) {
+          await pointAtX11(x, y, signal)
+          if (press.length > 0) await helper('xdotool', press, signal)
+          return
+        }
+        await helper('xdotool', ['mousemove', '--sync', int(x), int(y), ...press], signal)
+      })
     },
     async drag(fromX, fromY, toX, toY, button, signal) {
-      if (await useXdotool()) {
-        if (await throughXWayland()) {
-          await pointAtX11(toX, toY, signal)
-          await pointAtX11(fromX, fromY, signal)
+      await consented(async () => {
+        if (await useXdotool()) {
+          if (await throughXWayland()) {
+            await pointAtX11(toX, toY, signal)
+            await pointAtX11(fromX, fromY, signal)
+          }
+          await helper('xdotool', linuxDragArgs(fromX, fromY, toX, toY, X11_BUTTONS[button]), signal)
+          return
         }
-        await helper('xdotool', linuxDragArgs(fromX, fromY, toX, toY, X11_BUTTONS[button]), signal)
-        return
-      }
-      await ydoMove(fromX, fromY, signal)
-      await helper('ydotool', ['click', ydotoolClickCode(button, 'down')], signal)
-      try {
-        const steps = Math.max(8, Math.min(40, Math.round((Math.abs(toX - fromX) + Math.abs(toY - fromY)) / 25)))
-        for (let step = 1; step <= steps; step++) {
-          await helper('ydotool', ydotoolMoveArgs(fromX + (toX - fromX) * step / steps, fromY + (toY - fromY) * step / steps))
+        await ydoMove(fromX, fromY, signal)
+        await helper('ydotool', ['click', ydotoolClickCode(button, 'down')], signal)
+        try {
+          const steps = Math.max(8, Math.min(40, Math.round((Math.abs(toX - fromX) + Math.abs(toY - fromY)) / 25)))
+          for (let step = 1; step <= steps; step++) {
+            await helper('ydotool', ydotoolMoveArgs(fromX + (toX - fromX) * step / steps, fromY + (toY - fromY) * step / steps))
+          }
+        } finally {
+          await helper('ydotool', ['click', ydotoolClickCode(button, 'up')])
         }
-      } finally {
-        await helper('ydotool', ['click', ydotoolClickCode(button, 'up')])
-      }
+      })
     },
     async scroll(x, y, clicks, horizontal, signal) {
-      if (await useXdotool()) {
-        const wheel = horizontal ? (clicks > 0 ? '7' : '6') : (clicks > 0 ? '4' : '5')
-        if (await throughXWayland()) await pointAtX11(x, y, signal)
-        await helper('xdotool', ['mousemove', '--sync', int(x), int(y), 'click', '--repeat', String(Math.abs(Math.round(clicks))), wheel], signal)
-        return
-      }
-      await ydoMove(x, y, signal)
-      // ydotool wheel steps: positive y scrolls up, so a downward scroll (positive clicks) is negative.
-      const amount = String(-Math.round(clicks))
-      await helper('ydotool', ['mousemove', '--wheel', '-x', horizontal ? String(Math.round(clicks)) : '0', '-y', horizontal ? '0' : amount], signal)
+      await consented(async () => {
+        if (await useXdotool()) {
+          const wheel = horizontal ? (clicks > 0 ? '7' : '6') : (clicks > 0 ? '4' : '5')
+          if (await throughXWayland()) await pointAtX11(x, y, signal)
+          await helper('xdotool', ['mousemove', '--sync', int(x), int(y), 'click', '--repeat', String(Math.abs(Math.round(clicks))), wheel], signal)
+          return
+        }
+        await ydoMove(x, y, signal)
+        // ydotool wheel steps: positive y scrolls up, so a downward scroll (positive clicks) is negative.
+        const amount = String(-Math.round(clicks))
+        await helper('ydotool', ['mousemove', '--wheel', '-x', horizontal ? String(Math.round(clicks)) : '0', '-y', horizontal ? '0' : amount], signal)
+      })
     },
     async keys(chords, signal) {
       await keyboardAtX11()
-      await tool(ydotoolKeyArgs(chords.map(chord => chord.x11)), ['key', '--clearmodifiers', ...chords.map(chord => chord.x11)], signal)
+      await consented(async () => {
+        await tool(ydotoolKeyArgs(chords.map(chord => chord.x11)), ['key', '--clearmodifiers', ...chords.map(chord => chord.x11)], signal)
+      })
     },
     async pressButton(x, y, pressed, down, signal) {
-      if (!await useXdotool()) {
-        if (x !== undefined && y !== undefined) await ydoMove(x, y, signal)
-        await helper('ydotool', ['click', ydotoolClickCode(pressed, down ? 'down' : 'up')], signal)
-        return
-      }
-      if (down && x !== undefined && y !== undefined && await throughXWayland()) {
-        await pointAtX11(x, y, signal)
-        await helper('xdotool', ['mousedown', X11_BUTTONS[pressed]], signal)
-        return
-      }
-      const move = x === undefined || y === undefined ? [] : ['mousemove', '--sync', int(x), int(y)]
-      await helper('xdotool', [...move, down ? 'mousedown' : 'mouseup', X11_BUTTONS[pressed]], signal)
+      await consented(async () => {
+        if (!await useXdotool()) {
+          if (x !== undefined && y !== undefined) await ydoMove(x, y, signal)
+          await helper('ydotool', ['click', ydotoolClickCode(pressed, down ? 'down' : 'up')], signal)
+          return
+        }
+        if (down && x !== undefined && y !== undefined && await throughXWayland()) {
+          await pointAtX11(x, y, signal)
+          await helper('xdotool', ['mousedown', X11_BUTTONS[pressed]], signal)
+          return
+        }
+        const move = x === undefined || y === undefined ? [] : ['mousemove', '--sync', int(x), int(y)]
+        await helper('xdotool', [...move, down ? 'mousedown' : 'mouseup', X11_BUTTONS[pressed]], signal)
+      })
     },
     async holdKeys(chord, down, signal) {
       // Releasing is always sent; only pressing has to reach an X11 window.
       if (down) await keyboardAtX11()
-      await tool(ydotoolHoldArgs(chord.x11, down), [down ? 'keydown' : 'keyup', chord.x11], signal)
+      await consented(async () => {
+        await tool(ydotoolHoldArgs(chord.x11, down), [down ? 'keydown' : 'keyup', chord.x11], signal)
+      })
     },
     async type(text, paste, signal) {
       await keyboardAtX11()
-      // Long text goes through the clipboard (wl-clipboard on Wayland, xclip on X11), putting the earlier clipboard
-      // text back; without the clipboard tool it is typed.
-      if (paste === true) {
-        const script = await useXdotool() ? LINUX_PASTE : WAYLAND_PASTE
-        const pasted = await run('sh', ['-c', script, 'sh', text], 30_000).then(out => out.trim() === 'PASTED', () => false)
-        if (pasted) return
-      }
-      // Both tools wait 12 ms per character, so long text needs more than the default limit.
-      if (await useXdotool()) {
-        // xdotool types a newline as the Linefeed key, which single-line fields ignore: each one is pressed as Return.
-        for (const [index, part] of text.split(/\r?\n/u).entries()) {
-          if (index > 0) await helper('xdotool', ['key', '--clearmodifiers', 'Return'], signal)
-          if (part.length > 0) await helper('xdotool', ['type', '--clearmodifiers', '--delay', '12', '--', part], signal, 30_000 + part.length * 15)
+      await consented(async () => {
+        // Long text goes through the clipboard (wl-clipboard on Wayland, xclip on X11), putting the earlier clipboard
+        // text back; without the clipboard tool it is typed.
+        if (paste === true) {
+          const script = await useXdotool() ? LINUX_PASTE : WAYLAND_PASTE
+          const pasted = await run('sh', ['-c', script, 'sh', text], 30_000).then(out => out.trim() === 'PASTED', () => false)
+          if (pasted) return
         }
-        return
-      }
-      await helper('ydotool', ['type', '--key-delay', '12', '--', text], signal, 30_000 + text.length * 15)
+        // Both tools wait 12 ms per character, so long text needs more than the default limit.
+        if (await useXdotool()) {
+          // xdotool types a newline as the Linefeed key, which single-line fields ignore: each one is pressed as Return.
+          for (const [index, part] of text.split(/\r?\n/u).entries()) {
+            if (index > 0) await helper('xdotool', ['key', '--clearmodifiers', 'Return'], signal)
+            if (part.length > 0) await helper('xdotool', ['type', '--clearmodifiers', '--delay', '12', '--', part], signal, 30_000 + part.length * 15)
+          }
+          return
+        }
+        await helper('ydotool', ['type', '--key-delay', '12', '--', text], signal, 30_000 + text.length * 15)
+      })
     },
     windows,
     async windowAt(x, y) {
@@ -1834,7 +1933,7 @@ export function linuxBackend(
       // In a Wayland session that keeps its windows private, apps start as X11 apps under XWayland, so these tools can
       // list, read and operate them.
       const asX11 = wayland && (env['DISPLAY'] ?? '').length > 0 && await whichCompositor() === 'xwayland'
-      await run('sh', ['-c', LAUNCH_SCRIPT, 'sh', name, ...asX11 ? X11_APP_ENV : []]).catch((error: unknown) => {
+      await run('sh', ['-c', LAUNCH_SCRIPT, 'sh', accessibleLaunch(name), ...asX11 ? X11_APP_ENV : [], ...ACCESSIBLE_APP_ENV]).catch((error: unknown) => {
         throw new Error(`could not start "${name}": ${String(error instanceof Error ? error.message : error)}. Pass the command (with its arguments) or the .desktop id of the app`,
           { cause: error })
       })
@@ -1842,6 +1941,13 @@ export function linuxBackend(
     },
     async setup() {
       return linuxSetup(parseProbe(await run('sh', ['-c', LINUX_PROBE], 30_000)), env, wayland)
+    },
+    async inputHint() {
+      if (!await isGated()) return undefined
+      const asking = await portalPrompt()
+      return asking !== undefined
+        ? `GNOME is asking the person to allow remote interaction ("${asking}"); the input is held until they answer and then delivered to whatever window has focus. Ask them to answer it, then check the windows.`
+        : 'This GNOME desktop holds simulated keys and clicks until the person allows remote interaction in a prompt on the screen, and asks again after a while; if nothing reacts, ask them to check the screen.'
     },
     async captureWindow(path, window, maxDimension) {
       if (!await drawsX11(window)) return undefined
@@ -2426,7 +2532,8 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
         if (signal.aborted) throw miss
         misses.push(`attempt ${String(attempt + 1)}: ${miss instanceof Error ? miss.message : String(miss)}`)
         if (attempt >= expectation.retries) {
-          throw new Error(`${done}, but ${describeExpectation(expectation)} did not show (${misses.join('; ')}). The action was sent; check the window before repeating it.${await observe(true, signal)}`, { cause: miss })
+          const hint = await backend.inputHint?.().catch(() => undefined)
+          throw new Error(`${done}, but ${describeExpectation(expectation)} did not show (${misses.join('; ')}). The action was sent; check the window before repeating it.${hint === undefined ? '' : ` ${hint}`}${await observe(true, signal)}`, { cause: miss })
         }
       }
     }
@@ -3158,11 +3265,18 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     const x = Number(fallback[2])
     const y = Number(fallback[3])
     await front()
-    await backend.pointer(x, y, 'left', 1, undefined, signal)
-    if (fallback[1] === 'CLICK') return `[${String(index)}] does not support ${action}, so it was clicked at (${String(x)}, ${String(y)}) instead; check the result.`
+    if (fallback[1] === 'CLICK') {
+      await backend.pointer(x, y, 'left', 1, undefined, signal)
+      return `[${String(index)}] does not support ${action}, so it was clicked at (${String(x)}, ${String(y)}) instead; check the result.`
+    }
+    // Focus the field through accessibility first, which needs no pointer (a pointer can be refused where a window these
+    // tools cannot see covers the field); click it only when that does not take.
+    const focused = await backend.elementAction(window.handle, index, 'focus').then(line => /\(.*focused.*\)/u.test(line), () => false)
+    if (!focused) await backend.pointer(x, y, 'left', 1, undefined, signal)
     await backend.keys(parseKeys('ctrl+a'), signal)
     await backend.type(args.value ?? '', (args.value ?? '').length > PASTE_THRESHOLD, signal)
-    return `[${String(index)}] takes no direct value, so it was clicked at (${String(x)}, ${String(y)}), its text selected and "${(args.value ?? '').slice(0, 80)}" typed.`
+    const how = focused ? 'focused' : `clicked at (${String(x)}, ${String(y)})`
+    return `[${String(index)}] takes no direct value, so it was ${how}, its text selected and "${(args.value ?? '').slice(0, 80)}" typed.`
   }
 
   ctx.tools.register(defineTool({
@@ -3411,6 +3525,12 @@ export interface ElementArgs {
 
 /** How long a launch waits, once a new window appears, for the app to open its main window. */
 const LAUNCH_SETTLE_MS = 1200
+
+/** How long without input before the next input is checked for having made GNOME ask for consent. */
+const CONSENT_QUIET_MS = 20_000
+
+/** How long GNOME takes to show its consent prompt after the first input. */
+const CONSENT_SETTLE_MS = 400
 
 /** How long input waits for its window to come to the front before sending nothing. */
 const FOCUS_WAIT_MS = 2000

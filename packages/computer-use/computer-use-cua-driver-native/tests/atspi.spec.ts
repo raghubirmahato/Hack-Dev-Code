@@ -10,7 +10,7 @@ import * as NativeToolExecutor from '@hackdevcode/dsh-tool-executor-native'
 import ToolRuntime from '@hackdevcode/dsh-tools'
 import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import { ToolCallId } from '@hackdevcode/dsh-llm'
-import { atspiArgs } from '../src/atspi.ts'
+import { atspiArgs, PORTAL_PROMPT } from '../src/atspi.ts'
 import { linuxBackend, registerDisplayTools } from '../src/displays.ts'
 import type { CommandRunner } from '../src/displays.ts'
 
@@ -132,6 +132,28 @@ describe.skipIf(PYTHON === undefined)('AT-SPI controls script', () => {
       'select_child Colours 0',
       'grab_focus Profile name',
     ])
+  })
+
+  it('does not walk into a background tab\'s page, so the browser\'s own controls fit in the walk', async () => {
+    const shown = ['sensitive', 'showing']
+    const hiddenPage = Array.from({ length: 50 }, (_, index) => ({ name: `Hidden link ${String(index)}`, role: 'link', states: ['sensitive'] }))
+    writeFileSync(treeFile, JSON.stringify([{ pid: 80, children: [{ name: 'Browser', role: 'frame', states: shown, box: [0, 0, 800, 600], children: [
+      { name: 'Background tab', role: 'document web', states: ['sensitive'], children: hiddenPage },
+      { name: 'Work test', role: 'push button', states: shown, box: [700, 10, 40, 30] },
+    ] }] }]))
+    const found = (await python(atspiArgs('find', 80, 'Browser', 'hidden link', '', '', '15'))).trim()
+    expect(found).toBe('')
+    expect((await python(atspiArgs('find', 80, 'Browser', 'work test', 'Button', '', '15'))).trim()).toBe('=[2] Button "Work test" @(720,25)')
+  })
+
+  it('finds a consent prompt the desktop portal is showing', async () => {
+    writeFileSync(treeFile, JSON.stringify([
+      { pid: 70, name: 'xdg-desktop-portal-gnome', children: [{ name: 'Allow remote interaction', role: 'dialog', states: ['showing'] }] },
+      { pid: 71, name: 'mousepad', children: [{ name: 'Untitled 1 - Mousepad', role: 'frame', states: ['showing'] }] },
+    ]))
+    expect((await python(['-c', PORTAL_PROMPT])).trim()).toBe('PROMPT Allow remote interaction')
+    writeFileSync(treeFile, JSON.stringify([{ pid: 70, name: 'xdg-desktop-portal-gnome', children: [{ name: 'Hidden', role: 'dialog', states: [] }] }]))
+    expect((await python(['-c', PORTAL_PROMPT])).trim()).toBe('NONE')
   })
 
   it('gives no screen point for GTK 4 controls, which know positions inside their window only', async () => {

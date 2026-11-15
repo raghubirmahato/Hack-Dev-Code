@@ -13,7 +13,8 @@ export const ATSPI_HELPERS = 'sudo apt-get install -y python3-gi gir1.2-atspi-2.
  * window's process id, its title, then the mode's own: find takes name, role, accessible id and a limit; point takes
  * an index; act takes an index, an action and a value.
  *
- * Every mode walks the window's accessible tree in the same depth-first order (up to 2000 elements and 5 seconds)
+ * Every mode walks the window's accessible tree in the same depth-first order (up to 4000 elements and 8 seconds,
+ * not entering web pages that are not showing)
  * and numbers each useful element (one with a name, a value, or a control role) from 1, so the numbers of a read
  * stay valid for find, point and act while the window keeps the same controls. A process exists per call, so no
  * numbering survives between calls except through that order.
@@ -38,8 +39,11 @@ def kind(node):
     raw = (node.get_role_name() or '').title().replace(' ', '')
     return ROLES.get(raw, raw)
 
+# Web content fills container values with object replacement characters, one per embedded child: noise to drop.
+EMBEDDED = chr(0xFFFC)
+
 def clean(text):
-    return ' '.join((text or '').split())
+    return ' '.join((text or '').replace(EMBEDDED, ' ').split())
 
 def quote(text, limit=200):
     # Long values keep their start and their end, where new typing usually lands.
@@ -148,13 +152,17 @@ def frame_of(pid, title):
 def walk(frame):
     """Every useful element with its depth and number, in the order all modes share."""
     start, numbered, stack, visited = time.time(), [], [(frame, 0)], 0
-    while stack and visited < 2000 and time.time() - start < 5:
+    while stack and visited < 4000 and time.time() - start < 8:
         node, depth = stack.pop()
         visited += 1
         try:
             line, useful = describe(node)
             if node is not frame and useful:
                 numbered.append((node, depth, line))
+            # A web page that is not showing (a browser's background tab) can hold thousands of elements: it is listed
+            # but not walked, so the window's own controls fit in the walk.
+            if kind(node) == 'Document' and node is not frame and not showing(node):
+                continue
             children = [node.get_child_at_index(k) for k in range(min(node.get_child_count(), 300))]
             for child in reversed([c for c in children if c is not None]):
                 stack.append((child, depth + 1))
@@ -306,3 +314,28 @@ main()
 export function atspiArgs(mode: 'read' | 'find' | 'point' | 'act', pid: number, title: string, ...rest: readonly string[]): string[] {
   return ['-c', ATSPI_CONTROLS, mode, String(pid), title, ...rest]
 }
+
+/**
+ * Python that prints `PROMPT <title>` for each window the desktop portal is showing (GNOME's prompt to allow remote
+ * interaction among them), or `NONE`. While GNOME shows that prompt, simulated input is held, then delivered to
+ * whatever window has focus once the person answers.
+ */
+export const PORTAL_PROMPT = String.raw`
+import gi
+gi.require_version('Atspi', '2.0')
+from gi.repository import Atspi
+desktop = Atspi.get_desktop(0)
+found = []
+for i in range(desktop.get_child_count()):
+    app = desktop.get_child_at_index(i)
+    try:
+        if app is None or not (app.get_name() or '').startswith('xdg-desktop-portal'):
+            continue
+        for j in range(app.get_child_count()):
+            window = app.get_child_at_index(j)
+            if window is not None and window.get_state_set().contains(Atspi.StateType.SHOWING):
+                found.append(window.get_name() or 'a permission prompt')
+    except Exception:
+        continue
+print('\n'.join('PROMPT ' + name for name in found) if found else 'NONE')
+`
