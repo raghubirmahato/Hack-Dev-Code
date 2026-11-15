@@ -123,6 +123,8 @@ The desktop tools work on Windows and on Linux with X11 or Wayland; macOS uses i
 
 Pass `then_read: true` to `desktop_element`, `desktop_keys`, `desktop_type` or a `desktop_pointer` click and the result also says what the window in front shows afterwards, so an action and its check take one call instead of two.
 
+Pass `expect` to any input tool or sequence step and the call checks its own outcome: it waits until the window shows a text (`{"text": "Saved"}`), a window opens or closes (`{"window_title": "Save As"}`), or the window's text changes (`{"changed": true}`), and fails with what is in front instead when that does not happen, so a sequence stops before it acts on the wrong window. `retries` (up to 3) repeats a click, key press, scroll or drag that did not take; typing, launching, opening and toggling are never repeated. When an input action fails or is cancelled, the modifier keys and mouse button it may have left pressed are released.
+
 Anything left pressed is released when the tools unload. While the agent is working on the desktop, the screen is kept awake so an idle lock does not interrupt it. Apps running as administrator are reached by running Hack Dev Code as administrator (or through its one-time administrator helper).
 
 **Chrome.** The agent drives Chrome through Chrome DevTools: pages, forms, scripts, screenshots and clicks. To let it use the Chrome you already have open, enable remote debugging at `chrome://inspect/#remote-debugging` and set the `chrome` row to `mode: connect`.

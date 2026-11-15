@@ -42,6 +42,7 @@ This page compares Hack Dev Code with Claude Code, Codex, Cursor, Trae and Antig
 | Skills | Six built-in skills provided from memory; one generated skill per website session with a playbook the agent maintains; 20 more installable skills from Anthropic's and OpenAI's collections. |
 | Ollama | Ollama on any port or machine for Ollama routes; real context length per model; embedding models left out; tool and image support shown; tool calls written as text are recovered; a clear message when a model cannot call tools. |
 | Desktop control | `desktop_element` waits for controls that load late; `desktop_sequence` steps can be optional. |
+| Desktop control | Verify and retry: `expect` makes an input action wait for its outcome (text, a window, a change) and repeat up to 3 times when it does not show; a failed or cancelled action releases the keys and buttons it may have left pressed. |
 
 ## Plan
 

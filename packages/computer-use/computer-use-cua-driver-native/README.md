@@ -60,6 +60,28 @@ On Windows and Linux (X11) the provider adds tools that act on the whole desktop
 
 Numbered controls and OCR give exact points, so a model that cannot see images (DeepSeek, most local models) never has to guess coordinates.
 
+#### Verify and retry
+
+`desktop_pointer`, `desktop_drag`, `desktop_scroll`, `desktop_keys`, `desktop_type`, `desktop_element` and every input step of `desktop_sequence` take an optional `expect` naming the outcome the action should bring about. The call then waits for it from fresh state and fails when it does not show, so a sequence stops before it acts on the wrong window:
+
+| Field | Meaning |
+|---|---|
+| `text` | The window shows this text (with `gone`, no longer shows it), compared case-insensitively with runs of white space as one space. |
+| `window_title` | A window whose title contains this opens (with `gone`, closes). |
+| `changed` | `true`: the window's text differs from what it showed before the action. |
+| `in` | The window whose text is checked; by default the window in front, chosen again at every check so a dialog the action opened counts. |
+| `timeout_ms` | How long the outcome may take, 500 to 60000 ms (default 5000). |
+| `retries` | Repeat the action up to 3 times when the outcome does not show. Refused for typing, launching, opening and toggling, which a repeat would undo or duplicate. |
+
+```json
+{"action": "element", "element_action": "click", "name": "Save", "expect": {"window_title": "Save As"}}
+{"keys": "ctrl+s", "expect": {"text": "Saved", "retries": 1}}
+```
+
+Every expectation is validated before any input is sent, including all the steps of a sequence. A verified result ends with `Verified: …` (and the attempt that worked); a missed one says the action was sent, lists each attempt and shows what the window in front reads now. Only a missed outcome is repeated: an action that fails is not.
+
+When an input action fails or is cancelled after it has sent input, the modifier keys (ctrl, shift, alt, win) and the mouse buttons the action uses are released, except those held on purpose with `hold: down` or `press: down`; the error says what was released, or what could not be. A cancellation still ends the call as cancelled.
+
 Windows of apps running as administrator are marked `[administrator]`. Windows drops input that a normal process sends to them, so that input goes through an administrator helper: it starts on first need through Windows' "Run as administrator" prompt, accepts only a fixed table of input and window commands (never scripts) over a named pipe that only this user may open, checks the connecting process id and a one-time secret, and exits when the connection closes or when nobody connects within a minute. The desktop session sends nothing until it has confirmed the pipe is served by exactly the process the UAC prompt started. Its script is written to a temporary file and run by a bootstrap that verifies the file's SHA-256 before running the bytes it checked; for the elevated start the bootstrap first limits module loading to the system folder and compiles in a folder only administrators and SYSTEM can write to. UAC prompts and the lock screen stay out of reach by design: they run on the secure desktop.
 
 Real input reaches what background delivery cannot: the Start menu, taskbar, tray, shell shortcuts, and apps that ignore posted messages such as modern Notepad, Calculator and Settings. It moves the person's pointer and focus. On Windows one hidden Windows PowerShell session compiles the native helper once and serves every call (a warm call takes tens of milliseconds); it restarts after a step exceeds 30 seconds. On Linux an X11 session uses `x11-xserver-utils xdotool imagemagick wmctrl xdg-utils`. A Wayland session (detected from `XDG_SESSION_TYPE`, or forced with `HACKDEV_DESKTOP_BACKEND=wayland` or `=x11`) sends input through `ydotool` (its `ydotoold` service writes to /dev/uinput, which every compositor accepts), captures the screen with `grim`, `gnome-screenshot` or `spectacle`, pastes through `wl-clipboard`, lists displays with `wlr-randr` (or XWayland), and lists and manages windows through Sway (`swaymsg`) or Hyprland (`hyprctl`); on other compositors the windows of X11 apps are listed through XWayland. A missing helper is reported with the command that installs it. While the agent operates the Windows desktop, the session keeps the display awake and resets the idle timer every 50 seconds until 10 minutes after the last input (`keepAwakeMs`), so an idle lock does not interrupt the work; input refused because the lock screen or a UAC prompt is showing is reported as such.
@@ -91,6 +113,7 @@ The provider reserves the shared computer-use registration before loading native
 | [src/index.ts](src/index.ts) | Native runtime ownership, catalog validation, tool registration, and provider guidance |
 | [src/displays.ts](src/displays.ts) | Whole-desktop tools and their Windows and Linux backends |
 | [src/keys.ts](src/keys.ts) | Key names to Windows virtual keys and X11 keysyms |
+| [src/verify.ts](src/verify.ts) | The `expect` argument: validation, the change wait, and its description in results |
 | [src/powershell.ts](src/powershell.ts) | The reused PowerShell session with a line protocol and timeout restart |
 | [src/elevated.ts](src/elevated.ts) | Input operations and the administrator helper: its command table, launch and pipe client |
 | [src/snapshot.ts](src/snapshot.ts) | Bounded window snapshots and snapshot identity in result text |
@@ -146,11 +169,11 @@ The unchanged guidance preserves its repeated prompt prefix. Mounting, removing,
 
 #### What the model sees
 
-On Windows and Linux a second guidance section explains when to use real input instead of background delivery, how display coordinates work, that results name the window receiving input, that apps running as administrator, UAC prompts and the lock screen refuse input from a normal process, how to act on numbered controls and OCR text instead of guessing coordinates, how to start apps by name and wait for text, and how to fill a file dialog. The `desktop_*` tools return text; `desktop_screenshot` returns the image with its coordinate mapping.
+On Windows and Linux a second guidance section explains when to use real input instead of background delivery, how display coordinates work, that results name the window receiving input, that apps running as administrator, UAC prompts and the lock screen refuse input from a normal process, how to act on numbered controls and OCR text instead of guessing coordinates, how to start apps by name and wait for text, how to pass `expect` so a call checks its own outcome, and how to fill a file dialog. The `desktop_*` tools return text; `desktop_screenshot` returns the image with its coordinate mapping.
 
 #### Token effect
 
-The section and twelve tool definitions add request tokens while the `desktop` group is loaded; with `onDemand` they cost nothing until then. A window read now carries an index, a centre point and states per control, which makes it somewhat longer than before but replaces screenshots for most checks. The driver's full essential catalog is about 21K tokens per request, so only the core window tools join `desktop` and the rest wait in `desktop-more`. `desktop_sequence` replaces several model round trips with one call. Window lists grow with the number of open windows.
+The section and twelve tool definitions add request tokens while the `desktop` group is loaded; with `onDemand` they cost nothing until then. A window read now carries an index, a centre point and states per control, which makes it somewhat longer than before but replaces screenshots for most checks. The driver's full essential catalog is about 21K tokens per request, so only the core window tools join `desktop` and the rest wait in `desktop-more`. `desktop_sequence` replaces several model round trips with one call. The `expect` argument adds about 900 characters to each of seven tool definitions (about 1.5K tokens while the group is loaded) and one guidance line; a verified action saves the separate read or screenshot that checking it would otherwise take. Window lists grow with the number of open windows.
 
 #### KV Cache effect
 
@@ -180,6 +203,8 @@ The package preserves the upstream driver's platform and application limits.
 - **Native cursor overlay** — a headless macOS Node host can receive `facility_unavailable` for overlay operations while screenshots and background input remain usable.
 - **Shared desktop** — the provider does not reserve windows or complete workflows for a Session. Other callers and applications can change the same desktop between calls.
 - **Cancellation** — an aborted call can have delivered input already; inspect fresh state before retrying. The provider waits for SDK shutdown during unload but does not promise native action rollback.
+- **What `expect` proves** — it checks the window's text or the window list, not the pixels: text that was already shown before the action passes at once, so pick text that only the outcome brings, or use `changed`. A window that reads no text (a canvas, a game) can only be checked through `window_title`. A retry repeats the action even when the first attempt took effect after the check gave up.
+- **Releasing keys after a failure** — the release is sent for every modifier rather than only those still down: the provider does not ask the system which keys an interrupted chord left pressed (Windows could answer through `GetAsyncKeyState`; the Linux input tools cannot). Apps normally ignore the release of a key that is up. A key the person is physically holding at that moment is released too.
 - **Failed shutdown** — if native shutdown fails, the registration remains occupied. Restart the host before mounting another computer-use provider.
 - **Pinned upstream tools** — the driver's own tool schemas follow the pinned upstream SDK; the whole-desktop tools this package adds (`desktop_*`) are covered by its tests.
 - **Secure desktop** — no process can operate UAC prompts or the lock screen; the tools tell the agent to ask the person. Apps running as administrator are reachable through the approved administrator helper.

@@ -17,6 +17,8 @@ import { createMcpToolDefinition } from '@hackdevcode/dsh-mcp-client'
 import { defineTool } from '@hackdevcode/dsh-tools'
 import { parseKeys } from './keys.ts'
 import type { Chord } from './keys.ts'
+import { checkedExpectation, describeExpectation, waitForChange } from './verify.ts'
+import type { CheckedExpectation, Expectation } from './verify.ts'
 import { PowerShellHost } from './powershell.ts'
 import type { ScriptRunner } from './powershell.ts'
 import { ElevatedInput, opScript } from './elevated.ts'
@@ -1786,6 +1788,7 @@ export const DISPLAY_GUIDANCE = `Whole-desktop tools use the real mouse and keyb
 - File dialogs: focus the dialog, press alt+n (or click the "File name" box), type the full path, press enter, then wait for the dialog to close.
 - Controls appear a moment after a window opens or a page loads. desktop_element waits for the control it was asked for (1.5 seconds by default; pass timeout_ms for slow apps, 0 to fail at once), so act on a control by name right after opening its window instead of sleeping or re-reading first.
 - Act and check in one call: pass then_read: true to desktop_element, desktop_keys, desktop_type or a desktop_pointer click and the result includes what the window in front shows afterwards (the new dialog, the changed value, the error). Use it on every action whose outcome you need to know, instead of a separate read or screenshot.
+- When you know what success looks like, pass expect so the tool checks it: {"text":"Saved"} (text the window then shows), {"window_title":"Save As"} (a window that opens; add gone for one that closes) or {"changed":true}. The call waits for it (5 s by default) and fails with what is in front instead when it does not show, so a sequence stops before acting on the wrong window. Add retries (up to 3) to repeat a click, key press, scroll or drag that did not take; typing, launching, opening and toggling are never repeated. A failed or cancelled input action releases the modifier keys and mouse button it may have left pressed.
 - When something unexpected is in front (a dialog you did not open, a prompt, a different app), deal with it and continue: read it, choose the option that lets the task go on, and only stop for the person when it asks for a password, a payment or a permission that is theirs to give.
 - Things that may or may not be there (a "Don't save" prompt, a cookie banner, a first-run tip, an update dialog) should not stop the work: mark that desktop_sequence step optional and the sequence carries on when it is absent.`
 
@@ -1793,14 +1796,58 @@ type Group = { name: string; description: string }
 
 const DONE_SCHEMA = { type: 'object', additionalProperties: false, properties: { done: { type: 'string', required: true } } } as const
 
+/** Backend methods that send real input. */
+const INPUT_METHODS: ReadonlySet<string> = new Set(['pointer', 'drag', 'scroll', 'keys', 'type', 'pressButton', 'holdKeys'])
+
+/**
+ * The backend with every input method reporting that it was called.
+ * @param backend - platform backend.
+ * @param onInput - called before each input method runs.
+ * @returns a view of the backend; other methods pass through unchanged.
+ */
+function countedInput(backend: DisplayBackend, onInput: () => void): DisplayBackend {
+  return new Proxy(backend, {
+    get(target, key, receiver) {
+      const value: unknown = Reflect.get(target, key, receiver)
+      if (typeof key !== 'string' || !INPUT_METHODS.has(key) || typeof value !== 'function') return value
+      return (...args: unknown[]): unknown => {
+        onInput()
+        return Reflect.apply(value, target, args)
+      }
+    },
+  })
+}
+
+/** Modifier keys released after a failed or cancelled input action. */
+const MODIFIER_CHORD = 'ctrl+shift+alt+win'
+
+/** The `expect` argument of the input tools and of sequence steps. */
+const EXPECT_SPEC = {
+  type: 'object',
+  additionalProperties: false,
+  description: 'Outcome to wait for after the action; the call fails with what is in front when it does not show. One of text, window_title or changed.',
+  properties: {
+    text: { type: 'string', description: 'Text the window shows once the action worked.' },
+    window_title: { type: 'string', description: 'Title part of a window that opens once the action worked.' },
+    changed: { type: 'boolean', description: 'true: the window text changes.' },
+    gone: { type: 'boolean', description: 'Wait for the text or window to go away instead.' },
+    in: { type: 'string', description: 'Title part of the window to check text in (default: the one in front).' },
+    timeout_ms: { type: 'number', description: 'Milliseconds, 500 to 60000 (default 5000).' },
+    retries: { type: 'number', description: 'Repeat the action up to this many times (0 to 3) when the outcome does not show.' },
+  },
+} as const
+
 /**
  * Register the whole-desktop tools.
  * @param ctx - context with the tool registry.
- * @param backend - platform backend.
+ * @param source - platform backend.
  * @param group - on-demand group, when the tools load on demand.
  */
-export function registerDisplayTools(ctx: Context, backend: DisplayBackend, group?: Group): void {
+export function registerDisplayTools(ctx: Context, source: DisplayBackend, group?: Group): void {
   const options = group === undefined ? {} : { group }
+  /** Input calls sent so far: an action that fails before sending any has nothing to release. */
+  let sent = 0
+  const backend = countedInput(source, () => { sent++ })
   const onDisplay = async (x: number, y: number): Promise<DisplayInfo> => {
     const displays = await backend.list()
     const on = displays.find(d => x >= d.x && x < d.x + d.width && y >= d.y && y < d.y + d.height)
@@ -1856,6 +1903,99 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
     heldChords.clear()
     heldButtons.clear()
   }, 'desktop.held-input')
+  /**
+   * Release what a failed or cancelled input action may have left pressed: the modifier keys and the action's mouse
+   * buttons, except keys and buttons held on purpose with hold down or press down. Apps normally ignore the
+   * release of a key that is not down.
+   * @param buttons - mouse buttons the action pressed.
+   * @returns a sentence for the error the model reads.
+   */
+  const releaseLeftover = async (buttons: readonly PointerButton[]): Promise<string> => {
+    const kept = new Set([...heldChords.values()].flatMap(chord => chord.vk))
+    const all = parseKeys(MODIFIER_CHORD)[0] as Chord
+    const free = all.vk.flatMap((vk, index) => kept.has(vk) ? [] : [index])
+    const released: string[] = []
+    const failed: string[] = []
+    if (free.length > 0) {
+      const chord: Chord = { names: free.map(i => all.names[i] as string), vk: free.map(i => all.vk[i] as number), x11: free.map(i => all.x11.split('+')[i] as string).join('+') }
+      await backend.holdKeys(chord, false).then(() => { released.push(chord.names.join(', ')) }, (error: unknown) => {
+        failed.push(`${chord.names.join(', ')} (${error instanceof Error ? error.message : String(error)})`)
+      })
+    }
+    for (const which of new Set(buttons)) {
+      if (heldButtons.has(which)) continue
+      await backend.pressButton(undefined, undefined, which, false).then(() => { released.push(`the ${which} button`) }, (error: unknown) => {
+        failed.push(`the ${which} button (${error instanceof Error ? error.message : String(error)})`)
+      })
+    }
+    const done = released.length > 0 ? ` Released ${released.join(' and ')} in case the action left them pressed.` : ''
+    return failed.length > 0 ? `${done} Could not release ${failed.join(', ')}: check that no key or button is stuck before continuing.` : done
+  }
+  /**
+   * Run one input action; when it fails or is cancelled, release what it may have left pressed. A cancellation is
+   * rethrown unchanged so the call still ends as cancelled.
+   * @param buttons - mouse buttons the action presses.
+   * @param signal - the call's cancellation.
+   * @param run - the action.
+   * @returns the action's result.
+   */
+  const guarded = async <T>(buttons: readonly PointerButton[], signal: AbortSignal, run: () => Promise<T>): Promise<T> => {
+    const before = sent
+    try {
+      return await run()
+    } catch (error) {
+      if (sent === before) throw error
+      const note = await releaseLeftover(buttons)
+      if (signal.aborted) throw error
+      throw new Error(`${error instanceof Error ? error.message : String(error)}${note}`, { cause: error })
+    }
+  }
+  /**
+   * Run an input action, then wait until its expected outcome shows from fresh state, repeating the action up to
+   * `retries` times when it does not. Only a missed outcome is repeated; an action that fails is not.
+   * @param expectation - the outcome, or undefined to run the action once unchecked.
+   * @param buttons - mouse buttons the action presses.
+   * @param signal - the call's cancellation.
+   * @param run - the action; it returns its own one-line result.
+   * @returns the action's result followed by what was verified.
+   * @throws when the outcome never shows; the action was sent, and the error says what is in front instead.
+   */
+  const verified = async (
+    expectation: CheckedExpectation | undefined, buttons: readonly PointerButton[], signal: AbortSignal, run: () => Promise<string>,
+  ): Promise<string> => {
+    if (expectation === undefined) return guarded(buttons, signal, run)
+    // The window is chosen again at every check: the action may have opened a dialog or brought another window forward.
+    const scoped = async (): Promise<string> => windowText(await chosenWindow(undefined, expectation.kind === 'window' ? undefined : expectation.in), signal)
+    // A window that is not there (yet, or any more) reads as no text.
+    const current = (): Promise<string> => scoped().catch((error: unknown) => {
+      if (signal.aborted) throw error
+      return ''
+    })
+    const before = expectation.kind === 'changed'
+      ? await scoped().catch((error: unknown) => {
+        throw new Error(`expect changed needs the window's text before the action, and it could not be read: ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+      })
+      : ''
+    const misses: string[] = []
+    for (let attempt = 0; ; attempt++) {
+      const done = await guarded(buttons, signal, run)
+      try {
+        const proof = expectation.kind === 'text'
+          ? await waitForText(current, expectation.text, expectation.gone, expectation.timeoutMs, signal)
+          : expectation.kind === 'window'
+            ? await waitForWindow(backend, expectation.title, expectation.gone, expectation.timeoutMs, signal)
+            : await waitForChange(current, before, expectation.timeoutMs, signal)
+        const tries = attempt > 0 ? ` on attempt ${String(attempt + 1)} of ${String(expectation.retries + 1)}` : ''
+        return `${done}\nVerified${tries}: ${proof}`
+      } catch (miss) {
+        if (signal.aborted) throw miss
+        misses.push(`attempt ${String(attempt + 1)}: ${miss instanceof Error ? miss.message : String(miss)}`)
+        if (attempt >= expectation.retries) {
+          throw new Error(`${done}, but ${describeExpectation(expectation)} did not show (${misses.join('; ')}). The action was sent; check the window before repeating it.${await observe(true, signal)}`, { cause: miss })
+        }
+      }
+    }
+  }
   /** How points in the latest desktop_screenshot image map to the desktop, for image_x and image_y. */
   let lastCapture: { originX: number; originY: number; scale: number; width: number; height: number } | undefined
   /** A desktop point from x and y, or from image_x and image_y in the latest screenshot. */
@@ -2053,13 +2193,15 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       modifiers: { type: 'string', description: 'Keys held while clicking, such as ctrl (add to a selection), shift (extend it) or ctrl+shift.' },
       press: { type: 'string', description: 'Instead of a click: down presses the button at the point and keeps it down; up releases it there. Use for drags over several steps, drawing, or long presses.' },
       ...observeParameter,
+      expect: EXPECT_SPEC,
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
     async execute(
-      args: PointArgs & { button?: string; count?: number; modifiers?: string; press?: string; then_read?: boolean },
+      args: PointArgs & { button?: string; count?: number; modifiers?: string; press?: string; then_read?: boolean; expect?: Expectation },
       execution,
     ) {
       if (args.press !== undefined) {
+        if (args.expect !== undefined) throw new Error('expect does not apply to press down or up; check the outcome once the button is released')
         if (args.press !== 'down' && args.press !== 'up') throw new Error('press must be down or up')
         const which = button(args.button)
         const at = point(args)
@@ -2077,9 +2219,13 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       const { x, y } = point(args)
       const on = await onDisplay(x, y)
       const held = heldKeys(args.modifiers)
-      await backend.pointer(x, y, pressed, count, held, execution.signal)
+      const expectation = checkedExpectation(args.expect, true)
       const how = pressed === 'none' ? 'Moved to' : `${held === undefined ? '' : `${held.names.join('+')}+`}${pressed} click x${String(count)} at`
-      return { done: `${how} (${String(x)}, ${String(y)}) on display ${describe(on)}${pressed === 'none' ? '' : await observe(args.then_read, execution.signal)}` }
+      const done = await verified(expectation, pressed === 'none' ? [] : [pressed], execution.signal, async () => {
+        await backend.pointer(x, y, pressed, count, held, execution.signal)
+        return `${how} (${String(x)}, ${String(y)}) on display ${describe(on)}`
+      })
+      return { done: `${done}${pressed === 'none' ? '' : await observe(args.then_read, execution.signal)}` }
     },
   }), options)
 
@@ -2092,14 +2238,18 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       to_x: { type: 'number', required: true, description: 'End x in virtual-desktop pixels.' },
       to_y: { type: 'number', required: true, description: 'End y in virtual-desktop pixels.' },
       button: { type: 'string', description: 'left (default), right or middle.' },
+      expect: EXPECT_SPEC,
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: { from_x: number; from_y: number; to_x: number; to_y: number; button?: string }, execution) {
+    async execute(args: { from_x: number; from_y: number; to_x: number; to_y: number; button?: string; expect?: Expectation }, execution) {
       const pressed = button(args.button)
       await onDisplay(args.from_x, args.from_y)
       await onDisplay(args.to_x, args.to_y)
-      await backend.drag(args.from_x, args.from_y, args.to_x, args.to_y, pressed, execution.signal)
-      return { done: `Dragged with ${pressed} from (${String(args.from_x)}, ${String(args.from_y)}) to (${String(args.to_x)}, ${String(args.to_y)})` }
+      const expectation = checkedExpectation(args.expect, true)
+      return { done: await verified(expectation, [pressed], execution.signal, async () => {
+        await backend.drag(args.from_x, args.from_y, args.to_x, args.to_y, pressed, execution.signal)
+        return `Dragged with ${pressed} from (${String(args.from_x)}, ${String(args.from_y)}) to (${String(args.to_x)}, ${String(args.to_y)})`
+      }) }
     },
   }), options)
 
@@ -2111,16 +2261,20 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       y: { type: 'number', required: true, description: 'Virtual-desktop y in pixels.' },
       direction: { type: 'string', required: true, description: 'up, down, left or right.' },
       amount: { type: 'number', description: 'Wheel notches, 1 to 50 (default 3); one notch is usually three lines.' },
+      expect: EXPECT_SPEC,
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: { x: number; y: number; direction: string; amount?: number }, execution) {
+    async execute(args: { x: number; y: number; direction: string; amount?: number; expect?: Expectation }, execution) {
       const amount = Math.round(args.amount ?? 3)
       if (!Number.isFinite(amount) || amount < 1 || amount > 50) throw new Error('amount must be between 1 and 50')
       const sign = { up: 1, down: -1, right: 1, left: -1 }[args.direction]
       if (sign === undefined) throw new Error('direction must be up, down, left or right')
       await onDisplay(args.x, args.y)
-      await backend.scroll(args.x, args.y, sign * amount, args.direction === 'left' || args.direction === 'right', execution.signal)
-      return { done: `Scrolled ${args.direction} ${String(amount)} notches at (${String(args.x)}, ${String(args.y)})` }
+      const expectation = checkedExpectation(args.expect, true)
+      return { done: await verified(expectation, [], execution.signal, async () => {
+        await backend.scroll(args.x, args.y, sign * amount, args.direction === 'left' || args.direction === 'right', execution.signal)
+        return `Scrolled ${args.direction} ${String(amount)} notches at (${String(args.x)}, ${String(args.y)})`
+      }) }
     },
   }), options)
 
@@ -2133,11 +2287,16 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       hold: { type: 'string', description: 'Instead of pressing and releasing: down presses one chord and keeps it down (such as shift for a series of clicks); up releases it.' },
       ...focusParameters,
       ...observeParameter,
+      expect: EXPECT_SPEC,
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: { keys: string; repeat?: number; hold?: string; window?: number; title?: string; then_read?: boolean }, execution) {
+    async execute(
+      args: { keys: string; repeat?: number; hold?: string; window?: number; title?: string; then_read?: boolean; expect?: Expectation },
+      execution,
+    ) {
       const chords = parseKeys(args.keys)
       if (args.hold !== undefined) {
+        if (args.expect !== undefined) throw new Error('expect does not apply to hold down or up; check the outcome once the keys are released')
         if (args.hold !== 'down' && args.hold !== 'up') throw new Error('hold must be down or up')
         const chord = chords[0]
         if (chords.length !== 1 || chord === undefined) throw new Error('hold takes one chord, such as shift or ctrl+alt')
@@ -2150,9 +2309,13 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       }
       const repeat = Math.round(args.repeat ?? 1)
       if (!Number.isFinite(repeat) || repeat < 1 || repeat > 50) throw new Error('repeat must be between 1 and 50')
+      const expectation = checkedExpectation(args.expect, true)
       const receiver = await target(args.window, args.title, execution.signal)
-      await backend.keys(Array.from({ length: repeat }, () => chords).flat(), execution.signal)
-      return { done: `Pressed ${args.keys}${repeat > 1 ? ` x${String(repeat)}` : ''} into ${receiver}${await observe(args.then_read, execution.signal)}` }
+      const done = await verified(expectation, [], execution.signal, async () => {
+        await backend.keys(Array.from({ length: repeat }, () => chords).flat(), execution.signal)
+        return `Pressed ${args.keys}${repeat > 1 ? ` x${String(repeat)}` : ''} into ${receiver}`
+      })
+      return { done: `${done}${await observe(args.then_read, execution.signal)}` }
     },
   }), options)
 
@@ -2164,15 +2327,23 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       paste: { type: 'boolean', description: 'Paste through the clipboard instead of typing key by key: much faster for long text; the earlier clipboard text is restored. Defaults to true above 500 characters.' },
       ...focusParameters,
       ...observeParameter,
+      expect: EXPECT_SPEC,
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: { text: string; paste?: boolean; window?: number; title?: string; then_read?: boolean }, execution) {
+    async execute(
+      args: { text: string; paste?: boolean; window?: number; title?: string; then_read?: boolean; expect?: Expectation },
+      execution,
+    ) {
       if (args.text.length === 0) throw new Error('text is empty')
       if (args.text.length > 100_000) throw new Error('text is longer than 100000 characters; type it in parts')
+      const expectation = checkedExpectation(args.expect, NOT_REPEATABLE.type)
       const receiver = await target(args.window, args.title, execution.signal)
       const paste = args.paste ?? args.text.length > PASTE_THRESHOLD
-      await backend.type(args.text, paste, execution.signal)
-      return { done: `${paste ? 'Pasted' : 'Typed'} ${String(args.text.length)} characters into ${receiver}${await observe(args.then_read, execution.signal)}` }
+      const done = await verified(expectation, [], execution.signal, async () => {
+        await backend.type(args.text, paste, execution.signal)
+        return `${paste ? 'Pasted' : 'Typed'} ${String(args.text.length)} characters into ${receiver}`
+      })
+      return { done: `${done}${await observe(args.then_read, execution.signal)}` }
     },
   }), options)
 
@@ -2256,11 +2427,17 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
       timeout_ms: { type: 'number', description: 'How long to wait for a control found by name, role or automation_id to appear, 0 to 30000 milliseconds (default 1500).' },
       ...focusParameters,
       ...observeParameter,
+      expect: EXPECT_SPEC,
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },
-    async execute(args: ElementArgs & { then_read?: boolean }, execution) {
-      const done = await elementStep(args, execution.signal)
-      return { done: `${done}${args.action === 'find' ? '' : await observe(args.then_read, execution.signal)}` }
+    async execute(args: ElementArgs & { then_read?: boolean; expect?: Expectation }, execution) {
+      if (args.action === 'find') {
+        if (args.expect !== undefined) throw new Error('expect does not apply to find, which only looks')
+        return { done: await elementStep(args, execution.signal) }
+      }
+      const expectation = checkedExpectation(args.expect, elementRepeatable(args.action))
+      const done = await verified(expectation, elementButtons(args.action), execution.signal, () => elementStep(args, execution.signal))
+      return { done: `${done}${await observe(args.then_read, execution.signal)}` }
     },
   }), options)
 
@@ -2416,6 +2593,7 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
             direction: { type: 'string', description: 'scroll: up, down, left or right.' },
             amount: { type: 'number', description: 'scroll: notches (default 3).' },
             ms: { type: 'number', description: 'sleep: pause, 50 to 10000 milliseconds.' },
+            expect: EXPECT_SPEC,
           },
         },
       },
@@ -2424,11 +2602,22 @@ export function registerDisplayTools(ctx: Context, backend: DisplayBackend, grou
     async execute(args: { steps: SequenceStep[] }, execution) {
       if (!Array.isArray(args.steps) || args.steps.length === 0) throw new Error('steps is empty')
       if (args.steps.length > 30) throw new Error('at most 30 steps per sequence')
+      // Every expectation is checked before the first step, so a malformed one never leaves the sequence half done.
+      const expectations = args.steps.map((step, index) => {
+        try {
+          return stepExpectation(step)
+        } catch (error) {
+          throw new Error(`step ${String(index + 1)} (${step.action}): ${error instanceof Error ? error.message : String(error)}`, { cause: error })
+        }
+      })
       const done: string[] = []
       for (const [index, step] of args.steps.entries()) {
         execution.signal.throwIfAborted()
         try {
-          done.push(`${String(index + 1)}. ${await runStep(step, execution.signal)}`)
+          const result = INPUT_STEPS.has(step.action)
+            ? await verified(expectations[index], stepButtons(step), execution.signal, () => runStep(step, execution.signal))
+            : await runStep(step, execution.signal)
+          done.push(`${String(index + 1)}. ${result}`)
         } catch (error) {
           const reason = error instanceof Error ? error.message : String(error)
           // A cancelled call stops the sequence even on an optional step.
@@ -2616,6 +2805,32 @@ const CLICK_ACTIONS: Readonly<Record<string, { button: PointerButton; count: num
   click: { button: 'left', count: 1 }, double_click: { button: 'left', count: 2 }, right_click: { button: 'right', count: 1 },
 }
 
+/** Why an action is not repeated when its expected outcome does not show. */
+const NOT_REPEATABLE = {
+  type: 'typing again would enter the text a second time',
+  launch: 'launching again would start a second copy',
+  open: 'opening again would open it a second time',
+  toggle: 'toggling again would undo the first toggle',
+} as const
+
+/**
+ * Whether one element action is safe to repeat.
+ * @param action - the element action.
+ * @returns true, or why it is not.
+ */
+function elementRepeatable(action: string): true | string {
+  return action === 'toggle' ? NOT_REPEATABLE.toggle : true
+}
+
+/**
+ * The mouse buttons one element action may press: its click, or the left click a pattern action falls back to.
+ * @param action - the element action.
+ * @returns the buttons.
+ */
+function elementButtons(action: string): PointerButton[] {
+  return [CLICK_ACTIONS[action]?.button ?? 'left']
+}
+
 /** One step of `desktop_sequence`. */
 export interface SequenceStep {
   action: string
@@ -2647,4 +2862,35 @@ export interface SequenceStep {
   direction?: string
   amount?: number
   ms?: number
+  /** The outcome to wait for after the step. */
+  expect?: Expectation
+}
+
+/** Sequence steps that send input, and so release what they may leave pressed when they fail. */
+const INPUT_STEPS: ReadonlySet<string> = new Set(['keys', 'type', 'element', 'click', 'drag', 'scroll', 'launch', 'open', 'focus', 'minimize', 'maximize', 'restore', 'close', 'move'])
+
+/**
+ * Validate one step's expectation before the sequence starts.
+ * @param step - the step.
+ * @returns the expectation, or undefined when the step expects nothing.
+ * @throws when the step cannot carry one, or asks for repeats it cannot make.
+ */
+function stepExpectation(step: SequenceStep): CheckedExpectation | undefined {
+  if (step.expect === undefined) return undefined
+  if (!INPUT_STEPS.has(step.action)) throw new Error(`expect is not available for ${step.action} steps, which already report what they find`)
+  const repeatable = step.action === 'type' || step.action === 'launch' || step.action === 'open'
+    ? NOT_REPEATABLE[step.action]
+    : step.action === 'element' ? elementRepeatable(step.element_action ?? '') : true
+  return checkedExpectation(step.expect, repeatable)
+}
+
+/**
+ * The mouse buttons one step may press.
+ * @param step - the step.
+ * @returns the buttons.
+ */
+function stepButtons(step: SequenceStep): PointerButton[] {
+  if (step.action === 'click' || step.action === 'drag') return [step.button === 'right' || step.button === 'middle' ? step.button : 'left']
+  if (step.action === 'element') return elementButtons(step.element_action ?? '')
+  return []
 }
