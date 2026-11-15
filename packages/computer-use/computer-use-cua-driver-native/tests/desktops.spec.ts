@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { linuxBackend } from '../src/displays.ts'
+import { LAUNCH_SCRIPT, linuxBackend, X11_APP_ENV } from '../src/displays.ts'
+import { parseKeys } from '../src/keys.ts'
 import type { CommandRunner } from '../src/displays.ts'
 import { gvariantString, parseKdotoolGeometry, parseWindowCalls } from '../src/wayland.ts'
 
@@ -91,5 +92,55 @@ describe('KWin through kdotool', () => {
       'windowmove {5f1c} 10 20', 'windowsize {5f1c} 600 400',
     ])
     await expect(backend.window(9, 'close')).rejects.toThrow('no window with handle 9; list the windows again')
+  })
+})
+
+describe('GNOME on Wayland without the extension or ydotoold', () => {
+  /** A GNOME Wayland session with XWayland, one X11 Mousepad window, and ydotoold stopped or running. */
+  function session(daemon: boolean): { run: CommandRunner; sent: string[] } {
+    const sent: string[] = []
+    const run: CommandRunner = async (file, args) => {
+      if (file === 'sh' && String(args[1]).startsWith('pgrep -x ydotoold')) return daemon ? 'yes\n' : ''
+      if (file === 'sh' && args[1] === 'command -v "$1" >/dev/null 2>&1 && echo yes') return args[3] === 'xdotool' ? 'yes\n' : ''
+      if (file === 'gdbus') throw new Error('GDBus.Error:org.freedesktop.DBus.Error.UnknownMethod')
+      if (file === 'wmctrl') return '0x02a00004  0 4100   80 80  700 480  kali  Untitled 1 - Mousepad\n'
+      if (file === 'xprop') return '_NET_CLIENT_LIST_STACKING: window id # 0x2a00004\n'
+      if (file === 'xdotool' && args[0] === 'getactivewindow') return String(0x2a00004)
+      sent.push(`${file} ${file === 'sh' ? args.slice(3).join(' ') : args.join(' ')}`)
+      return ''
+    }
+    return { run, sent }
+  }
+  const env = { XDG_SESSION_TYPE: 'wayland', XDG_CURRENT_DESKTOP: 'GNOME', WAYLAND_DISPLAY: 'wayland-0', DISPLAY: ':0' }
+
+  it('starts apps as X11 apps, sends input through xdotool and knows the X11 window under a point', async () => {
+    const { run, sent } = session(false)
+    const backend = linuxBackend(run, env)
+    expect(await backend.launch('mousepad --disable-server')).toBe('Started mousepad --disable-server as an X11 app, so its windows can be listed and operated')
+    await backend.keys(parseKeys('ctrl+s'))
+    await backend.pointer(100, 120, 'left', 1)
+    expect(await backend.windowAt?.(100, 120)).toBe(0x2a00004)
+    expect(await backend.windowAt?.(1500, 800)).toBe(0)
+    expect(sent).toEqual([
+      `sh mousepad --disable-server ${X11_APP_ENV.join(' ')}`,
+      'xdotool key --clearmodifiers ctrl+s',
+      'xdotool mousemove --sync 100 120 click --repeat 1 1',
+    ])
+  })
+
+  it('sends input through ydotool while ydotoold runs, and then cannot tell which window is under a point', async () => {
+    const { run, sent } = session(true)
+    const backend = linuxBackend(run, env)
+    await backend.keys(parseKeys('ctrl+s'))
+    expect(await backend.windowAt?.(100, 120)).toBeUndefined()
+    expect(sent).toEqual(['ydotool key 29:1 31:1 31:0 29:0'])
+  })
+
+  it('starts apps natively where the compositor lists them, and on X11', async () => {
+    const x11: string[] = []
+    const backend = linuxBackend(async (file, args) => { x11.push(`${file} ${args.slice(3).join(' ')}`); return '' }, { XDG_SESSION_TYPE: 'x11', DISPLAY: ':0' })
+    expect(await backend.launch('gedit')).toBe('Started gedit')
+    expect(x11).toEqual(['sh gedit'])
+    expect(LAUNCH_SCRIPT).toContain('set -f')
   })
 })

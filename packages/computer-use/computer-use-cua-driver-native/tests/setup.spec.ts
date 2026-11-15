@@ -31,18 +31,32 @@ describe('Linux setup report', () => {
     expect(formatSetup(none)).toContain('No known package manager was found')
   })
 
-  it('reports a stopped ydotoold service and the GNOME Window Calls extension on Wayland', () => {
-    const report = linuxSetup(probe(['ydotool', 'gnome-screenshot', 'convert', 'wl-copy', 'tesseract', 'atspi', 'xdg-open', 'apt-get']), {
-      XDG_SESSION_TYPE: 'wayland', XDG_CURRENT_DESKTOP: 'ubuntu:GNOME', DISPLAY: ':0',
+  it('reports the Kali GNOME Wayland session from a live run: input and paste through XWayland without ydotoold', () => {
+    // The probe of a real Kali desktop (GNOME on Wayland, XWayland running, ydotoold stopped, wl-clipboard absent).
+    const report = linuxSetup(probe(['ydotool', 'xdotool', 'xclip', 'gnome-screenshot', 'grim', 'convert', 'tesseract', 'python3', 'atspi', 'xdg-open', 'gdbus', 'apt-get'], { a11y: 'false' }), {
+      XDG_SESSION_TYPE: 'wayland', XDG_CURRENT_DESKTOP: 'GNOME', DISPLAY: ':0', WAYLAND_DISPLAY: 'wayland-0',
     }, true)
     const text = formatSetup(report)
-    expect(text).toContain('missing: Real mouse and keyboard input (the ydotoold service is not running)')
-    expect(text).toContain('ready: Screenshots (gnome-screenshot and ImageMagick)')
+    expect(text).toContain('ready: Real mouse and keyboard input (xdotool through XWayland, which reaches X11 apps, including the apps the agent starts; '
+      + 'for every app, start the ydotool daemon: sudo ydotoold --socket-path=/tmp/.ydotool_socket')
+    expect(text).toContain('ready: Long text through the clipboard (xclip through XWayland)')
+    expect(text).toContain('ready: Screenshots (grim and ImageMagick)')
     expect(text).toContain('ready: Displays (XWayland)')
-    expect(text).toContain('missing: Listing and moving every window (GNOME keeps its windows private without the Window Calls extension')
-    expect(text).toContain('- start the input service with: sudo systemctl enable --now ydotoold')
+    expect(text).toContain('missing: Listing and moving every window (GNOME keeps its windows private without the Window Calls extension; '
+      + 'only X11 apps are listed, which include the apps the agent starts (they open under XWayland))')
+    expect(text).toContain('ready: Window text and controls by name (AT-SPI through Python; Qt apps also need assistive technologies on')
     expect(text).toContain('- install the Window Calls extension from https://extensions.gnome.org/extension/4724/window-calls/')
     expect(report.install).toBeUndefined()
+  })
+
+  it('needs ydotoold, or xdotool with XWayland, for input on Wayland', () => {
+    const input = (present: string[], env: Record<string, string>): string => formatSetup(linuxSetup(probe(present), { XDG_SESSION_TYPE: 'wayland', ...env }, true))
+    expect(input(['ydotool', 'ydotoold', 'wl-copy'], {})).toContain('ready: Real mouse and keyboard input (ydotool through the ydotoold service)')
+    expect(input(['ydotool', 'ydotoold', 'wl-copy'], {})).toContain('ready: Long text through the clipboard (wl-clipboard)')
+    const none = input(['ydotool', 'apt-get'], {})
+    expect(none).toContain('missing: Real mouse and keyboard input (the ydotoold service is not running, and xdotool cannot stand in without XWayland)')
+    expect(none).toContain('- start the ydotool daemon: sudo ydotoold')
+    expect(input(['apt-get'], { DISPLAY: ':0' })).toContain('sudo apt-get install -y ydotool xdotool')
   })
 
   it('counts KDE with kdotool, Sway and GNOME with the extension as full window control', () => {
@@ -54,12 +68,12 @@ describe('Linux setup report', () => {
     expect(lists([], { XDG_CURRENT_DESKTOP: 'KDE' })).toContain('KDE keeps its windows private without kdotool')
   })
 
-  it('asks for assistive technologies when GNOME has them turned off', () => {
-    const text = formatSetup(linuxSetup(probe(['atspi']), {}, false))
-    expect(text).toContain('ready: Window text and controls by name')
+  it('notes the GNOME accessibility setting without blocking GTK apps', () => {
+    expect(formatSetup(linuxSetup(probe(['atspi']), {}, false))).toContain('ready: Window text and controls by name (AT-SPI through Python)')
     const off = formatSetup(linuxSetup(probe(['atspi'], { a11y: 'false' }), {}, false))
-    expect(off).toContain('missing: Window text and controls by name (assistive technologies are turned off)')
-    expect(off).toContain('gsettings set org.gnome.desktop.interface toolkit-accessibility true')
+    expect(off).toContain('ready: Window text and controls by name (AT-SPI through Python; Qt apps also need assistive technologies on: '
+      + 'gsettings set org.gnome.desktop.interface toolkit-accessibility true, then restart them)')
+    expect(formatSetup(linuxSetup(probe(['apt-get']), {}, false))).toContain('missing: Window text and controls by name (Python cannot load AT-SPI)')
   })
 
   it('runs the probe through the backend', async () => {

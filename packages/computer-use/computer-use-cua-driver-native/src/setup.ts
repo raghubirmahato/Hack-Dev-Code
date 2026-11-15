@@ -47,6 +47,10 @@ export const LINUX_PROBE = `for c in ${COMMANDS.join(' ')}; do if command -v "$c
   + 'if gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell/Extensions/Windows '
   + '--method org.gnome.Shell.Extensions.Windows.List >/dev/null 2>&1; then echo windowcalls=yes; else echo windowcalls=no; fi'
 
+/** How to start the ydotool daemon, which needs root to write to /dev/uinput, so the person's own programs can use it. */
+const YDOTOOLD_STEP = 'start the ydotool daemon: sudo ydotoold --socket-path=/tmp/.ydotool_socket --socket-own=$(id -u):$(id -g) & '
+  + 'then start Hack Dev Code with YDOTOOL_SOCKET=/tmp/.ydotool_socket'
+
 /** Package names of one helper on each package manager. */
 type Packages = Readonly<Partial<Record<PackageManager, readonly string[]>>>
 
@@ -95,14 +99,21 @@ export function linuxSetup(
     checks.push({ feature, ok, detail: missing, ...packages === undefined ? {} : { packages }, ...step === undefined ? {} : { step } })
   }
   if (wayland) {
-    need('Real mouse and keyboard input', has('ydotool') && has('ydotoold'), 'ydotool through the ydotoold service',
-      has('ydotool') ? 'the ydotoold service is not running' : 'ydotool is missing', has('ydotool') ? undefined : same('ydotool'),
-      'start the input service with: sudo systemctl enable --now ydotoold (or run ydotoold), so it can write to /dev/uinput')
+    const xwayland = (env['DISPLAY'] ?? '').length > 0
+    // Without ydotoold, input goes through xdotool to X11 apps under XWayland, which include the apps the agent starts.
+    const xinput = !has('ydotoold') && xwayland && has('xdotool')
+    need('Real mouse and keyboard input', (has('ydotool') && has('ydotoold')) || xinput,
+      xinput ? `xdotool through XWayland, which reaches X11 apps, including the apps the agent starts; for every app, ${YDOTOOLD_STEP}` : 'ydotool through the ydotoold service',
+      !has('ydotool') ? 'ydotool is missing' : 'the ydotoold service is not running, and xdotool cannot stand in without XWayland',
+      has('ydotool') ? same('xdotool') : { apt: ['ydotool', 'xdotool'], dnf: ['ydotool', 'xdotool'], pacman: ['ydotool', 'xdotool'], zypper: ['ydotool', 'xdotool'] },
+      YDOTOOLD_STEP)
     const shot = ['grim', 'gnome-screenshot', 'spectacle'].find(has)
     need('Screenshots', shot !== undefined && has('convert'), `${shot ?? ''} and ImageMagick`,
       shot === undefined ? 'no screenshot tool (grim on wlroots, gnome-screenshot on GNOME, spectacle on KDE)' : 'ImageMagick is missing',
       shot === undefined ? { ...same('grim'), apt: ['grim', 'imagemagick'], dnf: ['grim', 'ImageMagick'], pacman: ['grim', 'imagemagick'], zypper: ['grim', 'ImageMagick'] } : IMAGEMAGICK)
-    need('Long text through the clipboard', has('wl-copy'), 'wl-clipboard', 'wl-clipboard is missing (long text is typed instead)', same('wl-clipboard'))
+    const paste = xinput ? has('xclip') : has('wl-copy')
+    need('Long text through the clipboard', paste, xinput ? 'xclip through XWayland' : 'wl-clipboard',
+      `${xinput ? 'xclip' : 'wl-clipboard'} is missing; long text is typed instead`, same(xinput ? 'xclip' : 'wl-clipboard'))
     need('Displays', has('wlr-randr') || (env['DISPLAY'] ?? '').length > 0, has('wlr-randr') ? 'wlr-randr' : 'XWayland',
       'neither wlr-randr nor XWayland answers', same('wlr-randr'))
     const sway = (env['SWAYSOCK'] ?? '').length > 0 && has('swaymsg')
@@ -111,11 +122,9 @@ export function linuxSetup(
     const gnome = desktop.includes('gnome') && has('windowcalls')
     const lists = sway ? 'Sway' : hypr ? 'Hyprland' : kde ? 'KWin through kdotool' : gnome ? 'GNOME Shell through the Window Calls extension' : undefined
     need('Listing and moving every window', lists !== undefined, lists ?? '',
-      desktop.includes('kde')
-        ? 'KDE keeps its windows private without kdotool; only X11 apps through XWayland are listed'
-        : desktop.includes('gnome')
-          ? 'GNOME keeps its windows private without the Window Calls extension; only X11 apps through XWayland are listed'
-          : 'this compositor keeps its windows private; only X11 apps through XWayland are listed',
+      `${desktop.includes('kde') ? 'KDE keeps its windows private without kdotool' : desktop.includes('gnome')
+        ? 'GNOME keeps its windows private without the Window Calls extension' : 'this compositor keeps its windows private'}; `
+        + 'only X11 apps are listed, which include the apps the agent starts (they open under XWayland)',
       undefined,
       desktop.includes('kde')
         ? 'install kdotool (cargo install kdotool, or the kdotool package where the distribution has one)'
@@ -126,13 +135,14 @@ export function linuxSetup(
     need('Displays', has('xrandr'), 'xrandr', 'xrandr is missing', XRANDR)
     need('Screenshots', has('import'), 'ImageMagick', 'ImageMagick is missing', IMAGEMAGICK)
     need('The window under a point (safer drags, reservations)', has('xprop'), 'xprop', 'xprop is missing', XPROP)
-    need('Long text through the clipboard', has('xclip'), 'xclip', 'xclip is missing (long text is typed instead)', same('xclip'))
+    need('Long text through the clipboard', has('xclip'), 'xclip', 'xclip is missing; long text is typed instead', same('xclip'))
   }
   need('Text recognition on screen', has('tesseract'), 'tesseract', 'tesseract is missing', TESSERACT)
+  // GTK apps expose AT-SPI either way; the GNOME setting decides whether Qt and older toolkits do.
   const a11yOff = probe.get('a11y') === 'false'
-  need('Window text and controls by name', has('atspi') && !a11yOff, 'AT-SPI through Python',
-    !has('atspi') ? 'Python cannot load AT-SPI' : 'assistive technologies are turned off', has('atspi') ? undefined : ATSPI,
-    a11yOff ? 'turn on assistive technologies: gsettings set org.gnome.desktop.interface toolkit-accessibility true, then restart the apps' : undefined)
+  need('Window text and controls by name', has('atspi'),
+    `AT-SPI through Python${a11yOff ? '; Qt apps also need assistive technologies on: gsettings set org.gnome.desktop.interface toolkit-accessibility true, then restart them' : ''}`,
+    'Python cannot load AT-SPI', ATSPI)
   need('Opening files, folders and links', has('xdg-open'), 'xdg-open', 'xdg-open is missing', same('xdg-utils'))
   const manager: PackageManager | undefined = has('apt-get') ? 'apt' : has('dnf') ? 'dnf' : has('pacman') ? 'pacman' : has('zypper') ? 'zypper' : undefined
   const missing = checks.filter(check => !check.ok)

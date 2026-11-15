@@ -141,8 +141,11 @@ export interface DisplayBackend {
   ocrWindow?(window: WindowInfo): Promise<OcrLine[] | undefined>
   /** Capture one window as it draws itself, even behind others; undefined when it cannot draw itself so. */
   captureWindow?(path: string, window: WindowInfo, maxDimension: number): Promise<CaptureResult | undefined>
-  /** The handle of the top-level window under a desktop point (0 for none), where the platform can tell. */
-  windowAt?(x: number, y: number): Promise<number>
+  /**
+   * The handle of the top-level window under a desktop point (0 for none), or undefined when this session cannot tell
+   * (a Wayland compositor that keeps its window stacking private).
+   */
+  windowAt?(x: number, y: number): Promise<number | undefined>
   /** Which desktop features work in this session and what is missing for the rest. */
   setup?(): Promise<SetupReport>
   /** Stop helper processes. */
@@ -1280,6 +1283,17 @@ export function linuxDragArgs(fromX: number, fromY: number, toX: number, toY: nu
   return ['mousemove', '--sync', String(Math.round(fromX)), String(Math.round(fromY)), 'mousedown', button, 'sleep', '0.06', ...path, 'sleep', '0.08', 'mouseup', button]
 }
 
+/**
+ * Shell script that starts $1 detached from this process: a command on PATH with its arguments (split on spaces with
+ * globbing off, never run through a shell), else a desktop entry id through gtk-launch. Later arguments are
+ * NAME=value settings for the app's environment.
+ */
+export const LAUNCH_SCRIPT = 'app="$1"; shift; vars="$*"; set -f; set -- $app; '
+  + 'if command -v "$1" >/dev/null 2>&1; then env $vars setsid -f "$@" >/dev/null 2>&1; else env $vars gtk-launch "$app"; fi'
+
+/** Settings that make GTK, Qt, SDL, Firefox and Electron apps open as X11 apps under XWayland. */
+export const X11_APP_ENV: readonly string[] = ['GDK_BACKEND=x11', 'QT_QPA_PLATFORM=xcb', 'SDL_VIDEODRIVER=x11', 'MOZ_ENABLE_WAYLAND=0', 'ELECTRON_OZONE_PLATFORM_HINT=x11']
+
 /** Shell script that pastes $1 through the clipboard and restores the earlier clipboard text; prints PASTED. */
 export const LINUX_PASTE = 'command -v xclip >/dev/null 2>&1 || exit 3; '
   + 'old=$(xclip -o -selection clipboard 2>/dev/null); had=$?; '
@@ -1314,6 +1328,23 @@ export function linuxBackend(
   const offset = (value: number): string => (Math.round(value) < 0 ? '' : '+') + int(value)
   const has = (command: string): Promise<boolean> =>
     run('sh', ['-c', 'command -v "$1" >/dev/null 2>&1 && echo yes', 'sh', command]).then(out => out.trim() === 'yes', () => false)
+  /**
+   * Whether real input goes through xdotool: always on X11, and on Wayland while the ydotoold service is not running
+   * but XWayland is. There xdotool reaches X11 apps, which include the apps these tools start (see launch). The answer
+   * is kept for 30 seconds, so starting ydotoold takes effect without a restart.
+   */
+  let route: { until: number; xdotool: Promise<boolean> } | undefined
+  const useXdotool = (): Promise<boolean> => {
+    if (!wayland) return Promise.resolve(true)
+    if (route === undefined || route.until < Date.now()) {
+      route = { until: Date.now() + 30_000, xdotool: (async () => {
+        if ((env['DISPLAY'] ?? '').length === 0) return false
+        const daemon = await run('sh', ['-c', 'pgrep -x ydotoold >/dev/null 2>&1 && echo yes']).then(out => out.trim() === 'yes', () => false)
+        return !daemon && await has('xdotool')
+      })() }
+    }
+    return route.xdotool
+  }
   /**
    * The Wayland compositor whose own commands list and move windows, if any: Sway, Hyprland, GNOME Shell with the
    * Window Calls extension, or KWin through kdotool; otherwise only XWayland windows are reachable.
@@ -1418,9 +1449,9 @@ export function linuxBackend(
       await rm(join(whole, '..'), { recursive: true, force: true }).catch(() => {})
     }
   }
-  /** Run ydotool (Wayland) with the arguments, or xdotool (X11) with the other set. */
-  const tool = (ydotool: readonly string[], xdotool: readonly string[], signal?: AbortSignal, timeoutMs?: number): Promise<string> =>
-    wayland ? helper('ydotool', ydotool, signal, timeoutMs) : helper('xdotool', xdotool, signal, timeoutMs)
+  /** Run xdotool with its arguments when input goes through it, else ydotool with the other set. */
+  const tool = async (ydotool: readonly string[], xdotool: readonly string[], signal?: AbortSignal, timeoutMs?: number): Promise<string> =>
+    await useXdotool() ? helper('xdotool', xdotool, signal, timeoutMs) : helper('ydotool', ydotool, signal, timeoutMs)
   const ydoMove = async (x: number, y: number, signal?: AbortSignal): Promise<void> => { await helper('ydotool', ydotoolMoveArgs(x, y), signal) }
   const windows = async (): Promise<WindowInfo[]> => {
     if (wayland) {
@@ -1480,7 +1511,7 @@ export function linuxBackend(
       return { width: Math.round((area?.width ?? 0) * scale), height: Math.round((area?.height ?? 0) * scale), scale }
     },
     async pointer(x, y, button, count, modifiers, signal) {
-      if (wayland) {
+      if (!await useXdotool()) {
         if (button !== 'none' && modifiers !== undefined) await helper('ydotool', ydotoolHoldArgs(modifiers.x11, true), signal)
         try {
           await ydoMove(x, y, signal)
@@ -1501,7 +1532,7 @@ export function linuxBackend(
       await helper('xdotool', ['mousemove', '--sync', int(x), int(y), ...press], signal)
     },
     async drag(fromX, fromY, toX, toY, button, signal) {
-      if (!wayland) {
+      if (await useXdotool()) {
         await helper('xdotool', linuxDragArgs(fromX, fromY, toX, toY, X11_BUTTONS[button]), signal)
         return
       }
@@ -1517,7 +1548,7 @@ export function linuxBackend(
       }
     },
     async scroll(x, y, clicks, horizontal, signal) {
-      if (!wayland) {
+      if (await useXdotool()) {
         const wheel = horizontal ? (clicks > 0 ? '7' : '6') : (clicks > 0 ? '4' : '5')
         await helper('xdotool', ['mousemove', '--sync', int(x), int(y), 'click', '--repeat', String(Math.abs(Math.round(clicks))), wheel], signal)
         return
@@ -1531,7 +1562,7 @@ export function linuxBackend(
       await tool(ydotoolKeyArgs(chords.map(chord => chord.x11)), ['key', '--clearmodifiers', ...chords.map(chord => chord.x11)], signal)
     },
     async pressButton(x, y, pressed, down, signal) {
-      if (wayland) {
+      if (!await useXdotool()) {
         if (x !== undefined && y !== undefined) await ydoMove(x, y, signal)
         await helper('ydotool', ['click', ydotoolClickCode(pressed, down ? 'down' : 'up')], signal)
         return
@@ -1546,19 +1577,20 @@ export function linuxBackend(
       // Long text goes through the clipboard (wl-clipboard on Wayland, xclip on X11), putting the earlier clipboard
       // text back; without the clipboard tool it is typed.
       if (paste === true) {
-        const pasted = await run('sh', ['-c', wayland ? WAYLAND_PASTE : LINUX_PASTE, 'sh', text], 30_000).then(out => out.trim() === 'PASTED', () => false)
+        const script = await useXdotool() ? LINUX_PASTE : WAYLAND_PASTE
+        const pasted = await run('sh', ['-c', script, 'sh', text], 30_000).then(out => out.trim() === 'PASTED', () => false)
         if (pasted) return
       }
       // Both tools wait 12 ms per character, so long text needs more than the default limit.
       await tool(['type', '--key-delay', '12', '--', text], ['type', '--clearmodifiers', '--delay', '12', '--', text], signal, 30_000 + text.length * 15)
     },
     windows,
-    // X11 keeps a stacking order; Wayland compositors do not tell clients which window is on top.
-    ...wayland ? {} : {
-      async windowAt(x: number, y: number): Promise<number> {
-        const stacking = parseStacking(await helper('xprop', ['-root', '-notype', '_NET_CLIENT_LIST_STACKING']))
-        return topWindowAt(await windows(), stacking, x, y)
-      },
+    async windowAt(x, y) {
+      // X11 keeps a stacking order of its own windows. Wayland compositors keep theirs private, so there it answers
+      // only while input goes to X11 apps through XWayland and the window list is the X11 one.
+      if (wayland && (await whichCompositor() !== 'xwayland' || !await useXdotool())) return undefined
+      const stacking = parseStacking(await helper('xprop', ['-root', '-notype', '_NET_CLIENT_LIST_STACKING']))
+      return topWindowAt(await windows(), stacking, x, y)
     },
     async window(handle, action, signal) {
       const kind = wayland ? await whichCompositor() : 'xwayland'
@@ -1630,12 +1662,14 @@ export function linuxBackend(
     },
     async launch(app) {
       const name = app.trim()
-      // A command on PATH starts detached from this process; anything else is tried as a desktop entry id.
-      await run('sh', ['-c', 'if command -v "$1" >/dev/null 2>&1; then setsid -f "$1" >/dev/null 2>&1; else gtk-launch "$1"; fi', 'sh', name])
-        .catch((error: unknown) => {
-          throw new Error(`could not start "${name}": ${String(error instanceof Error ? error.message : error)}. Pass the command name or the .desktop id of the app`, { cause: error })
-        })
-      return `Started ${name}`
+      // In a Wayland session that keeps its windows private, apps start as X11 apps under XWayland, so these tools can
+      // list, read and operate them.
+      const asX11 = wayland && (env['DISPLAY'] ?? '').length > 0 && await whichCompositor() === 'xwayland'
+      await run('sh', ['-c', LAUNCH_SCRIPT, 'sh', name, ...asX11 ? X11_APP_ENV : []]).catch((error: unknown) => {
+        throw new Error(`could not start "${name}": ${String(error instanceof Error ? error.message : error)}. Pass the command (with its arguments) or the .desktop id of the app`,
+          { cause: error })
+      })
+      return asX11 ? `Started ${name} as an X11 app, so its windows can be listed and operated` : `Started ${name}`
     },
     async setup() {
       return linuxSetup(parseProbe(await run('sh', ['-c', LINUX_PROBE], 30_000)), env, wayland)
@@ -2030,8 +2064,10 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     let handle: number
     if (where === undefined) handle = windows.find(window => window.foreground)?.handle ?? 0
     else if ('handle' in where) handle = where.handle
-    else if (backend.windowAt === undefined) handle = windows.find(window => window.foreground)?.handle ?? 0
-    else handle = await backend.windowAt(Math.round(where.x), Math.round(where.y))
+    else {
+      const at = backend.windowAt === undefined ? undefined : await backend.windowAt(Math.round(where.x), Math.round(where.y))
+      handle = at ?? windows.find(window => window.foreground)?.handle ?? 0
+    }
     const receiving = windows.find(window => window.handle === handle)
     const label = receiving === undefined ? (handle === 0 ? 'the desktop' : `an unlisted window (handle ${String(handle)})`) : describeWindow(receiving)
     const other = reservations.get(handle)
@@ -2252,13 +2288,14 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
    */
   const dragPlan = async (fromX: number, fromY: number, toX: number, toY: number, onto: string | undefined): Promise<string> => {
     const windowAt = backend.windowAt?.bind(backend)
-    if (windowAt === undefined) {
+    const first = windowAt === undefined ? undefined : await windowAt(Math.round(fromX), Math.round(fromY))
+    if (windowAt === undefined || first === undefined) {
       if (onto !== undefined) throw new Error('this session cannot tell which window is under a point, so onto cannot be checked; drag without it and check the result')
       return ''
     }
     const windows = await backend.windows()
     const under = async (x: number, y: number): Promise<{ handle: number; window: WindowInfo | undefined }> => {
-      const handle = await windowAt(Math.round(x), Math.round(y))
+      const handle = (await windowAt(Math.round(x), Math.round(y))) ?? 0
       return { handle, window: windows.find(candidate => candidate.handle === handle) }
     }
     const name = (found: { handle: number; window: WindowInfo | undefined }): string => {
@@ -2641,7 +2678,7 @@ export function registerDisplayTools(ctx: Context, source: DisplayBackend, group
     name: 'desktop_open',
     description: 'Start an installed app by name (app: "Calculator", "Microsoft Word", "Visual Studio Code", "chrome") and report the window it opened; or open a file, folder, URL, or a system page (on Windows, settings pages such as ms-settings:display or ms-settings:network) with its default app, the way double-clicking it would.',
     parameters: {
-      app: { type: 'string', description: 'Name of an installed app as shown in the Start menu or application menu, or its command.' },
+      app: { type: 'string', description: 'Name of an installed app as shown in the Start menu or application menu, or its command (on Linux with arguments, such as "mousepad --disable-server").' },
       target: { type: 'string', description: 'Instead of app: absolute path, URL, or URI such as ms-settings:bluetooth.' },
     },
     output: { schema: DONE_SCHEMA, render: (_args, value) => [{ type: 'text', text: value.done }] },

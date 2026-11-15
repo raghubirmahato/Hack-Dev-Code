@@ -1,12 +1,13 @@
 /**
- * Live check of the whole-desktop tools on a Linux desktop (X11): report the setup, open a Mousepad window of its
+ * Live check of the whole-desktop tools on a Linux desktop (X11, or Wayland with XWayland): report the setup, open a Mousepad window of its
  * own, reserve it, read its controls through AT-SPI, type into it with a verified outcome, find a control by type,
  * wait for it to settle, check a drag's drop target, show that a click outside the reserved window is refused
  * before it is sent, and close the window without saving. It acts only in the window it opens.
  *
  * Run it from the repository root in a terminal of the graphical session (not over SSH), with no Mousepad window
  * open: `HACKDEV_LIVE_DESKTOP=1 npx vitest run --config vitest.e2e.config.ts` followed by this file's path.
- * `HACKDEV_LIVE_APP` and `HACKDEV_LIVE_TITLE` pick another editor (default `mousepad` and `Mousepad`).
+ * `HACKDEV_LIVE_APP` and `HACKDEV_LIVE_TITLE` pick another editor (default `mousepad --disable-server`, a process of its own
+ * rather than a new window of a Mousepad already running, and `Mousepad`).
  */
 import { describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
@@ -17,11 +18,12 @@ import SystemPrompt from '@hackdevcode/dsh-system-prompt'
 import { ToolCallId } from '@hackdevcode/dsh-llm'
 import { linuxBackend, registerDisplayTools } from '../src/displays.ts'
 
-const APP = process.env['HACKDEV_LIVE_APP'] ?? 'mousepad'
+const APP = process.env['HACKDEV_LIVE_APP'] ?? 'mousepad --disable-server'
 const TITLE = process.env['HACKDEV_LIVE_TITLE'] ?? 'Mousepad'
 
 describe.runIf(process.platform === 'linux' && process.env['HACKDEV_LIVE_DESKTOP'] === '1')('live Linux desktop', () => {
-  it('drives its own editor window like a person', { timeout: 240_000 }, async () => {
+  // No retries: each attempt opens a window, and a failed attempt may leave one the next cannot see.
+  it('drives its own editor window like a person', { timeout: 240_000, retry: 0 }, async () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
     await ctx.plugin(ToolRuntime)
@@ -38,10 +40,10 @@ describe.runIf(process.platform === 'linux' && process.env['HACKDEV_LIVE_DESKTOP
     let handle: number | undefined
     try {
       const setup = await call('desktop_setup', {})
-      expect.soft(setup.text).toContain('ready: Real mouse and keyboard input')
-      expect.soft(setup.text).toContain('ready: Window text and controls by name')
+      expect(setup.text).toContain('ready: Real mouse and keyboard input')
       const displays = await call('desktop_list_displays', {})
       expect(displays.failed).toBe(false)
+      const [, width, height] = /(\d+)x(\d+) at \(/u.exec(displays.text)?.map(Number) ?? [0, 1280, 720]
 
       expect((await call('desktop_open', { app: APP })).failed).toBe(false)
       expect((await call('desktop_window', { action: 'wait', title: TITLE, timeout_ms: 20_000 })).failed).toBe(false)
@@ -73,8 +75,8 @@ describe.runIf(process.platform === 'linux' && process.env['HACKDEV_LIVE_DESKTOP
       const refusedDrop = await call('desktop_drag', { from_x: 200, from_y: 250, to_x: 400, to_y: 250, onto: 'no such window' })
       expect.soft(refusedDrop.text).toContain('Nothing was dragged')
 
-      // A point well outside the reserved window: the click must be refused before it is sent.
-      const outside = await call('desktop_pointer', { x: 1000, y: 700 })
+      // A point well outside the reserved window (80, 80, 700x480): the click must be refused before it is sent.
+      const outside = await call('desktop_pointer', { x: Math.max(800, (width ?? 1280) - 60), y: Math.max(600, (height ?? 720) - 60) })
       expect.soft(outside.failed).toBe(true)
       expect.soft(outside.text).toContain('Nothing was sent')
 
