@@ -11,10 +11,32 @@ function manifestAt(file: string): WorkspaceManifest {
   return JSON.parse(readFileSync(file, 'utf8')) as WorkspaceManifest
 }
 
+/** Directory beside a packaged Desktop archive holding the on-demand Official bundle tarballs. */
+const SHIPPED_BUNDLES_DIR = 'official-bundles'
+
 /**
- * Offer a source checkout link or an exact published package version. Source installations are
- * identified by the real CLI manifest and its unpacked workspace dependencies, including Desktop's
- * development symlink. An incomplete checkout is an error, never a registry fallback.
+ * The tarball a packaged installation ships for one Official bundle. Desktop keeps these beside its archive, a few
+ * levels above the DSH manifest, because the registry does not carry the bundles; the search stops at the
+ * filesystem root.
+ * @param name - Official catalog package name.
+ * @param anchor - Real path of the running DSH package.json.
+ * @param version - Running DSH version.
+ * @returns the absolute tarball path, or undefined when this installation ships none.
+ */
+function shippedBundleTarball(name: string, anchor: string, version: string): string | undefined {
+  const file = `${name.replace(/^@/u, '').replace('/', '-')}-${version}.tgz`
+  for (let directory = dirname(anchor), parent = dirname(directory); ; directory = parent, parent = dirname(parent)) {
+    const candidate = join(directory, SHIPPED_BUNDLES_DIR, file)
+    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate
+    if (parent === directory) return undefined
+  }
+}
+
+/**
+ * Offer a source checkout link, a tarball the installation ships, or an exact published package version. Source
+ * installations are identified by the real CLI manifest and its unpacked workspace dependencies, including Desktop's
+ * development symlink. An incomplete checkout is an error, never a registry fallback. A packaged Desktop installs
+ * from the tarball beside its archive when it ships one, since the registry does not carry the bundle.
  * @param name - Official catalog package name.
  * @param installAnchor - Running application's DSH package.json, possibly reached through a symlink.
  * @param version - Running DSH version used by its release family.
@@ -26,7 +48,10 @@ export function officialBundleInstallTarget(name: string, installAnchor: string,
   const installation = manifestAt(anchor)
   const source = installation.name === '@hackdevcode/dsh'
     && Object.values(installation.dependencies ?? {}).some(value => value.startsWith('workspace:'))
-  if (!source) return { spec: `${name}@${version}`, version }
+  if (!source) {
+    const shipped = shippedBundleTarball(name, anchor, version)
+    return shipped === undefined ? { spec: `${name}@${version}`, version } : { spec: `file:${shipped}`, version }
+  }
   const root = resolve(dirname(anchor), '../..')
   if (anchor !== join(root, 'apps', 'cli', 'package.json')
     || !existsSync(join(root, 'package.json'))

@@ -1,0 +1,40 @@
+diff --git a/typescript/dist/resolve-lib.js b/typescript/dist/resolve-lib.js
+index e8837bb2337c42eaffe15942923b8af39fca2b1a..c76f359df1b4777349dd1b7849bfa02b5aa85643 100644
+--- a/typescript/dist/resolve-lib.js
++++ b/typescript/dist/resolve-lib.js
+@@ -82,6 +82,19 @@ function callerDir(callerUrl) {
+         : callerUrl;
+     return (0, node_path_1.dirname)(path);
+ }
++/**
++ * Electron packs JavaScript into app.asar and keeps native binaries in app.asar.unpacked. A path built from a
++ * module's own location inside the archive names a file the operating system cannot open, so a native library
++ * found there is loaded from its unpacked copy instead.
++ */
++function unpackedAsarPath(path) {
++    const archive = `${node_path_1.sep}app.asar${node_path_1.sep}`;
++    const index = path.indexOf(archive);
++    if (index < 0)
++        return path;
++    const unpacked = `${path.slice(0, index)}${node_path_1.sep}app.asar.unpacked${node_path_1.sep}${path.slice(index + archive.length)}`;
++    return (0, node_fs_1.existsSync)(unpacked) ? unpacked : path;
++}
+ function libFileName(crateName, platform) {
+     if (platform === "win32")
+         return `${crateName}.dll`;
+@@ -107,7 +120,7 @@ function resolveColocated(crateName, callerUrl) {
+             attempted: [candidate],
+         });
+     }
+-    return candidate;
++    return unpackedAsarPath(candidate);
+ }
+ function resolveOverride(crateName, path) {
+     if (!(0, node_path_1.isAbsolute)(path)) {
+@@ -166,5 +179,5 @@ function resolveNpmPackage(crateName, callerUrl, npmPackageBase, tripleStyle) {
+             attempted: [binaryPath],
+         });
+     }
+-    return binaryPath;
++    return unpackedAsarPath(binaryPath);
+ }

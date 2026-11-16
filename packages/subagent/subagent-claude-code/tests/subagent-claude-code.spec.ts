@@ -347,11 +347,14 @@ describe('task admission and package contracts', () => {
     const root = fileURLToPath(new URL('..', import.meta.url))
     const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
+      peerDependencies?: Record<string, string>
       files?: string[]
       dsh?: { bundle?: { patch?: string } }
     }
     expect(manifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
     expect(manifest.files).toContain('cordis.patch.yml')
+    // DSH packages come from the installation, so an on-demand install fetches only public packages.
+    expect(Object.keys(manifest.dependencies ?? {}).filter(name => name.startsWith('@hackdevcode/'))).toEqual([])
     expect(manifest.dependencies).toHaveProperty(
       '@anthropic-ai/claude-agent-sdk',
       CLAUDE_AGENT_SDK_VERSION,
@@ -399,7 +402,7 @@ describe('task admission and package contracts', () => {
         provider: 'claude-code', toolName: 'subagent_claude_code', maxDepth: 'provider-managed',
       } },
     ] }])
-    expect(manifest.dependencies).toHaveProperty('@hackdevcode/dsh-tool-subagent', 'workspace:*')
+    expect(manifest.peerDependencies).toHaveProperty('@hackdevcode/dsh-tool-subagent', 'workspace:*')
   })
 
   it('preserves text sequences and rejects empty, blank, and non-text tasks', () => {

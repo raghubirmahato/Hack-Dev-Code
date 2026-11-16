@@ -7,6 +7,7 @@ import { DESKTOP_HOST_RUNTIME_FILES, DESKTOP_PACKAGES_DIR } from '../src/core-pa
 import {
   assertDesktopHostPackageFiles,
   prepareDesktopPackageSet,
+  prepareOfficialBundleTarballs,
   selectDesktopPackageClosure,
   type PackedDesktopPackage,
 } from '../scripts/prepare-package-set.ts'
@@ -162,4 +163,26 @@ it('copies no macOS tarball into the Windows package set', () => {
   prepareDesktopPackageSet([inputs], output, { platform: 'darwin', arch: 'arm64' })
   expect(readFileSync(join(output, DESKTOP_PACKAGES_DIR, 'dsh-cua-macos.tgz')))
     .toEqual(readFileSync(join(inputs, 'dsh-cua-macos.tgz')))
+})
+
+it('stages the on-demand bundle tarballs Desktop installs from', () => {
+  const root = mkdtempSync(join(tmpdir(), 'desktop-official-bundles-'))
+  onTestFinished(() => { rmSync(root, { recursive: true, force: true }) })
+  const inputs = join(root, 'inputs')
+  mkdirSync(inputs)
+  for (const name of ['@hackdevcode/dsh-subagent-codex', '@hackdevcode/dsh-unrelated']) {
+    const stem = name.replace('@hackdevcode/', 'hackdevcode-')
+    const folder = join(root, stem, 'package')
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(join(folder, 'package.json'), JSON.stringify({ name, version: '1.0.0' }))
+    execFileSync(tarExecutable(), ['-czf', join(inputs, `${stem}-1.0.0.tgz`), '-C', join(folder, '..'), 'package'])
+  }
+  const output = join(root, 'official-bundles')
+  mkdirSync(output)
+  writeFileSync(join(output, 'stale.tgz'), '')
+  expect(prepareOfficialBundleTarballs([inputs], output, ['@hackdevcode/dsh-subagent-codex']))
+    .toEqual(['hackdevcode-dsh-subagent-codex-1.0.0.tgz'])
+  expect(readdirSync(output)).toEqual(['hackdevcode-dsh-subagent-codex-1.0.0.tgz'])
+  expect(() => prepareOfficialBundleTarballs([inputs], output, ['@hackdevcode/dsh-missing']))
+    .toThrow('packed inputs omit on-demand bundle @hackdevcode/dsh-missing')
 })

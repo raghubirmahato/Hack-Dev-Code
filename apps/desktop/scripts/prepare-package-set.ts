@@ -25,6 +25,7 @@ import {
 } from '../src/core-package-set.ts'
 import { capture } from '../../../scripts/release/process.ts'
 import { tarballFiles, tarExecutable } from '../../../scripts/release/tarball.ts'
+import { ON_DEMAND_BUNDLES } from '../../../packages/util/official-bundles/src/index.ts'
 import { desktopTargetPlatform, resolveDesktopBuildTarget, resolveDesktopTargetBuildPaths } from './desktop-build-paths.mjs'
 
 const DSH_PACKAGE = '@hackdevcode/dsh'
@@ -180,6 +181,30 @@ export function prepareDesktopPackageSet(
   writeFileSync(join(output, DESKTOP_PACKAGE_SET_FILE), `${JSON.stringify(packageSet, undefined, 2)}\n`, { mode: 0o600 })
 }
 
+/**
+ * Stage the on-demand Official bundles as plain tarballs Desktop ships beside its archive. These packages are not
+ * published to a registry, so an installed Desktop installs them from the shipped file; their DSH dependencies are
+ * peers the installation already provides, and their remaining dependencies are public packages.
+ * @param inputs - Release tarball directories.
+ * @param output - Destination directory, replaced on every run.
+ * @param names - Bundle package names to stage.
+ * @returns The staged tarball file names.
+ */
+export function prepareOfficialBundleTarballs(
+  inputs: readonly string[], output: string, names: readonly string[] = ON_DEMAND_BUNDLES,
+): string[] {
+  const available = packedPackages(inputs)
+  rmSync(output, { recursive: true, force: true })
+  mkdirSync(output, { recursive: true })
+  return names.map((name) => {
+    const packed = available.get(name)
+    if (packed === undefined) throw new Error(`desktop package set: packed inputs omit on-demand bundle ${name}`)
+    const file = basename(packed.tarball)
+    copyFileSync(packed.tarball, join(output, file), constants.COPYFILE_EXCL)
+    return file
+  })
+}
+
 function main(): void {
   const buildPaths = resolveDesktopTargetBuildPaths()
   const defaultInputs = [
@@ -195,6 +220,10 @@ function main(): void {
   const output = values.out === undefined ? buildPaths.packageSet : resolve(REPOSITORY_ROOT, values.out)
   prepareDesktopPackageSet(inputs, output, desktopTargetPlatform(resolveDesktopBuildTarget()))
   console.log(`desktop package set: prepared ${output}`)
+  if (values.out === undefined) {
+    const bundles = prepareOfficialBundleTarballs(inputs, buildPaths.officialBundles)
+    console.log(`desktop package set: staged on-demand bundles ${bundles.join(', ')}`)
+  }
 }
 
 if (import.meta.main) main()

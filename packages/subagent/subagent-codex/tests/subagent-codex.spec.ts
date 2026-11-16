@@ -363,15 +363,15 @@ describe('task admission and package contracts', () => {
     const root = fileURLToPath(new URL('..', import.meta.url))
     const manifest = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')) as {
       dependencies?: Record<string, string>
+      peerDependencies?: Record<string, string>
       files?: string[]
       dsh?: { bundle?: { patch?: string } }
     }
     expect(manifest.dsh?.bundle?.patch).toBe('./cordis.patch.yml')
     expect(manifest.files).toContain('cordis.patch.yml')
-    expect(manifest.dependencies).toHaveProperty(
-      '@hackdevcode/dsh-sdk-protocol',
-      'workspace:*',
-    )
+    // DSH packages come from the installation, so an on-demand install fetches only public packages.
+    expect(manifest.peerDependencies).toHaveProperty('@hackdevcode/dsh-sdk-protocol', 'workspace:*')
+    expect(Object.keys(manifest.dependencies ?? {}).filter(name => name.startsWith('@hackdevcode/'))).toEqual([])
     expect(manifest.dependencies).toHaveProperty('@openai/codex', CODEX_VERSION)
     expect(manifest.dependencies).not.toHaveProperty('@hackdevcode/dsh-subagent-claude-code')
 
@@ -412,7 +412,7 @@ describe('task admission and package contracts', () => {
         provider: 'codex', toolName: 'subagent_codex', maxDepth: 'provider-managed',
       } },
     ] }])
-    expect(manifest.dependencies).toHaveProperty('@hackdevcode/dsh-tool-subagent', 'workspace:*')
+    expect(manifest.peerDependencies).toHaveProperty('@hackdevcode/dsh-tool-subagent', 'workspace:*')
   })
 
   it('accepts one or more text blocks and rejects empty or non-text tasks', () => {

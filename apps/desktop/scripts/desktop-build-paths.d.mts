@@ -8,6 +8,8 @@ export interface DesktopTargetBuildPaths {
   readonly unnotarizedArtifacts: string
   readonly runtime: string
   readonly packageSet: string
+  /** On-demand Official bundle tarballs shipped beside the application archive. */
+  readonly officialBundles: string
   readonly dsh: string
   readonly dshPnpm: string
   readonly electron: string

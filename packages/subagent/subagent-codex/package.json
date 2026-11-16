@@ -45,14 +45,14 @@
     "@hackdevcode/dsh-session": "workspace:*",
     "@hackdevcode/dsh-subagent": "workspace:*",
     "@hackdevcode/dsh-subprocess": "workspace:*",
-    "@hackdevcode/dsh-timeout": "workspace:*"
-  },
-  "dependencies": {
+    "@hackdevcode/dsh-timeout": "workspace:*",
     "@hackdevcode/dsh-brand": "workspace:*",
     "@hackdevcode/dsh-sdk-protocol": "workspace:*",
     "@hackdevcode/schemastery": "workspace:~",
-    "@openai/codex": "0.153.4",
     "@hackdevcode/dsh-tool-subagent": "workspace:*"
+  },
+  "dependencies": {
+    "@openai/codex": "0.153.4"
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -71,7 +71,11 @@
     "@hackdevcode/dsh-subprocess-local": "workspace:*",
     "@hackdevcode/dsh-timeout": "workspace:*",
     "@hackdevcode/dsh-tool-jobs": "workspace:*",
-    "@hackdevcode/dsh-tools": "workspace:*"
+    "@hackdevcode/dsh-tools": "workspace:*",
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/dsh-sdk-protocol": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "@hackdevcode/dsh-tool-subagent": "workspace:*"
   },
   "icon": "./icon.svg"
 }

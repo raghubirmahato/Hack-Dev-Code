@@ -45,16 +45,16 @@
     "@hackdevcode/dsh-session": "workspace:*",
     "@hackdevcode/dsh-subagent": "workspace:*",
     "@hackdevcode/dsh-subprocess": "workspace:*",
-    "@hackdevcode/dsh-timeout": "workspace:*"
+    "@hackdevcode/dsh-timeout": "workspace:*",
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "@hackdevcode/dsh-tool-subagent": "workspace:*"
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "0.3.263",
     "@anthropic-ai/sdk": "0.93.0",
-    "@hackdevcode/dsh-brand": "workspace:*",
-    "@hackdevcode/schemastery": "workspace:~",
     "@modelcontextprotocol/sdk": "^1.31.0",
-    "zod": "4.6.6",
-    "@hackdevcode/dsh-tool-subagent": "workspace:*"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@hackdevcode/cordis": "workspace:~",
@@ -74,7 +74,10 @@
     "@hackdevcode/dsh-timeout": "workspace:*",
     "@hackdevcode/dsh-tool-jobs": "workspace:*",
     "@hackdevcode/dsh-tools": "workspace:*",
-    "@hackdevcode/dsh-agent-loop-testkit": "workspace:*"
+    "@hackdevcode/dsh-agent-loop-testkit": "workspace:*",
+    "@hackdevcode/dsh-brand": "workspace:*",
+    "@hackdevcode/schemastery": "workspace:~",
+    "@hackdevcode/dsh-tool-subagent": "workspace:*"
   },
   "icon": "./icon.svg"
 }

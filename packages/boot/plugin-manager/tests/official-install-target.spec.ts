@@ -30,6 +30,23 @@ it('offers an exact prerelease registry target for a packed installation inside 
   expect(officialBundleInstallTarget(name, anchor, version)).toEqual({ spec: `${name}@${version}`, version })
 })
 
+it('installs a packaged Desktop bundle from the tarball it ships beside its archive', () => {
+  const temporary = mkdtempSync(join(tmpdir(), 'official-shipped-'))
+  onTestFinished(() => { rmSync(temporary, { recursive: true, force: true }) })
+  const resources = realpathSync(temporary)
+  const anchor = join(resources, 'app', 'dsh', 'node_modules', '@hackdevcode', 'dsh', 'package.json')
+  mkdirSync(dirname(anchor), { recursive: true })
+  writeFileSync(anchor, JSON.stringify({ name: '@hackdevcode/dsh', version, dependencies: { '@hackdevcode/dsh-app-boot': version } }))
+  // Without the shipped file the registry spec stays.
+  expect(officialBundleInstallTarget(name, anchor, version)).toEqual({ spec: `${name}@${version}`, version })
+  const tarball = join(resources, 'official-bundles', `hackdevcode-dsh-subagent-codex-${version}.tgz`)
+  mkdirSync(dirname(tarball), { recursive: true })
+  writeFileSync(tarball, 'tarball')
+  expect(officialBundleInstallTarget(name, anchor, version)).toEqual({ spec: `file:${tarball}`, version })
+  // Another version's tarball is not this release's bundle.
+  expect(officialBundleInstallTarget(name, anchor, '9.9.9')).toEqual({ spec: `${name}@9.9.9`, version: '9.9.9' })
+})
+
 it('keeps an installation without workspace dependencies on the registry path', () => {
   const { anchor } = fixture()
   writeFileSync(anchor, JSON.stringify({ name: '@hackdevcode/dsh', version }))
