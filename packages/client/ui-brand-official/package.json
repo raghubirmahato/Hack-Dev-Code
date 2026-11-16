@@ -1,6 +1,6 @@
 {
   "name": "@hackdevcode/dsh-client-ui-brand-official",
-  "description": "Official Hack Dev Code brand artwork and click-triggered home background",
+  "description": "Official Hack Dev Code brand artwork",
   "version": "0.2.2-rc.3",
   "publishConfig": {
     "access": "public"
@@ -24,8 +24,7 @@
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json",
-    "./locale/*.json": "./locale/*.json",
-    "./assets/*": "./lib/assets/*"
+    "./locale/*.json": "./locale/*.json"
   },
   "dsh": {
     "client": {
@@ -60,7 +59,6 @@
     "locale/*.json",
     "lib/index.js",
     "lib/client.js",
-    "lib/assets",
     "lib/types/**/*.d.ts",
     "lib/types/**/*.d.ts.map",
     "lib/**/*.js.map",

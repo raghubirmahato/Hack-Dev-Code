@@ -17,7 +17,6 @@ afterEach(() => {
 const HOLES = [
   'sidebar.brand.mark',
   'sidebar.brand.name',
-  'conversation.hero.frame',
 ] as const
 
 const HERO_HOLE = 'conversation.hero.brand.mark'
@@ -46,13 +45,13 @@ describe('official browser-brand plugin', () => {
     expect(inject).toEqual(['slots'])
   })
 
-  it('keeps local sidebar branding and provides the same blank-home feedback', async () => {
+  it('keeps local sidebar branding and leaves the blank home undecorated', async () => {
     vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'local')
     const subject = await bench()
     await subject.ctx.plugin({ inject: [...inject], apply }).await()
     expect(subject.slots.entries('sidebar.brand.mark')).toHaveLength(0)
     expect(subject.slots.entries('sidebar.brand.name')).toHaveLength(0)
-    expect(subject.slots.entries('conversation.hero.frame')).toHaveLength(1)
+    expect(subject.slots.entries('conversation.hero.frame')).toHaveLength(0)
   })
 
   it('fills declarations before or after apply and removes every occupant on teardown', async () => {
@@ -86,15 +85,13 @@ describe('official browser-brand plugin', () => {
     expect(subject.slots.entries(HERO_HOLE)).toHaveLength(0)
   })
 
-  it('registers the whale as a self-contained frame layer without replacing the hero mark', async () => {
+  it('leaves the blank home without a background decoration', async () => {
     vi.stubEnv('DSH_CLIENT_BUILD_PROFILE', 'official')
     const subject = await bench()
     const fiber = subject.ctx.plugin({ inject: [...inject], apply })
     try {
       await fiber.await()
-      const [entry] = subject.slots.entries('conversation.hero.frame')
-      expect(entry?.options.id).toBe('pixel-whale')
-      expect(entry?.inject).toBeUndefined()
+      expect(subject.slots.entries('conversation.hero.frame')).toHaveLength(0)
       expect(subject.slots.entries(HERO_HOLE)).toHaveLength(0)
     } finally {
       await fiber.dispose()
