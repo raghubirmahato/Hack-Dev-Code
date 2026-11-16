@@ -46,6 +46,48 @@ export function isCredentialRefName(value: string): boolean {
   return REF_PATTERN.test(value)
 }
 
+/** Separators between the entries of one stored value: commas and semicolons. */
+const ENTRY_SEPARATOR = /[,;]+/
+
+/**
+ * Split one stored value into its entries. A reference may hold several API keys for one platform, which the
+ * model adapters rotate through; this is the one place the separator rule lives for storage and configuration
+ * surfaces. Blank entries and repeats are dropped.
+ * @param value - the value exactly as stored.
+ * @returns the distinct non-empty entries in stored order.
+ */
+export function splitCredentialEntries(value: string): string[] {
+  const seen = new Set<string>()
+  for (const part of value.split(ENTRY_SEPARATOR)) {
+    const entry = part.trim()
+    if (entry.length > 0) seen.add(entry)
+  }
+  return [...seen]
+}
+
+/**
+ * Apply one edit to the entries of a stored value: drop entries by position, then append new ones.
+ * @param stored - the value as currently stored, or `undefined` when nothing is stored.
+ * @param remove - zero-based positions of entries to drop, counted in {@link splitCredentialEntries} order.
+ * @param add - new entries, separated as in a stored value; repeats of kept entries are dropped.
+ * @param expectedCount - how many entries the editor saw; a different count means the value changed underneath it.
+ * @returns the value to store, an empty string when no entry is left, or `undefined` when the stored value no
+ *   longer has `expectedCount` entries or a position is out of range.
+ */
+export function editCredentialEntries(
+  stored: string | undefined,
+  remove: readonly number[],
+  add: string,
+  expectedCount: number,
+): string | undefined {
+  const entries = stored === undefined ? [] : splitCredentialEntries(stored)
+  if (entries.length !== expectedCount) return undefined
+  if (remove.some(index => !Number.isInteger(index) || index < 0 || index >= entries.length)) return undefined
+  const dropped = new Set(remove)
+  const kept = entries.filter((_, index) => !dropped.has(index))
+  return splitCredentialEntries([...kept, ...splitCredentialEntries(add)].join(',')).join(',')
+}
+
 /**
  * Whether a raw string could be a {@link credentialKey} segment at all.
  * Consumers whose addressing units come from somewhere else — a settings dict

@@ -7,6 +7,18 @@
 /** Milliseconds a key rests after the provider rejected it for rate limiting. */
 const DEFAULT_COOLDOWN_MS = 60_000
 
+/**
+ * Milliseconds a key rests after the provider refused the key itself (invalid, revoked, or out of balance): such a key
+ * does not recover within a rate-limit window, so it stays out of the rotation far longer.
+ */
+const KEY_REFUSED_REST_MS = 15 * 60_000
+
+/**
+ * Why a provider refused a key: `rate-limit` is a throttle that lifts by itself; `key` means the key itself was
+ * refused (invalid, revoked, or out of balance), which waiting does not fix.
+ */
+export type KeyRefusal = 'rate-limit' | 'key'
+
 /** Longest a request waits for a resting key before it is sent anyway. */
 export const MAX_KEY_WAIT_MS = 60_000
 
@@ -50,6 +62,8 @@ export function splitApiKeys(raw: string): string[] {
 export class ApiKeyPool {
   private readonly cursor = new Map<string, number>()
   private readonly restingUntil = new Map<string, number>()
+  /** Keys resting because the provider refused the key itself; waiting for them is pointless. */
+  private readonly refusedKeys = new Set<string>()
 
   /**
    * @param now - clock in milliseconds; injectable for deterministic tests.
@@ -94,17 +108,25 @@ export class ApiKeyPool {
    * Rest a key the provider throttled or rejected so the next requests use another one.
    * @param key - the key that failed.
    * @param retryAfterMs - the provider's own wait hint, when it gave one.
+   * @param refusal - why it failed; a refused key rests far longer than a throttled one unless the provider named a wait.
    */
-  report(key: string, retryAfterMs?: number): void {
-    this.restingUntil.set(key, this.now() + (retryAfterMs !== undefined && retryAfterMs > 0 ? retryAfterMs : this.cooldownMs))
+  report(key: string, retryAfterMs?: number, refusal: KeyRefusal = 'rate-limit'): void {
+    const rest = retryAfterMs !== undefined && retryAfterMs > 0 ? retryAfterMs
+      : refusal === 'key' ? Math.max(this.cooldownMs, KEY_REFUSED_REST_MS) : this.cooldownMs
+    this.restingUntil.set(key, this.now() + rest)
+    if (refusal === 'key') this.refusedKeys.add(key)
+    else this.refusedKeys.delete(key)
   }
 
   /**
-   * How long a key still rests; zero once it may be used again.
+   * How long a request should wait before using a key: its remaining rest after a throttle, and zero once it may be
+   * used again or when the provider refused the key itself, since waiting cannot fix that key and the request should
+   * fail at once with the provider's own reason.
    * @param key - a key previously returned by {@link next}.
    * @returns the remaining rest in milliseconds.
    */
   readyInMs(key: string): number {
+    if (this.refusedKeys.has(key)) return 0
     return Math.max(0, (this.restingUntil.get(key) ?? 0) - this.now())
   }
 

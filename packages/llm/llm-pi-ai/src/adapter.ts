@@ -50,6 +50,7 @@ import {
 import type {
   GenerateOptions,
   ImageAttachmentAccess,
+  KeyRefusal,
   LlmModelInfo,
   LlmProviderInfo,
   LlmResolvedModelInfo,
@@ -106,6 +107,11 @@ const IMAGE_OMITTED_NOTE = '[An earlier image was omitted because the provider l
 /** Failure codes another stored key can cure: refused key, exhausted quota and rate limit. */
 const ROTATING_CODES: ReadonlySet<string> = new Set(['AUTH', 'QUOTA', 'RATE_LIMIT'])
 
+/** An authentication refusal is about the key itself; quota and rate refusals lift with time. */
+function refusalOf(code: string): KeyRefusal {
+  return code === 'AUTH' ? 'key' : 'rate-limit'
+}
+
 /** One resolution's frozen view: the profiles and the collection built from them. */
 interface PiAiSnapshot {
   /** The resolved profiles this collection was built from, used as its identity. */
@@ -128,16 +134,17 @@ export interface PiAiAdapterOptions {
    * `MISSING_CREDENTIAL` rather than falling back.
    */
   resolveApiKey: (provider: string, profile: ResolvedPiAiProviderProfile) => Promise<string | undefined>
-  /**
-   * After a provider refused `refused` for rate, quota or key reasons, rest it and return another stored
-   * key that this request has not tried, or `undefined` when none is left.
-   */
   /** Milliseconds a stored key still rests after a refusal; omission means keys never rest. */
   apiKeyReadyInMs?: (key: string) => number
+  /**
+   * After a provider refused the newest key in `refused` for rate, quota or key reasons, rest it and return another
+   * stored key that this request has not tried, or `undefined` when none is left.
+   */
   rotateApiKey?: (
     provider: string,
     profile: ResolvedPiAiProviderProfile,
     refused: ReadonlySet<string>,
+    refusal: KeyRefusal,
   ) => Promise<string | undefined>
   /**
    * How every collection this adapter builds resolves auth the request-level
@@ -592,7 +599,7 @@ export class PiAiAdapter extends LlmAdapter {
               if (chunk.type === 'finish' && chunk.reason.kind === 'error' && ROTATING_CODES.has(chunk.reason.failure.code)
                 && apiKey !== undefined && this.config.rotateApiKey !== undefined) {
                 refusedKeys.add(apiKey)
-                const next = await this.config.rotateApiKey(options.provider, profile, refusedKeys)
+                const next = await this.config.rotateApiKey(options.provider, profile, refusedKeys, refusalOf(chunk.reason.failure.code))
                 if (next !== undefined) {
                   yield { ...chunk, reason: { kind: 'error', failure: { ...chunk.reason.failure, code: 'RATE_LIMIT' } } }
                   continue
@@ -635,7 +642,7 @@ export class PiAiAdapter extends LlmAdapter {
             if (chunk.type === 'finish' && chunk.reason.kind === 'error' && ROTATING_CODES.has(chunk.reason.failure.code)
               && apiKey !== undefined && this.config.rotateApiKey !== undefined) {
               refusedKeys.add(apiKey)
-              const next = await this.config.rotateApiKey(options.provider, profile, refusedKeys)
+              const next = await this.config.rotateApiKey(options.provider, profile, refusedKeys, refusalOf(chunk.reason.failure.code))
               if (next !== undefined) {
                 // The refused stream has ended; let it finish so the shared consumer stays usable.
                 await watchdog.next(iterator)

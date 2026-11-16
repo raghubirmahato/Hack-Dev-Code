@@ -925,9 +925,10 @@ select.input {
   line-height: 18px;
 }
 
-.savedKeyInput .input::placeholder {
-  color: var(--dsw-alias-label-primary);
-  opacity: 1;
+/* A saved key: its server-made mask, read-only; it can only be removed. */
+.savedKey {
+  color: var(--dsw-alias-label-secondary);
+  cursor: default;
 }
 
 .keyInputFilled {

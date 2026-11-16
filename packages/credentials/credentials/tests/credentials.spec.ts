@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
-import { credentialRef, isCredentialKeySegment } from '../src/index.ts'
+import { credentialRef, editCredentialEntries, isCredentialKeySegment, splitCredentialEntries } from '../src/index.ts'
 import type { CredentialRef } from '../src/index.ts'
 import { MemoryCredentials } from './memory.ts'
 
@@ -23,6 +23,29 @@ describe('credentialRef', () => {
     for (const invalid of ['', '9LEADING', 'WITH-DASH', 'WITH SPACE', 'ns:key']) {
       expect(() => credentialRef(invalid)).toThrow(TypeError)
     }
+  })
+})
+
+describe('stored entries', () => {
+  it('splits on commas and semicolons, trimming blanks and repeats', () => {
+    expect(splitCredentialEntries(' sk-a, sk-b;;sk-a ,, ; sk-c ')).toEqual(['sk-a', 'sk-b', 'sk-c'])
+    expect(splitCredentialEntries('sk-only')).toEqual(['sk-only'])
+    expect(splitCredentialEntries(' , ; ')).toEqual([])
+  })
+
+  it('drops entries by position and appends new ones without repeating a kept entry', () => {
+    expect(editCredentialEntries('sk-a,sk-b,sk-c', [1], 'sk-d; sk-a', 3)).toBe('sk-a,sk-c,sk-d')
+    expect(editCredentialEntries('sk-a', [], 'sk-b', 1)).toBe('sk-a,sk-b')
+    expect(editCredentialEntries(undefined, [], 'sk-a,sk-b', 0)).toBe('sk-a,sk-b')
+    expect(editCredentialEntries('sk-a,sk-b', [0, 1], '', 2)).toBe('')
+  })
+
+  it('refuses an edit made against a different list', () => {
+    expect(editCredentialEntries('sk-a,sk-b', [0], '', 3)).toBeUndefined()
+    expect(editCredentialEntries(undefined, [], 'sk-a', 1)).toBeUndefined()
+    expect(editCredentialEntries('sk-a,sk-b', [2], '', 2)).toBeUndefined()
+    expect(editCredentialEntries('sk-a,sk-b', [-1], '', 2)).toBeUndefined()
+    expect(editCredentialEntries('sk-a,sk-b', [0.5], '', 2)).toBeUndefined()
   })
 })
 

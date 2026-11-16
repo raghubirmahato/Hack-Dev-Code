@@ -199,10 +199,16 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     const { mode } = retryPolicyDefaults(schema, node, schema.getPath(namespace.base, path))
     return { ...loaded, retryPolicy: { ...policy, mode } }
   })
-  // Undefined is untouched; strings hold new input and a reference stages removal.
-  const [keyDraft, setKeyDraft] = useState<string | { readonly ref: string; readonly removed?: true }>()
-  const keyText = typeof keyDraft === 'string' ? keyDraft : ''
-  const keyRemoval = typeof keyDraft === 'object' ? keyDraft : undefined
+  // New keys typed into the field, joined by commas.
+  const [keyText, setKeyText] = useState('')
+  // A reference staged for whole removal; `removed` once the Host has deleted it.
+  const [keyRemoval, setKeyRemoval] = useState<{ readonly ref: string; readonly removed?: true }>()
+  // Saved keys staged for removal by position while others stay, with the count the page listed.
+  const [savedRemoved, setSavedRemoved] = useState<{
+    readonly ref: string
+    readonly count: number
+    readonly indexes: ReadonlySet<number>
+  }>()
   const [busy, setBusy] = useState(false)
   const [listBusy, setListBusy] = useState(false)
   const { onBusyChange } = props
@@ -245,8 +251,41 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       ? schema.deletePath(current, [key])
       : schema.setPath(current, [key], value))
   }
-  const clearsDerivedRef = keyRemoval !== undefined && layout === 'pi-ai'
+  // A removed key replaced by typed ones under the same reference is overwritten, not deleted first: the
+  // reference keeps authenticating, and a refused deletion cannot block the replacement.
+  const stagedRemoval = keyRemoval !== undefined && keyRemoval.removed !== true && keyRemoval.ref === keyRef
+    && storedKeys(keyText).length > 0 ? undefined : keyRemoval
+  const clearsDerivedRef = stagedRemoval !== undefined && layout === 'pi-ai'
     && props.nativeAuth !== undefined && stringAt(draft, 'apiKeyEnv') === deriveKeyRef(props.provider)
+
+  /**
+   * Which credential this card authenticates with and what the page knows of it. A named reference is the only
+   * credential the adapter reads for this route; without one, a catalog route authenticates the way the directory
+   * reports, and a declared route sends no key at all.
+   */
+  const credentialView = () => {
+    const namedRef = clearsDerivedRef
+      ? stringAt(schema.getPath(namespace.base, settingsPath), 'apiKeyEnv')
+      : stringAt(fallback, 'apiKeyEnv')
+    const nativeAuth = namedRef === undefined ? props.nativeAuth : undefined
+    const endpointEnv = props.baseURLEnv ?? []
+    // Display method-neutral references without changing the adapter's lookup.
+    const authRefs = namedRef === undefined
+      ? (nativeAuth?.env ?? []).filter(ref => !endpointEnv.includes(ref)) : [namedRef]
+    const visibleRefs = authRefs.filter(ref => !ref.toLowerCase().includes('oauth'))
+    const checkedRefs = authRefs.map(ref => [
+      ref, props.credentialChecks?.[ref] ?? (ref === namedRef ? props.credential : undefined),
+    ] as const)
+    const detected = checkedRefs.find(([, info]) => info?.configured === true)
+    const detectedRef = detected?.[0]
+    const detectedVisibleRef = detectedRef === undefined || !visibleRefs.includes(detectedRef) ? undefined : detectedRef
+    const info = detected?.[1]
+    // Keys this page saved: listed one per row, and editable by position when the store can be written.
+    const saved = info?.source === 'file' && detectedVisibleRef !== undefined
+      ? { ref: detectedVisibleRef, writable: info.writable, masked: info.maskedEntries ?? [info.masked ?? ''] }
+      : undefined
+    return { nativeAuth, visibleRefs, checkedRefs, detectedRef, detectedVisibleRef, saved }
+  }
 
   // The model list is validated by the same per-row checker for both families,
   // so a bad row is named by its position rather than by a blanket message.
@@ -348,11 +387,11 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       : materializesNativeProfile
         ? [{ op: 'set', path: [...settingsPath], value: {} }]
         : pathOps(settingsPath, committedOriginal, next)
-    if (keyRemoval !== undefined && keyRemoval.removed !== true) {
-      const removed = await operations.removeCredential(keyRemoval.ref)
+    if (stagedRemoval !== undefined && stagedRemoval.removed !== true) {
+      const removed = await operations.removeCredential(stagedRemoval.ref)
       if (removed !== undefined) return removed
       // A later settings failure cannot restore a secret that was deleted.
-      setKeyDraft({ ...keyRemoval, removed: true })
+      setKeyRemoval({ ...stagedRemoval, removed: true })
     }
     if (ops.length > 0) {
       const written = await operations.writeSettings(ns, ops, expectedRevision)
@@ -361,11 +400,22 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
       setExpectedRevision(written.view.revision)
       setDraft(next)
     }
-    if (keyValue.length > 0) {
+    // Keys join or leave a saved list in place, so the page never needs the keys it is not changing.
+    const saved = keyRemoval === undefined ? credentialView().saved : undefined
+    const removedIndexes = savedRemoved !== undefined && saved !== undefined && savedRemoved.ref === saved.ref
+      ? [...savedRemoved.indexes].sort((left, right) => left - right) : []
+    if (saved?.writable === true && (removedIndexes.length > 0 || keyValue.length > 0)) {
+      const edited = await operations.editCredentialKeys(
+        saved.ref, removedIndexes, keyValue, savedRemoved?.ref === saved.ref ? savedRemoved.count : saved.masked.length,
+      )
+      if (edited !== undefined) return edited
+    } else if (keyValue.length > 0) {
       const stored = await operations.storeCredential(keyRef, keyValue)
       if (stored !== undefined) return stored
     }
-    setKeyDraft('')
+    setKeyText('')
+    setKeyRemoval(undefined)
+    setSavedRemoved(undefined)
     return undefined
   }
 
@@ -422,38 +472,44 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     const endpointEnv = props.baseURLEnv ?? []
     const endpointHint = family === 'deepseek' ? t('deepSeekEndpointHint')
       : baseURL === undefined && endpointEnv.length > 0 ? t('baseUrlEnvironment').replace('{env}', () => endpointEnv.join(', ')) : undefined
-    // A named reference is the only credential the adapter reads for this
-    // route. Without one, a catalog route authenticates the way the directory
-    // reports, and a declared route sends no key at all.
-    const namedRef = clearsDerivedRef
-      ? stringAt(schema.getPath(namespace.base, settingsPath), 'apiKeyEnv')
-      : stringAt(fallback, 'apiKeyEnv')
-    const nativeAuth = namedRef === undefined ? props.nativeAuth : undefined
-    // Display method-neutral references without changing the adapter's lookup.
-    const authRefs = namedRef === undefined
-      ? (nativeAuth?.env ?? []).filter(ref => !endpointEnv.includes(ref)) : [namedRef]
-    const visibleRefs = authRefs.filter(ref => !ref.toLowerCase().includes('oauth'))
+    const { nativeAuth, visibleRefs, checkedRefs, detectedRef, detectedVisibleRef, saved } = credentialView()
     const keyHint = visibleRefs[0]
-    const checkedRefs = authRefs.map(ref => [
-      ref, props.credentialChecks?.[ref] ?? (ref === namedRef ? props.credential : undefined),
-    ] as const)
-    const detected = checkedRefs.find(([, info]) => info?.configured === true)
-    const detectedRef = detected?.[0]
-    const detectedVisibleRef = detectedRef === undefined || !visibleRefs.includes(detectedRef) ? undefined : detectedRef
     const missingRefs = checkedRefs.length > 0 && checkedRefs.every(([, info]) => info?.configured === false)
-    const savedCredential = detected?.[1]?.source === 'file' && detectedVisibleRef !== undefined
+    const savedCredential = saved !== undefined
+    // The saved keys still kept: a whole removal hides them all, a staged one hides the keys it names.
+    const keptSaved = saved === undefined || keyRemoval !== undefined ? undefined
+      : saved.masked.map((masked, index) => ({ index, masked }))
+        .filter(({ index }) => savedRemoved?.ref !== saved.ref || !savedRemoved.indexes.has(index))
+    const removedCount = saved === undefined || savedRemoved?.ref !== saved.ref ? 0 : savedRemoved.indexes.size
+    const addedCount = keyValue.length === 0 ? 0 : keyValue.split(',').length
+    const removeSaved = saved?.writable === true
+      ? (index: number): void => {
+        const indexes = new Set(savedRemoved?.ref === saved.ref ? savedRemoved.indexes : [])
+        indexes.add(index)
+        // Removing the last kept key is removing the credential, with its environment fallback.
+        if (indexes.size >= saved.masked.length) {
+          setKeyRemoval({ ref: saved.ref })
+          setSavedRemoved(undefined)
+        } else {
+          setSavedRemoved({ ref: saved.ref, count: saved.masked.length, indexes })
+        }
+        setFailure(undefined)
+      }
+      : undefined
     const credentialHint = props.credentialRequired === true
       ? undefined
-      : keyText.length > 0 ? savedCredential ? t('keyReplacePending') : undefined
-        : keyRemoval !== undefined ? keyRemoval.removed === true ? t('keyRemoveApplied')
-          : keyHint === undefined ? t('keyRemovePending')
-            : t('keyRemovePendingEnvironment').replace('{hint}', () => keyHint)
-          : keyHint === undefined ? undefined
-            : savedCredential
-              ? t('keySaved')
-              : t(detectedRef === undefined ? missingRefs ? 'keyFallbackMissing' : 'keyFallbackUnchecked'
-                : detectedVisibleRef === undefined ? 'keyFallbackDetectedHidden' : 'keyFallbackDetected')
-                .replace('{hint}', () => detectedVisibleRef ?? keyHint)
+      : removedCount > 0 ? t('keyEditPending').replace('{removed}', String(removedCount)).replace('{added}', String(addedCount))
+        : keyText.length > 0 ? keyRemoval === undefined && saved?.writable === true ? t('keyAddPending')
+          : savedCredential || keyRemoval !== undefined ? t('keyReplacePending') : undefined
+          : keyRemoval !== undefined ? keyRemoval.removed === true ? t('keyRemoveApplied')
+            : keyHint === undefined ? t('keyRemovePending')
+              : t('keyRemovePendingEnvironment').replace('{hint}', () => keyHint)
+            : keyHint === undefined ? undefined
+              : savedCredential
+                ? saved.masked.length > 1 ? t('keySavedMany').replace('{count}', String(saved.masked.length)) : t('keySaved')
+                : t(detectedRef === undefined ? missingRefs ? 'keyFallbackMissing' : 'keyFallbackUnchecked'
+                  : detectedVisibleRef === undefined ? 'keyFallbackDetectedHidden' : 'keyFallbackDetected')
+                  .replace('{hint}', () => detectedVisibleRef ?? keyHint)
     const keyHelp = visibleRefs.length === 0
       ? undefined
       : t('keyHelp').replace('{env}', () => visibleRefs.join(' / '))
@@ -464,9 +520,10 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
     )
     // A provider with no native key authentication has no key for this field to store.
     const keylessNativeAuth = nativeAuth?.env.length === 0 && nativeAuth.oauth
-    const keyPlaceholder = keyHint === undefined || props.credentialRequired === true
-      ? t('keyPlaceholder')
-      : t('keyPlaceholderFallback').replace('{hint}', () => keyHint)
+    const keyPlaceholder = keptSaved !== undefined && keptSaved.length > 0 ? t('keyAddPlaceholder')
+      : keyHint === undefined || props.credentialRequired === true
+        ? t('keyPlaceholder')
+        : t('keyPlaceholderFallback').replace('{hint}', () => keyHint)
     /** What both family editors take: the rows, whose layer owns them, and the two writes. */
     const catalogProps = {
       models,
@@ -490,13 +547,9 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
             <ApiKeyInput
               t={t}
               value={keyText}
-              {...keyDraft === undefined && savedCredential ? {
-                saved: {
-                  masked: detected[1].masked ?? '',
-                  ...detected[1].writable
-                    ? { clear: () => { setKeyDraft({ ref: detected[0] }); setFailure(undefined) } } : {},
-                },
-              } : {}}
+              {...keptSaved === undefined ? {} : {
+                saved: { entries: keptSaved, ...removeSaved === undefined ? {} : { remove: removeSaved } },
+              }}
               placeholder={keyPlaceholder}
               aria-label={t('keyInput')}
               aria-invalid={shownKeyFailure !== undefined && !protocolKeyMissing}
@@ -505,13 +558,11 @@ export function ProviderEditor(props: ProviderEditorProps): ReactNode {
               autoFocus={props.autoFocusCredential === true}
               disabled={disabled || keyRemoval?.removed === true}
               onChange={(event) => {
-                setKeyDraft(event.target.value === '' && savedCredential
-                  ? detected[1].writable ? { ref: detected[0] } : undefined
-                  : event.target.value)
+                setKeyText(event.target.value)
                 setFailure(undefined)
               }}
             />
-            {credentialHint === undefined ? null : <p id={`${props.provider}-credential-hint`} className={styles[keyRemoval !== undefined || missingRefs ? 'notice' : keyText.length > 0 || detectedRef === undefined ? 'advancedHint' : 'savedNotice']}>{credentialHint}</p>}
+            {credentialHint === undefined ? null : <p id={`${props.provider}-credential-hint`} className={styles[keyRemoval !== undefined || missingRefs || removedCount > 0 ? 'notice' : keyText.length > 0 || detectedRef === undefined ? 'advancedHint' : 'savedNotice']}>{credentialHint}</p>}
             {/* A key the protocol requires is a requirement still to meet, not a fault. */}
             {shownKeyFailure === undefined
               ? null

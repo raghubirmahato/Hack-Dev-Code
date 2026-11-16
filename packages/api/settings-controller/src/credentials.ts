@@ -6,7 +6,7 @@
  */
 
 import { Context } from '@hackdevcode/cordis'
-import { credentialRef } from '@hackdevcode/dsh-credentials'
+import { credentialRef, editCredentialEntries } from '@hackdevcode/dsh-credentials'
 import type { CredentialProvider } from '@hackdevcode/dsh-credentials'
 import type { CredentialInfo } from '@hackdevcode/dsh-credentials/types'
 import { Remote, RemoteError, TypertRemoteService } from '@hackdevcode/dsh-typert-protocol'
@@ -25,6 +25,14 @@ const describeRequestSchema = z.object({
 })
 const setRequestSchema = z.object({ ref: credentialRefSchema, value: z.string().min(1) })
 const unsetRequestSchema = z.object({ ref: credentialRefSchema })
+/** Bound on one key edit; far above any key list a person keeps for one platform. */
+const MAX_KEY_ENTRIES = 256
+const editKeysRequestSchema = z.object({
+  ref: credentialRefSchema,
+  remove: z.array(z.number().int().min(0)).max(MAX_KEY_ENTRIES),
+  add: z.string(),
+  expectedCount: z.number().int().min(0).max(MAX_KEY_ENTRIES),
+}).refine(request => request.remove.length > 0 || request.add.trim().length > 0, { message: 'an edit removes or adds at least one key' })
 
 /** Parse the domain constraints that are more specific than generated TypeScript codecs. */
 function parseRequest<T>(method: string, schema: z.ZodType<T>, value: unknown): T {
@@ -48,6 +56,7 @@ function projectCredentialInfo(info: CredentialInfo): CredentialInfo {
     ...info.source === undefined ? {} : { source: info.source },
     writable: info.writable,
     ...info.masked === undefined ? {} : { masked: info.masked },
+    ...info.maskedEntries === undefined ? {} : { maskedEntries: [...info.maskedEntries] },
   }
 }
 
@@ -103,6 +112,33 @@ export class CredentialsController extends TypertRemoteService {
     const branded = credentialRef(request.ref)
     const credentials = this.provider()
     await this.write(request.ref, () => credentials.set(branded, request.value))
+  }
+
+  /**
+   * Edit the keys stored under one reference without the page ever holding them: drop keys by position and append
+   * new ones, so a person adds a key to the rotation, or retires one, without typing the others again. Removing the
+   * last key removes the reference.
+   * @param ref - reference name the keys are stored under.
+   * @param remove - zero-based positions of stored keys to drop, as {@link describe} listed them.
+   * @param add - new keys, separated by commas; a key already stored is not added twice.
+   * @param expectedCount - how many keys the page listed; any other count refuses the edit, since positions would
+   *   then name different keys.
+   * @throws RemoteError when the request is invalid, no provider is mounted, the stored keys changed since the page
+   *   described them, or the provider refuses the write.
+   */
+  @Remote
+  async editKeys(ref: string, remove: number[], add: string, expectedCount: number): Promise<void> {
+    const request = parseRequest('credentials.editKeys', editKeysRequestSchema, { ref, remove, add, expectedCount })
+    const branded = credentialRef(request.ref)
+    const credentials = this.provider()
+    await this.write(request.ref, async () => {
+      const stored = await credentials.resolve(branded)
+      const next = editCredentialEntries(stored?.value, request.remove, request.add, request.expectedCount)
+      if (next === undefined) {
+        throw new Error(`the keys saved for ${request.ref} changed since this page listed them; reopen the provider and edit them again`)
+      }
+      await (next.length === 0 ? credentials.unset(branded) : credentials.set(branded, next))
+    })
   }
 
   /**

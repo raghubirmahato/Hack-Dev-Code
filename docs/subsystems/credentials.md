@@ -251,6 +251,20 @@ Host service backing the generated `ctx.remote.credentials` namespace. It carrie
 @Remote async set(ref: string, value: string): Promise<void>
 
 /**
+ * Edit the keys stored under one reference without the page ever holding them: drop keys by position and append
+ * new ones, so a person adds a key to the rotation, or retires one, without typing the others again. Removing the
+ * last key removes the reference.
+ * @param ref - reference name the keys are stored under.
+ * @param remove - zero-based positions of stored keys to drop, as {@link describe} listed them.
+ * @param add - new keys, separated by commas; a key already stored is not added twice.
+ * @param expectedCount - how many keys the page listed; any other count refuses the edit, since positions would
+ *   then name different keys.
+ * @throws RemoteError when the request is invalid, no provider is mounted, the stored keys changed since the page
+ *   described them, or the provider refuses the write.
+ */
+@Remote async editKeys(ref: string, remove: number[], add: string, expectedCount: number): Promise<void>
+
+/**
  * Remove one reference from a configuration surface.
  * @param ref - reference name to remove.
  * @throws RemoteError when the request is invalid, no provider is mounted, or the provider refuses the write.

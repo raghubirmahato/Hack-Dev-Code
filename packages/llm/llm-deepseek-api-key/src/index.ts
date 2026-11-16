@@ -77,7 +77,8 @@ export function apply(ctx: Context, config: Config): void {
     readyInMs: pool.readyInMs(key),
     rotate: async ({ status, retryAfterMs }) => {
       if (!ROTATING_STATUSES.has(status)) return undefined
-      pool.report(key, retryAfterMs)
+      // 429 is a throttle that lifts; 401, 402 and 403 refuse the key itself (invalid, revoked or out of balance).
+      pool.report(key, retryAfterMs, status === 429 ? 'rate-limit' : 'key')
       tried.add(key)
       const next = await untriedKey(connection, tried)
       return next === undefined ? undefined : authWith(connection, next, tried)

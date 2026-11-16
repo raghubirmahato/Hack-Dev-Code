@@ -282,6 +282,7 @@ describe('reasoning levels in the model list', () => {
     discoverModels: () => Promise.resolve({ kind: 'found', models: [] }),
     storeCredential: vi.fn(),
     removeCredential: vi.fn(),
+    editCredentialKeys: vi.fn(),
     writeSettings: vi.fn(),
   }
 

@@ -46,6 +46,15 @@ export interface ModelsOperations {
    */
   removeCredential(ref: string): Promise<string | undefined>
   /**
+   * Edit the keys saved under one reference by position, without the page holding them: drop some, append others.
+   * @param ref - credential reference name.
+   * @param remove - zero-based positions of saved keys to drop, as the credential view listed them.
+   * @param add - new keys joined by commas, or an empty string.
+   * @param expectedCount - how many saved keys the page listed.
+   * @returns the refusal message, or undefined once stored.
+   */
+  editCredentialKeys(ref: string, remove: number[], add: string, expectedCount: number): Promise<string | undefined>
+  /**
    * Apply path operations to one settings namespace.
    * @param ns - settings namespace identity.
    * @param ops - ordered path operations against the stored section, as the
@@ -81,6 +90,10 @@ export function createModelsOperations(ctx: ClientContext): ModelsOperations {
     },
     removeCredential: async (ref) => {
       const response = await ctx.remote.credentials.unset(ref)
+      return response.ok ? undefined : response.error.message
+    },
+    editCredentialKeys: async (ref, remove, add, expectedCount) => {
+      const response = await ctx.remote.credentials.editKeys(ref, remove, add, expectedCount)
       return response.ok ? undefined : response.error.message
     },
     writeSettings: async (ns, ops, expectedRevision) => {

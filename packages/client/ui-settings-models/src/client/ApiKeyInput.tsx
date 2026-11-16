@@ -1,6 +1,7 @@
 /**
- * Write-only credential inputs, one row per key, with the same reveal behavior as masked conversation text. A saved
- * key is shown as a protected mask that can only be replaced or deleted.
+ * Write-only credential inputs, one row per key, with the same reveal behavior as masked conversation text. Saved
+ * keys are listed one per row as protected masks that can only be removed; new keys are typed in rows below them
+ * and join the saved ones, so a key is added to the rotation without typing the others again.
  */
 import { useState } from 'react'
 import type { ChangeEvent, InputHTMLAttributes, ReactNode } from 'react'
@@ -10,15 +11,25 @@ import styles from './ModelsSection.module.css'
 const EYE_CONTOUR = 'M1.5 8C2.9 5.25 5.25 3.5 8 3.5C10.75 3.5 13.1 5.25 14.5 8C13.1 10.75 10.75 12.5 8 12.5C5.25 12.5 2.9 10.75 1.5 8Z'
 const EYE_PATH = `${EYE_CONTOUR}M10 8C10 9.1 9.1 10 8 10C6.9 10 6 9.1 6 8C6 6.9 6.9 6 8 6C9.1 6 10 6.9 10 8Z`
 const EYE_OFF_PATH = `${EYE_CONTOUR}M2.5 2.5L13.5 13.5`
+const CROSS_PATH = 'M4 4L12 12M12 4L4 12'
+
+/** One saved key as the Host previews it. */
+export interface SavedKeyEntry {
+  /** Position of the key in the stored value, which a removal names. */
+  readonly index: number
+  /** Server-made mask; the key itself never reaches the page. */
+  readonly masked: string
+}
 
 /** Input attributes and section copy for the current credential draft. */
 interface ApiKeyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'type' | 'className' | 'autoComplete'> {
-  /** Unsaved input, keys separated by commas; stored credentials are never read into this field. */
+  /** Unsaved new keys, separated by commas; stored credentials are never read into this field. */
   readonly value: string
-  /** Server-masked preview and actions; the full stored credential stays on the Host. */
+  /** The saved keys still kept, and how to stage removing one; the full stored credential stays on the Host. */
   readonly saved?: {
-    readonly masked: string
-    readonly clear?: () => void
+    readonly entries: readonly SavedKeyEntry[]
+    /** Stage removing one saved key; absent when the store cannot be written. */
+    readonly remove?: (index: number) => void
   }
   /** Section copy, including the same reveal labels as SecretText. */
   readonly t: (key: keyof typeof en) => string
@@ -34,18 +45,27 @@ function changed(props: ApiKeyInputProps, next: string): void {
   props.onChange?.({ target: { value: next } } as ChangeEvent<HTMLInputElement>)
 }
 
+/** The small cross shared by every remove button. */
+function CrossIcon(): ReactNode {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d={CROSS_PATH} />
+    </svg>
+  )
+}
+
 /**
- * One row per key: requests rotate through every key, and a key the provider refuses is skipped. A nonempty row can
- * be revealed; a changed value starts masked, as in SecretText.
- * @param props - current draft, input attributes for the first row, and translated control labels.
- * @returns the key rows, an add button and the pool summary.
+ * Saved keys first, then one row per new key: requests rotate through every key, and a key the provider refuses is
+ * skipped. A nonempty new row can be revealed; a changed value starts masked, as in SecretText.
+ * @param props - current draft, saved key previews, input attributes for the first new row, and translated labels.
+ * @returns the saved rows, the new key rows, an add button and the pool summary.
  */
 export function ApiKeyInput(props: ApiKeyInputProps): ReactNode {
   const { value, t, saved, ...inputProps } = props
   const [revealed, setRevealed] = useState<{ row: number; value: string } | undefined>()
-  // A saved key is one protected row; typing into it starts the replacement in the same input element.
-  const rows = saved === undefined ? rowsOf(value) : [value]
-  const keyCount = rows.filter(row => row.trim().length > 0).length
+  const rows = rowsOf(value)
+  const savedCount = saved?.entries.length ?? 0
+  const keyCount = savedCount + rows.filter(row => row.trim().length > 0).length
   const write = (next: string[]): void => {
     setRevealed(undefined)
     changed(props, next.join(','))
@@ -53,30 +73,53 @@ export function ApiKeyInput(props: ApiKeyInputProps): ReactNode {
   return (
     <>
       <div className={styles['keyRows']}>
+        {saved?.entries.map(({ index, masked }, position) => {
+          const label = String(position + 1)
+          return (
+            <div key={`saved-${String(index)}`} className={styles['keyRow']}>
+              <div className={styles['keyInput']}>
+                <input
+                  className={`${styles['input']} ${styles['savedKey']}`}
+                  type="text"
+                  readOnly
+                  value={masked}
+                  aria-label={t('keySavedRowLabel').replace('{n}', label)}
+                  // The stored key never leaves the Host: its mask cannot be copied, and Backspace or Delete removes it.
+                  onCopy={(event) => { event.preventDefault() }}
+                  onCut={(event) => { event.preventDefault() }}
+                  onKeyDown={(event) => {
+                    if (saved.remove === undefined || inputProps.disabled === true) return
+                    if (event.key !== 'Backspace' && event.key !== 'Delete') return
+                    event.preventDefault()
+                    saved.remove(index)
+                  }}
+                />
+              </div>
+              {saved.remove === undefined ? null : <button
+                type="button"
+                className={styles['keyRemove']}
+                aria-label={t('keySavedRemove').replace('{n}', label)}
+                disabled={inputProps.disabled}
+                onClick={() => { saved.remove?.(index) }}
+              >
+                <CrossIcon />
+              </button>}
+            </div>
+          )
+        })}
         {rows.map((row, index) => {
-          const canReveal = saved === undefined && row.length > 0 && inputProps.disabled !== true
+          const canReveal = row.length > 0 && inputProps.disabled !== true
           const shown = canReveal && revealed?.row === index && revealed.value === row
           return (
             <div key={index} className={styles['keyRow']}>
-              <div className={`${styles['keyInput']} ${saved === undefined ? '' : styles['savedKeyInput']}`}>
+              <div className={styles['keyInput']}>
                 <input
-                  {...index === 0 ? inputProps : { disabled: inputProps.disabled, 'aria-label': t('keyRowLabel').replace('{n}', String(index + 1)) }}
+                  {...index === 0 ? inputProps : { disabled: inputProps.disabled, 'aria-label': t('keyRowLabel').replace('{n}', String(savedCount + index + 1)) }}
                   className={`${styles['input']} ${canReveal ? styles['keyInputFilled'] : ''}`}
                   type={shown ? 'text' : 'password'}
                   autoComplete="new-password"
                   value={row}
-                  placeholder={saved === undefined ? (index === 0 ? inputProps.placeholder : undefined) : saved.masked}
-                  // The stored key never leaves the Host: its mask cannot be copied, and Backspace or Delete clears it.
-                  onCopy={(event) => { if (saved !== undefined) event.preventDefault() }}
-                  onCut={(event) => { if (saved !== undefined) event.preventDefault() }}
-                  onKeyDown={(event) => {
-                    if (saved !== undefined && (event.key === 'Backspace' || event.key === 'Delete')) {
-                      event.preventDefault()
-                      saved.clear?.()
-                      return
-                    }
-                    if (index === 0) inputProps.onKeyDown?.(event)
-                  }}
+                  placeholder={index === 0 ? inputProps.placeholder : undefined}
                   onPaste={(event) => {
                     // Pasted lines are separate keys: each becomes its own row.
                     const text = event.clipboardData.getData('text')
@@ -111,19 +154,17 @@ export function ApiKeyInput(props: ApiKeyInputProps): ReactNode {
               {rows.length === 1 ? null : <button
                 type="button"
                 className={styles['keyRemove']}
-                aria-label={t('keyRemove').replace('{n}', String(index + 1))}
+                aria-label={t('keyRemove').replace('{n}', String(savedCount + index + 1))}
                 disabled={inputProps.disabled}
                 onClick={() => { write(rows.filter((_, at) => at !== index)) }}
               >
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
-                  <path d="M4 4L12 12M12 4L4 12" />
-                </svg>
+                <CrossIcon />
               </button>}
             </div>
           )
         })}
       </div>
-      {saved !== undefined || inputProps.disabled === true ? null : <div className={styles['keyFooter']}>
+      {inputProps.disabled === true ? null : <div className={styles['keyFooter']}>
         <button
           type="button"
           className={styles['keyAdd']}

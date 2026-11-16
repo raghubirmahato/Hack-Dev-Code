@@ -47,6 +47,29 @@ describe('ApiKeyPool', () => {
     expect(pool.next('REF', 'a,b')).toBe('b')
   })
 
+  it('rests a refused key far longer than a throttled one, and never makes a request wait for it', () => {
+    let now = 0
+    const pool = new ApiKeyPool(() => now, 1000)
+    pool.report('a', undefined, 'key')
+    pool.report('b')
+    expect(pool.readyInMs('a')).toBe(0)
+    expect(pool.readyInMs('b')).toBe(1000)
+    now = 1000
+    // The throttled key is back; the refused one stays out for its 15 minutes.
+    expect(Array.from({ length: 3 }, () => pool.next('REF', 'a,b'))).toEqual(['b', 'b', 'b'])
+    now = 15 * 60_000
+    expect(pool.next('REF', 'a,b')).toBe('a')
+  })
+
+  it('keeps the provider wait hint for a refused key and clears the refusal on a later throttle', () => {
+    const pool = new ApiKeyPool(() => 0, 1000)
+    pool.report('a', 5000, 'key')
+    pool.report('b', undefined, 'key')
+    expect(pool.next('REF', 'a,b')).toBe('a')
+    pool.report('a', 2000)
+    expect(pool.readyInMs('a')).toBe(2000)
+  })
+
   it('counts distinct keys', () => {
     expect(ApiKeyPool.count('a,b,a')).toBe(2)
   })

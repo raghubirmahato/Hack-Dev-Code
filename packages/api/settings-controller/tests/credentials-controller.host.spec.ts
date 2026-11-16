@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { Context } from '@hackdevcode/cordis'
+import { credentialRef } from '@hackdevcode/dsh-credentials'
 import type { CredentialInfo } from '@hackdevcode/dsh-credentials/types'
 import { remoteErrorOf, remoteMethods } from '@hackdevcode/dsh-typert-protocol'
 import CredentialsController from '../src/credentials.ts'
@@ -28,6 +29,21 @@ class RejectingCredentials extends MemoryCredentials {
   }
 }
 
+/** A store that previews several keys under one reference, one mask each. */
+class ManyKeyCredentials extends MemoryCredentials {
+  override describe(): Promise<CredentialInfo> {
+    return Promise.resolve({ configured: true, source: 'memory', writable: true, masked: 'a•, b•', maskedEntries: ['a•', 'b•'] })
+  }
+}
+
+/** Boot the controller over a memory store and hand back both, so a case can read what an edit stored. */
+async function bootWithStore(seed: Record<string, string>): Promise<{ controller: CredentialsController; credentials: MemoryCredentials }> {
+  const ctx = new Context()
+  await ctx.plugin(MemoryCredentials, seed)
+  await ctx.plugin(CredentialsController)
+  return { controller: ctx.credentialsController, credentials: ctx.credentials as MemoryCredentials }
+}
+
 async function boot(
   seed: Record<string, string> = {},
   provider: typeof MemoryCredentials = MemoryCredentials,
@@ -47,6 +63,7 @@ describe('the credentials Remote namespace a configuration surface calls', () =>
     expect(remoteMethods(controller)).toEqual([
       { method: 'describe', invocation: { kind: 'direct' } },
       { method: 'set', invocation: { kind: 'direct' } },
+      { method: 'editKeys', invocation: { kind: 'direct' } },
       { method: 'unset', invocation: { kind: 'direct' } },
     ])
   })
@@ -58,6 +75,7 @@ describe('the credentials Remote namespace a configuration surface calls', () =>
       () => ctx.credentialsController.describe(['DEEPSEEK_API_KEY']),
       () => ctx.credentialsController.set('DEEPSEEK_API_KEY', 'sk-live'),
       () => ctx.credentialsController.unset('DEEPSEEK_API_KEY'),
+      () => ctx.credentialsController.editKeys('DEEPSEEK_API_KEY', [], 'sk-live', 0),
     ]) {
       const failure = await call().catch((error: unknown) => error)
       expect(remoteErrorOf(failure)).toMatchObject({
@@ -129,6 +147,47 @@ describe('the credentials Remote namespace a configuration surface calls', () =>
     const controller = await boot()
     const failure = await controller.set('DEEPSEEK_API_KEY', '').catch((error: unknown) => error)
     expect(remoteErrorOf(failure)).toMatchObject({ code: 'gateway/bad-request' })
+  })
+
+  it('adds and retires keys by position without the page holding them', async () => {
+    const { controller, credentials } = await bootWithStore({ DEEPSEEK_API_KEY: 'sk-one,sk-two' })
+    await controller.editKeys('DEEPSEEK_API_KEY', [], 'sk-three, sk-one', 2)
+    expect(await credentials.resolve(credentialRef('DEEPSEEK_API_KEY'))).toMatchObject({ value: 'sk-one,sk-two,sk-three' })
+    await controller.editKeys('DEEPSEEK_API_KEY', [0, 2], '', 3)
+    expect(await credentials.resolve(credentialRef('DEEPSEEK_API_KEY'))).toMatchObject({ value: 'sk-two' })
+    // Retiring the last key removes the reference.
+    await controller.editKeys('DEEPSEEK_API_KEY', [0], '', 1)
+    expect(await credentials.resolve(credentialRef('DEEPSEEK_API_KEY'))).toBeUndefined()
+  })
+
+  it('refuses a key edit made against keys that changed since the page listed them', async () => {
+    const { controller, credentials } = await bootWithStore({ DEEPSEEK_API_KEY: 'sk-one,sk-two' })
+    const failure = await controller.editKeys('DEEPSEEK_API_KEY', [0], '', 3).catch((error: unknown) => error)
+    expect(remoteErrorOf(failure)).toMatchObject({
+      code: 'credential/rejected',
+      message: 'the keys saved for DEEPSEEK_API_KEY changed since this page listed them; reopen the provider and edit them again',
+      details: { ref: 'DEEPSEEK_API_KEY' },
+    })
+    expect(await credentials.resolve(credentialRef('DEEPSEEK_API_KEY'))).toMatchObject({ value: 'sk-one,sk-two' })
+  })
+
+  it('reports an empty or malformed key edit as bad-request', async () => {
+    const controller = await boot({ DEEPSEEK_API_KEY: 'sk-one' })
+    for (const call of [
+      () => controller.editKeys('DEEPSEEK_API_KEY', [], '  ', 1),
+      () => controller.editKeys('DEEPSEEK_API_KEY', [-1], '', 1),
+      () => controller.editKeys('DEEPSEEK_API_KEY', [0.5], '', 1),
+      () => controller.editKeys('not a var', [], 'sk-two', 1),
+    ]) {
+      const failure = await call().catch((error: unknown) => error)
+      expect(remoteErrorOf(failure)).toMatchObject({ code: 'gateway/bad-request' })
+    }
+  })
+
+  it('copies the per-key previews a provider describes', async () => {
+    const controller = await boot({}, ManyKeyCredentials)
+    expect((await controller.describe(['DEEPSEEK_API_KEY'])).DEEPSEEK_API_KEY)
+      .toEqual({ configured: true, source: 'memory', writable: true, masked: 'a•, b•', maskedEntries: ['a•', 'b•'] })
   })
 
   it('stringifies a refusal that is not an Error', async () => {

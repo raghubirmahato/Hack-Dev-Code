@@ -240,7 +240,7 @@ export function apply(ctx: Context, config: Config): void {
     profiles,
     resolveApiKey,
     apiKeyReadyInMs: key => keyPool.readyInMs(key),
-    rotateApiKey: async (_provider, profile, refused) => {
+    rotateApiKey: async (_provider, profile, refused, refusal) => {
       const ref = profile.apiKeyEnv
       if (ref === undefined) return undefined
       const credentials = ctx.get('credentials')
@@ -248,7 +248,9 @@ export function apply(ctx: Context, config: Config): void {
         ? (await credentials.resolve(ref))?.value
         : launchEnvironmentOf(ctx).get(ref)?.value
       if (stored === undefined || stored.length === 0) return undefined
-      for (const key of refused) keyPool.report(key)
+      // Keys refused earlier in this request were rested when they failed; only the newest is new.
+      const newest = [...refused].at(-1)
+      if (newest !== undefined) keyPool.report(newest, undefined, refusal)
       for (let attempt = 0; attempt < splitApiKeys(stored).length; attempt++) {
         const key = assertUsableApiKey(keyPool.next(ref, stored), 'llm-pi-ai', ref)
         if (!refused.has(key)) return key

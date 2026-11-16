@@ -13,6 +13,7 @@ function operations(discoverModels: ModelsOperations['discoverModels']): ModelsO
     discoverModels,
     storeCredential: vi.fn(),
     removeCredential: vi.fn(),
+    editCredentialKeys: vi.fn(),
     writeSettings: vi.fn(),
   }
 }

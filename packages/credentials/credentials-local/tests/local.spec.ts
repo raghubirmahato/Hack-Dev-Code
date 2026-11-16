@@ -85,6 +85,18 @@ describe('layering and reads', () => {
     expect(await ctx.credentials.resolve(KEY)).toEqual({ value, source: 'file' })
   })
 
+  it('masks each of several stored keys on its own', async () => {
+    const dir = await tempDir()
+    const ctx = await boot({ path: join(dir, '.credentials.yaml'), watch: false })
+    const value = 'sk-proj-abcdefghijklmnopq,sk-proj-rstuvwxyz0123456'
+    await ctx.credentials.set(KEY, value)
+    const info = await ctx.credentials.describe(KEY)
+    const maskedEntries = [`sk-proj-${'•'.repeat(13)}nopq`, `sk-proj-${'•'.repeat(12)}3456`]
+    expect(info).toEqual({ configured: true, source: 'file', writable: true, masked: maskedEntries.join(', '), maskedEntries })
+    expect(JSON.stringify(info)).not.toContain('abcdefghijklmnopq')
+    expect(JSON.stringify(info)).not.toContain('rstuvwxyz0123456')
+  })
+
   it('treats an absent file as an empty writable store', async () => {
     const dir = await tempDir()
     const ctx = await boot({ path: join(dir, '.credentials.yaml'), watch: false })

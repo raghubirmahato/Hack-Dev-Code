@@ -56,7 +56,7 @@ await ctx.credentials.set(ref, 'sk-…')                 // the stored value out
 await ctx.credentials.unset(ref)                       // no-op when absent; an environment fallback then applies again
 ```
 
-Store a key with `set`, remove it with `unset`, check its status with `describe`, and read the current value with `resolve` when an operation needs it. `describe` reports whether the key is set, where it comes from, and whether you can write to it — it never returns the value. Providers may disclose a masked stored-value preview through the optional `masked` field; the full value stays on the Host.
+Store a key with `set`, remove it with `unset`, check its status with `describe`, and read the current value with `resolve` when an operation needs it. `describe` reports whether the key is set, where it comes from, and whether you can write to it — it never returns the value. Providers may disclose a masked stored-value preview through the optional `masked` field, and one preview per key through `maskedEntries` when the value holds several keys for one platform; the full value stays on the Host. `splitCredentialEntries` and `editCredentialEntries` own the separator rule (commas or semicolons) that the model adapters rotate by.
 
 ### Storing, updating, and removing records
 

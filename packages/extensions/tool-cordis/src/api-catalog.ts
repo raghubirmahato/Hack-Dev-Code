@@ -908,6 +908,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         throws: ['RemoteError when the request is invalid, no provider is mounted, or the provider refuses the write.'],
       },
       {
+        signature: '@Remote async editKeys(ref: string, remove: number[], add: string, expectedCount: number): Promise<void>',
+        description: 'Edit the keys stored under one reference without the page ever holding them: drop keys by position and append new ones, so a person adds a key to the rotation, or retires one, without typing the others again. Removing the last key removes the reference.',
+        parameters: [{ name: 'ref', description: 'reference name the keys are stored under.' }, { name: 'remove', description: 'zero-based positions of stored keys to drop, as {@link describe} listed them.' }, { name: 'add', description: 'new keys, separated by commas; a key already stored is not added twice.' }, { name: 'expectedCount', description: 'how many keys the page listed; any other count refuses the edit, since positions would then name different keys.' }],
+        throws: ['RemoteError when the request is invalid, no provider is mounted, the stored keys changed since the page described them, or the provider refuses the write.'],
+      },
+      {
         signature: '@Remote async unset(ref: string): Promise<void>',
         description: 'Remove one reference from a configuration surface.',
         parameters: [{ name: 'ref', description: 'reference name to remove.' }],
@@ -6745,7 +6751,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'CredentialInfo',
-    declaration: 'export interface CredentialInfo {\n    configured: boolean;\n    source?: string;\n    writable: boolean;\n    masked?: string;\n}',
+    declaration: 'export interface CredentialInfo {\n    configured: boolean;\n    source?: string;\n    writable: boolean;\n    masked?: string;\n    maskedEntries?: string[];\n}',
   },
   {
     name: 'CredentialKey',

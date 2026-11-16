@@ -46,7 +46,7 @@ import { dpapiCodec, SEALED_PREFIX } from './at-rest.ts'
 import type { AtRestCodec } from './at-rest.ts'
 import { canonicalizeWatchPath, resolveDshHome } from '@hackdevcode/dsh-home-paths'
 import { launchEnvironmentOf } from '@hackdevcode/dsh-launch-environment'
-import { CredentialProvider, credentialRef, parseCredentialKey } from '@hackdevcode/dsh-credentials'
+import { CredentialProvider, credentialRef, parseCredentialKey, splitCredentialEntries } from '@hackdevcode/dsh-credentials'
 import type {
   ApiKeyRecord,
   CredentialInfo,
@@ -537,6 +537,19 @@ function maskCredential(value: string): string {
     : `${chars.slice(0, providerEnd + 5).join('')}${'•'.repeat(hidden)}${chars.slice(-4).join('')}`
 }
 
+/**
+ * The preview of a stored value. A value holding several keys (rotated for one platform) is masked key by key, so
+ * each key keeps its own recognizable ends and a settings page can list them one per row.
+ * @param value - the stored value.
+ * @returns the whole preview, and one preview per key when there are several.
+ */
+function maskedPreview(value: string): { masked: string; maskedEntries?: string[] } {
+  const entries = splitCredentialEntries(value)
+  if (entries.length <= 1) return { masked: maskCredential(value) }
+  const maskedEntries = entries.map(maskCredential)
+  return { masked: maskedEntries.join(', '), maskedEntries }
+}
+
 /** File-backed credentials provider (`$DSH_HOME/.credentials.yaml`). */
 export class LocalCredentialProvider extends CredentialProvider {
   static Config: z<Config> = z.object({
@@ -662,7 +675,7 @@ export class LocalCredentialProvider extends CredentialProvider {
 
   override describe(ref: CredentialRef): Promise<CredentialInfo> {
     const stored = this.values.get(ref)
-    if (stored !== undefined) return Promise.resolve({ configured: true, source: 'file', writable: true, masked: maskCredential(stored) })
+    if (stored !== undefined) return Promise.resolve({ configured: true, source: 'file', writable: true, ...maskedPreview(stored) })
     // Every reference is writable: a set writes the managed file, which
     // outranks every fallback, and an unset exposes the fallback again.
     if (this.inherited(ref) !== undefined) return Promise.resolve({ configured: true, source: 'env', writable: true })

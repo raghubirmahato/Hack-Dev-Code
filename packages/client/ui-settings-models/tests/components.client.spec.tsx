@@ -182,12 +182,14 @@ function scriptedFace(overrides: {
   mutate?: ReturnType<typeof vi.fn>
   set?: ReturnType<typeof vi.fn>
   unset?: ReturnType<typeof vi.fn>
+  editKeys?: ReturnType<typeof vi.fn>
 } = {}) {
   const providerNamespace = wireNamespaces().find(view => view.ns === 'llm-pi-ai')!
   const update = overrides.update ?? vi.fn(() => Promise.resolve(remoteOk(providerNamespace)))
   const mutate = overrides.mutate ?? vi.fn(() => Promise.resolve(remoteOk(providerNamespace)))
   const set = overrides.set ?? vi.fn(() => Promise.resolve(remoteOk(undefined)))
   const unset = overrides.unset ?? vi.fn(() => Promise.resolve(remoteOk(undefined)))
+  const editKeys = overrides.editKeys ?? vi.fn(() => Promise.resolve(remoteOk(undefined)))
   const face = {
     llm: {
       listProviders: vi.fn((): ReturnType<PageContext['remote']['llm']['listProviders']> => Promise.resolve(remoteOk([
@@ -229,9 +231,10 @@ function scriptedFace(overrides: {
         ))),
       set,
       unset,
+      editKeys,
     },
   }
-  return { face, update, mutate, set, unset }
+  return { face, update, mutate, set, unset, editKeys }
 }
 
 type PageContext = ConstructorParameters<typeof ModelsSettingsStore>[0]
@@ -284,6 +287,16 @@ function renderPiAiEditor(
     operations={operationsWith(scriptedFace().face)} t={t} readOnly={false} onClose={vi.fn()} {...facts} />)
 }
 
+/** The accessible name of the nth saved-key row. */
+function savedRow(n: number): string {
+  return en.keySavedRowLabel.replace('{n}', String(n))
+}
+
+/** Stage removing the nth saved key with its remove button. */
+function removeSaved(n: number): void {
+  fireEvent.click(screen.getByRole('button', { name: en.keySavedRemove.replace('{n}', String(n)) }))
+}
+
 /** Hover the key label's help button and read its tooltip; null when the label has no button. */
 function authHelpText(): string | null {
   const button = screen.queryByRole('button', { name: en.authHelp })
@@ -315,7 +328,7 @@ function cardSeatCalls(
 }
 
 async function mountFace(scripted: ReturnType<typeof scriptedFace>) {
-  const { face, update, mutate, set, unset } = scripted
+  const { face, update, mutate, set, unset, editKeys } = scripted
   const ctx = ctxWith(face)
   const mirror = new SettingsDescribeMirror(ctx)
   const controller = new ModelsSettingsStore(ctx, settingsSchema, mirror)
@@ -330,7 +343,7 @@ async function mountFace(scripted: ReturnType<typeof scriptedFace>) {
     renderSlot: renderSlot as unknown as ModelsSectionProps['renderSlot'],
   }
   const view = render(<ModelsSection {...injected} />)
-  return { view, ctx, face, update, mutate, set, unset, controller, mirror, renderSlot }
+  return { view, ctx, face, update, mutate, set, unset, editKeys, controller, mirror, renderSlot }
 }
 
 async function mountSection(overrides: Parameters<typeof scriptedFace>[0] = {}) {
@@ -1455,8 +1468,9 @@ describe('ModelsSection', () => {
     const { mutate } = await mountSection()
     fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
     // The field names the profile's reference; a stored value stays hidden.
-    const editorKey = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
-    expect(editorKey.placeholder).toBe('••••••••')
+    const editorKey = await screen.findByLabelText<HTMLInputElement>(savedRow(1))
+    expect(editorKey.value).toBe('••••••••')
+    expect(editorKey.readOnly).toBe(true)
     // pi-ai carries Base URL too: the stored override shows as the value and
     // the effective profile endpoint, ahead of the catalog's, as its placeholder.
     fireEvent.click(screen.getByText(en.customized))
@@ -1638,14 +1652,17 @@ describe('ModelsSection', () => {
   })
 
   it('keeps a failed credential describe silent and the input usable', async () => {
-    const { face, set } = await mountSection()
+    const { face, set, editKeys } = await mountSection()
     face.credentials.describe.mockImplementation(() => Promise.resolve(remoteFail('down', 'gateway/internal')))
     fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
-    const editorKey = await screen.findByLabelText<HTMLInputElement>(en.keyInput)
-    expect(editorKey.placeholder).toBe('••••••••')
+    expect((await screen.findByLabelText<HTMLInputElement>(savedRow(1))).value).toBe('••••••••')
+    const editorKey = screen.getByLabelText<HTMLInputElement>(en.keyInput)
+    expect(editorKey.placeholder).toBe(en.keyAddPlaceholder)
     fireEvent.change(editorKey, { target: { value: 'sk-live' } })
     fireEvent.click(screen.getByText(en.apply))
-    await waitFor(() => { expect(set).toHaveBeenCalledTimes(1) })
+    // The new key joins the saved one instead of replacing it.
+    await waitFor(() => { expect(editKeys).toHaveBeenCalledExactlyOnceWith('OPENAI_API_KEY', [], 'sk-live', 1) })
+    expect(set).not.toHaveBeenCalled()
   })
 
   it('requires confirmation before removing a user-added provider', async () => {
@@ -2246,22 +2263,28 @@ it.each(['file', 'env', 'project-env', 'user-env'] as const)('shows the existing
   const hint = en.keyFallbackDetected.replace('{hint}', 'OPENAI_API_KEY')
   const input = screen.getByLabelText<HTMLInputElement>(en.keyInput)
   expect(screen.queryByText(/^API key source:/)).toBeNull()
-  if (source === 'file') expect(screen.getByText(en.keySaved)).toBeTruthy()
-  else expect(screen.getAllByText(hint)).toHaveLength(1)
+  if (source === 'file') {
+    expect(screen.getByText(en.keySaved)).toBeTruthy()
+    expect(screen.getByLabelText<HTMLInputElement>(savedRow(1)).value).toBe('••••••••')
+  } else {
+    expect(screen.getAllByText(hint)).toHaveLength(1)
+    expect(screen.queryByLabelText(savedRow(1))).toBeNull()
+  }
   expect(input.value).toBe('')
   expect(input.placeholder)
-    .toBe(source === 'file' ? '••••••••' : en.keyPlaceholderFallback.replace('{hint}', 'OPENAI_API_KEY'))
+    .toBe(source === 'file' ? en.keyAddPlaceholder : en.keyPlaceholderFallback.replace('{hint}', 'OPENAI_API_KEY'))
   fireEvent.change(input, { target: { value: 'new-key' } })
   expect(screen.queryByText(hint)).toBeNull()
   expect(screen.queryByText(/^API key source:/)).toBeNull()
   if (source === 'file') {
-    expect(document.getElementById(input.getAttribute('aria-describedby')!)?.textContent).toBe(en.keyReplacePending)
+    expect(document.getElementById(input.getAttribute('aria-describedby')!)?.textContent).toBe(en.keyAddPending)
   } else {
-    expect(screen.queryByText(en.keyReplacePending)).toBeNull()
+    expect(screen.queryByText(en.keyAddPending)).toBeNull()
     expect(input.getAttribute('aria-describedby')).toBeNull()
   }
+  // Emptying the new row keeps the saved key: nothing is removed by leaving the field blank.
   fireEvent.change(input, { target: { value: '' } })
-  if (source === 'file') expect(screen.getByText(en.keyRemovePendingEnvironment.replace('{hint}', 'OPENAI_API_KEY'))).toBeTruthy()
+  if (source === 'file') expect(screen.getByText(en.keySaved)).toBeTruthy()
   else expect(screen.getAllByText(hint)).toHaveLength(1)
 })
 
@@ -2271,30 +2294,29 @@ it.each([
   ['google', `AIzaS${'•'.repeat(8)}wxyz`],
   ['deepseek', `sk-abcde${'•'.repeat(8)}wxyz`],
   ['acme-gateway', `vendor_abcde${'•'.repeat(8)}wxyz`],
-] as const)('protects the saved %s key and reveals only its replacement', (provider, masked) => {
+] as const)('protects the saved %s key and reveals only a new key', (provider, masked) => {
   renderPiAiEditor(provider, piAiNamespaceWith(provider, { apiKeyEnv: 'TEAM_API_KEY' }), {
     credential: { configured: true, source: 'file', writable: true, masked },
   })
+  const saved = screen.getByLabelText<HTMLInputElement>(savedRow(1))
+  expect(saved.value).toBe(masked)
+  expect(saved.readOnly).toBe(true)
+  expect(fireEvent.copy(saved)).toBe(false)
+  expect(fireEvent.cut(saved)).toBe(false)
+  expect(screen.queryByRole('button', { name: en.keyReveal })).toBeNull()
   const input = screen.getByLabelText<HTMLInputElement>(en.keyInput)
   expect(input.value).toBe('')
   expect(input.type).toBe('password')
-  expect(input.placeholder).toBe(masked)
-  expect(screen.queryByRole('button', { name: 'Clear saved key' })).toBeNull()
-  expect(screen.queryByRole('button', { name: en.keyReveal })).toBeNull()
-  expect(fireEvent.copy(input)).toBe(false)
-  expect(fireEvent.cut(input)).toBe(false)
-  fireEvent.change(input, { target: { value: 'replacement-key' } })
+  fireEvent.change(input, { target: { value: 'second-key' } })
   expect(screen.queryByText(en.keySaved)).toBeNull()
-  expect(document.getElementById(input.getAttribute('aria-describedby')!)?.textContent).toBe(en.keyReplacePending)
+  expect(document.getElementById(input.getAttribute('aria-describedby')!)?.textContent).toBe(en.keyAddPending)
+  expect(screen.getByText(en.keyPoolCount.replace('{count}', '2'))).toBeTruthy()
   fireEvent.click(screen.getByRole('button', { name: en.keyReveal }))
   expect(input.type).toBe('text')
-  expect(input.value).toBe('replacement-key')
+  expect(input.value).toBe('second-key')
   expect(fireEvent.copy(input)).toBe(true)
   expect(fireEvent.cut(input)).toBe(true)
-  fireEvent.change(input, { target: { value: '' } })
-  expect(screen.getByText(en.keyRemovePendingEnvironment.replace('{hint}', 'TEAM_API_KEY'))).toBeTruthy()
-  expect(input.placeholder).toBe(en.keyPlaceholderFallback.replace('{hint}', 'TEAM_API_KEY'))
-  expect(screen.queryByLabelText(en.keyReveal)).toBeNull()
+  expect(saved.value).toBe(masked)
 })
 
 it('hides the reveal control and masks a disabled key draft', () => {
@@ -2310,9 +2332,8 @@ it('does not invent a preview when the credential provider omits it', () => {
   renderPiAiEditor('openai', piAiNamespaceWith('openai', { apiKeyEnv: 'OPENAI_API_KEY' }), {
     credential: { configured: true, source: 'file', writable: true },
   })
-  const input = screen.getByLabelText<HTMLInputElement>(en.keyInput)
-  expect(input.value).toBe('')
-  expect(input.placeholder).toBe('')
+  expect(screen.getByLabelText<HTMLInputElement>(savedRow(1)).value).toBe('')
+  expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).value).toBe('')
   expect(screen.getByText(en.keySaved)).toBeTruthy()
   expect(screen.queryByRole('button', { name: en.keyReveal })).toBeNull()
 })
@@ -2321,20 +2342,21 @@ it.each(['Backspace', 'Delete'])('stages whole saved-key deletion with %s and ca
   const { unset } = await mountSection()
   const edit = () => screen.getByRole('button', { name: openaiCopy(en.editProvider) })
   fireEvent.click(edit())
-  let input = screen.getByLabelText<HTMLInputElement>(en.keyInput)
-  expect(input.placeholder).toBe('••••••••')
-  fireEvent.keyDown(input, { key: 'ArrowLeft' })
-  expect(input.placeholder).toBe('••••••••')
-  fireEvent.keyDown(input, { key })
-  expect(input.placeholder).toBe(en.keyPlaceholderFallback.replace('{hint}', 'OPENAI_API_KEY'))
+  let saved = screen.getByLabelText<HTMLInputElement>(savedRow(1))
+  fireEvent.keyDown(saved, { key: 'ArrowLeft' })
+  expect(screen.getByLabelText(savedRow(1))).toBe(saved)
+  fireEvent.keyDown(saved, { key })
+  expect(screen.queryByLabelText(savedRow(1))).toBeNull()
+  expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder)
+    .toBe(en.keyPlaceholderFallback.replace('{hint}', 'OPENAI_API_KEY'))
   expect(screen.getByText(en.keyRemovePendingEnvironment.replace('{hint}', 'OPENAI_API_KEY'))).toBeTruthy()
   expect(unset).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: en.cancel }))
   expect(unset).not.toHaveBeenCalled()
   fireEvent.click(edit())
-  input = screen.getByLabelText<HTMLInputElement>(en.keyInput)
-  expect(input.placeholder).toBe('••••••••')
-  fireEvent.keyDown(input, { key })
+  saved = screen.getByLabelText<HTMLInputElement>(savedRow(1))
+  expect(saved.value).toBe('••••••••')
+  fireEvent.keyDown(saved, { key })
   fireEvent.click(screen.getByRole('button', { name: en.apply }))
   await waitFor(() => { expect(unset).toHaveBeenCalledExactlyOnceWith('OPENAI_API_KEY') })
 })
@@ -2343,13 +2365,101 @@ it('keeps a saved read-only credential masked when deletion is unavailable', () 
   renderPiAiEditor('openai', piAiNamespaceWith('openai', { apiKeyEnv: 'OPENAI_API_KEY' }), {
     credential: { configured: true, source: 'file', writable: false, masked: '••••••••' },
   })
-  const input = screen.getByLabelText<HTMLInputElement>(en.keyInput)
-  fireEvent.keyDown(input, { key: 'Delete' })
-  expect(input.placeholder).toBe('••••••••')
+  fireEvent.keyDown(screen.getByLabelText(savedRow(1)), { key: 'Delete' })
+  expect(screen.getByLabelText<HTMLInputElement>(savedRow(1)).value).toBe('••••••••')
+  expect(screen.queryByRole('button', { name: en.keySavedRemove.replace('{n}', '1') })).toBeNull()
   expect(screen.queryByText(en.keyRemovePending)).toBeNull()
-  fireEvent.change(input, { target: { value: 'replacement' } })
-  fireEvent.change(input, { target: { value: '' } })
-  expect(input.placeholder).toBe('••••••••')
+  // A store this page cannot edit in place takes typed keys as a replacement.
+  fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'replacement' } })
+  expect(screen.getByText(en.keyReplacePending)).toBeTruthy()
+})
+
+/** Render the OpenAI route with several keys saved under its reference, over a scripted Host. */
+function renderSavedKeys(masks: string[], overrides: Parameters<typeof scriptedFace>[0] = {}) {
+  const scripted = scriptedFace(overrides)
+  const closed = vi.fn()
+  render(<ProviderEditor provider="openai" displayName="OpenAI"
+    namespace={piAiNamespaceWith('openai', { apiKeyEnv: 'OPENAI_API_KEY' })}
+    settingsPath={['providers', 'openai']} schema={settingsSchema} operations={operationsWith(scripted.face)}
+    t={t} readOnly={false} onClose={closed}
+    credential={{ configured: true, source: 'file', writable: true, masked: masks.join(', '),
+      ...masks.length > 1 ? { maskedEntries: masks } : {} }} />)
+  return { ...scripted, closed }
+}
+
+const SAVED_MASKS = ['sk-aaaaa••••••••1111', 'sk-bbbbb••••••••2222', 'sk-ccccc••••••••3333']
+
+it('lists every saved key, retires some and adds another in one edit', async () => {
+  const { editKeys, set, unset, closed } = renderSavedKeys(SAVED_MASKS)
+  expect(SAVED_MASKS.map((_, index) => screen.getByLabelText<HTMLInputElement>(savedRow(index + 1)).value)).toEqual(SAVED_MASKS)
+  expect(screen.getByText(en.keySavedMany.replace('{count}', '3'))).toBeTruthy()
+  expect(screen.getByText(en.keyPoolCount.replace('{count}', '3'))).toBeTruthy()
+  expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder).toBe(en.keyAddPlaceholder)
+  removeSaved(3)
+  removeSaved(1)
+  expect(screen.queryByDisplayValue(SAVED_MASKS[0]!)).toBeNull()
+  expect(screen.queryByDisplayValue(SAVED_MASKS[2]!)).toBeNull()
+  expect(screen.getByLabelText<HTMLInputElement>(savedRow(1)).value).toBe(SAVED_MASKS[1])
+  expect(screen.getByText(en.keyEditPending.replace('{removed}', '2').replace('{added}', '0'))).toBeTruthy()
+  fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'sk-new-one' } })
+  fireEvent.click(screen.getByRole('button', { name: en.keyAdd }))
+  fireEvent.change(screen.getByLabelText(en.keyRowLabel.replace('{n}', '3')), { target: { value: 'sk-new-two' } })
+  expect(screen.getByText(en.keyEditPending.replace('{removed}', '2').replace('{added}', '2'))).toBeTruthy()
+  expect(screen.getByText(en.keyPoolCount.replace('{count}', '3'))).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: en.apply }))
+  await waitFor(() => { expect(closed).toHaveBeenCalledWith(true) })
+  // Positions name the keys as the Host listed them, so it can drop them without the page ever holding a key.
+  expect(editKeys).toHaveBeenCalledExactlyOnceWith('OPENAI_API_KEY', [0, 2], 'sk-new-one,sk-new-two', 3)
+  expect(set).not.toHaveBeenCalled()
+  expect(unset).not.toHaveBeenCalled()
+})
+
+it('removes the credential with its environment fallback once every saved key is removed', async () => {
+  const { editKeys, unset, closed } = renderSavedKeys(SAVED_MASKS.slice(0, 2))
+  removeSaved(2)
+  fireEvent.keyDown(screen.getByLabelText(savedRow(1)), { key: 'Backspace' })
+  expect(screen.queryByLabelText(savedRow(1))).toBeNull()
+  expect(screen.getByText(en.keyRemovePendingEnvironment.replace('{hint}', 'OPENAI_API_KEY'))).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: en.apply }))
+  await waitFor(() => { expect(closed).toHaveBeenCalledWith(true) })
+  expect(unset).toHaveBeenCalledExactlyOnceWith('OPENAI_API_KEY')
+  expect(editKeys).not.toHaveBeenCalled()
+})
+
+it('overwrites a removed saved key with the keys typed in its place', async () => {
+  const { editKeys, set, unset, closed } = renderSavedKeys(SAVED_MASKS.slice(0, 1))
+  removeSaved(1)
+  fireEvent.change(screen.getByLabelText(en.keyInput), { target: { value: 'sk-replacement' } })
+  expect(screen.getByText(en.keyReplacePending)).toBeTruthy()
+  fireEvent.click(screen.getByRole('button', { name: en.apply }))
+  await waitFor(() => { expect(closed).toHaveBeenCalledWith(true) })
+  // The same reference is written over: it never goes without a key, and no deletion can fail first.
+  expect(set).toHaveBeenCalledExactlyOnceWith('OPENAI_API_KEY', 'sk-replacement')
+  expect(unset).not.toHaveBeenCalled()
+  expect(editKeys).not.toHaveBeenCalled()
+})
+
+it('keeps the staged key edit and shows the Host refusal', async () => {
+  const refusal = 'the keys saved for OPENAI_API_KEY changed since this page listed them; reopen the provider and edit them again'
+  const { editKeys, closed } = renderSavedKeys(SAVED_MASKS.slice(0, 2), {
+    editKeys: vi.fn(() => Promise.resolve(remoteFail(refusal))),
+  })
+  removeSaved(1)
+  fireEvent.click(screen.getByRole('button', { name: en.apply }))
+  await screen.findByText(refusal)
+  expect(editKeys).toHaveBeenCalledExactlyOnceWith('OPENAI_API_KEY', [0], '', 2)
+  expect(closed).not.toHaveBeenCalled()
+  expect(screen.queryByDisplayValue(SAVED_MASKS[0]!)).toBeNull()
+  expect(screen.getByText(en.keyEditPending.replace('{removed}', '1').replace('{added}', '0'))).toBeTruthy()
+})
+
+it('leaves saved keys alone while the key field is disabled', () => {
+  const remove = vi.fn()
+  render(<ApiKeyInput value="" t={t} disabled saved={{ entries: [{ index: 0, masked: '••••' }], remove }} />)
+  fireEvent.keyDown(screen.getByLabelText(savedRow(1)), { key: 'Delete' })
+  expect(screen.getByRole<HTMLButtonElement>('button', { name: en.keySavedRemove.replace('{n}', '1') }).disabled).toBe(true)
+  expect(remove).not.toHaveBeenCalled()
+  expect(screen.queryByRole('button', { name: en.keyAdd })).toBeNull()
 })
 
 it('keeps a hidden OAuth reference out of the saved API-key controls', () => {
@@ -2375,7 +2485,7 @@ it.each([
     settingsPath={['providers', provider]} schema={settingsSchema} operations={operationsWith(face)}
     t={t} readOnly={false} onClose={closed} {...nativeAuth === undefined ? {} : { nativeAuth }}
     credential={{ configured: true, source: 'file', writable: true, masked: '••••••••' }} />)
-  fireEvent.keyDown(screen.getByLabelText(en.keyInput), { key: 'Delete' })
+  removeSaved(1)
   const envRef = removesReference && nativeAuth !== undefined ? nativeAuth.env[0] : ref
   expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder)
     .toBe(en.keyPlaceholderFallback.replace('{hint}', envRef))
@@ -2396,7 +2506,7 @@ it('keeps the clear hint generic when native authentication has no visible envir
     nativeAuth: { env: [], oauth: false },
     credential: { configured: true, source: 'file', writable: true, masked: '••••••••' },
   })
-  fireEvent.keyDown(screen.getByLabelText(en.keyInput), { key: 'Delete' })
+  removeSaved(1)
   expect(screen.getByText(en.keyRemovePending)).toBeTruthy()
   expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder).toBe(en.keyPlaceholder)
 })
@@ -2411,7 +2521,7 @@ it.each(['cancel', 'replace'])('keeps authentication unchanged after refused del
     settingsPath={['providers', 'google']} schema={settingsSchema} operations={operationsWith(face)}
     t={t} readOnly={false} onClose={closed} nativeAuth={{ env: ['GEMINI_API_KEY'], oauth: false }}
     credential={{ configured: true, source: 'file', writable: true, masked: '••••••••' }} />)
-  fireEvent.keyDown(screen.getByLabelText(en.keyInput), { key: 'Delete' })
+  removeSaved(1)
   fireEvent.click(screen.getByRole('button', { name: en.apply }))
   await screen.findByText('credential store locked')
   expect(mutate).not.toHaveBeenCalled()
@@ -2441,7 +2551,7 @@ it.each(['retry', 'close'])('reports a completed deletion when settings fail, th
     settingsPath={['providers', 'google']} schema={settingsSchema} operations={operationsWith(face)}
     t={t} readOnly={false} onClose={closed} nativeAuth={{ env: ['GEMINI_API_KEY'], oauth: false }}
     credential={{ configured: true, source: 'file', writable: true, masked: '••••••••' }} />)
-  fireEvent.keyDown(screen.getByLabelText(en.keyInput), { key: 'Delete' })
+  removeSaved(1)
   fireEvent.click(screen.getByRole('button', { name: en.apply }))
   await screen.findByText('settings locked')
   expect(screen.getByText(en.keyRemoveApplied)).toBeTruthy()
@@ -2466,7 +2576,7 @@ it('clears the selected reference when refreshed metadata names a different cred
     t, readOnly: false, onClose: vi.fn(), credential: { configured: true, source: 'file', writable: true, masked: '••••••••' },
   }
   const view = render(<ProviderEditor {...props} />)
-  fireEvent.keyDown(screen.getByLabelText(en.keyInput), { key: 'Delete' })
+  removeSaved(1)
   view.rerender(<ProviderEditor {...props} namespace={piAiNamespaceWith('openai', { apiKeyEnv: 'NEW_KEY' })} />)
   fireEvent.click(screen.getByRole('button', { name: en.apply }))
   await waitFor(() => { expect(unset).toHaveBeenCalledExactlyOnceWith('OLD_KEY') })
@@ -2479,7 +2589,7 @@ it('clears the detected native key instead of an unused derived reference', asyn
     settingsPath={['providers', 'google']} schema={settingsSchema} operations={operationsWith(face)}
     t={t} readOnly={false} onClose={vi.fn()} nativeAuth={{ env: ['GEMINI_API_KEY'], oauth: false }}
     credentialChecks={{ GEMINI_API_KEY: { configured: true, source: 'file', writable: true, masked: '••••••••' } }} />)
-  fireEvent.keyDown(screen.getByLabelText(en.keyInput), { key: 'Delete' })
+  removeSaved(1)
   fireEvent.click(screen.getByRole('button', { name: en.apply }))
   await waitFor(() => { expect(unset).toHaveBeenCalledExactlyOnceWith('GEMINI_API_KEY') })
   expect(mutate).not.toHaveBeenCalled()
@@ -2499,7 +2609,7 @@ it('refreshes a blank editor from saved credentials to environment detection wit
   const { face, controller } = await mountSection()
   const reads = face.credentials.describe.mock.calls.length
   fireEvent.click(screen.getByRole('button', { name: openaiCopy(en.editProvider) }))
-  expect(screen.getByLabelText<HTMLInputElement>(en.keyInput).placeholder).toBe('••••••••')
+  expect(screen.getByLabelText<HTMLInputElement>(savedRow(1)).value).toBe('••••••••')
   expect(screen.queryByText(/^API key source:/)).toBeNull()
   expect(screen.queryByText(/Env var detected/)).toBeNull()
   expect(face.credentials.describe).toHaveBeenCalledTimes(reads)

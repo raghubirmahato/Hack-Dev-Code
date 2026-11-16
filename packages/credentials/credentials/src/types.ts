@@ -72,6 +72,11 @@ export interface CredentialInfo {
   writable: boolean
   /** Provider-generated masked preview of a stored value; never the full value. */
   masked?: string
+  /**
+   * One masked preview per entry when the stored value holds several (keys rotated for one platform), in stored
+   * order; absent for a single entry, where {@link masked} is the whole preview.
+   */
+  maskedEntries?: string[]
 }
 
 declare module '@hackdevcode/cordis' {
