@@ -13,6 +13,7 @@
   -webkit-user-select: none;
   user-select: none;
   color: var(--dsw-alias-label-primary);
+  transition: background-color var(--ds-transition-duration-fast) ease, box-shadow var(--ds-transition-duration) var(--ds-ease-out);
 }
 
 @media (hover: hover) {
@@ -22,7 +23,8 @@
 }
 
 .sessionRow.selected {
-  background-color: var(--dsw-alias-interactive-bg-hover);
+  background-color: var(--dsw-alias-accent-soft);
+  box-shadow: inset 3px 0 0 var(--dsw-alias-brand-primary);
 }
 
 .dragPreview {
@@ -54,7 +56,7 @@
 }
 
 .searchResultRow.selected {
-  background-color: var(--dsw-alias-interactive-bg-hover);
+  background-color: var(--dsw-alias-accent-soft);
 }
 
 .searchResultHeading {

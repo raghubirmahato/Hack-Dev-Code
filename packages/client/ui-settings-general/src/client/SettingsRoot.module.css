@@ -108,6 +108,8 @@
   overflow: hidden;
   background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dsw-elevation-prominent);
+  /* The window rises and settles into place when it opens. */
+  animation: settings-rise var(--ds-transition-duration-slow) var(--ds-ease-spring);
   /* Elevated surface: the scrollbar thumb takes the l2 elevation tokens.
      Declared on the panel rather than the scrolling `.options` child so the
      elevation choice sits with the surface; the custom properties inherit
@@ -121,6 +123,17 @@
   outline: none;
 }
 
+@keyframes settings-rise {
+  from { opacity: 0; transform: translateY(18px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    animation: none;
+  }
+}
+
 /* Nav rail (figma .Setting-nav 501:29958): the 188px track's cells, pad
    (12,0), no own fill — the panel white shows through. */
 .nav {
@@ -129,8 +142,10 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 10px 12px 0;
+  padding: 10px 12px 12px;
   box-sizing: border-box;
+  background: var(--dsw-specific-sidebar-fill);
+  box-shadow: inset -0.5px 0 0 var(--dsw-alias-border-l2);
 }
 
 /* Title row (figma 501:29959): 16/500 lh24, at the rail's 24px text inset.
@@ -138,11 +153,14 @@
    10px before the first cell. */
 .navTitle {
   grid-area: title;
-  padding: 22px 12px 8px 24px;
-  font-size: 16px;
-  line-height: 24px;
+  padding: 20px 12px 8px 22px;
+  font-size: 20px;
+  line-height: 26px;
   font-weight: 500;
+  letter-spacing: -0.01em;
   color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-sidebar-fill);
+  box-shadow: inset -0.5px 0 0 var(--dsw-alias-border-l2);
 }
 
 /* Cell stack (figma 501:29961): gap 4. */
@@ -164,25 +182,47 @@
   padding: 9px 16px 9px 12px;
   box-sizing: border-box;
   border: none;
-  border-radius: var(--dsw-radius-md);
+  border-radius: 999px;
+  corner-shape: round;
   background: transparent;
   cursor: pointer;
   font-family: inherit;
   font-size: 14px;
   line-height: 22px;
   font-weight: 400;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-label-secondary);
   text-align: left;
+  transition:
+    background-color var(--ds-transition-duration-fast) ease,
+    color var(--ds-transition-duration-fast) ease,
+    transform var(--ds-transition-duration) var(--ds-ease-spring);
 }
 
 @media (hover: hover) {
   .navCell:hover {
     background-color: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-primary);
   }
 }
 
+.navCell:active {
+  transform: scale(0.97);
+}
+
 .navCell.active {
-  background: var(--dsw-specific-sidebar-nav-item-active);
+  background: var(--dsw-alias-accent-soft);
+  color: var(--dsw-alias-brand-primary);
+  font-weight: 500;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navCell {
+    transition: none;
+  }
+
+  .navCell:active {
+    transform: none;
+  }
 }
 
 .navIcon {
@@ -225,19 +265,28 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: none;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: 999px;
+  corner-shape: round;
   background: transparent;
   cursor: pointer;
   color: var(--dsw-alias-label-primary);
+  transition: background-color var(--ds-transition-duration-fast) ease, transform var(--ds-transition-duration-slow) var(--ds-ease-spring);
 }
 
 @media (hover: hover) {
   .close:hover {
     background-color: var(--dsw-alias-interactive-bg-hover);
+    transform: rotate(90deg);
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .close:hover {
+    transform: none;
   }
 }
 
@@ -246,7 +295,7 @@
   grid-area: options;
   min-width: 0;
   min-height: 0;
-  padding: 0 24px 24px;
+  padding: 4px 28px 28px;
   overflow-y: auto;
 }
 

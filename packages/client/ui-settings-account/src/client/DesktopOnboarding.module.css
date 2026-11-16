@@ -144,7 +144,6 @@
 
 .card {
   -webkit-app-region: no-drag;
-  --card-border-stops: var(--dsw-gradient-onboarding-blue-stops);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -175,11 +174,9 @@
   transition: opacity 120ms ease, border-color 120ms ease;
 }
 .card::before { border: 0.5px solid var(--dsw-alias-border-l2); }
+/* The selection ring is one solid accent stroke (no color sweep). */
 .card::after {
-  padding: 2px;
-  background: conic-gradient(from var(--dsh-onboarding-border-angle), var(--card-border-stops));
-  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
-  mask-composite: exclude;
+  border: 2px solid var(--dsw-alias-brand-primary);
   opacity: 0;
 }
 @media (hover: hover) {
@@ -192,20 +189,6 @@
 
 @media (hover: hover) {
   .selected:hover::after { opacity: 1; }
-}
-.selected::after { animation: borderSweep 14s linear infinite; }
-.officeCard, .card[data-process='compact'] { --card-border-stops: var(--dsw-gradient-onboarding-violet-stops); }
-.card[data-process='detailed'] { --card-border-stops: var(--dsw-gradient-onboarding-cyan-stops); }
-
-@property --dsh-onboarding-border-angle {
-  syntax: '<angle>';
-  inherits: false;
-  initial-value: 90deg;
-}
-
-@keyframes borderSweep {
-  from { --dsh-onboarding-border-angle: 90deg; }
-  to { --dsh-onboarding-border-angle: 450deg; }
 }
 .card:focus-visible, html:not([data-input-modality='pointer']) .card:has(:focus-visible) { outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)); outline-offset: 5px; }
 .card[aria-disabled='true'] { cursor: wait; }

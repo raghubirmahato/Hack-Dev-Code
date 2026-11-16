@@ -11,18 +11,6 @@
   padding: 0 24px;
 }
 
-/* Cap matches the InputBar card. Glow may paint past the sides. */
-.stack {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  /* figma 75:8208: 12 between title block / workspace / card. */
-  gap: 12px;
-  width: 100%;
-  max-width: var(--dsh-composer-card-max-width);
-  overflow: visible;
-}
-
 /* figma 34:10411: fish + title, gap 10, centered; 26/32 wt500. The preview
    badge is a product addition outside that source: a mono superscript pill
    riding the title's top-right. */
@@ -39,20 +27,20 @@
   align-items: center;
   justify-content: center;
   font-family: var(--dsw-font-family-brand);
-  font-size: 30px;
-  line-height: 38px;
+  font-size: 34px;
+  line-height: 42px;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--dsw-alias-label-primary);
 }
 
 /* One-sentence promise under the headline. */
 .subtitle {
-  margin: 14px auto 0;
+  margin: 18px auto 4px;
   max-width: 56ch;
   color: var(--dsw-alias-label-secondary);
-  font-size: 14.5px;
-  line-height: 22px;
+  font-size: 15px;
+  line-height: 23px;
   text-align: center;
 }
 
@@ -72,16 +60,30 @@
   position: relative;
 }
 
-/* A short vermilion rule under the headline: the product's one decorative accent. */
+/* A short accent rule under the headline that draws itself in. */
 .titleGroup::after {
   content: '';
   position: absolute;
   left: 0;
-  bottom: -9px;
-  width: 36px;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--dsw-alias-state-business-primary);
+  bottom: -10px;
+  width: 48px;
+  height: 4px;
+  border-radius: 999px;
+  corner-shape: round;
+  background: var(--dsw-alias-brand-primary);
+  transform-origin: left center;
+  animation: hero-rule 600ms var(--ds-ease-out) 200ms both;
+}
+
+@keyframes hero-rule {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .titleGroup::after {
+    animation: none;
+  }
 }
 
 /* Keep hover detection on a stationary box while the mark moves within it;
@@ -100,7 +102,7 @@
   display: block;
   overflow: visible;
   transform-origin: 50% 60%;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-brand-primary);
 }
 
 /* Hover swim: a slow continuous sway about the body center — the head
@@ -164,9 +166,11 @@
   gap: 4px;
   max-width: min(100%, 360px);
   min-height: 28px;
-  padding: 0 8px;
+  padding: 0 10px;
   border: none;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: 999px;
+  corner-shape: round;
+  transition: background-color var(--ds-transition-duration-fast) ease;
   background: transparent;
   color: var(--dsw-alias-label-primary);
   font-size: 13px;

@@ -1,6 +1,7 @@
 // Mission-control additions to the new-session screen: the pipeline a mission
 // runs through, and templates that start a draft in the composer.
 
+import type { CSSProperties } from 'react'
 import type { ConversationContentProps } from '../contract/slots.ts'
 import css from './MissionHome.module.css'
 
@@ -20,11 +21,13 @@ export function MissionTemplates({ t, onPick }: { t: MissionTranslate; onPick: (
     <section className={css.templates} aria-label={t('mission.templates.title')} data-testid="mission-templates">
       <h2 className={css.templatesTitle}>{t('mission.templates.title')}</h2>
       <div className={css.grid}>
-        {TEMPLATES.map(template => (
+        {TEMPLATES.map((template, index) => (
           <button
             key={template}
             type="button"
             className={css.card}
+            // The stagger position for the tiles' entrance.
+            style={{ '--dsh-card-index': index } as CSSProperties}
             onClick={() => { onPick(t(`mission.template.${template}.prompt`)) }}
           >
             <span className={css.cardTitle}>{t(`mission.template.${template}.title`)}</span>

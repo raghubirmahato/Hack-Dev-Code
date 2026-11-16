@@ -22,13 +22,20 @@ describe('Button styles', () => {
 
   it('limits the inset stroke to outlined buttons', () => {
     for (const selector of ['button', 'primary', 'ghost:hover:not(:disabled)', 'toolbar']) {
-      expect(declarations(selector)).not.toContain('box-shadow')
+      expect(declarations(selector)).not.toMatch(/box-shadow:[^;]*inset/)
     }
     expect(declarations('outline:hover:not(:disabled)')).not.toContain('box-shadow')
   })
 
   it('keeps the shared medium and small control heights', () => {
-    expect(declarations('md')).toContain('height: 36px;')
-    expect(declarations('sm')).toContain('height: 28px;')
+    expect(declarations('md')).toContain('height: 38px;')
+    expect(declarations('sm')).toContain('height: 30px;')
+  })
+
+  it('draws buttons as pills with a spring press', () => {
+    expect(declarations('button')).toContain('border-radius: 999px;')
+    expect(declarations('button')).toContain('corner-shape: round;')
+    expect(declarations('button')).toContain('var(--ds-ease-spring)')
+    expect(declarations('button:active:not(:disabled)')).toContain('transform: scale(0.96);')
   })
 })

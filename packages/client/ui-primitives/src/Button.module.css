@@ -1,18 +1,29 @@
-/* Button sizes share the global control-radius scale. */
+/* Buttons are pills: a capsule shape, a spring press and a small lift on hover. */
 .button {
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   border: none;
-  border-radius: var(--dsw-radius-md);
+  border-radius: 999px;
+  corner-shape: round;
   cursor: pointer;
   font-size: 14px;
   line-height: 22px;
+  font-weight: 500;
   color: var(--dsw-alias-label-primary);
   background: transparent;
-  padding: 0 14px;
+  padding: 0 18px;
+  transition:
+    background-color var(--ds-transition-duration-fast) ease,
+    color var(--ds-transition-duration-fast) ease,
+    box-shadow var(--ds-transition-duration) ease,
+    transform var(--ds-transition-duration) var(--ds-ease-spring);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .button:disabled {
@@ -21,30 +32,48 @@
 }
 
 .md {
-  height: 36px;
+  height: 38px;
 }
 
 /* Compact controls retain their dimensions across filled and outlined variants. */
 .sm {
-  height: 28px;
+  height: 30px;
   font-size: 12px;
   line-height: 18px;
-  padding: 0 10px;
-  border-radius: var(--dsw-radius-sm);
+  padding: 0 12px;
 }
 
 .primary {
   background: var(--dsw-alias-button-primary-fill);
   color: var(--dsw-alias-label-primary-foreground);
+  box-shadow: 0 4px 12px -6px var(--dsw-alias-accent-shadow);
 }
 
 @media (hover: hover) {
   .primary:hover:not(:disabled) {
     background: var(--dsw-alias-button-primary-hover);
+    box-shadow: 0 8px 18px -8px var(--dsw-alias-accent-shadow);
+    transform: translateY(-1px);
   }
 
   .ghost:hover:not(:disabled) {
     background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: background-color var(--ds-transition-duration-fast) ease, color var(--ds-transition-duration-fast) ease;
+  }
+
+  .button:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@media (hover: hover) and (prefers-reduced-motion: reduce) {
+  .primary:hover:not(:disabled) {
+    transform: none;
   }
 }
 
@@ -61,7 +90,9 @@
 
 @media (hover: hover) {
   .outline:hover:not(:disabled) {
-    background: var(--dsw-alias-interactive-bg-hover);
+    --dsh-button-outline-color: var(--dsw-alias-brand-primary);
+    background: var(--dsw-alias-accent-soft);
+    color: var(--dsw-alias-brand-primary);
   }
 }
 

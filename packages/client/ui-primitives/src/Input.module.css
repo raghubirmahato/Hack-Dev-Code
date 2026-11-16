@@ -1,16 +1,24 @@
 .wrap {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 8px;
+  gap: 8px;
+  height: 38px;
+  padding: 0 12px;
   border: 0.5px solid var(--dsw-alias-border-l4);
   border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-1);
+  transition: border-color var(--ds-transition-duration-fast) ease, box-shadow var(--ds-transition-duration) ease;
+}
+
+@media (hover: hover) {
+  .wrap:hover {
+    border-color: var(--dsw-alias-label-caption);
+  }
 }
 
 .wrap:focus-within {
   border-color: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary)) 22%, transparent);
 }
 
 .icon {

@@ -10,6 +10,7 @@ import type {
   BootManifest, ClientModuleCreateOptions, ClientModuleSystem, DshWindow,
 } from '@hackdevcode/dsh-client-modules/client'
 import { bootClient } from './boot-client.ts'
+import { BootIntro } from './boot-intro.ts'
 import { BootPage } from './boot-page.ts'
 import { mountClient } from './mount.ts'
 import { getStaticModules } from './seed.ts'
@@ -24,6 +25,8 @@ export class AppWebEntry {
   private readonly container: HTMLElement
   private readonly seams: BootSeams | undefined
   private readonly page: BootPage
+  /** The launch intro over the window; the boot never waits for it. */
+  private readonly intro: BootIntro
   private ctx: Context | undefined
   private stopDragRecall: (() => void) | undefined
   private modules: ClientModuleSystem | undefined
@@ -38,6 +41,7 @@ export class AppWebEntry {
     this.container = container
     this.seams = seams
     this.page = new BootPage(container)
+    this.intro = new BootIntro(container.ownerDocument.body)
   }
 
   /**
@@ -102,6 +106,8 @@ export class AppWebEntry {
       await mountClient(ctx, this.container)
     } catch (reason) {
       console.error(reason)
+      // A failure report must not sit behind the intro.
+      this.intro.finish()
       if (onFailure !== undefined) onFailure(reason)
       else this.page.fail(reason instanceof Error ? reason.message : String(reason))
     }
@@ -119,6 +125,7 @@ export class AppWebEntry {
       try {
         await this.modules?.dispose()
       } finally {
+        this.intro.dispose()
         this.page.dispose()
       }
     }

@@ -10,8 +10,8 @@
 
 .checkbox input {
   flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   margin: 0;
   accent-color: var(--dsw-alias-brand-primary);
   cursor: inherit;

@@ -180,16 +180,17 @@
   align-items: center;
   gap: 6px;
   width: 100%;
-  min-height: 34px;
-  padding: 6px 8px;
+  min-height: 36px;
+  padding: 6px 10px;
   border: none;
-  border-radius: var(--dsw-radius-md);
+  border-radius: var(--dsw-radius-sm);
   background: transparent;
   cursor: pointer;
   font-size: 13px;
   line-height: 20px;
   color: var(--dsw-alias-label-primary);
   text-align: left;
+  transition: background-color var(--ds-transition-duration-fast) ease;
 }
 
 @media (hover: hover) {

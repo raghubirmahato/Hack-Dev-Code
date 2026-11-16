@@ -44,12 +44,17 @@
   border-radius: var(--dsw-radius-panel);
   background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dsw-elevation-prominent);
-  animation: modalEnter var(--ds-transition-duration) var(--ds-ease-in-out);
+  animation: modalRise var(--ds-transition-duration-slow) var(--ds-ease-spring);
 }
 
 @keyframes modalEnter {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+@keyframes modalRise {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+  to { opacity: 1; transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -66,33 +66,36 @@ function expectConsumerColors(source: string, palette: Map<string, string>): voi
 }
 
 const lightColors = {
-  background: [249, 248, 246],
-  backing: [215, 212, 206],
-  detail: [215, 212, 206],
-  inset: [243, 241, 238],
-  shadow: [243, 241, 238],
-  surface: [243, 241, 238],
+  background: [248, 247, 254],
+  backing: [207, 202, 230],
+  detail: [207, 202, 230],
+  inset: [241, 238, 251],
+  shadow: [241, 238, 251],
+  surface: [241, 238, 251],
 }
 
-it('keeps the light artwork colors on the warm palette, including surface-colored insets and shadows', () => {
+it('keeps the light artwork colors on the ink palette, including surface-colored insets and shadows', () => {
   expect(illustrationColors(definitions(false))).toEqual(lightColors)
 })
 
-it.each([false, true])('defines the approved light static steps in the dark=%s palette', (dark) => {
+it.each([
+  [false, [248, 247, 254], [241, 238, 251], [207, 202, 230]],
+  [true, [247, 247, 247], [240, 240, 240], [200, 200, 200]],
+])('defines the approved light static steps in the dark=%s palette', (dark, step55, step90, step310) => {
   const palette = definitions(dark)
-  expect(resolveColor(palette, '--dsw-static-neutral-warm-55')).toEqual([249, 248, 246])
-  expect(resolveColor(palette, '--dsw-static-neutral-warm-90')).toEqual([243, 241, 238])
-  expect(resolveColor(palette, '--dsw-static-neutral-warm-310')).toEqual([215, 212, 206])
+  expect(resolveColor(palette, '--dsw-static-neutral-warm-55')).toEqual(step55)
+  expect(resolveColor(palette, '--dsw-static-neutral-warm-90')).toEqual(step90)
+  expect(resolveColor(palette, '--dsw-static-neutral-warm-310')).toEqual(step310)
 })
 
 it('resolves the dark artwork colors through the actual static palette', () => {
   expect(illustrationColors(definitions(true))).toEqual({
-    background: [48, 46, 42],
-    backing: [75, 72, 66],
-    detail: [145, 137, 124],
-    inset: [75, 72, 66],
-    shadow: [75, 72, 66],
-    surface: [109, 104, 95],
+    background: [34, 34, 34],
+    backing: [58, 58, 58],
+    detail: [115, 115, 115],
+    inset: [58, 58, 58],
+    shadow: [58, 58, 58],
+    surface: [87, 87, 87],
   })
 })
 

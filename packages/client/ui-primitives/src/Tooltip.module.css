@@ -22,7 +22,7 @@
   /* Unbreakable tokens (URLs, paths) must not push past max-width. */
   overflow-wrap: break-word;
   pointer-events: none;
-  animation: tooltip-in 150ms var(--ds-ease-in-out);
+  animation: tooltip-in 180ms var(--ds-ease-out);
 }
 
 .bubble[data-portal] { z-index: 1100; }
@@ -58,7 +58,7 @@
 }
 
 @keyframes tooltip-in {
-  from { opacity: 0; }
+  from { opacity: 0; scale: 0.94; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -6,14 +6,15 @@
   box-sizing: border-box;
   position: relative;
   flex: 0 0 auto;
-  width: 36px;
-  height: 20px;
-  padding: 2px;
+  width: 42px;
+  height: 24px;
+  padding: 3px;
   border: 0;
   border-radius: 999px;
   corner-shape: round;
   background: var(--dsw-alias-border-l3);
   cursor: pointer;
+  transition: background-color var(--ds-transition-duration) ease;
 }
 
 .switch[aria-checked='true'] {
@@ -32,12 +33,18 @@
 
 .thumb {
   display: block;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
   corner-shape: round;
   background: var(--dsw-alias-label-primary-foreground);
-  transition: transform 120ms ease;
+  box-shadow: 0 1px 3px rgba(17, 12, 46, 0.25);
+  transition: transform var(--ds-transition-duration-slow) var(--ds-ease-spring), width var(--ds-transition-duration) ease;
+}
+
+/* Pressing stretches the thumb toward where it is going. */
+.switch:active:not(:disabled) .thumb {
+  width: 22px;
 }
 
 .switch[aria-checked='false'] .thumb {
@@ -45,5 +52,16 @@
 }
 
 .switch[aria-checked='true'] .thumb {
-  transform: translateX(16px);
+  transform: translateX(18px);
+}
+
+.switch[aria-checked='true']:active:not(:disabled) .thumb {
+  transform: translateX(14px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .thumb {
+    transition: none;
+  }
 }

@@ -22,7 +22,8 @@
   width: max-content;
   max-width: min(640px, calc(100vw - 48px));
   padding: 12px 16px;
-  border-radius: var(--dsw-radius-lg);
+  border-radius: 999px;
+  corner-shape: round;
   /* The design platform's toast surface is dark in BOTH themes (bluish-800
      light / bluish-750 dark), so the label and the action text below stay
      fixed instead of flipping with the theme. */
@@ -33,7 +34,7 @@
   box-shadow: var(--dsw-shadow-lv3);
   transform: translateX(-50%);
   animation:
-    dsh-toast-in 160ms ease-out,
+    dsh-toast-in 320ms var(--ds-ease-spring),
     dsh-toast-fade 1000ms ease var(--dsh-toast-hold, 3000ms) forwards;
 }
 
@@ -77,7 +78,7 @@
 @keyframes dsh-toast-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -6px);
+    transform: translate(-50%, -14px) scale(0.94);
   }
 
   to {

@@ -132,8 +132,11 @@ describe('WorkspaceBrowser.module.css list', () => {
     expect(rowDeclarations('.sessionRow .title')?.get('margin')).toBe('0 6px 0 var(--dsh-sidebar-label-gap)')
     expect(rowDeclarations('.searchResultRow')?.get('min-height')).toBe('48px')
     expect(rowDeclarations('.searchResultTitle')?.get('margin')).toBe('0 var(--dsh-sidebar-label-gap)')
+    // The selected session is tinted with the accent and carries an accent bar on its leading edge.
     expect(rowDeclarations('.sessionRow.selected')?.get('background-color'))
-      .toBe('var(--dsw-alias-interactive-bg-hover)')
+      .toBe('var(--dsw-alias-accent-soft)')
+    expect(rowDeclarations('.sessionRow.selected')?.get('box-shadow'))
+      .toBe('inset 3px 0 0 var(--dsw-alias-brand-primary)')
   })
 
   it('shares action spacing and inset backgrounds without moving the title column', () => {

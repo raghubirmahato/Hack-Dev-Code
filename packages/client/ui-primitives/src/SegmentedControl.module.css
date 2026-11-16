@@ -15,7 +15,8 @@
   grid-auto-columns: 1fr;
   gap: 2px;
   padding: 4px;
-  border-radius: var(--dsw-radius-md);
+  border-radius: 999px;
+  corner-shape: round;
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
@@ -26,11 +27,12 @@
   width: calc((100% - 8px - 2px * (var(--dsh-segment-count) - 1)) / var(--dsh-segment-count));
   height: calc(100% - 8px);
   border: 0;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: 999px;
+  corner-shape: round;
   background: var(--dsw-alias-bg-layer-1);
   box-shadow: var(--dsw-elevation-soft);
   transform: translateX(calc(var(--dsh-segment-index) * (100% + 2px)));
-  transition: transform 160ms ease;
+  transition: transform var(--ds-transition-duration-slow) var(--ds-ease-spring);
   pointer-events: none;
 }
 
@@ -38,10 +40,11 @@
   box-sizing: border-box;
   position: relative;
   z-index: 1;
-  height: 28px;
+  height: 30px;
   padding: 0 16px;
   border: 0;
-  border-radius: var(--dsw-radius-sm);
+  border-radius: 999px;
+  corner-shape: round;
   background: transparent;
   color: var(--dsw-alias-label-secondary);
   font: inherit;
